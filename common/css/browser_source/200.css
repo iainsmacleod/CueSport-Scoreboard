@@ -7,7 +7,7 @@
 				-moz-transform: scale(2.00, 2.00);
                 zoom: 2.00;
                 zoom: 200%;
-                font-family:tahoma;
+                font-family:roboto;
             }
 			
             #scoreBoardDiv {
@@ -21,7 +21,7 @@
     
             td {
                 border:2px solid black;
-                border-radius:10px;
+                border-radius:0px;
                 vertical-align: middle;
 
             }
@@ -60,13 +60,15 @@
 
             }
             #player1Name {
-                 background-image: linear-gradient(to left, white , steelblue);
+                 background-image: linear-gradient(to left, rgba(0,212,255, 100) , steelblue);
 				 text-shadow: -1px 0 white, 0 1px white, 1px 0 white, 0 -1px white;
+                 box-shadow: 0 8px 16px 0 rgba(0,0,0,0.3), 0 6px 20px 0 rgba(0,0,0,0.3);
 
             }
             #player2Name {
-                 background-image: linear-gradient(to right, white , steelblue);
+                 background-image: linear-gradient(to right, rgba(0,212,255, 100) , steelblue);
 				 text-shadow: -1px 0 white, 0 1px white, 1px 0 white, 0 -1px white;
+                 box-shadow: 0 8px 16px 0 rgba(0,0,0,0.3), 0 6px 20px 0 rgba(0,0,0,0.3);
 
             }            
             #p1ExtIcon{
@@ -213,6 +215,8 @@
 			}
 			#player1Name, #player2Name {
 				font-size: 15pt;
+                color: white;
+                text-shadow: 1px 1px 2px black, 0 0 25px blue, 0 0 5px darkblue;
 			}	
 			.startTimer {
 				width: 0px;
