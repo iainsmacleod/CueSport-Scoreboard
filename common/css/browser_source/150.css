@@ -42,6 +42,8 @@
                 font-weight:bold;
                 vertical-align: middle;
                 text-shadow: -1px 0 white, 0 1px white, 1px 0 white, 0 -1px white;
+                box-shadow: 0 8px 16px 0 rgba(0,0,0,0.3), 0 6px 20px 0 rgba(0,0,0,0.3);
+
                 }
 				
            .noShow{
@@ -63,11 +65,13 @@
             #player1Name {
                  background-image: linear-gradient(to left, white , steelblue);
 				 text-shadow: -1px 0 white, 0 1px white, 1px 0 white, 0 -1px white;
+                 box-shadow: 0 8px 16px 0 rgba(0,0,0,0.3), 0 6px 20px 0 rgba(0,0,0,0.3);
 
             }
             #player2Name {
                  background-image: linear-gradient(to right, white , steelblue);
 				 text-shadow: -1px 0 white, 0 1px white, 1px 0 white, 0 -1px white;
+                 box-shadow: 0 8px 16px 0 rgba(0,0,0,0.3), 0 6px 20px 0 rgba(0,0,0,0.3);
 
             }            
             #p1ExtIcon{

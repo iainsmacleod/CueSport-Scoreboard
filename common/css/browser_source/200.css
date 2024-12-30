@@ -32,16 +32,17 @@
             }
 			
             #player1Score, #player2Score{
-                text-shadow: -1px 0 white, 0 1px white, 1px 0 white, 0 -1px white;
                 text-align:center;
                 width:9%;
                 padding-right:1px;
                 padding-left:1px;
-                background: rgba(255,255,255,1);;
+                background: #ed4e54;
                 font-size:15pt;
                 font-weight:bold;
                 vertical-align: middle;
-                text-shadow: -1px 0 white, 0 1px white, 1px 0 white, 0 -1px white;
+                color: white;
+                text-shadow: 1px 1px 2px black, 0 0 25px black, 0 0 5px black;
+                box-shadow: 0 8px 16px 0 rgba(0,0,0,0.3), 0 6px 20px 0 rgba(0,0,0,0.3);
                 }
 				
            .noShow{
@@ -57,41 +58,43 @@
             }
             #player1Name, #player2Name {
                 width:250px;
+                text-shadow: 1px 1px 2px black, 0 0 25px black, 0 0 5px black;
 
             }
             #player1Name {
-                 background-image: linear-gradient(to left, rgba(0,212,255, 100) , steelblue);
-				 text-shadow: -1px 0 white, 0 1px white, 1px 0 white, 0 -1px white;
+                 background-image: linear-gradient(to left, white , steelblue);
                  box-shadow: 0 8px 16px 0 rgba(0,0,0,0.3), 0 6px 20px 0 rgba(0,0,0,0.3);
 
             }
             #player2Name {
-                 background-image: linear-gradient(to right, rgba(0,212,255, 100) , steelblue);
-				 text-shadow: -1px 0 white, 0 1px white, 1px 0 white, 0 -1px white;
+                 background-image: linear-gradient(to right, white , steelblue);
                  box-shadow: 0 8px 16px 0 rgba(0,0,0,0.3), 0 6px 20px 0 rgba(0,0,0,0.3);
 
             }            
             #p1ExtIcon{
                 position:absolute;
-                left:29.0px;
-                top:32.75px;
+                left:2.0px;
+                top:31.0px;
                 background:green;
-                border: solid 1px #000;
-                border-radius:9px 0px 0px 9px;
+                border: solid 2px #000;
+                border-radius:0px;
                 color:#fff;
-                font-size:8.75pt;
-                padding:5.55px;
+                font-size:9.5pt;
+                padding:5.5px;
+                text-shadow: 1px 1px 2px black, 0 0 25px black, 0 0 5px black;
+
             }
             #p2ExtIcon {
                 position:absolute;
-                right:29.0px;
-                top:32.75px;
+                right:2.0px;
+                top:31.0px;
                 background:green;
-                border: solid 1px #000;
-                border-radius:0px 9px 9px 0px;
+                border: solid 2px #000;
+                border-radius:0px;
                 color:#fff;
-                font-size:8.75pt;
-                padding:5.55px;
+                font-size:9.5pt;
+                padding:5.5px;
+                text-shadow: 1px 1px 2px black, 0 0 25px black, 0 0 5px black;
                 
             }
                        
@@ -216,7 +219,6 @@
 			#player1Name, #player2Name {
 				font-size: 15pt;
                 color: white;
-                text-shadow: 1px 1px 2px black, 0 0 25px blue, 0 0 5px darkblue;
 			}	
 			.startTimer {
 				width: 0px;

@@ -98,15 +98,18 @@ if (localStorage.getItem("useSalotto") != "yes" && localStorage.getItem("useCloc
 if (localStorage.getItem('p1colorSet') !== null) {
 	var cvalue = localStorage.getItem('p1colorSet');
 	document.getElementById('p1colorDiv').style.background = localStorage.getItem('p1colorSet');
+	document.getElementById('p1Name').style.background = `linear-gradient(to right, ${localStorage.getItem('p1colorSet')}, white)`;
 	document.getElementsByTagName("select")[0].options[0].value = cvalue;
-	if (cvalue == "orange" || cvalue == "khaki" || cvalue == "tomato" || cvalue == "red" || cvalue == "white" || cvalue == "orangered" || cvalue == "orange" || cvalue == "lightgreen" || cvalue == "lightseagreen") { document.getElementById("p1colorDiv").style.color = "#000"; } else { document.getElementById("p1colorDiv").style.color = "lightgrey"; };
+	if (cvalue == "cadetblue" || cvalue == "steelblue" || cvalue == "grey" ||cvalue == "lightgrey" || cvalue == "green" || cvalue == "khaki" || cvalue == "tomato" || cvalue == "red" || cvalue == "white" || cvalue == "orangered" || cvalue == "orange" || cvalue == "lightgreen" || cvalue == "lightseagreen") { document.getElementById("p1colorDiv").style.color = "#000"; } else { document.getElementById("p1colorDiv").style.color = "lightgrey"; };
 
 }
 
 if (localStorage.getItem('p2colorSet') !== null) {
 	var cvalue = localStorage.getItem('p2colorSet');
 	document.getElementById('p2colorDiv').style.background = localStorage.getItem('p2colorSet');
-	if (cvalue == "orange" || cvalue == "khaki" || cvalue == "tomato" || cvalue == "red" || cvalue == "orangered" || cvalue == "white" || cvalue == "orange" || cvalue == "lightgreen" || cvalue == "lightseagreen") { document.getElementById("p2colorDiv").style.color = "#000"; } else { document.getElementById("p2colorDiv").style.color = "lightgrey"; };
+	document.getElementById('p1Name').style.background = `linear-gradient(to left, ${localStorage.getItem('p2colorSet')}, white)`;
+	document.getElementById('p2Name').style.background = localStorage.getItem('p2colorSet');
+	if (cvalue == "cadetblue" || cvalue == "steelblue" || cvalue == "grey" || cvalue == "lightgrey" || cvalue == "green" || cvalue == "khaki" || cvalue == "tomato" || cvalue == "red" || cvalue == "orangered" || cvalue == "white" || cvalue == "orange" || cvalue == "lightgreen" || cvalue == "lightseagreen") { document.getElementById("p2colorDiv").style.color = "#000"; } else { document.getElementById("p2colorDiv").style.color = "lightgrey"; };
 
 }
 

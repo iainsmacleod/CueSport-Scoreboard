@@ -20,7 +20,7 @@ for more information about Salotto please visit https://salotto.app
 	<link rel="stylesheet" href="./common/css/control_panel/required.css" />
 	<script>
 	//---------------------------------------------------------------------------------------------
-		var versionNum = "1.6.1";
+		var versionNum = "1.6.2";
  	 //---------------------------------------------------------------------------------------------
 	</script>
 	<script src="./common/js/jquery.js"></script>
@@ -32,64 +32,69 @@ for more information about Salotto please visit https://salotto.app
 <body>
 	<div id="mainDiv">
 		<center>
-			<div id="topPlayerGameInfo" class="obs28">
-				<p style="font-size:1px">&nbsp;</p>
-				Player/Team 1 Name:&nbsp;<input style="font-size:8pt; width: 120px; background:lightgrey" type="text"
-					id="p1Name" placeholder="Player 1"><br>
-				<p style="font-size:1px">&nbsp;</p>
-				Player/Team 2 Name:&nbsp;<input style="font-size:8pt; width: 120px; background:lightgrey" type="text"
-					id="p2Name" placeholder="Player 2"><br>
-				<p style="font-size:1px">&nbsp;</p>
-				<text style="font-size:4px">&nbsp;</text>Game and Race Info:&nbsp;<input
-					style="font-size:8pt; width: 120px; background:lightgrey" type="text" id="raceInfoTxt"
-					placeholder=""><br>
-				<p style="font-size:1px">&nbsp;</p>
-				<text style="font-size:8.5px">&nbsp;&nbsp;&nbsp;</text>Wager / Other Info:&nbsp;<input
-					style="font-size:8pt; width: 120px; background:lightgrey" type="text" id="wagerInfoTxt"
-					placeholder="">
-				<p style="font-size:5px" /p>
-			</div>
+			<div id="topPlayerGameInfo" class="obs28 two-column-container">
+				<div class="column">
+				  Player/Team 1 Name:&nbsp;<input style="font-size:12pt; width: 200px; background: lightgrey; text-shadow: 1px 1px 2px black, 0 0 25px black, 0 0 5px black; font-weight:bold; text-align: center; vertical-align: middle; color:white;" type="text" id="p1Name"  placeholder="Player 1">
+				</p>
+				  Player/Team 2 Name:&nbsp;<input style="font-size:12pt; width: 200px; background:lightgrey; text-shadow: 1px 1px 2px black, 0 0 25px black, 0 0 5px black; font-weight:bold; text-align: center; vertical-align: middle; color:white;" type="text" id="p2Name" placeholder="Player 2">
+				</div>
+				
+				<div class="column">
+				  Game and Race Info:&nbsp;<input style="font-size:12pt; width: 200px; background:lightgrey" type="text" id="raceInfoTxt" placeholder="">
+				</p>
+				  Wager / Other Info:&nbsp;<input style="font-size:12pt; width: 200px; background:lightgrey" type="text" id="wagerInfoTxt" placeholder="">
+				</div>
+				<div class="column">
+					</p>
+					<div class="hover obs28" id="sendPNames" onclick="postNames()">Update Info</div>
+				</div>
+			    </br>
+				<div class="column">
+					Player/Team 1 Color:&nbsp;
+				  <select style="text-align:justify" name="p1Colors" id="p1colorDiv" class="obs28" onchange="playerColorChange(1)">
+					  <option value="" default>--Choose--</option>
+					  <option value="grey">Grey</option>
+					  <option value="steelblue">Steel Blue</option>
+					  <option value="cadetblue">Cadet Blue</option>
+					  <option value="blue">Blue</option>
+					  <option value="tomato">Tomato</option>
+					  <option value="red">Red</option>
+					  <option value="orangered">Orange-Red</option>
+					  <option value="orange">Orange</option>
+					  <option value="khaki">Khaki</option>
+					  <option value="green">Green</option>
+					  <option value="lightgreen">Light Green</option>
+					  <option value="lightseagreen">Sea Green</option>
+					  <option value="purple">Purple</option>
+					  <option value="white">White</option>
+				  </select>
+				  </p>
+					Player/Team 2 Color:&nbsp;
+				  <select style="text-align:justify" name="p2Colors" id="p2colorDiv" class="obs28" onchange="playerColorChange(2)">
+					  <option value="" default>--Choose--</option>
+					  <option value="grey">Grey</option>
+					  <option value="steelblue">Steel Blue</option>
+					  <option value="cadetblue">Cadet Blue</option>
+					  <option value="blue">Blue</option>
+					  <option value="tomato">Tomato</option>
+					  <option value="red">Red</option>
+					  <option value="orangered">Orange-Red</option>
+					  <option value="orange">Orange</option>
+					  <option value="khaki">Khaki</option>
+					  <option value="green">Green</option>
+					  <option value="lightgreen">Light Green</option>
+					  <option value="lightseagreen">Sea Green</option>
+					  <option value="purple">Purple</option>
+					  <option value="white">White</option>
+				  </select>
+				  </div>
+				  <div class="column">
+					  </p>
+					  <div class="hover obs28" onclick="swapColors()" id="swapBtn"></text>Swap Colors</div>
+				  </div>
+			  </div>
 			<p style="font-size:12px">&nbsp;</p>
-			<div class="hover obs28" id="sendPNames" onclick="postNames()">Update Info</div>
 			<p style="font-size:1.5pt">&nbsp;</p>
-			<select style="text-align:justify" name="p1Colors" id="p1colorDiv" class="obs28"
-				onchange="playerColorChange(1)">
-				<option value="" default>P1 Color</option>
-				<option value="grey">Grey</option>
-				<option value="steelblue">SteelBlue</option>
-				<option value="cadetblue">CadetBlue</option>
-				<option value="blue">Blue</option>
-				<option value="tomato">Tomato</option>
-				<option value="red">Red</option>
-				<option value="orangered">OrangeRed</option>
-				<option value="orange">Orange</option>
-				<option value="khaki">Khaki</option>
-				<option value="green">Green</option>
-				<option value="lightgreen">lightGreen</option>
-				<option value="lightseagreen">SeaGreen</option>
-				<option value="purple">Purple</option>
-				<option value="white">White</option>
-			</select>
-			<select style="text-align:justify" name="p2Colors" id="p2colorDiv" class="obs28"
-				onchange="playerColorChange(2)">
-				<option value="" default>P2 Color</option>
-				<option value="grey">Grey</option>
-				<option value="steelblue">SteelBlue</option>
-				<option value="cadetblue">CadetBlue</option>
-				<option value="blue">Blue</option>
-				<option value="tomato">Tomato</option>
-				<option value="red">Red</option>
-				<option value="orangered">OrangeRed</option>
-				<option value="orange">Orange</option>
-				<option value="khaki">Khaki</option>
-				<option value="green">Green</option>
-				<option value="lightgreen">lightGreen</option>
-				<option value="lightseagreen">SeaGreen</option>
-				<option value="purple">Purple</option>
-				<option value="white">White</option>
-			</select>
-			<div class="hover obs28" onclick="swapColors()" id="swapBtn"><text style="font-size:2pt">&nbsp;</text>Swap
-			</div>
 			<hr>
 			<div class="hover obs28" id="sendP1Score" onclick="postScore('add','1')">P1 +1 Score</div>
 			<div class="hover obs28" id="sendP2Score" onclick="postScore('add','2')">P2 +1 Score</div>

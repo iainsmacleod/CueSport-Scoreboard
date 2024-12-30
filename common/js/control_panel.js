@@ -78,9 +78,10 @@ function swapColors() {
 	setTimeout(function () {
 		document.getElementById("p1colorDiv").value = p2original; document.getElementById("p2colorDiv").value = p1original; bc.postMessage({ player: '1', color: p2original }); bc.postMessage({ player: '2', color: p1original });
 		document.getElementById("p2colorDiv").style.background = p1original; document.getElementById("p1colorDiv").style.background = p2original; localStorage.setItem('p1colorSet', p2original); localStorage.setItem('p2colorSet', p1original);
+		document.getElementById("p2Name").style.background = `linear-gradient(to left, ${p1original}, white)`; document.getElementById("p1Name").style.background = `linear-gradient(to right, ${p2original}, white)`;
 		document.getElementsByTagName("select")[0].options[0].value = p2original; document.getElementsByTagName("select")[1].options[0].value = p1original; c1value = p1original; c2value = p2original;
-		if (c1value == "orange" || c1value == "khaki" || c1value == "tomato" || c1value == "red" || c1value == "orangered" || c1value == "white" || c1value == "orange" || c1value == "lightgreen" || c1value == "lightseagreen") { document.getElementById("p2colorDiv").style.color = "#000"; } else { document.getElementById("p2colorDiv").style.color = "lightgrey"; };
-		if (c2value == "orange" || c2value == "khaki" || c2value == "tomato" || c2value == "red" || c2value == "orangered" || c2value == "white" || c2value == "orange" || c2value == "lightgreen" || c2value == "lightseagreen") { document.getElementById("p1colorDiv").style.color = "#000"; } else { document.getElementById("p1colorDiv").style.color = "lightgrey"; };
+		if (c1value == "cadetblue" || c1value == "steelblue" || c1value == "grey" || c1value == "lightgrey" || c1value == "green" || c1value == "khaki" || c1value == "tomato" || c1value == "red" || c1value == "orangered" || c1value == "white" || c1value == "orange" || c1value == "lightgreen" || c1value == "lightseagreen") { document.getElementById("p2colorDiv").style.color = "#000"; } else { document.getElementById("p2colorDiv").style.color = "lightgrey"; };
+		if (c2value == "cadetblue" || c2value == "steelblue" || c2value == "grey" || c2value == "lightgrey" || c2value == "green" || c2value == "orange" || c2value == "khaki" || c2value == "tomato" || c2value == "red" || c2value == "orangered" || c2value == "white" || c2value == "orange" || c2value == "lightgreen" || c2value == "lightseagreen") { document.getElementById("p1colorDiv").style.color = "#000"; } else { document.getElementById("p1colorDiv").style.color = "lightgrey"; };
 	}, 100);
 }
 
@@ -90,16 +91,22 @@ function playerColorChange(player) {
 		playerx = player;
 		pColormsg = document.getElementById("p" + player + "colorDiv").value;
 		bc.postMessage({ player: playerx, color: pColormsg });
-		document.getElementById("p1colorDiv").style.background = document.getElementById("p" + player + "colorDiv").value;
-		if (cvalue == "orange" || cvalue == "khaki" || cvalue == "tomato" || cvalue == "red" || cvalue == "orangered" || cvalue == "white" || cvalue == "orange" || cvalue == "lightgreen" || cvalue == "lightseagreen") { document.getElementById("p1colorDiv").style.color = "#000"; } else { document.getElementById("p1colorDiv").style.color = "lightgrey"; };
+		var selectedColor = document.getElementById("p" + player + "colorDiv").value;
+		document.getElementById("p1colorDiv").style.background = `${selectedColor}`;
+		document.getElementById("p1Name").style.background = `linear-gradient(to right, ${selectedColor}, white)`;
+
+		if (cvalue == "cadetblue" || cvalue == "steelblue" || cvalue == "grey" || cvalue == "lightgrey" || cvalue == "green" || cvalue == "khaki" || cvalue == "tomato" || cvalue == "red" || cvalue == "orangered" || cvalue == "white" || cvalue == "orange" || cvalue == "lightgreen" || cvalue == "lightseagreen") { document.getElementById("p1colorDiv").style.color = "#000"; } else { document.getElementById("p1colorDiv").style.color = "lightgrey"; };
 		localStorage.setItem("p1colorSet", document.getElementById("p" + player + "colorDiv").value);
 		document.getElementsByTagName("select")[0].options[0].value = cvalue;
 	} else {
 		playerx = player;
 		pColormsg = document.getElementById("p" + player + "colorDiv").value;
 		bc.postMessage({ player: playerx, color: pColormsg });
-		document.getElementById("p2colorDiv").style.background = document.getElementById("p" + player + "colorDiv").value;
-		if (cvalue == "orange" || cvalue == "khaki" || cvalue == "tomato" || cvalue == "red" || cvalue == "orangered" || cvalue == "white" || cvalue == "orange" || cvalue == "lightgreen" || cvalue == "lightseagreen") { document.getElementById("p2colorDiv").style.color = "#000"; } else { document.getElementById("p2colorDiv").style.color = "lightgrey"; };
+		var selectedColor = document.getElementById("p" + player + "colorDiv").value;
+		document.getElementById("p2colorDiv").style.background = `${selectedColor}`;
+		document.getElementById("p2Name").style.background = `linear-gradient(to left, ${selectedColor}, white)`;
+
+		if (cvalue == "cadetblue" || cvalue == "steelblue" || cvalue == "grey" || cvalue == "lightgrey" || cvalue == "green" || cvalue == "khaki" || cvalue == "tomato" || cvalue == "red" || cvalue == "orangered" || cvalue == "white" || cvalue == "orange" || cvalue == "lightgreen" || cvalue == "lightseagreen") { document.getElementById("p2colorDiv").style.color = "#000"; } else { document.getElementById("p2colorDiv").style.color = "lightgrey"; };
 		localStorage.setItem("p2colorSet", document.getElementById("p" + player + "colorDiv").value);
 		document.getElementsByTagName("select")[1].options[0].value = cvalue;
 	}
