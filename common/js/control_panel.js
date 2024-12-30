@@ -112,6 +112,22 @@ function playerColorChange(player) {
 	}
 }
 
+function playerSetting(player) {
+    var usePlayerSetting = document.getElementById("usePlayer" + player + "Setting");
+    var isChecked = usePlayerSetting.checked;
+    var action = isChecked ? "remove" : "add";
+    var storageValue = isChecked ? "yes" : "no";
+	var usePlayer = isChecked ? 'showPlayer':'hidePlayer'
+    
+    localStorage.setItem("usePlayer" + player, storageValue);
+    
+    ["Name", "NameLabel", "colorDiv", "ColorLabel"].forEach(function(elem) {
+        document.getElementById("p" + player + elem).classList[action]("noShow");
+    });
+
+	bc.postMessage({playerDisplay: usePlayer});
+}
+
 function clockSetting() {
 	if (!document.getElementById("useClockSetting").checked) {
 		localStorage.setItem("useClock", "no");

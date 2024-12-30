@@ -97,6 +97,15 @@ if (localStorage.getItem("useSalotto") != "yes" && localStorage.getItem("useCloc
 
 if (localStorage.getItem('p1colorSet') !== null) {
 	var cvalue = localStorage.getItem('p1colorSet');
+	var selectElement = document.getElementById('p1colorDiv');
+    
+    // Set the selected option
+    for (var i = 0; i < selectElement.options.length; i++) {
+        if (selectElement.options[i].value === cvalue) {
+            selectElement.selectedIndex = i;
+            break;
+        }
+    }
 	document.getElementById('p1colorDiv').style.background = localStorage.getItem('p1colorSet');
 	document.getElementById('p1Name').style.background = `linear-gradient(to right, ${localStorage.getItem('p1colorSet')}, white)`;
 	document.getElementsByTagName("select")[0].options[0].value = cvalue;
@@ -106,9 +115,17 @@ if (localStorage.getItem('p1colorSet') !== null) {
 
 if (localStorage.getItem('p2colorSet') !== null) {
 	var cvalue = localStorage.getItem('p2colorSet');
+	var selectElement = document.getElementById('p2colorDiv');
+    
+    // Set the selected option
+    for (var i = 0; i < selectElement.options.length; i++) {
+        if (selectElement.options[i].value === cvalue) {
+            selectElement.selectedIndex = i;
+            break;
+        }
+    }
 	document.getElementById('p2colorDiv').style.background = localStorage.getItem('p2colorSet');
-	document.getElementById('p1Name').style.background = `linear-gradient(to left, ${localStorage.getItem('p2colorSet')}, white)`;
-	document.getElementById('p2Name').style.background = localStorage.getItem('p2colorSet');
+	document.getElementById('p2Name').style.background = `linear-gradient(to left, ${localStorage.getItem('p2colorSet')}, white)`;
 	if (cvalue == "cadetblue" || cvalue == "steelblue" || cvalue == "grey" || cvalue == "lightgrey" || cvalue == "green" || cvalue == "khaki" || cvalue == "tomato" || cvalue == "red" || cvalue == "orangered" || cvalue == "white" || cvalue == "orange" || cvalue == "lightgreen" || cvalue == "lightseagreen") { document.getElementById("p2colorDiv").style.color = "#000"; } else { document.getElementById("p2colorDiv").style.color = "lightgrey"; };
 
 }
@@ -158,6 +175,45 @@ if (localStorage.getItem("useClock") == "yes") {
 	document.getElementById("useSalottoSetting").removeAttribute("checked");
 	clockSetting()
 }
+
+function setPlayerVisibility(playerNumber) {
+	const usePlayer = localStorage.getItem(`usePlayer${playerNumber}`) === "yes";
+	const checkbox = document.getElementById(`usePlayer${playerNumber}Setting`);
+	
+	checkbox.checked = usePlayer;
+	if (!usePlayer) {
+	  checkbox.removeAttribute("checked");
+	}
+	
+	if (usePlayer) {
+	  console.log(`Use Player ${playerNumber} = TRUE`);
+	}
+	
+	playerSetting(playerNumber);
+  }
+  
+  setPlayerVisibility(1);
+  setPlayerVisibility(2);
+  
+// if (localStorage.getItem("usePlayer1") == "yes") {
+// 	console.log("Use Player 1 = TRUE");
+// 	document.getElementById("usePlayer1Setting").checked = true;
+// 	playerSetting(1);
+// } else {
+// 	document.getElementById("usePlayer1Setting").checked = false;
+// 	document.getElementById("usePlayer1Setting").removeAttribute("checked");
+// 	playerSetting(1)
+// }
+
+// if (localStorage.getItem("usePlayer2") == "yes") {
+// 	console.log("Use Player 2 = TRUE");
+// 	document.getElementById("usePlayer2Setting").checked = true;
+// 	playerSetting(2);
+// } else {
+// 	document.getElementById("usePlayer2Setting").checked = false;
+// 	document.getElementById("usePlayer2Setting").removeAttribute("checked");
+// 	playerSetting(2)
+// }
 
 if (localStorage.getItem("customLogo1") != null) { document.getElementById("l1Img").src = localStorage.getItem("customLogo1"); } else { document.getElementById("l1Img").src = "./common/images/placeholder.png"; };
 if (localStorage.getItem("customLogo2") != null) { document.getElementById("l2Img").src = localStorage.getItem("customLogo2"); } else { document.getElementById("l2Img").src = "./common/images/placeholder.png"; };

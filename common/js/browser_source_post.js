@@ -82,6 +82,10 @@ bc.onmessage = (event) => {
 		}
 	}
 
+	if (event.data.playerDisplay != null){
+		
+	}
+
 	// start of original clockDisplay channel 
 	if (event.data.clockDisplay != null) {
 		console.log("event.data.clockDisplay: " + event.data.clockDisplay);
@@ -174,6 +178,10 @@ if (localStorage.getItem("useSalotto") == "yes") {
 if (localStorage.getItem("useClock") != "yes") {
 	document.getElementById("p1ExtIcon").classList.replace("fadeInElm", "fadeOutElm");
 	document.getElementById("p2ExtIcon").classList.replace("fadeInElm", "fadeOutElm");
+}
+
+if (localStorage.getItem("usePlayer1") == "no") {
+	document.getElementById("player1Name").classList.add("noShow");
 }
 
 if (localStorage.getItem('p1colorSet') != "") {
