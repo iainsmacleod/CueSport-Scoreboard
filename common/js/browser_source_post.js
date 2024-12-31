@@ -26,6 +26,8 @@ bc.onmessage = (event) => {
 		if (event.data.score > document.getElementById("player" + event.data.player + "Score").innerHTML) {
 			document.getElementById("player" + event.data.player + "Score").innerHTML = event.data.score;
 			document.getElementById("player" + event.data.player + "Score").classList.add("winBlink");
+			// Update the control_panel score on click
+			document.getElementById("p" + event.data.player + "Score").textContent = event.data.score;
 			setTimeout("clearWinBlink()", 500);
 		} else {
 			document.getElementById("player" + event.data.player + "Score").innerHTML = event.data.score;
@@ -82,8 +84,27 @@ bc.onmessage = (event) => {
 		}
 	}
 
-	if (event.data.playerDisplay != null){
-		
+	if (event.data.playerDisplay != null) {
+		console.log("event.data.playerDisplay: " + event.data.playerDisplay + " event.data.playerNumber: " + event.data.playerNumber);
+		if (event.data.playerDisplay == "showPlayer") { 
+			showPlayer(event.data.playerNumber);
+			// Add a small delay to check after showPlayer has completed
+			setTimeout(() => {
+				// Debug logs
+				console.log("Player1 status:", localStorage.getItem("usePlayer1"));
+				console.log("Player2 status:", localStorage.getItem("usePlayer2"));
+				if (localStorage.getItem("usePlayer1") === "yes" && localStorage.getItem("usePlayer2") === "yes") {
+					console.log("Both players enabled, showing scores");
+					showScores();
+				} else {
+					console.log("Not all players enabled, scores remain hidden");
+				}
+			}, 50); // Small delay to ensure localStorage is updated
+		};
+		if (event.data.playerDisplay == "hidePlayer") { 
+			hidePlayer(event.data.playerNumber); 
+			hideScores();
+		};
 	}
 
 	// start of original clockDisplay channel 
@@ -164,7 +185,7 @@ if (localStorage.getItem("raceInfo") != null) {
 }
 
 document.getElementById("player1Name").innerHTML = localStorage.getItem("p1NameCtrlPanel");
-document.getElementById("raceInfo").innerHTML = localStorage.getItem("raceInfo");
+document.getElementById("player1Score").innerHTML = localStorage.getItem("p1ScoreCtrlPanel");
 document.getElementById("player2Name").innerHTML = localStorage.getItem("p2NameCtrlPanel");
 document.getElementById("wagerInfo").innerHTML = localStorage.getItem("wagerInfo");
 document.getElementById("raceInfo").innerHTML = localStorage.getItem("raceInfo");
@@ -180,8 +201,15 @@ if (localStorage.getItem("useClock") != "yes") {
 	document.getElementById("p2ExtIcon").classList.replace("fadeInElm", "fadeOutElm");
 }
 
-if (localStorage.getItem("usePlayer1") == "no") {
-	document.getElementById("player1Name").classList.add("noShow");
+if (localStorage.getItem(("usePlayer1")) != "yes") {
+	document.getElementById("player1Name").classList.replace("fadeInElm", "fadeOutElm");
+	document.getElementById("player1Score").classList.replace("fadeInElm", "fadeOutElm");
+	document.getElementById("player2Score").classList.replace("fadeInElm", "fadeOutElm");
+}
+if (localStorage.getItem(("usePlayer2")) != "yes") {
+	document.getElementById("player2Name").classList.replace("fadeInElm", "fadeOutElm");
+	document.getElementById("player1Score").classList.replace("fadeInElm", "fadeOutElm");
+	document.getElementById("player2Score").classList.replace("fadeInElm", "fadeOutElm");
 }
 
 if (localStorage.getItem('p1colorSet') != "") {

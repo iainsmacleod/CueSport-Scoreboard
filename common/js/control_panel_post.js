@@ -109,8 +109,7 @@ if (localStorage.getItem('p1colorSet') !== null) {
 	document.getElementById('p1colorDiv').style.background = localStorage.getItem('p1colorSet');
 	document.getElementById('p1Name').style.background = `linear-gradient(to right, ${localStorage.getItem('p1colorSet')}, white)`;
 	document.getElementsByTagName("select")[0].options[0].value = cvalue;
-	if (cvalue == "cadetblue" || cvalue == "steelblue" || cvalue == "grey" ||cvalue == "lightgrey" || cvalue == "green" || cvalue == "khaki" || cvalue == "tomato" || cvalue == "red" || cvalue == "white" || cvalue == "orangered" || cvalue == "orange" || cvalue == "lightgreen" || cvalue == "lightseagreen") { document.getElementById("p1colorDiv").style.color = "#000"; } else { document.getElementById("p1colorDiv").style.color = "lightgrey"; };
-
+	// if (cvalue == "cadetblue" || cvalue == "steelblue" || cvalue == "grey" ||cvalue == "lightgrey" || cvalue == "green" || cvalue == "khaki" || cvalue == "tomato" || cvalue == "red" || cvalue == "white" || cvalue == "orangered" || cvalue == "orange" || cvalue == "lightgreen" || cvalue == "lightseagreen") { document.getElementById("p1colorDiv").style.color = "#000"; } else { document.getElementById("p1colorDiv").style.color = "lightgrey"; };
 }
 
 if (localStorage.getItem('p2colorSet') !== null) {
@@ -126,8 +125,7 @@ if (localStorage.getItem('p2colorSet') !== null) {
     }
 	document.getElementById('p2colorDiv').style.background = localStorage.getItem('p2colorSet');
 	document.getElementById('p2Name').style.background = `linear-gradient(to left, ${localStorage.getItem('p2colorSet')}, white)`;
-	if (cvalue == "cadetblue" || cvalue == "steelblue" || cvalue == "grey" || cvalue == "lightgrey" || cvalue == "green" || cvalue == "khaki" || cvalue == "tomato" || cvalue == "red" || cvalue == "orangered" || cvalue == "white" || cvalue == "orange" || cvalue == "lightgreen" || cvalue == "lightseagreen") { document.getElementById("p2colorDiv").style.color = "#000"; } else { document.getElementById("p2colorDiv").style.color = "lightgrey"; };
-
+	// if (cvalue == "cadetblue" || cvalue == "steelblue" || cvalue == "grey" || cvalue == "lightgrey" || cvalue == "green" || cvalue == "khaki" || cvalue == "tomato" || cvalue == "red" || cvalue == "orangered" || cvalue == "white" || cvalue == "orange" || cvalue == "lightgreen" || cvalue == "lightseagreen") { document.getElementById("p2colorDiv").style.color = "#000"; } else { document.getElementById("p2colorDiv").style.color = "lightgrey"; };
 }
 
 if (localStorage.getItem('p1ScoreCtrlPanel') > 0 || localStorage.getItem('p1ScoreCtrlPanel') == "") {
@@ -177,7 +175,7 @@ if (localStorage.getItem("useClock") == "yes") {
 }
 
 function setPlayerVisibility(playerNumber) {
-	const usePlayer = localStorage.getItem(`usePlayer${playerNumber}`) === "yes";
+	const usePlayer = localStorage.getItem(`usePlayer${playerNumber}`) == "yes";
 	const checkbox = document.getElementById(`usePlayer${playerNumber}Setting`);
 	
 	checkbox.checked = usePlayer;
@@ -194,26 +192,6 @@ function setPlayerVisibility(playerNumber) {
   
   setPlayerVisibility(1);
   setPlayerVisibility(2);
-  
-// if (localStorage.getItem("usePlayer1") == "yes") {
-// 	console.log("Use Player 1 = TRUE");
-// 	document.getElementById("usePlayer1Setting").checked = true;
-// 	playerSetting(1);
-// } else {
-// 	document.getElementById("usePlayer1Setting").checked = false;
-// 	document.getElementById("usePlayer1Setting").removeAttribute("checked");
-// 	playerSetting(1)
-// }
-
-// if (localStorage.getItem("usePlayer2") == "yes") {
-// 	console.log("Use Player 2 = TRUE");
-// 	document.getElementById("usePlayer2Setting").checked = true;
-// 	playerSetting(2);
-// } else {
-// 	document.getElementById("usePlayer2Setting").checked = false;
-// 	document.getElementById("usePlayer2Setting").removeAttribute("checked");
-// 	playerSetting(2)
-// }
 
 if (localStorage.getItem("customLogo1") != null) { document.getElementById("l1Img").src = localStorage.getItem("customLogo1"); } else { document.getElementById("l1Img").src = "./common/images/placeholder.png"; };
 if (localStorage.getItem("customLogo2") != null) { document.getElementById("l2Img").src = localStorage.getItem("customLogo2"); } else { document.getElementById("l2Img").src = "./common/images/placeholder.png"; };
@@ -227,7 +205,9 @@ if (localStorage.getItem("b_style") == "3") { document.getElementById("bsStyle")
 if (localStorage.getItem("clogoNameStored") != null) { cLogoName = localStorage.getItem("clogoNameStored"); }
 document.getElementById("logoName").innerHTML = cLogoName.substring(0, 13);
 document.getElementById("p1Name").value = localStorage.getItem("p1NameCtrlPanel");
+document.getElementById("p1Score").value = localStorage.getItem("p1ScoreCtrlPanel");
 document.getElementById("p2Name").value = localStorage.getItem("p2NameCtrlPanel");
+document.getElementById("p2Score").value = localStorage.getItem("p2ScoreCtrlPanel");
 document.getElementById("raceInfoTxt").value = localStorage.getItem("raceInfo");
 document.getElementById("wagerInfoTxt").value = localStorage.getItem("wagerInfo");
 document.getElementById("verNum").innerHTML = versionNum;
@@ -240,6 +220,9 @@ postNames(); startThemeCheck();
 bcr.onmessage = (event) => {
 	document.getElementById("clockLocalDisplay").style.background = "green";
 	document.getElementById("clockLocalDisplay").innerHTML = event.data + "s";
+	// trying to replace button with time when pressed
+	//document.getElementById("shotClock30").style.background = "green";
+	//document.getElementById("shotClock30").innerHTML = event.data + "s";
 	tev = event.data;
 	console.log(tev);
 	if (tev > 20) { document.getElementById("clockLocalDisplay").style.color = "white"; };
@@ -250,7 +233,7 @@ bcr.onmessage = (event) => {
 	if (tev == 10) {
 		document.getElementById("shotClockShow").setAttribute("onclick", "clockDisplay('hide')");
 		document.getElementById("shotClockShow").innerHTML = "Hide Clock";
-		document.getElementById("shotClockShow").style.border = "1px solid lime";
+		document.getElementById("shotClockShow").style.border = "2px solid lime";
 	}
 	if (tev < 6 && tev > 0) {    //tev > 0   this prevents both sounds from playing at 0.
 		document.getElementById("clockLocalDisplay").style.background = "red";

@@ -63,8 +63,58 @@
 		padding-top:2px;
 	
 		}
+
+	#p1Score, #p2Score {
+		cursor: pointer;
+		position: sticky;
+		width:85px;
+		height:26px;
+		border: 0px solid #000;
+		border-radius: 0px;
+		background-color: #ed4e54;
+		font-size: 15pt;
+		}
 	
-	#sendP1Score, #sendP1ScoreSub, #shotClock30, #shotClockShow, #p1extensionBtn, #p1ExtReset {
+	.score-control {
+		display: flex;
+		align-items: center;
+		}
+		
+		.score-control input {
+		flex: 1;
+		}
+		
+		.score-control button {
+		/* font-size: 100pt; */
+		}
+	
+		/* Add to one of your CSS files */
+		input[type="number"]::-webkit-inner-spin-button,
+		input[type="number"]::-webkit-outer-spin-button {
+			-webkit-appearance: none;
+			margin: 0;
+		}
+
+		input[type="number"] {
+			-moz-appearance: textfield;
+		}
+		  
+	#sendP2Score, #sendP2ScoreSub, #sendP1Score, #sendP1ScoreSub {
+		cursor: pointer;
+		width:85px;
+		height:28px;
+		border: 0px solid #000;
+		border-radius: 0px;
+		font-size: 15pt;
+		}
+	
+	#usePlayer1Setting, #usePlayer2Setting, #useClockSetting{
+		cursor: pointer;
+		width: 15px;
+        height: 15px;
+	}
+	
+	/* #p1extensionBtn, #p1ExtReset {
 		cursor: pointer;
 		min-width:85px;
 		width:125px;
@@ -74,9 +124,9 @@
 		padding-right:10px;
 		margin-right:2px;
 		font-size: 10pt;
-		}
-		
-	#sendP2Score, #sendP2ScoreSub, #shotClock60, #clockLocalDisplay, #p2extensionBtn, #p2ExtReset {
+		} */
+	
+	 /* #clockLocalDisplay {
 		cursor: pointer;
 		width:125px;
 		position:absolute;
@@ -89,7 +139,7 @@
 		
 	 #clockLocalDisplay {
 		cursor:default;
-	 }
+	 } */
 	
 	#logoSsImg1, #logoSsImg2, #logoSsImg3 {
 	position:absolute;
@@ -114,55 +164,34 @@
 
 	}
 	
-	#p1colorDiv {
-		
+	#p1colorDiv, #p2colorDiv {
 		cursor: pointer;
 		width:200px;
-		/* position:absolute;
-		right:50%;
-		padding-left:10px;
-		padding-right:10px;
-
-		color: #fff;
-		border-radius:5px;
-		margin-right:30px; */
-		font-family:tahoma;
-		font-size: 12pt;
-		/* color: lightgrey; */
+		font-family:roboto;
+		font-size: 15pt;
+		font-weight: bold;
+		width: 200px;
+		text-shadow: 1px 1px 2px black, 0 0 25px black, 0 0 5px black;
+		text-align: center;
+		vertical-align: middle;
+		color:white;
+		-webkit-text-stroke: 1px black;
 	}
 	
-	#p2colorDiv {
-		cursor: pointer;
-		width:200px;
-		/* position:absolute;
-		left:50%;
-		padding-left:10px;
-		padding-right:10px;
-		
-		color: #fff;
-		border-radius:5px;
-		margin-left:30px; */
-		font-family:tahoma;
-		font-size: 12pt;
-		/* color: lightgrey; */
-	}
-	
-	
-	#stopClockDiv, #sendPNames, #swapBtn {
+	#resetBtn, /*#clockLocalDisplay,*/ #p1extensionBtn, #p1ExtReset, #p2extensionBtn, #p2ExtReset, #shotClock30, #shotClock60, #stopClockDiv, #sendPNames, #sendPScores, #swapBtn, #shotClockShow {
 			cursor: pointer;
-			/* width:295px; */
+			width:150px;
 			font-size: 12pt;
 			padding: 0px 5px 0px 5px;
 			border:2px solid black;
-
 		}
 
-	#resetBtn{
+	/* #resetBtn{
 		cursor: pointer;
 		width:295px;
 		font-size: 15pt;
 
-	}
+	} */
 	
 	
 	.noShow{
@@ -198,14 +227,22 @@
 	#topPlayerGameInfo {
 	min-width:85px;
 	width:800px;
-	/* height:78px; */
 	position:relative;
 	top:33px;
 	display:block;
-	/* font-size: 8pt; */
 	padding-top:5px;
-	
 	}
+
+	#scoreInfo, #clockInfo {
+		min-width:85px;
+		width:800px;
+		/* height:78px; */
+		position:relative;
+		top:33px;
+		display:block;
+		/* font-size: 8pt; */
+		padding-top:5px;
+		}
 	
 	#settingsBox1, #logoSlideShowDiv {
 	min-width:85px;

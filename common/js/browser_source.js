@@ -108,6 +108,25 @@ function hideClock() {
 	document.getElementById("shotClock").classList.replace("fadeInElm", "fadeOutElm");
 }
 
+function showPlayer(playerNumber) {
+	document.getElementById("player"+playerNumber+"Name").classList.replace("fadeOutElm", "fadeInElm");
+}
+
+function hidePlayer(playerNumber) {
+	document.getElementById("player"+playerNumber+"Name").classList.replace("fadeInElm", "fadeOutElm");
+}
+
+function showScores() {
+	document.getElementById("player1Score").classList.replace("fadeOutElm", "fadeInElm");
+	document.getElementById("player2Score").classList.replace("fadeOutElm", "fadeInElm");
+}
+
+function hideScores() {
+	document.getElementById("player1Score").classList.replace("fadeInElm", "fadeOutElm");
+	document.getElementById("player2Score").classList.replace("fadeInElm", "fadeOutElm");
+}
+
+
 function stopClock() {
 	clearInterval(shotClockxr);
 	hideClock();
