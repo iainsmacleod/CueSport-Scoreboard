@@ -1,25 +1,40 @@
-.slidecontainer {
-	  width: 100%;
+    .slidecontainer {
+	  width: auto;
 	  position:relative;
 	  bottom:-10px;
-	}
+	} 
 
+	.slider {
+		-webkit-appearance: none;
+		width: 75%;
+		height: 5px;
+		border-radius: 5px;
+		background: lightgrey; 
+		outline: none;
+		opacity: 1;
+		-webkit-transition: .2s;
+		transition: opacity .2s;
+	  }
 
 	.slider::-webkit-slider-thumb {
 	  -webkit-appearance: none;
 	  appearance: none;
-	  width: 15px;
-	  height: 15px;
-	  border-radius: 50%;
-	  background: #3345a3;
+	  width: 20px;
+	  height: 20px;
+	  /* border-radius: 50%; */
+	  background-image: url('../../images/8ball_small.png');
+	  background-size: cover;
+	  /* background: #3345a3; */
 	  cursor: pointer;
 	}
 
 	.slider::-moz-range-thumb {
-	  width: 15px;
-	  height: 15px;
-	  border-radius: 50%;
-	  background: #3345a3;
+	  width: 20px;
+	  height: 20px;
+	  /* border-radius: 50%; */
+	  background-image: url('../../images/8ball_small.png');
+	  background-size: cover;
+	  /* background: #3345a3; */
 	  cursor: pointer;
 	}
 	
@@ -35,8 +50,8 @@
 		
 	
 	div {
-		color:lightgrey;
-		min-height: 30px;
+		color:white;
+		min-height: 24px;
 		border: 0px solid #000;
 		border-radius: 5px;
 		display: flex;
@@ -84,9 +99,9 @@
 		flex: 1;
 		}
 		
-		.score-control button {
-		/* font-size: 100pt; */
-		}
+		/* .score-control button {
+		font-size: 100pt;
+		} */
 	
 		/* Add to one of your CSS files */
 		input[type="number"]::-webkit-inner-spin-button,
@@ -95,9 +110,9 @@
 			margin: 0;
 		}
 
-		input[type="number"] {
+		/* input[type="number"] {
 			-moz-appearance: textfield;
-		}
+		} */
 		  
 	#sendP2Score, #sendP2ScoreSub, #sendP1Score, #sendP1ScoreSub {
 		cursor: pointer;
@@ -108,7 +123,7 @@
 		font-size: 15pt;
 		}
 	
-	#usePlayer1Setting, #usePlayer2Setting, #useClockSetting{
+	#usePlayer1Setting, #usePlayer2Setting, #useClockSetting, #allCheck, #useSalottoSetting, #customLogo, #logoSlideshowChk{
 		cursor: pointer;
 		width: 15px;
         height: 15px;
@@ -141,7 +156,7 @@
 		cursor:default;
 	 } */
 	
-	#logoSsImg1, #logoSsImg2, #logoSsImg3 {
+	/* #logoSsImg1, #logoSsImg2, #logoSsImg3 {
 	position:absolute;
 	cursor: pointer;
 	font-size: 10pt;
@@ -162,7 +177,7 @@
 	#logoSsImg3 {
 		margin-left:100px;
 
-	}
+	} */
 	
 	#p1colorDiv, #p2colorDiv {
 		cursor: pointer;
@@ -170,7 +185,6 @@
 		font-family:roboto;
 		font-size: 15pt;
 		font-weight: bold;
-		width: 200px;
 		text-shadow: 1px 1px 2px black, 0 0 25px black, 0 0 5px black;
 		text-align: center;
 		vertical-align: middle;
@@ -178,28 +192,28 @@
 		-webkit-text-stroke: 1px black;
 	}
 	
-	#resetBtn, /*#clockLocalDisplay,*/ #p1extensionBtn, #p1ExtReset, #p2extensionBtn, #p2ExtReset, #shotClock30, #shotClock60, #stopClockDiv, #sendPNames, #sendPScores, #swapBtn, #shotClockShow {
+	#resetBtn, #shotClock30, #shotClock60, #stopClockDiv, #sendPNames, #sendPInfo, #sendPScores, #swapBtn, #settingsBox2, #shotClockShow, #logoSsImg1, #logoSsImg2, #logoSsImg3{
 			cursor: pointer;
-			width:150px;
+			width: 150px;
 			font-size: 12pt;
-			padding: 0px 5px 0px 5px;
+			padding: 0px 0px 0px 0px;
 			border:2px solid black;
 		}
 
-	/* #resetBtn{
+	#p1extensionBtn, #p2extensionBtn  {
 		cursor: pointer;
-		width:295px;
-		font-size: 15pt;
-
-	} */
+		width:200px;
+		font-size: 12pt;
+		padding: 0px 5px 0px 5px;
+		border:2px solid black;
+		color:black;
+		background: green;
+	}
 	
 	
 	.noShow{
         visibility:hidden;
         }
-	#clockLocalDisplay {
-		font-weight:bolder;
-	}
 	
 	#footer {
 	width:90%;
@@ -217,14 +231,14 @@
 	#btnFile {
 	font-size: 10pt;
 
-	color: lightgrey;
+	color: white;
 	border: none;
 	padding:0px;
 	cursor: pointer;
 	}
 	
 	
-	#topPlayerGameInfo {
+	#playerInfo, #scoreInfo, #gameInfo, #clockInfo, #generalSettings, #settingsBox0, #settingsBox1 {
 	min-width:85px;
 	width:800px;
 	position:relative;
@@ -233,51 +247,29 @@
 	padding-top:5px;
 	}
 
-	#scoreInfo, #clockInfo {
+
+	#logoSlideShowDiv { 
 		min-width:85px;
-		width:800px;
-		/* height:78px; */
-		position:relative;
-		top:33px;
-		display:block;
-		/* font-size: 8pt; */
-		padding-top:5px;
-		}
-	
-	#settingsBox1, #logoSlideShowDiv {
-	min-width:85px;
-	width:125px;
-	position:absolute;
-	right:50%;
-	padding-left:10px;
-	padding-right:10px;
-	padding-bottom:2px;
-	margin-right:2px;
-	font-size: 10pt;
+		width:125px;
+		position:absolute;
+		right:50%;
+		padding-left:10px;
+		padding-right:10px;
+		padding-bottom:2px;
+		margin-right:2px;
+		font-size: 10pt;
 	}
-	
-	#settingsBox2 {
-	cursor: pointer;
-	font-size: 10pt;
-	min-width:85px;
-	width: 145px;
-	position:absolute;
-	left:50%;
-	margin-left:2px;
-	padding-bottom:2.5px;
-	padding-top:2.5px;
-	}	
+
 	
 	#settingsBox3 {
-	cursor: arrow;
-	min-width:85px;
-	width:145px;
-	position:static;
-	left:50%;
-	margin-left:150px;
-	
-	margin-bottom:3px;
-	font-size:7pt;
+		cursor: arrow;
+		min-width:85px;
+		width:145px;
+		position:static;
+		left:50%;
+		margin-left:150px;
+		margin-bottom:3px;
+		font-size:7pt;
 	}	
 	
 	text {
@@ -336,8 +328,8 @@
 		border:0px;
 	}
 	
-		.tooltip {
-		}
+		/* .tooltip {
+		} */
 				
 		.tooltip .tooltiptext {
 		visibility: hidden;
@@ -358,14 +350,38 @@
 		  visibility: visible;
 		}
 
-		.two-column-container {
+		.two-column-container{
 			/* display: flex; */
 			justify-content: space-between;
 			padding: 10px;
+			clear: both;
+		  }
+		
+		  .four-column-container{
+			/* display: flex; */
+			justify-content: space-between;
+			padding: 10px;
+			clear: both;
 		  }
 		  
 		  .column {
 			width: 100%;
 			justify-content: space-between;
 		  }
+
+/* Basic placeholder styling */
+::placeholder { /* Chrome, Firefox, Opera, Safari */
+    color: white;
+}
+
+/* For older browsers you might also need: */
+::-webkit-input-placeholder { /* Chrome/Safari/Opera */
+    color: white;
+}
+:-ms-input-placeholder { /* Internet Explorer */
+    color: white;
+}
+::-ms-input-placeholder { /* Microsoft Edge */
+    color: white;
+}
 		  

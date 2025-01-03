@@ -10,7 +10,7 @@
 // variable declarations
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-var cLogoName = "Custom";  // 13 character limit. it will auto trim to 13 characters.
+var cLogoName = "Custom Logo";  // 13 character limit. it will auto trim to 13 characters.
 const bc = new BroadcastChannel('g4-main');
 const bcr = new BroadcastChannel('g4-recv'); // return channel from browser_source 
 var hotkeyP1ScoreUp;
@@ -64,6 +64,7 @@ var pColormsg;
 
 slider.oninput = function () {
 	sliderValue = this.value / 100;
+	document.getElementById("sliderValue").innerHTML = this.value + "%";  // Add this line
 	bc.postMessage({ opacity: sliderValue });
 }
 
@@ -179,9 +180,6 @@ function setPlayerVisibility(playerNumber) {
 	const checkbox = document.getElementById(`usePlayer${playerNumber}Setting`);
 	
 	checkbox.checked = usePlayer;
-	if (!usePlayer) {
-	  checkbox.removeAttribute("checked");
-	}
 	
 	if (usePlayer) {
 	  console.log(`Use Player ${playerNumber} = TRUE`);
@@ -211,18 +209,17 @@ document.getElementById("p2Score").value = localStorage.getItem("p2ScoreCtrlPane
 document.getElementById("raceInfoTxt").value = localStorage.getItem("raceInfo");
 document.getElementById("wagerInfoTxt").value = localStorage.getItem("wagerInfo");
 document.getElementById("verNum").innerHTML = versionNum;
-postNames(); startThemeCheck();
+postNames(); postInfo(); startThemeCheck();
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // broadcast channel events from browser_source
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////			
 
 bcr.onmessage = (event) => {
-	document.getElementById("clockLocalDisplay").style.background = "green";
-	document.getElementById("clockLocalDisplay").innerHTML = event.data + "s";
-	// trying to replace button with time when pressed
-	//document.getElementById("shotClock30").style.background = "green";
-	//document.getElementById("shotClock30").innerHTML = event.data + "s";
+	const clockDisplay = document.getElementById("clockLocalDisplay");
+    clockDisplay.style.background = "green";
+	clockDisplay.style.border = "2px solid black";
+    clockDisplay.innerHTML = event.data + "s";
 	tev = event.data;
 	console.log(tev);
 	if (tev > 20) { document.getElementById("clockLocalDisplay").style.color = "white"; };
@@ -233,7 +230,7 @@ bcr.onmessage = (event) => {
 	if (tev == 10) {
 		document.getElementById("shotClockShow").setAttribute("onclick", "clockDisplay('hide')");
 		document.getElementById("shotClockShow").innerHTML = "Hide Clock";
-		document.getElementById("shotClockShow").style.border = "2px solid lime";
+		document.getElementById("shotClockShow").style.border = "2px solid black";
 	}
 	if (tev < 6 && tev > 0) {    //tev > 0   this prevents both sounds from playing at 0.
 		document.getElementById("clockLocalDisplay").style.background = "red";

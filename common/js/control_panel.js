@@ -159,14 +159,18 @@ function clockSetting() {
 	if (!document.getElementById("useClockSetting").checked) {
 		localStorage.setItem("useClock", "no");
 		bc.postMessage({ clockDisplay: 'noClock' });
-		document.getElementById("shotClock30").classList.add("noShow");
-		document.getElementById("shotClock60").classList.add("noShow");
-		document.getElementById("shotClockShow").classList.add("noShow");
-		document.getElementById("stopClockDiv").classList.add("noShow");
-		document.getElementById("p1extensionBtn").classList.add("noShow");
-		document.getElementById("p2extensionBtn").classList.add("noShow");
-		document.getElementById("p1ExtReset").classList.add("noShow");
-		document.getElementById("p2ExtReset").classList.add("noShow");
+		// document.getElementById("shotClock30").classList.add("noShow");
+		// document.getElementById("shotClock60").classList.add("noShow");
+		// document.getElementById("shotClockShow").classList.add("noShow");
+		// document.getElementById("stopClockDiv").classList.add("noShow");
+		// document.getElementById("p1extensionBtn").classList.add("noShow");
+		// document.getElementById("p2extensionBtn").classList.add("noShow");
+		// document.getElementById("p1ExtReset").classList.add("noShow");
+		// document.getElementById("p2ExtReset").classList.add("noShow");
+		// document.getElementById("clockInfo").classList.add("noShow");
+		document.getElementById("resetBtn").classList.add("noShow");
+		document.getElementById("clockInfo").classList.add("noShow");
+		//document.getElementById("extensionSettingsLabel").classList.add("noShow");
 		document.getElementById("resetBtn").innerHTML = "Reset Scores";
 		if (localStorage.getItem("useSalotto") != "yes" && localStorage.getItem("useClock") != "yes" && localStorage.getItem("useCustomLogo") != "yes") {
 			document.getElementById("allCheck").checked = false;
@@ -174,15 +178,20 @@ function clockSetting() {
 	} else if (document.getElementById("useClockSetting").checked) {
 		localStorage.setItem("useClock", "yes");
 		bc.postMessage({ clockDisplay: 'useClock' });
-		document.getElementById("shotClock30").classList.remove("noShow");
-		document.getElementById("shotClock60").classList.remove("noShow");
-		document.getElementById("shotClockShow").classList.remove("noShow");
-		document.getElementById("stopClockDiv").classList.remove("noShow");
-		document.getElementById("p1extensionBtn").classList.remove("noShow");
-		document.getElementById("p2extensionBtn").classList.remove("noShow");
-		document.getElementById("p1ExtReset").classList.remove("noShow");
-		document.getElementById("p2ExtReset").classList.remove("noShow");
-		document.getElementById("resetBtn").innerHTML = "Reset Extensions";
+		// document.getElementById("shotClock30").classList.remove("noShow");
+		// document.getElementById("shotClock60").classList.remove("noShow");
+		// document.getElementById("shotClockShow").classList.remove("noShow");
+		// document.getElementById("stopClockDiv").classList.remove("noShow");
+		// document.getElementById("p1extensionBtn").classList.remove("noShow");
+		// document.getElementById("p2extensionBtn").classList.remove("noShow");
+		// document.getElementById("p1ExtReset").classList.remove("noShow");
+		// document.getElementById("p2ExtReset").classList.remove("noShow");
+		// document.getElementById("clockInfo").classList.remove("noShow");
+		document.getElementById("resetBtn").classList.remove("noShow");
+		// document.getElementById("resetBtn").innerHTML = "Reset Extensions";
+		document.getElementById("clockInfo").classList.remove("noShow");
+		//document.getElementById("extensionSettingsLabel").classList.remove("noShow");
+		//document.getElementById("extensionSettingsLabel").innerHTML = "Extension Controls";
 		if (localStorage.getItem("useSalotto") == "yes" && localStorage.getItem("useClock") == "yes" && localStorage.getItem("useCustomLogo") == "yes") {
 			document.getElementById("allCheck").checked = true;
 		}
@@ -195,44 +204,63 @@ function clockDisplay(opt3) {
 	if (opt3 == "show") {
 		document.getElementById("shotClockShow").innerHTML = "Hide Clock";
 		document.getElementById("shotClockShow").setAttribute("onclick", "clockDisplay('hide')");
-		document.getElementById("shotClockShow").style.border = "2px solid lime";
+		document.getElementById("shotClockShow").style.background = "green";
+		document.getElementById("shotClockShow").style.color = "black";
 	} else if (opt3 == "hide") {
 		document.getElementById("shotClockShow").innerHTML = "Show Clock";
 		document.getElementById("shotClockShow").setAttribute("onclick", "clockDisplay('show')");
-		document.getElementById("shotClockShow").style.border = "2px solid black";
+		document.getElementById("shotClockShow").style.background = "none";
+		document.getElementById("shotClockShow").style.color = "white";
+		//document.getElementById("shotClockShow").style.border = "2px solid black";
 	}
 }
 
 function postNames() {
-	if (raceInfoTxt.value == " ") {
-		raceInfoTxt.value = "&nbsp;";
-	}
-	if (wagerInfoTxt.value == " ") {
-		wagerInfoTxt.value = "&nbsp;";
-	}
+	// if (raceInfoTxt.value == " ") {
+	// 	raceInfoTxt.value = "&nbsp;";
+	// }
+	// if (wagerInfoTxt.value == " ") {
+	// 	wagerInfoTxt.value = "&nbsp;";
+	// }
 	p1namemsg = document.getElementById("p1Name").value.substring(0, 29);
 	p2namemsg = document.getElementById("p2Name").value.substring(0, 29);
 	bc.postMessage({ player: '1', name: p1namemsg });
 	bc.postMessage({ player: '2', name: p2namemsg });
-	racemsg = document.getElementById("raceInfoTxt").value;
-	wagermsg = document.getElementById("wagerInfoTxt").value;
-	bc.postMessage({ race: racemsg });
-	bc.postMessage({ wager: wagermsg });	
+	// racemsg = document.getElementById("raceInfoTxt").value;
+	// wagermsg = document.getElementById("wagerInfoTxt").value;
+	// bc.postMessage({ race: racemsg });
+	// bc.postMessage({ wager: wagermsg });	
 	var p1FirstName = document.getElementById("p1Name").value.split(" ")[0];
 	var p2FirstName = document.getElementById("p2Name").value.split(" ")[0];
-	if (!p1Name.value == "") { document.getElementById("p1ExtReset").innerHTML = "Reset<br>" + p1FirstName.substring(0, 9) + "'s Ext"; } else { document.getElementById("p1ExtReset").innerHTML = "P1 Ext Reset"; }
-	if (!p2Name.value == "") { document.getElementById("p2ExtReset").innerHTML = "Reset<br>" + p2FirstName.substring(0, 9) + "'s Ext"; } else { document.getElementById("p2ExtReset").innerHTML = "P2 Ext Reset"; }
-	if (!p1Name.value == "") { document.getElementById("p1extensionBtn").innerHTML = p1FirstName.substring(0, 9) + "'s<br>Extension"; } else { document.getElementById("p1extensionBtn").innerHTML = "P1 Extension"; }
-	if (!p2Name.value == "") { document.getElementById("p2extensionBtn").innerHTML = p2FirstName.substring(0, 9) + "'s<br>Extension"; } else { document.getElementById("p2extensionBtn").innerHTML = "P2 Extension"; }
+	// if (!p1Name.value == "") { document.getElementById("p1ExtReset").innerHTML = "Reset<br>" + p1FirstName.substring(0, 9) + "'s Ext"; } else { document.getElementById("p1ExtReset").innerHTML = "P1 Ext Reset"; }
+	// if (!p2Name.value == "") { document.getElementById("p2ExtReset").innerHTML = "Reset<br>" + p2FirstName.substring(0, 9) + "'s Ext"; } else { document.getElementById("p2ExtReset").innerHTML = "P2 Ext Reset"; }
+	if (!p1Name.value == "") { document.getElementById("p1extensionBtn").innerHTML = p1FirstName.substring(0, 9) + "'s Extension"; } else { document.getElementById("p1extensionBtn").innerHTML = "P1 Extension"; }
+	if (!p2Name.value == "") { document.getElementById("p2extensionBtn").innerHTML = p2FirstName.substring(0, 9) + "'s Extension"; } else { document.getElementById("p2extensionBtn").innerHTML = "P2 Extension"; }
 	if (!p1Name.value == "") { document.getElementById("p1ScoreLabel").innerHTML = p1namemsg + " - Score/Rack(s)/Ball(s)"; } else { document.getElementById("p1ScoreLabel").innerHTML = "Player/Team 1 - Score/Rack(s)/Ball(s)";}
 	if (!p2Name.value == "") { document.getElementById("p2ScoreLabel").innerHTML = p2namemsg + " - Score/Rack(s)/Ball(s)"; } else { document.getElementById("p2ScoreLabel").innerHTML = "Player/Team 2 - Score/Rack(s)/Ball(s)";}
 	//if (!p1Name.value == "") { document.getElementById("sendP1Score").innerHTML = p1FirstName.substring(0, 9) + "<br>+1 Score"; document.getElementById("sendP1ScoreSub").innerHTML = p1FirstName.substring(0, 9) + "<br>-1 Score"; } else { document.getElementById("sendP1Score").innerHTML = "P1 +1 Score"; document.getElementById("sendP1ScoreSub").innerHTML = "P1 -1 Score"; }
 	//if (!p2Name.value == "") { document.getElementById("sendP2Score").innerHTML = p2FirstName.substring(0, 9) + "<br>+1 Score"; document.getElementById("sendP2ScoreSub").innerHTML = p2FirstName.substring(0, 9) + "<br>-1 Score"; } else { document.getElementById("sendP2Score").innerHTML = "P2 +1 Score"; document.getElementById("sendP2ScoreSub").innerHTML = "P2 -1 Score"; }
 	localStorage.setItem("p1NameCtrlPanel", p1Name.value);
 	localStorage.setItem("p2NameCtrlPanel", p2Name.value);
+	// localStorage.setItem("raceInfo", raceInfoTxt.value);
+	// localStorage.setItem("wagerInfo", wagerInfoTxt.value);
+}
+
+function postInfo() {
+	if (raceInfoTxt.value == " ") {
+		raceInfoTxt.value = "&nbsp;";
+	}
+	if (wagerInfoTxt.value == " ") {
+		wagerInfoTxt.value = "&nbsp;";
+	}
+	racemsg = document.getElementById("raceInfoTxt").value;
+	wagermsg = document.getElementById("wagerInfoTxt").value;
+	bc.postMessage({ race: racemsg });
+	bc.postMessage({ wager: wagermsg });	
 	localStorage.setItem("raceInfo", raceInfoTxt.value);
 	localStorage.setItem("wagerInfo", wagerInfoTxt.value);
 }
+
 
 function pushScores() {
 	// Send current scores
@@ -310,8 +338,8 @@ function rst_scr_btn() {
 	document.getElementById("sendP2Score").style.border = "none";
 	document.getElementById("sendP1ScoreSub").style.border = "none";
 	document.getElementById("sendP2ScoreSub").style.border = "none";
-	document.getElementById("p1ExtReset").style.border = "2px solid black";
-	document.getElementById("p2ExtReset").style.border = "2px solid black";
+	// document.getElementById("p1ExtReset").style.border = "2px solid black";
+	// document.getElementById("p2ExtReset").style.border = "2px solid black";
 	document.getElementById('settingsBox2').style.border = "none";
 	document.getElementById('logoSsImg1').style.border = "none";
 	document.getElementById('logoSsImg2').style.border = "none";
@@ -322,13 +350,34 @@ function shotClock(timex) {
 	timerIsRunning = true;
 	var stime = timex;
 	bc.postMessage({ time: stime });
-	if (timex == 31000) { document.getElementById("shotClock30").style.border = "2px solid lime"; } else { document.getElementById("shotClock60").style.border = "2px solid lime"; };
+
+	// Store which button was clicked
+    const buttonId = timex === 31000 ? 'shotClock30' : 'shotClock60';
+    const button = document.getElementById(buttonId);
+    const clockDisplay = document.getElementById("clockLocalDisplay");
+
+	// // Reset any existing styles first
+    // clockDisplay.style.cssText = '';
+
+	if (timex == 31000) { document.getElementById("shotClock30").style.border = "2px solid black"; } else { document.getElementById("shotClock60").style.border = "2px solid black"; };
 	document.getElementById("shotClock30").setAttribute("onclick", "");
 	document.getElementById("shotClock60").setAttribute("onclick", "");
 	document.getElementById("shotClock30").classList.add("clkd");
 	document.getElementById("shotClock60").classList.add("clkd");
 	document.getElementById("stopClockDiv").classList.replace("obs28", "blue28");
 	document.getElementById("stopClockDiv").classList.remove("hover");
+    
+    // Position clockLocalDisplay over the button that was clicked
+    const buttonRect = button.getBoundingClientRect();
+    clockDisplay.style.position = 'fixed';
+    clockDisplay.style.left = buttonRect.left + 'px';
+    clockDisplay.style.top = buttonRect.top + 'px';
+    clockDisplay.style.width = '160px';
+    clockDisplay.style.height = '30px';
+    clockDisplay.style.display = 'flex';
+    clockDisplay.style.justifyContent = 'center';
+    clockDisplay.style.alignItems = 'center';
+    clockDisplay.style.zIndex = '1000';
 
 }
 
@@ -337,13 +386,14 @@ function stopClock() {
 	timerIsRunning = false;
 	document.getElementById("shotClock30").style.border = "2px solid black";
 	document.getElementById("shotClock60").style.border = "2px solid black";
-	document.getElementById("clockLocalDisplay").style.background = "none";
 	document.getElementById("shotClock30").setAttribute("onclick", "shotClock(31000)");
 	document.getElementById("shotClock60").setAttribute("onclick", "shotClock(61000)");
-	document.getElementById("clockLocalDisplay").innerHTML = "";
-	document.getElementById("clockLocalDisplay").style.background = "2px solid black";
+	// document.getElementById("clockLocalDisplay").innerHTML = "";
+	// document.getElementById("clockLocalDisplay").style.background = "none";
+	// document.getElementById("clockLocalDisplay").style.background = "2px solid black";
+	// document.getElementById("clockLocalDisplay").style.color = "black";
+	document.getElementById("clockLocalDisplay").style.display = 'none';
 	clockDisplay("hide");
-	document.getElementById("clockLocalDisplay").style.color = "black";
 	if (localStorage.getItem("obsTheme") == "light") {
 		document.getElementById("shotClock30").classList.remove("clkd");
 		document.getElementById("shotClock60").classList.remove("clkd");
@@ -381,10 +431,11 @@ function add30(player) {
 	bc.postMessage({ clockDisplay: playermsgx + 'extension' });
 	document.getElementById(player + "extensionBtn").setAttribute("onclick", "resetExt('" + player + "')");
 	document.getElementById(player + "extensionBtn").classList.add("clkd");
-	document.getElementById(player + "extensionBtn").style.border = "2px solid red";
+	document.getElementById(player + "extensionBtn").style.background = "red";
+	document.getElementById(player + "extensionBtn").style.color = "black";
 	
 	var playerName = document.getElementById(player + "Name").value.split(" ")[0] || player.toUpperCase();
-	document.getElementById(player + "extensionBtn").innerHTML = "Reset<br>" + playerName.substring(0, 9) + "'s Ext";
+	document.getElementById(player + "extensionBtn").innerHTML = "Reset " + playerName.substring(0, 9) + "'s Ext";
 	
 	clockDisplay("hide");
 }
@@ -396,9 +447,10 @@ function resetExt(player, flash) {
 	document.getElementById(player + "extensionBtn").setAttribute("onclick", "add30('" + player + "')");
 	document.getElementById(player + "extensionBtn").style.border = "2px solid black";
 	document.getElementById(player + "extensionBtn").classList.remove("clkd");
+	document.getElementById(player + "extensionBtn").style.background = "green";
 	
 	var playerName = document.getElementById(player + "Name").value.split(" ")[0] || player.toUpperCase();
-	document.getElementById(player + "extensionBtn").innerHTML = playerName.substring(0, 9) + "'s<br>Extension";
+	document.getElementById(player + "extensionBtn").innerHTML = playerName.substring(0, 9) + "'s Extension";
 	
 	if (flash != "noflash") {
 		document.getElementById(player + "extensionBtn").style.border = "2px solid blue";
@@ -599,7 +651,7 @@ function startThemeCheck() {
 }
 
 function cLogoNameChange() {
-	cLogoName = prompt("Rename Custom Logo Checkbox Label");
+	cLogoName = prompt("Rename \'Custom Logo\' checkbox label (13 character maximum)");
 	if (cLogoName != null && cLogoName != "") {
 		localStorage.setItem("clogoNameStored", cLogoName.substring(0, 13));
 		document.getElementById("logoName").innerHTML = cLogoName.substring(0, 13);
