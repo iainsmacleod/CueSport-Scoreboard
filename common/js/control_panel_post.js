@@ -71,25 +71,25 @@ slider.oninput = function () {
 document.getElementById('settingsBox2').onclick = function () {
 	document.getElementById('settingsBox2').style.border = "1px solid blue";
 	document.getElementById('FileUploadL0').click();
-	setTimeout(rst_scr_btn, 100);
+	//setTimeout(rst_scr_btn, 100);
 };
 
 document.getElementById('logoSsImg1').onclick = function () {
 	document.getElementById('logoSsImg1').style.border = "1px solid blue";
 	document.getElementById('FileUploadL1').click();
-	setTimeout(rst_scr_btn, 100);
+	//setTimeout(rst_scr_btn, 100);
 };
 
 document.getElementById('logoSsImg2').onclick = function () {
 	document.getElementById('logoSsImg2').style.border = "1px solid blue";
 	document.getElementById('FileUploadL2').click();
-	setTimeout(rst_scr_btn, 100);
+	//setTimeout(rst_scr_btn, 100);
 };
 
 document.getElementById('logoSsImg3').onclick = function () {
 	document.getElementById('logoSsImg3').style.border = "1px solid blue";
 	document.getElementById('FileUploadL3').click();
-	setTimeout(rst_scr_btn, 100);
+	//setTimeout(rst_scr_btn, 100);
 };
 
 if (localStorage.getItem("useSalotto") != "yes" && localStorage.getItem("useClock") != "yes" && localStorage.getItem("useCustomLogo") != "yes") {

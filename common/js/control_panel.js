@@ -289,7 +289,7 @@ function postScore(opt1, player) {
 			stopClock();
 			document.getElementById("sendP" + player + "Score").style.border = "2px solid lightgreen";
 			document.getElementById("p"+player+"Score").value = p1ScoreValue;
-			setTimeout(rst_scr_btn, 100);
+			//setTimeout(rst_scr_btn, 100);
 			resetExt('p1', 'noflash');
 			resetExt('p2', 'noflash');
 		} else {
@@ -301,7 +301,7 @@ function postScore(opt1, player) {
 				localStorage.setItem("p" + player + "Score", p1ScoreValue);
 				document.getElementById("sendP" + player + "ScoreSub").style.border = "2px solid tomato";
 				document.getElementById("p"+player+"Score").value = p1ScoreValue;
-				setTimeout(rst_scr_btn, 100);
+				//setTimeout(rst_scr_btn, 100);
 			}
 		}
 	}
@@ -315,7 +315,7 @@ function postScore(opt1, player) {
 			stopClock();
 			document.getElementById("sendP" + player + "Score").style.border = "2px solid lightgreen";
 			document.getElementById("p"+player+"Score").value = p2ScoreValue;
-			setTimeout(rst_scr_btn, 100);
+			//setTimeout(rst_scr_btn, 100);
 			resetExt('p1', 'noflash');
 			resetExt('p2', 'noflash');
 		} else {
@@ -327,24 +327,24 @@ function postScore(opt1, player) {
 				localStorage.setItem("p" + player + "Score", p2ScoreValue);
 				document.getElementById("sendP" + player + "ScoreSub").style.border = "2px solid tomato";
 				document.getElementById("p"+player+"Score").value = p2ScoreValue;
-				setTimeout(rst_scr_btn, 100);
+				//setTimeout(rst_scr_btn, 100);
 			}
 		}
 	}
 }
 
-function rst_scr_btn() {
-	document.getElementById("sendP1Score").style.border = "none";
-	document.getElementById("sendP2Score").style.border = "none";
-	document.getElementById("sendP1ScoreSub").style.border = "none";
-	document.getElementById("sendP2ScoreSub").style.border = "none";
-	// document.getElementById("p1ExtReset").style.border = "2px solid black";
-	// document.getElementById("p2ExtReset").style.border = "2px solid black";
-	document.getElementById('settingsBox2').style.border = "none";
-	document.getElementById('logoSsImg1').style.border = "none";
-	document.getElementById('logoSsImg2').style.border = "none";
-	document.getElementById('logoSsImg3').style.border = "none";
-}
+// function rst_scr_btn() {
+// 	document.getElementById("sendP1Score").style.border = "none";
+// 	document.getElementById("sendP2Score").style.border = "none";
+// 	document.getElementById("sendP1ScoreSub").style.border = "none";
+// 	document.getElementById("sendP2ScoreSub").style.border = "none";
+// 	// document.getElementById("p1ExtReset").style.border = "2px solid black";
+// 	// document.getElementById("p2ExtReset").style.border = "2px solid black";
+// 	document.getElementById('settingsBox2').style.border = "none";
+// 	document.getElementById('logoSsImg1').style.border = "none";
+// 	document.getElementById('logoSsImg2').style.border = "none";
+// 	document.getElementById('logoSsImg3').style.border = "none";
+// }
 
 function shotClock(timex) {
 	timerIsRunning = true;
@@ -403,7 +403,7 @@ function stopClock() {
 	}
 	document.getElementById("stopClockDiv").classList.replace("blue28", "obs28");
 	document.getElementById("stopClockDiv").classList.add("hover");
-	setTimeout(rst_scr_btn, 100);
+	//setTimeout(rst_scr_btn, 100);
 }
 
 // function resetScore() {
@@ -454,7 +454,7 @@ function resetExt(player, flash) {
 	
 	if (flash != "noflash") {
 		document.getElementById(player + "extensionBtn").style.border = "2px solid blue";
-		setTimeout(rst_scr_btn, 100);
+		//setTimeout(rst_scr_btn, 100);
 	}
 }
 
