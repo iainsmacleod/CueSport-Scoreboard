@@ -6,7 +6,7 @@
 
 	.slider {
 		-webkit-appearance: none;
-		width: 75%;
+		width: 70%;
 		height: 5px;
 		border-radius: 5px;
 		background: lightgrey; 
@@ -57,7 +57,7 @@
 		display: flex;
 		justify-content: center; /* align horizontal */
 		align-items: center; /* align vertical */
-		font-size: 12pt;
+		font-size: 10pt;
 		}
 		
 	#mainDiv {
@@ -82,12 +82,12 @@
 	#p1Score, #p2Score {
 		cursor: pointer;
 		position: sticky;
-		width:85px;
+		width:50px;
 		height:26px;
 		border: 0px solid #000;
 		border-radius: 0px;
 		background-color: #ed4e54;
-		font-size: 15pt;
+		font-size: 12pt;
 		}
 	
 	.score-control {
@@ -116,14 +116,14 @@
 		  
 	#sendP2Score, #sendP2ScoreSub, #sendP1Score, #sendP1ScoreSub {
 		cursor: pointer;
-		width:85px;
+		width:40px;
 		height:28px;
 		border: 0px solid #000;
 		border-radius: 0px;
-		font-size: 15pt;
+		font-size: 12pt;
 		}
 	
-	#usePlayer1Setting, #usePlayer2Setting, #useClockSetting, #allCheck, #useSalottoSetting, #customLogo, #logoSlideshowChk{
+	#usePlayer1Setting, #usePlayer2Setting, #useClockSetting, #allCheck, #useSalottoSetting, #customLogo1, #customLogo2 #logoSlideshowChk{
 		cursor: pointer;
 		width: 15px;
         height: 15px;
@@ -181,9 +181,9 @@
 	
 	#p1colorDiv, #p2colorDiv {
 		cursor: pointer;
-		width:200px;
+		width:120px;
 		font-family:roboto;
-		font-size: 15pt;
+		font-size: 12pt;
 		font-weight: bold;
 		text-shadow: 1px 1px 2px black, 0 0 25px black, 0 0 5px black;
 		text-align: center;
@@ -192,18 +192,26 @@
 		-webkit-text-stroke: 1px black;
 	}
 	
-	#resetBtn, #shotClock30, #shotClock60, #stopClockDiv, #sendPNames, #sendPInfo, #sendPScores, #swapBtn, #settingsBox2, #shotClockShow, #logoSsImg1, #logoSsImg2, #logoSsImg3{
+	#shotClock30, #shotClock60, #stopClockDiv, #sendPNames, #sendPInfo, #sendPScores, #swapBtn, #shotClockShow, #logoSsImg1, #logoSsImg2, #logoSsImg3, #logoSsImg4, #logoSsImg5{
 			cursor: pointer;
-			width: 150px;
-			font-size: 12pt;
+			width: 100px;
+			font-size: 10pt;
 			padding: 0px 0px 0px 0px;
 			border:2px solid black;
 		}
 
+	#resetBtn, #uploadCustomLogo, #uploadCustomLogo2{
+		cursor: pointer;
+		width: 150px;
+		font-size: 10pt;
+		padding: 0px 0px 0px 0px;
+		border:2px solid black;
+	}
+
 	#p1extensionBtn, #p2extensionBtn  {
 		cursor: pointer;
-		width:200px;
-		font-size: 12pt;
+		width:120px;
+		font-size: 10pt;
 		padding: 0px 5px 0px 5px;
 		border:2px solid black;
 		color:black;
@@ -224,7 +232,7 @@
 	bottom: 5px;
 	text-align:center;
 	}
-	#FileUploadL0, #FileUploadL1, #FileUploadL2, #FileUploadL3 {
+	#FileUploadL1, #FileUploadL2, #FileUploadL3, #FileUploadL4, #FileUploadL5 {
     display: none;
 	}
 
@@ -240,7 +248,7 @@
 	
 	#playerInfo, #scoreInfo, #gameInfo, #clockInfo, #generalSettings, #settingsBox0, #settingsBox1 {
 	min-width:85px;
-	width:800px;
+	width:600px;
 	position:relative;
 	top:33px;
 	display:block;

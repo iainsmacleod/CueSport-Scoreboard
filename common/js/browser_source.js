@@ -13,8 +13,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////            
 
 function postLogo() {
-	if (localStorage.getItem("customLogo0") !== "") {
-		document.getElementById("g4Logo").src = localStorage.getItem("customLogo0");
+	if (localStorage.getItem("customLogo2") !== null && localStorage.getItem("customLogo2") !== "") {
+		document.getElementById("customLogo2").src = localStorage.getItem("customLogo2");
 	}
 }
 
@@ -175,22 +175,43 @@ function salottoHide() {
 }
 
 function customShow() {
-	document.getElementById("g4Logo").style.removeProperty('display');
+	document.getElementById("customLogo1").style.removeProperty('display');
 	setTimeout(function () {
-		if (document.getElementById("g4Logo").classList.contains("logoSlide")) {
-			document.getElementById("g4Logo").classList.replace("logoSlide", "fadeOutElm");
+		if (document.getElementById("customLogo1").classList.contains("logoSlide")) {
+			document.getElementById("customLogo1").classList.replace("logoSlide", "fadeOutElm");
 		}
-		if (document.getElementById("g4Logo").classList.contains("fade")) {
-			document.getElementById("g4Logo").classList.replace("fade", "fadeOutElm");
+		if (document.getElementById("customLogo1").classList.contains("fade")) {
+			document.getElementById("customLogo1").classList.replace("fade", "fadeOutElm");
 		}
-		document.getElementById("g4Logo").classList.replace("fadeOutElm", "fadeInElm");
+		document.getElementById("customLogo1").classList.replace("fadeOutElm", "fadeInElm");
 	}, 100);
-
 }
-function customHide() {
-	document.getElementById("g4Logo").classList.replace("fadeInElm", "fadeOutElm");
-	setTimeout(function () { document.getElementById("g4Logo").style.display = "none"; }, 1000);
 
+function customHide() {
+	document.getElementById("customLogo1").classList.replace("fadeInElm", "fadeOutElm");
+	setTimeout(function () { 
+		document.getElementById("customLogo1").style.display = "none"; 
+	}, 1000);
+}
+
+function custom2Show() {
+	document.getElementById("customLogo2").style.removeProperty('display');
+	setTimeout(function () {
+		if (document.getElementById("customLogo2").classList.contains("logoSlide")) {
+			document.getElementById("customLogo2").classList.replace("logoSlide", "fadeOutElm");
+		}
+		if (document.getElementById("customLogo2").classList.contains("fade")) {
+			document.getElementById("customLogo2").classList.replace("fade", "fadeOutElm");
+		}
+		document.getElementById("customLogo2").classList.replace("fadeOutElm", "fadeInElm");
+	}, 100);
+}
+
+function custom2Hide() {
+	document.getElementById("customLogo2").classList.replace("fadeInElm", "fadeOutElm");
+	setTimeout(function () { 
+		document.getElementById("customLogo2").style.display = "none"; 
+	}, 1000);
 }
 
 function showSlides() {

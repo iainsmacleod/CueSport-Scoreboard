@@ -10,7 +10,8 @@
 // variable declarations
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-var cLogoName = "Custom Logo";  // 13 character limit. it will auto trim to 13 characters.
+var cLogoName = "Player 1 Logo";  // 13 character limit. it will auto trim to 13 characters.
+var cLogoName2 = "Player 2 Logo";
 const bc = new BroadcastChannel('g4-main');
 const bcr = new BroadcastChannel('g4-recv'); // return channel from browser_source 
 var hotkeyP1ScoreUp;
@@ -68,31 +69,37 @@ slider.oninput = function () {
 	bc.postMessage({ opacity: sliderValue });
 }
 
-document.getElementById('settingsBox2').onclick = function () {
-	document.getElementById('settingsBox2').style.border = "1px solid blue";
-	document.getElementById('FileUploadL0').click();
-	//setTimeout(rst_scr_btn, 100);
-};
-
-document.getElementById('logoSsImg1').onclick = function () {
-	document.getElementById('logoSsImg1').style.border = "1px solid blue";
+document.getElementById('uploadCustomLogo').onclick = function () {
+	document.getElementById('uploadCustomLogo').style.border = "2px solid blue";
 	document.getElementById('FileUploadL1').click();
 	//setTimeout(rst_scr_btn, 100);
 };
 
-document.getElementById('logoSsImg2').onclick = function () {
-	document.getElementById('logoSsImg2').style.border = "1px solid blue";
+document.getElementById('uploadCustomLogo2').onclick = function () {
+	document.getElementById('uploadCustomLogo2').style.border = "2px solid blue";
 	document.getElementById('FileUploadL2').click();
 	//setTimeout(rst_scr_btn, 100);
 };
 
 document.getElementById('logoSsImg3').onclick = function () {
-	document.getElementById('logoSsImg3').style.border = "1px solid blue";
+	document.getElementById('logoSsImg3').style.border = "2px solid blue";
 	document.getElementById('FileUploadL3').click();
 	//setTimeout(rst_scr_btn, 100);
 };
 
-if (localStorage.getItem("useSalotto") != "yes" && localStorage.getItem("useClock") != "yes" && localStorage.getItem("useCustomLogo") != "yes") {
+document.getElementById('logoSsImg4').onclick = function () {
+	document.getElementById('logoSsImg4').style.border = "2px solid blue";
+	document.getElementById('FileUploadL4').click();
+	//setTimeout(rst_scr_btn, 100);
+};
+
+document.getElementById('logoSsImg5').onclick = function () {
+	document.getElementById('logoSsImg5').style.border = "2px solid blue";
+	document.getElementById('FileUploadL5').click();
+	//setTimeout(rst_scr_btn, 100);
+};
+
+if (localStorage.getItem("customLogo1") != "yes" || localStorage.getItem("customLogo2") != "yes" ) {
 	document.getElementById("allCheck").checked = false;
 }
 
@@ -110,6 +117,7 @@ if (localStorage.getItem('p1colorSet') !== null) {
 	document.getElementById('p1colorDiv').style.background = localStorage.getItem('p1colorSet');
 	document.getElementById('p1Name').style.background = `linear-gradient(to right, ${localStorage.getItem('p1colorSet')}, white)`;
 	document.getElementsByTagName("select")[0].options[0].value = cvalue;
+	if (cvalue == "white") { document.getElementById("p1colorDiv").style.color = "black"; } else { document.getElementById("p1colorDiv").style.color = "white"; };
 	// if (cvalue == "cadetblue" || cvalue == "steelblue" || cvalue == "grey" ||cvalue == "lightgrey" || cvalue == "green" || cvalue == "khaki" || cvalue == "tomato" || cvalue == "red" || cvalue == "white" || cvalue == "orangered" || cvalue == "orange" || cvalue == "lightgreen" || cvalue == "lightseagreen") { document.getElementById("p1colorDiv").style.color = "#000"; } else { document.getElementById("p1colorDiv").style.color = "lightgrey"; };
 }
 
@@ -126,6 +134,7 @@ if (localStorage.getItem('p2colorSet') !== null) {
     }
 	document.getElementById('p2colorDiv').style.background = localStorage.getItem('p2colorSet');
 	document.getElementById('p2Name').style.background = `linear-gradient(to left, ${localStorage.getItem('p2colorSet')}, white)`;
+	if (cvalue == "white") { document.getElementById("p2colorDiv").style.color = "black"; } else { document.getElementById("p2colorDiv").style.color = "white"; };
 	// if (cvalue == "cadetblue" || cvalue == "steelblue" || cvalue == "grey" || cvalue == "lightgrey" || cvalue == "green" || cvalue == "khaki" || cvalue == "tomato" || cvalue == "red" || cvalue == "orangered" || cvalue == "white" || cvalue == "orange" || cvalue == "lightgreen" || cvalue == "lightseagreen") { document.getElementById("p2colorDiv").style.color = "#000"; } else { document.getElementById("p2colorDiv").style.color = "lightgrey"; };
 }
 
@@ -149,20 +158,28 @@ if (localStorage.getItem('p2ScoreCtrlPanel') > 0 || localStorage.getItem('p2Scor
 	bc.postMessage(msg);
 }
 
-if (localStorage.getItem("useSalotto") == "yes") {
-	console.log("salotto = TRUE");
-	document.getElementById("useSalottoSetting").checked = true;
-	salottoSetting();
-} else {
-	salottoSetting()
-}
+// if (localStorage.getItem("useSalotto") == "yes") {
+// 	console.log("salotto = TRUE");
+// 	document.getElementById("useSalottoSetting").checked = true;
+// 	salottoSetting();
+// } else {
+// 	salottoSetting()
+// }
 
 if (localStorage.getItem("useCustomLogo") == "yes") {
-	console.log("customLogo = TRUE");
-	document.getElementById("customLogo").checked = true;
+	console.log("customLogo1 = TRUE");
+	document.getElementById("customLogo1").checked = true;
 	customLogoSetting();
 } else {
 	customLogoSetting()
+}
+
+if (localStorage.getItem("useCustomLogo2") == "yes") {
+	console.log("customLogo2 = TRUE");
+	document.getElementById("customLogo2").checked = true;	
+	customLogoSetting2();
+} else {
+	customLogoSetting2()
 }
 
 if (localStorage.getItem("useClock") == "yes") {
@@ -170,8 +187,8 @@ if (localStorage.getItem("useClock") == "yes") {
 	document.getElementById("useClockSetting").checked = true;
 	clockSetting();
 } else {
-	document.getElementById("useSalottoSetting").checked = false;
-	document.getElementById("useSalottoSetting").removeAttribute("checked");
+	// document.getElementById("useSalottoSetting").checked = false;
+	// document.getElementById("useSalottoSetting").removeAttribute("checked");
 	clockSetting()
 }
 
@@ -194,14 +211,17 @@ function setPlayerVisibility(playerNumber) {
 if (localStorage.getItem("customLogo1") != null) { document.getElementById("l1Img").src = localStorage.getItem("customLogo1"); } else { document.getElementById("l1Img").src = "./common/images/placeholder.png"; };
 if (localStorage.getItem("customLogo2") != null) { document.getElementById("l2Img").src = localStorage.getItem("customLogo2"); } else { document.getElementById("l2Img").src = "./common/images/placeholder.png"; };
 if (localStorage.getItem("customLogo3") != null) { document.getElementById("l3Img").src = localStorage.getItem("customLogo3"); } else { document.getElementById("l3Img").src = "./common/images/placeholder.png"; };
-if (localStorage.getItem("customLogo0") != null) { document.getElementById("l0Img").src = localStorage.getItem("customLogo0"); } else { document.getElementById("l0Img").src = "./common/images/placeholder.png"; };
+if (localStorage.getItem("customLogo4") != null) { document.getElementById("l4Img").src = localStorage.getItem("customLogo4"); } else { document.getElementById("l4Img").src = "./common/images/placeholder.png"; };
+if (localStorage.getItem("customLogo5") != null) { document.getElementById("l5Img").src = localStorage.getItem("customLogo5"); } else { document.getElementById("l5Img").src = "./common/images/placeholder.png"; };
 if (localStorage.getItem("slideShow") == "yes") { document.getElementById("logoSlideshowChk").checked = true; logoSlideshow(); };
 if (localStorage.getItem("obsTheme") == "28") { document.getElementById("obsTheme").value = "28"; }
 if (localStorage.getItem("b_style") == "1") { document.getElementById("bsStyle").value = "1"; }
 if (localStorage.getItem("b_style") == "2") { document.getElementById("bsStyle").value = "2"; }
 if (localStorage.getItem("b_style") == "3") { document.getElementById("bsStyle").value = "3"; }
 if (localStorage.getItem("clogoNameStored") != null) { cLogoName = localStorage.getItem("clogoNameStored"); }
+if (localStorage.getItem("clogoName2Stored") != null) { cLogoName2 = localStorage.getItem("clogoName2Stored"); }
 document.getElementById("logoName").innerHTML = cLogoName.substring(0, 13);
+document.getElementById("logoName2").innerHTML = cLogoName2.substring(0, 13);
 document.getElementById("p1Name").value = localStorage.getItem("p1NameCtrlPanel");
 document.getElementById("p1Score").value = localStorage.getItem("p1ScoreCtrlPanel");
 document.getElementById("p2Name").value = localStorage.getItem("p2NameCtrlPanel");

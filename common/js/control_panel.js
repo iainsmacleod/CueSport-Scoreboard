@@ -38,8 +38,10 @@ function bsStyleChange() {
 
 function logoSlideshow() {
 	if (document.getElementById("logoSlideshowChk").checked == true) {
-		document.getElementById("customLogo").checked = false;
-		customLogoSetting_slideshowoff();
+		document.getElementById("customLogo1").checked = false;
+		document.getElementById("customLogo2").checked = false;
+		customLogoSetting();
+		customLogoSetting2();
 		localStorage.setItem("slideShow", "yes");
 		bc.postMessage({ clockDisplay: 'logoSlideShow-show' });
 	} else {
@@ -97,7 +99,9 @@ function swapColors() {
 		document.getElementsByTagName("select")[1].options[0].value = p1original;
 		c1value = p1original;
 		c2value = p2original;
+		if (c1value == "white") { document.getElementById("p1colorDiv").style.color = "black"; } else { document.getElementById("p1colorDiv").style.color = "white"; };
 		//if (c1value == "cadetblue" || c1value == "steelblue" || c1value == "grey" || c1value == "lightgrey" || c1value == "green" || c1value == "khaki" || c1value == "tomato" || c1value == "red" || c1value == "orangered" || c1value == "white" || c1value == "orange" || c1value == "lightgreen" || c1value == "lightseagreen") { document.getElementById("p2colorDiv").style.color = "#000"; } else { document.getElementById("p2colorDiv").style.color = "lightgrey"; };
+		if (c2value == "white") { document.getElementById("p2colorDiv").style.color = "black"; } else { document.getElementById("p2colorDiv").style.color = "white"; };
 		//if (c2value == "cadetblue" || c2value == "steelblue" || c2value == "grey" || c2value == "lightgrey" || c2value == "green" || cvalue == "orange" || cvalue == "khaki" || cvalue == "tomato" || cvalue == "red" || cvalue == "orangered" || cvalue == "white" || cvalue == "orange" || cvalue == "lightgreen" || cvalue == "lightseagreen") { document.getElementById("p1colorDiv").style.color = "#000"; } else { document.getElementById("p1colorDiv").style.color = "lightgrey"; };
 	}, 100);
 }
@@ -113,6 +117,7 @@ function playerColorChange(player) {
 		document.getElementById("p1Name").style.background = `linear-gradient(to right, ${selectedColor}, white)`;
 
 		//if (cvalue == "cadetblue" || cvalue == "steelblue" || cvalue == "grey" || cvalue == "lightgrey" || cvalue == "green" || cvalue == "khaki" || cvalue == "tomato" || cvalue == "red" || cvalue == "orangered" || cvalue == "white" || cvalue == "orange" || cvalue == "lightgreen" || cvalue == "lightseagreen") { document.getElementById("p1colorDiv").style.color = "#000"; } else { document.getElementById("p1colorDiv").style.color = "lightgrey"; };
+		if (cvalue == "white") { document.getElementById("p1colorDiv").style.color = "black"; } else { document.getElementById("p1colorDiv").style.color = "white"; };
 		localStorage.setItem("p1colorSet", document.getElementById("p" + player + "colorDiv").value);
 		document.getElementsByTagName("select")[0].options[0].value = cvalue;
 	} else {
@@ -124,6 +129,7 @@ function playerColorChange(player) {
 		document.getElementById("p2Name").style.background = `linear-gradient(to left, ${selectedColor}, white)`;
 
 		//if (cvalue == "cadetblue" || cvalue == "steelblue" || cvalue == "grey" || cvalue == "lightgrey" || cvalue == "green" || cvalue == "khaki" || cvalue == "tomato" || cvalue == "red" || cvalue == "orangered" || cvalue == "white" || cvalue == "orange" || cvalue == "lightgreen" || cvalue == "lightseagreen") { document.getElementById("p2colorDiv").style.color = "#000"; } else { document.getElementById("p2colorDiv").style.color = "lightgrey"; };
+		if (cvalue == "white") { document.getElementById("p2colorDiv").style.color = "black"; } else { document.getElementById("p2colorDiv").style.color = "white"; };
 		localStorage.setItem("p2colorSet", document.getElementById("p" + player + "colorDiv").value);
 		document.getElementsByTagName("select")[1].options[0].value = cvalue;
 	}
@@ -172,7 +178,7 @@ function clockSetting() {
 		document.getElementById("clockInfo").classList.add("noShow");
 		//document.getElementById("extensionSettingsLabel").classList.add("noShow");
 		document.getElementById("resetBtn").innerHTML = "Reset Scores";
-		if (localStorage.getItem("useSalotto") != "yes" && localStorage.getItem("useClock") != "yes" && localStorage.getItem("useCustomLogo") != "yes") {
+		if (localStorage.getItem("useCustomLogo") != "yes" && localStorage.getItem("useCustomLogo2") != "yes") {
 			document.getElementById("allCheck").checked = false;
 		}
 	} else if (document.getElementById("useClockSetting").checked) {
@@ -192,7 +198,7 @@ function clockSetting() {
 		document.getElementById("clockInfo").classList.remove("noShow");
 		//document.getElementById("extensionSettingsLabel").classList.remove("noShow");
 		//document.getElementById("extensionSettingsLabel").innerHTML = "Extension Controls";
-		if (localStorage.getItem("useSalotto") == "yes" && localStorage.getItem("useClock") == "yes" && localStorage.getItem("useCustomLogo") == "yes") {
+		if (localStorage.getItem("useCustomLogo") == "yes" && localStorage.getItem("useCustomLogo2") == "yes") {
 			document.getElementById("allCheck").checked = true;
 		}
 	}
@@ -210,7 +216,7 @@ function clockDisplay(opt3) {
 		document.getElementById("shotClockShow").innerHTML = "Show Clock";
 		document.getElementById("shotClockShow").setAttribute("onclick", "clockDisplay('show')");
 		document.getElementById("shotClockShow").style.background = "none";
-		document.getElementById("shotClockShow").style.color = "white";
+		//document.getElementById("shotClockShow").style.color = "white";
 		//document.getElementById("shotClockShow").style.border = "2px solid black";
 	}
 }
@@ -234,8 +240,8 @@ function postNames() {
 	var p2FirstName = document.getElementById("p2Name").value.split(" ")[0];
 	// if (!p1Name.value == "") { document.getElementById("p1ExtReset").innerHTML = "Reset<br>" + p1FirstName.substring(0, 9) + "'s Ext"; } else { document.getElementById("p1ExtReset").innerHTML = "P1 Ext Reset"; }
 	// if (!p2Name.value == "") { document.getElementById("p2ExtReset").innerHTML = "Reset<br>" + p2FirstName.substring(0, 9) + "'s Ext"; } else { document.getElementById("p2ExtReset").innerHTML = "P2 Ext Reset"; }
-	if (!p1Name.value == "") { document.getElementById("p1extensionBtn").innerHTML = p1FirstName.substring(0, 9) + "'s Extension"; } else { document.getElementById("p1extensionBtn").innerHTML = "P1 Extension"; }
-	if (!p2Name.value == "") { document.getElementById("p2extensionBtn").innerHTML = p2FirstName.substring(0, 9) + "'s Extension"; } else { document.getElementById("p2extensionBtn").innerHTML = "P2 Extension"; }
+	if (!p1Name.value == "") { document.getElementById("p1extensionBtn").innerHTML = p1FirstName.substring(0, 9) + "'s Extension"; } else { document.getElementById("p1extensionBtn").innerHTML = "P1's Extension"; }
+	if (!p2Name.value == "") { document.getElementById("p2extensionBtn").innerHTML = p2FirstName.substring(0, 9) + "'s Extension"; } else { document.getElementById("p2extensionBtn").innerHTML = "P2's Extension"; }
 	if (!p1Name.value == "") { document.getElementById("p1ScoreLabel").innerHTML = p1namemsg + " - Score/Rack(s)/Ball(s)"; } else { document.getElementById("p1ScoreLabel").innerHTML = "Player/Team 1 - Score/Rack(s)/Ball(s)";}
 	if (!p2Name.value == "") { document.getElementById("p2ScoreLabel").innerHTML = p2namemsg + " - Score/Rack(s)/Ball(s)"; } else { document.getElementById("p2ScoreLabel").innerHTML = "Player/Team 2 - Score/Rack(s)/Ball(s)";}
 	//if (!p1Name.value == "") { document.getElementById("sendP1Score").innerHTML = p1FirstName.substring(0, 9) + "<br>+1 Score"; document.getElementById("sendP1ScoreSub").innerHTML = p1FirstName.substring(0, 9) + "<br>-1 Score"; } else { document.getElementById("sendP1Score").innerHTML = "P1 +1 Score"; document.getElementById("sendP1ScoreSub").innerHTML = "P1 -1 Score"; }
@@ -279,58 +285,54 @@ function pushScores() {
 }
 
 function postScore(opt1, player) {
-	if (player == "1") {
-		if (opt1 == "add") {
-			p1ScoreValue = p1ScoreValue++ + 1;
-			msg = { player: player, score: p1ScoreValue };
-			bc.postMessage(msg);
-			localStorage.setItem("p" + player + "ScoreCtrlPanel", p1ScoreValue);
-			localStorage.setItem("p" + player + "Score", p1ScoreValue);
-			stopClock();
-			document.getElementById("sendP" + player + "Score").style.border = "2px solid lightgreen";
-			document.getElementById("p"+player+"Score").value = p1ScoreValue;
-			//setTimeout(rst_scr_btn, 100);
-			resetExt('p1', 'noflash');
-			resetExt('p2', 'noflash');
-		} else {
-			if (p1ScoreValue > 0) {
-				p1ScoreValue = p1ScoreValue-- - 1;
-				msg = { player: player, score: p1ScoreValue };
-				bc.postMessage(msg);
-				localStorage.setItem("p" + player + "ScoreCtrlPanel", p1ScoreValue);
-				localStorage.setItem("p" + player + "Score", p1ScoreValue);
-				document.getElementById("sendP" + player + "ScoreSub").style.border = "2px solid tomato";
-				document.getElementById("p"+player+"Score").value = p1ScoreValue;
-				//setTimeout(rst_scr_btn, 100);
-			}
-		}
-	}
-	if (player == "2") {
-		if (opt1 == "add") {
-			p2ScoreValue = p2ScoreValue++ + 1;
-			msg2 = { player: player, score: p2ScoreValue };
-			bc.postMessage(msg2);
-			localStorage.setItem("p" + player + "ScoreCtrlPanel", p2ScoreValue);
-			localStorage.setItem("p" + player + "Score", p2ScoreValue);
-			stopClock();
-			document.getElementById("sendP" + player + "Score").style.border = "2px solid lightgreen";
-			document.getElementById("p"+player+"Score").value = p2ScoreValue;
-			//setTimeout(rst_scr_btn, 100);
-			resetExt('p1', 'noflash');
-			resetExt('p2', 'noflash');
-		} else {
-			if (p2ScoreValue > 0) {
-				p2ScoreValue = p2ScoreValue-- - 1;
-				msg2 = { player: player, score: p2ScoreValue };
-				bc.postMessage(msg2);
-				localStorage.setItem("p" + player + "ScoreCtrlPanel", p2ScoreValue);
-				localStorage.setItem("p" + player + "Score", p2ScoreValue);
-				document.getElementById("sendP" + player + "ScoreSub").style.border = "2px solid tomato";
-				document.getElementById("p"+player+"Score").value = p2ScoreValue;
-				//setTimeout(rst_scr_btn, 100);
-			}
-		}
-	}
+    if (player == "1") {
+        if (opt1 == "add") {
+            if (p1ScoreValue < 9999) {
+                p1ScoreValue = p1ScoreValue + 1;
+                msg = { player: player, score: p1ScoreValue };
+                bc.postMessage(msg);
+                localStorage.setItem("p" + player + "ScoreCtrlPanel", p1ScoreValue);
+                localStorage.setItem("p" + player + "Score", p1ScoreValue);
+                stopClock();
+                document.getElementById("sendP" + player + "Score").style.border = "2px solid lightgreen";
+                document.getElementById("p"+player+"Score").value = p1ScoreValue;
+                resetExt('p1', 'noflash');
+                resetExt('p2', 'noflash');
+            }
+        } else if (p1ScoreValue > 0) {
+            p1ScoreValue = p1ScoreValue - 1;
+            msg = { player: player, score: p1ScoreValue };
+            bc.postMessage(msg);
+            localStorage.setItem("p" + player + "ScoreCtrlPanel", p1ScoreValue);
+            localStorage.setItem("p" + player + "Score", p1ScoreValue);
+            document.getElementById("sendP" + player + "ScoreSub").style.border = "2px solid tomato";
+            document.getElementById("p"+player+"Score").value = p1ScoreValue;
+        }
+    }
+    if (player == "2") {
+        if (opt1 == "add") {
+            if (p2ScoreValue < 9999) {
+                p2ScoreValue = p2ScoreValue + 1;
+                msg2 = { player: player, score: p2ScoreValue };
+                bc.postMessage(msg2);
+                localStorage.setItem("p" + player + "ScoreCtrlPanel", p2ScoreValue);
+                localStorage.setItem("p" + player + "Score", p2ScoreValue);
+                stopClock();
+                document.getElementById("sendP" + player + "Score").style.border = "2px solid lightgreen";
+                document.getElementById("p"+player+"Score").value = p2ScoreValue;
+                resetExt('p1', 'noflash');
+                resetExt('p2', 'noflash');
+            }
+        } else if (p2ScoreValue > 0) {
+            p2ScoreValue = p2ScoreValue - 1;
+            msg2 = { player: player, score: p2ScoreValue };
+            bc.postMessage(msg2);
+            localStorage.setItem("p" + player + "ScoreCtrlPanel", p2ScoreValue);
+            localStorage.setItem("p" + player + "Score", p2ScoreValue);
+            document.getElementById("sendP" + player + "ScoreSub").style.border = "2px solid tomato";
+            document.getElementById("p"+player+"Score").value = p2ScoreValue;
+        }
+    }
 }
 
 // function rst_scr_btn() {
@@ -458,60 +460,78 @@ function resetExt(player, flash) {
 	}
 }
 
-function salottoSetting() {
-	if (!document.getElementById("useSalottoSetting").checked) {
-		bc.postMessage({ clockDisplay: 'hidesalotto' });
-		localStorage.setItem("useSalotto", "no");
-		if (localStorage.getItem("useSalotto") != "yes" && localStorage.getItem("useClock") != "yes" && localStorage.getItem("useCustomLogo") != "yes") { document.getElementById("allCheck").checked = false; }
-	} else {
-		bc.postMessage({ clockDisplay: 'showsalotto' });
-		localStorage.setItem("useSalotto", "yes");
-		if (localStorage.getItem("useSalotto") == "yes" && localStorage.getItem("useClock") == "yes" && localStorage.getItem("useCustomLogo") == "yes") { document.getElementById("allCheck").checked = true; }
-	}
-}
+// function salottoSetting() {
+// 	if (!document.getElementById("useSalottoSetting").checked) {
+// 		bc.postMessage({ clockDisplay: 'hidesalotto' });
+// 		localStorage.setItem("useSalotto", "no");
+// 		if (localStorage.getItem("useSalotto") != "yes" && localStorage.getItem("useClock") != "yes" && localStorage.getItem("useCustomLogo") != "yes") { document.getElementById("allCheck").checked = false; }
+// 	} else {
+// 		bc.postMessage({ clockDisplay: 'showsalotto' });
+// 		localStorage.setItem("useSalotto", "yes");
+// 		if (localStorage.getItem("useSalotto") == "yes" && localStorage.getItem("useClock") == "yes" && localStorage.getItem("useCustomLogo") == "yes") { document.getElementById("allCheck").checked = true; }
+// 	}
+// }
 
-function customLogoSetting_slideshowoff() {
-	if (!document.getElementById("customLogo").checked) {
-		bc.postMessage({ clockDisplay: 'hidecustomLogo' });
-		localStorage.setItem("useCustomLogo", "no");
-		if (localStorage.getItem("useSalotto") != "yes" && localStorage.getItem("useClock") != "yes" && localStorage.getItem("useCustomLogo") != "yes") { document.getElementById("allCheck").checked = false; }
-	} else {
-		bc.postMessage({ clockDisplay: 'showcustomLogo' });
-		localStorage.setItem("useCustomLogo", "yes");
-		if (localStorage.getItem("useSalotto") == "yes" && localStorage.getItem("useClock") == "yes" && localStorage.getItem("useCustomLogo") == "yes") { document.getElementById("allCheck").checked = true; }
-	}
-}
+// function customLogoSetting_slideshowoff() {
+// 	if (!document.getElementById("customLogo1").checked) {
+// 		bc.postMessage({ clockDisplay: 'hidecustomLogo' });
+// 		localStorage.setItem("useCustomLogo", "no");
+// 		if (localStorage.getItem("useCustomLogo") != "yes" || localStorage.getItem("useCustomLogo2") != "yes") { document.getElementById("allCheck").checked = false; }
+// 	} else {
+// 		bc.postMessage({ clockDisplay: 'showcustomLogo' });
+// 		localStorage.setItem("useCustomLogo", "yes");
+// 		if (localStorage.getItem("useCustomLogo") == "yes" && localStorage.getItem("useCustomLogo2") == "yes") { document.getElementById("allCheck").checked = true; }
+// 	}
+// }
 
 function customLogoSetting() {
-	if (!document.getElementById("customLogo").checked) {
+	if (!document.getElementById("customLogo1").checked) {
 		bc.postMessage({ clockDisplay: 'hidecustomLogo' });
 		localStorage.setItem("useCustomLogo", "no");
-		if (localStorage.getItem("useSalotto") != "yes" && localStorage.getItem("useClock") != "yes" && localStorage.getItem("useCustomLogo") != "yes") { document.getElementById("allCheck").checked = false; }
+		if (localStorage.getItem("useCustomLogo") != "yes" || localStorage.getItem("useCustomLogo2") != "yes") { document.getElementById("allCheck").checked = false; }
 	} else {
 		bc.postMessage({ clockDisplay: 'showcustomLogo' });
 		localStorage.setItem("useCustomLogo", "yes");
 		document.getElementById("logoSlideshowChk").checked = false;
 		logoSlideshow();
-		if (localStorage.getItem("useSalotto") == "yes" && localStorage.getItem("useClock") == "yes" && localStorage.getItem("useCustomLogo") == "yes") { document.getElementById("allCheck").checked = true; }
+		if (localStorage.getItem("useCustomLogo") == "yes" && localStorage.getItem("useCustomLogo2") == "yes") { document.getElementById("allCheck").checked = true; }
+	}
+}
+
+function customLogoSetting2() {
+	if (!document.getElementById("customLogo2").checked) {
+		bc.postMessage({ clockDisplay: 'hidecustomLogo2' });
+		localStorage.setItem("useCustomLogo2", "no");
+		if (localStorage.getItem("useCustomLogo") != "yes" && localStorage.getItem("useCustomLogo2") != "yes") { document.getElementById("allCheck").checked = false; }
+	} else {
+		bc.postMessage({ clockDisplay: 'showcustomLogo2' });
+		localStorage.setItem("useCustomLogo2", "yes");
+		document.getElementById("logoSlideshowChk").checked = false;
+		logoSlideshow();
+		if (localStorage.getItem("useCustomLogo") == "yes" && localStorage.getItem("useCustomLogo2") == "yes") { document.getElementById("allCheck").checked = true; }
 	}
 }
 
 function allCheck() {
 	if (!document.getElementById("allCheck").checked) {
-		document.getElementById("useClockSetting").checked = true;
-		document.getElementById("useSalottoSetting").checked = true;
-		document.getElementById("customLogo").checked = true;
-		document.getElementById("useClockSetting").click();
-		document.getElementById("useSalottoSetting").click();
-		document.getElementById("customLogo").click();
+		//document.getElementById("useClockSetting").checked = true;
+		//document.getElementById("useSalottoSetting").checked = true;
+		document.getElementById("customLogo1").checked = true;
+		document.getElementById("customLogo2").checked = true;
+		//document.getElementById("useClockSetting").click();
+		//document.getElementById("useSalottoSetting").click();
+		document.getElementById("customLogo1").click();
+		document.getElementById("customLogo2").click();
 	}
 	else {
-		document.getElementById("useClockSetting").checked = false;
-		document.getElementById("useSalottoSetting").checked = false;
-		document.getElementById("customLogo").checked = false;
-		document.getElementById("useClockSetting").click();
-		document.getElementById("useSalottoSetting").click();
-		document.getElementById("customLogo").click();
+		//document.getElementById("useClockSetting").checked = false;
+		//document.getElementById("useSalottoSetting").checked = false;
+		document.getElementById("customLogo1").checked = false;
+		document.getElementById("customLogo2").checked = false;
+		//document.getElementById("useClockSetting").click();
+		//document.getElementById("useSalottoSetting").click();
+		document.getElementById("customLogo1").click();
+		document.getElementById("customLogo2").click();
 	}
 
 }
@@ -651,10 +671,18 @@ function startThemeCheck() {
 }
 
 function cLogoNameChange() {
-	cLogoName = prompt("Rename \'Custom Logo\' checkbox label (13 character maximum)");
+	cLogoName = prompt("Rename \'Player 1 Logo\' checkbox label (13 character maximum)");
 	if (cLogoName != null && cLogoName != "") {
 		localStorage.setItem("clogoNameStored", cLogoName.substring(0, 13));
 		document.getElementById("logoName").innerHTML = cLogoName.substring(0, 13);
+	}
+}
+
+function cLogoNameChange2() {
+	cLogoName2 = prompt("Rename \'Player 2 Logo\' checkbox label (13 character maximum)");
+	if (cLogoName2 != null && cLogoName2 != "") {
+		localStorage.setItem("clogoName2Stored", cLogoName2.substring(0, 13));
+		document.getElementById("logoName2").innerHTML = cLogoName2.substring(0, 13);
 	}
 }
 

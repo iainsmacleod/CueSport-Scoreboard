@@ -28,7 +28,6 @@
 			
             #scoreBoard{
                 width: 95%;
-                margin:auto;
             }
 			
             #player1Score, #player2Score{
@@ -66,6 +65,7 @@
             #player1Name {
                  background-image: linear-gradient(to left, white , steelblue);
                  box-shadow: 0 8px 16px 0 rgba(0,0,0,0.3), 0 6px 20px 0 rgba(0,0,0,0.3);
+                 position: relative;
 
             }
             #player2Name {
@@ -153,19 +153,25 @@
 			
               /* end of blink code */
             
-            #salottoLogo {
+            #customLogo1 {
                 position:absolute;
-                top: 36.5px;
-                right: 525px;
+                bottom: 7px;
+                /* left: 328px; */
+                right: 516px;
                 z-index:9;
+                height:26px;
+                border: 2px solid black;
             }
-			 #g4Logo {
+			 #customLogo2 {
                 position:absolute;
-                top: 36.5px;
-                left: 525px;
+                bottom: 7px;
+                /* right: 328px; */
+                left: 516px;
                 z-index:9;
+                height: 26px;
+                border: 2px solid black;
             }
-           #player1Image {
+           /* #player1Image {
                position:absolute;
                top:8px;
                z-index:9;
@@ -180,7 +186,7 @@
                right:60px;
                width:50px;
                height:50px;
-            }
+            } */
             #raceInfo {
                 background-image: linear-gradient(to right, lightgrey, white);
 				position:fixed;
@@ -213,7 +219,7 @@
                 offset: 5px;
 				width: 90%;
 				left:5%;
-				bottom:36px;
+				bottom:40px;
 				height: 3px;
 				background: #fff ;
 				border-radius:5px;
@@ -238,8 +244,8 @@
 			.mySlides {
 			position:fixed;
 			display: none;
-			bottom: 13.75px;
-            left: 573px;
+			bottom: 200px;
+            left: 200px;
 			}
 
 

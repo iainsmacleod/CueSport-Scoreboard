@@ -127,17 +127,27 @@ bc.onmessage = (event) => {
 		if (event.data.clockDisplay == "p2ExtReset") { extReset('p2'); };
 		if (event.data.clockDisplay == "hidesalotto") { salottoHide(); };
 		if (event.data.clockDisplay == "showsalotto") { salottoShow(); };
-		if (event.data.clockDisplay == "hidecustomLogo") { customHide(); };
-		if (event.data.clockDisplay == "showcustomLogo") { customShow(); };
+		if (event.data.clockDisplay == "hidecustomLogo") { 
+			customHide(); 
+		}
+		if (event.data.clockDisplay == "showcustomLogo") { 
+			customShow(); 
+		}
+		if (event.data.clockDisplay == "hidecustomLogo2") { 
+			custom2Hide(); 
+		}
+		if (event.data.clockDisplay == "showcustomLogo2") { 
+			custom2Show(); 
+		}
 		if (event.data.clockDisplay == "postLogo") { postLogo(); };
 		if (event.data.clockDisplay == "logoSlideShow-show") {
 			customHide();
 			document.getElementById("logoSlideshowDiv").classList.replace("fadeOutElm", "fadeInElm");
-			document.getElementById("g4Logo").classList.replace("fadeOutElm", "logoSlide");
-			setTimeout(function () { document.getElementById("g4Logo").classList.add("fade"); }, 500);
-			if (localStorage.getItem("customLogo1") != null) { document.getElementById("customLogo1").src = localStorage.getItem("customLogo1"); } else { document.getElementById("customLogo1").src = "./common/images/placeholder.png"; };
-			if (localStorage.getItem("customLogo2") != null) { document.getElementById("customLogo2").src = localStorage.getItem("customLogo2"); } else { document.getElementById("customLogo2").src = "./common/images/placeholder.png"; };
+			document.getElementById("customLogo2").classList.replace("fadeOutElm", "logoSlide");
+			setTimeout(function () { document.getElementById("customLogo2").classList.add("fade"); }, 500);
 			if (localStorage.getItem("customLogo3") != null) { document.getElementById("customLogo3").src = localStorage.getItem("customLogo3"); } else { document.getElementById("customLogo3").src = "./common/images/placeholder.png"; };
+			if (localStorage.getItem("customLogo4") != null) { document.getElementById("customLogo4").src = localStorage.getItem("customLogo4"); } else { document.getElementById("customLogo4").src = "./common/images/placeholder.png"; };
+			if (localStorage.getItem("customLogo5") != null) { document.getElementById("customLogo5").src = localStorage.getItem("customLogo5"); } else { document.getElementById("customLogo5").src = "./common/images/placeholder.png"; };
 		}
 		if (event.data.clockDisplay == "logoSlideShow-hide") { document.getElementById("logoSlideshowDiv").classList.replace("fadeInElm", "fadeOutElm"); };
 		if (event.data.clockDisplay == "style100") { styleChange(1); };
@@ -151,17 +161,28 @@ bc.onmessage = (event) => {
 //							autostart stuff
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-if (localStorage.getItem("customLogo1") != null) { document.getElementById("customLogo1").src = localStorage.getItem("customLogo1"); } else { document.getElementById("customLogo1").src = "./common/images/placeholder.png"; };
-if (localStorage.getItem("customLogo2") != null) { document.getElementById("customLogo2").src = localStorage.getItem("customLogo2"); } else { document.getElementById("customLogo2").src = "./common/images/placeholder.png"; };
+if (localStorage.getItem("customLogo1") !== null && localStorage.getItem("customLogo1") !== "") {
+	document.getElementById("customLogo1").src = localStorage.getItem("customLogo1");
+	document.getElementById("customLogo1").classList.replace("fadeOutElm", "fadeInElm");
+} else {
+	document.getElementById("customLogo1").src = "./common/images/placeholder.png";
+}
+
+if (localStorage.getItem("customLogo2") !== null && localStorage.getItem("customLogo2") !== "") {
+	document.getElementById("customLogo2").src = localStorage.getItem("customLogo2");
+	document.getElementById("customLogo2").classList.replace("fadeOutElm", "fadeInElm");
+} else {
+	document.getElementById("customLogo2").src = "./common/images/placeholder.png";
+}
+
 if (localStorage.getItem("customLogo3") != null) { document.getElementById("customLogo3").src = localStorage.getItem("customLogo3"); } else { document.getElementById("customLogo3").src = "./common/images/placeholder.png"; };
+if (localStorage.getItem("customLogo4") != null) { document.getElementById("customLogo4").src = localStorage.getItem("customLogo4"); } else { document.getElementById("customLogo4").src = "./common/images/placeholder.png"; };
+if (localStorage.getItem("customLogo5") != null) { document.getElementById("customLogo5").src = localStorage.getItem("customLogo5"); } else { document.getElementById("customLogo5").src = "./common/images/placeholder.png"; };
 if (localStorage.getItem("slideShow") == "yes") {
 	document.getElementById("logoSlideshowDiv").classList.replace("fadeOutElm", "fadeInElm");
 	document.getElementById("logoSlideshowDiv").classList.replace("fadeOutElm", "fadeInElm");
-	document.getElementById("g4Logo").classList.replace("fadeOutElm", "logoSlide");
-	document.getElementById("g4Logo").classList.add("fade");
-}
-if (localStorage.getItem("customLogo0") != null) {
-	document.getElementById("g4Logo").src = localStorage.getItem("customLogo0");
+	document.getElementById("customLogo2").classList.replace("fadeOutElm", "logoSlide");
+	document.getElementById("customLogo2").classList.add("fade");
 }
 
 if (localStorage.getItem("p1ScoreCtrlPanel") != null) {
@@ -191,11 +212,11 @@ document.getElementById("wagerInfo").innerHTML = localStorage.getItem("wagerInfo
 document.getElementById("raceInfo").innerHTML = localStorage.getItem("raceInfo");
 
 if (localStorage.getItem("useCustomLogo") == "yes") {
-	document.getElementById("g4Logo").classList.replace("fadeOutElm", "fadeInElm");
+	document.getElementById("customLogo2").classList.replace("fadeOutElm", "fadeInElm");
 }
-if (localStorage.getItem("useSalotto") == "yes") {
-	document.getElementById("salottoLogo").classList.replace("fadeOutElm", "fadeInElm");
-}
+// if (localStorage.getItem("useSalotto") == "yes") {
+// 	document.getElementById("salottoLogo").classList.replace("fadeOutElm", "fadeInElm");
+// }
 if (localStorage.getItem("useClock") != "yes") {
 	document.getElementById("p1ExtIcon").classList.replace("fadeInElm", "fadeOutElm");
 	document.getElementById("p2ExtIcon").classList.replace("fadeInElm", "fadeOutElm");
@@ -229,10 +250,10 @@ if (localStorage.getItem("b_style") != null) {
 	document.styleSheets[2].disabled = true;
 }
 
-if (localStorage.getItem("customLogo1") != null) {
-	document.getElementById("customLogo1").src = localStorage.getItem("customLogo1");
-	document.getElementById("customLogo2").src = localStorage.getItem("customLogo2");
+if (localStorage.getItem("customLogo3") != null) {
 	document.getElementById("customLogo3").src = localStorage.getItem("customLogo3");
+	document.getElementById("customLogo4").src = localStorage.getItem("customLogo4");
+	document.getElementById("customLogo5").src = localStorage.getItem("customLogo5");
 }
 
 let slideIndex = 0;
