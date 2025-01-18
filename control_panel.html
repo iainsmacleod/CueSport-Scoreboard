@@ -40,7 +40,7 @@ for more information about Salotto please visit https://salotto.app
 					Enable Player/Team 1<input type="checkbox" class="smallSize" id="usePlayer1Setting" onchange="playerSetting(1)" checked>
 					Enable Player/Team 2<input type="checkbox" class="smallSize" id="usePlayer2Setting" onchange="playerSetting(2)" checked>
 					Enable Clock<input type="checkbox" class="smallSize" id="useClockSetting" onchange="clockSetting()">
-					Custom Logos<input type="checkbox" class="smallSize" id="allCheck" onchange="allCheck()">
+					<!-- Custom Logos<input type="checkbox" class="smallSize" id="allCheck" onchange="allCheck()"> -->
 				</div>
 				<div class="slidecontainer">
 					<label id="opacityLabel" for="scoreOpacity">Overlay Opacity</label>
@@ -173,13 +173,17 @@ for more information about Salotto please visit https://salotto.app
 				</div>
 				<div class="column">
 					<!-- Salotto Logo<input type="checkbox" class="smallSize" id="useSalottoSetting" onchange="salottoSetting()"><p></p> -->
-					<text class="hover" onclick="cLogoNameChange()" id="logoName" style="text-decoration: underline;">Player 1 Logo</text><input class="smallSize" type="checkbox" id="customLogo1" onchange="customLogoSetting()">
-					<div class="hover obs28 tooltip" id="uploadCustomLogo" style="width: 150px">Upload Player 1 Logo<input type="file" id="FileUploadL1" onchange="logoPost(this,1)" accept="image/png, image/jpeg, image/svg+xml, image/bmp"/>
+					<text class="hover" onclick="cLogoNameChange()" id="logoName" style="text-decoration: underline;">Player 1 Logo</text>
+					<input class="smallSize" type="checkbox" id="customLogo1" onchange="customLogoSetting()" disabled>
+					<div class="hover obs28 tooltip" id="uploadCustomLogo" style="width: 150px">
+						Upload Player 1 Logo<input type="file" id="FileUploadL1" onchange="logoPost(this,1); toggleCheckbox('customLogo1', this)" accept="image/png, image/jpeg, image/svg+xml, image/bmp"/>
 						<span class="tooltiptext"><img id="l1Img" src="" style="height:100px; max-width:300px"></span>
 						<br>
 					</div>
-					<text class="hover" onclick="cLogoNameChange2()" id="logoName2" style="text-decoration: underline;">Player 2 Logo</text><input class="smallSize" type="checkbox" id="customLogo2" onchange="customLogoSetting2()">
-					<div class="hover obs28 tooltip" id="uploadCustomLogo2" style="width: 150px">Upload Player 2 Logo<input type="file" id="FileUploadL2" onchange="logoPost(this,2)" accept="image/png, image/jpeg, image/svg+xml, image/bmp">
+					<text class="hover" onclick="cLogoNameChange2()" id="logoName2" style="text-decoration: underline;">Player 2 Logo</text>
+					<input class="smallSize" type="checkbox" id="customLogo2" onchange="customLogoSetting()" disabled>
+					<div class="hover obs28 tooltip" id="uploadCustomLogo2" style="width: 150px">
+						Upload Player 2 Logo<input type="file" id="FileUploadL2" onchange="logoPost(this,2); toggleCheckbox('customLogo2', this)" accept="image/png, image/jpeg, image/svg+xml, image/bmp">
 						<span class="tooltiptext"><img id="l2Img" src="" style="height:100px; max-width:300px"></span>
 						<br>
 					</div>
@@ -205,9 +209,9 @@ for more information about Salotto please visit https://salotto.app
 		<div class="themeSizeLabels" id="obsThemeLabel"><text id="StyleChange">size:&nbsp;</text>
 			<select class="obs28" name="bsstyle" id="bsStyle" onchange="bsStyleChange()">
 				<option value="1">small</option>
-				<option value="2" selected>medium</option>
+				<option value="2">medium</option>
 				<option value="3">large</option>
-				<option value="4">XL</option>
+				<option value="4" selected>XL</option>
 			</select>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 		</div>
 		<div class="themeSizeLabels" id="obsThemeDiv">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;

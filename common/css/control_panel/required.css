@@ -76,6 +76,8 @@
 		padding-right:60px;
 		padding-left:60px;
 		padding-top:2px;
+		display: flex; /* or display: grid; */
+		flex-direction: column; /* or row, depending on your layout */
 	
 		}
 
@@ -221,6 +223,7 @@
 	
 	.noShow{
         visibility:hidden;
+		display: none;
         }
 	
 	#footer {
@@ -285,8 +288,8 @@
 	}
 	
 	input.smallSize {
-	height: 11px;
-	width: 11px;
+	height: 15px;
+	width: 15px;
 	color:red;
 	}
 		 
@@ -341,17 +344,16 @@
 				
 		.tooltip .tooltiptext {
 		visibility: hidden;
-		width:70px;
 		background: rgba(0,0,0,0.6);
 		border-radius: 6px;
-		padding: 5px 0;
+		padding: 5px;
 	  
 		/* Position the tooltip */
 		position: absolute;
 		z-index: 1;
 		bottom: 100%;
 		left: 50%;
-		margin-left: -50px;
+		margin-left: -80px;
 		}
 
 		.tooltip:hover .tooltiptext {

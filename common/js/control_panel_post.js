@@ -63,6 +63,28 @@ var pColormsg;
 // onload stuff
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+window.onload = function() {
+	 // Set local storage values if not previously configured
+	 if (localStorage.getItem("usePlayer1") === null) {
+		localStorage.setItem("usePlayer1", "yes");
+	}
+	if (localStorage.getItem("usePlayer2") === null) {
+		localStorage.setItem("usePlayer2", "yes");
+	}
+
+	// Call the visibility functions based on the checkbox states
+    setPlayerVisibility(1);
+    setPlayerVisibility(2);
+
+    // Check if custom logos exist in local storage and enable checkboxes accordingly
+    if (localStorage.getItem("customLogo1") != null) {
+        document.getElementById("customLogo1").disabled = false; // Enable checkbox for Player 1
+    }
+    if (localStorage.getItem("customLogo2") != null) {
+        document.getElementById("customLogo2").disabled = false; // Enable checkbox for Player 2
+    }
+};
+
 slider.oninput = function () {
 	sliderValue = this.value / 100;
 	document.getElementById("sliderValue").innerHTML = this.value + "%";  // Add this line
@@ -99,9 +121,9 @@ document.getElementById('logoSsImg5').onclick = function () {
 	//setTimeout(rst_scr_btn, 100);
 };
 
-if (localStorage.getItem("customLogo1") != "yes" || localStorage.getItem("customLogo2") != "yes" ) {
-	document.getElementById("allCheck").checked = false;
-}
+// if (localStorage.getItem("customLogo1") != "yes" || localStorage.getItem("customLogo2") != "yes" ) {
+// 	document.getElementById("allCheck").checked = false;
+// }
 
 if (localStorage.getItem('p1colorSet') !== null) {
 	var cvalue = localStorage.getItem('p1colorSet');
@@ -205,8 +227,8 @@ function setPlayerVisibility(playerNumber) {
 	playerSetting(playerNumber);
   }
   
-  setPlayerVisibility(1);
-  setPlayerVisibility(2);
+//   setPlayerVisibility(1);
+//   setPlayerVisibility(2);
 
 if (localStorage.getItem("customLogo1") != null) { document.getElementById("l1Img").src = localStorage.getItem("customLogo1"); } else { document.getElementById("l1Img").src = "./common/images/placeholder.png"; };
 if (localStorage.getItem("customLogo2") != null) { document.getElementById("l2Img").src = localStorage.getItem("customLogo2"); } else { document.getElementById("l2Img").src = "./common/images/placeholder.png"; };

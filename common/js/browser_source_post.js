@@ -143,8 +143,8 @@ bc.onmessage = (event) => {
 		if (event.data.clockDisplay == "logoSlideShow-show") {
 			customHide();
 			document.getElementById("logoSlideshowDiv").classList.replace("fadeOutElm", "fadeInElm");
-			document.getElementById("customLogo2").classList.replace("fadeOutElm", "logoSlide");
-			setTimeout(function () { document.getElementById("customLogo2").classList.add("fade"); }, 500);
+			// document.getElementById("customLogo2").classList.replace("fadeOutElm", "logoSlide");
+			// setTimeout(function () { document.getElementById("customLogo2").classList.add("fade"); }, 500);
 			if (localStorage.getItem("customLogo3") != null) { document.getElementById("customLogo3").src = localStorage.getItem("customLogo3"); } else { document.getElementById("customLogo3").src = "./common/images/placeholder.png"; };
 			if (localStorage.getItem("customLogo4") != null) { document.getElementById("customLogo4").src = localStorage.getItem("customLogo4"); } else { document.getElementById("customLogo4").src = "./common/images/placeholder.png"; };
 			if (localStorage.getItem("customLogo5") != null) { document.getElementById("customLogo5").src = localStorage.getItem("customLogo5"); } else { document.getElementById("customLogo5").src = "./common/images/placeholder.png"; };
@@ -163,14 +163,18 @@ bc.onmessage = (event) => {
 
 if (localStorage.getItem("customLogo1") !== null && localStorage.getItem("customLogo1") !== "") {
 	document.getElementById("customLogo1").src = localStorage.getItem("customLogo1");
-	document.getElementById("customLogo1").classList.replace("fadeOutElm", "fadeInElm");
+	if (localStorage.getItem("useCustomLogo") === "yes") {
+		document.getElementById("customLogo1").classList.replace("fadeOutElm", "fadeInElm");
+	}
 } else {
 	document.getElementById("customLogo1").src = "./common/images/placeholder.png";
 }
 
 if (localStorage.getItem("customLogo2") !== null && localStorage.getItem("customLogo2") !== "") {
 	document.getElementById("customLogo2").src = localStorage.getItem("customLogo2");
-	document.getElementById("customLogo2").classList.replace("fadeOutElm", "fadeInElm");
+	if (localStorage.getItem("useCustomLogo2") === "yes") {
+		document.getElementById("customLogo2").classList.replace("fadeOutElm", "fadeInElm");
+	}
 } else {
 	document.getElementById("customLogo2").src = "./common/images/placeholder.png";
 }
@@ -181,8 +185,8 @@ if (localStorage.getItem("customLogo5") != null) { document.getElementById("cust
 if (localStorage.getItem("slideShow") == "yes") {
 	document.getElementById("logoSlideshowDiv").classList.replace("fadeOutElm", "fadeInElm");
 	document.getElementById("logoSlideshowDiv").classList.replace("fadeOutElm", "fadeInElm");
-	document.getElementById("customLogo2").classList.replace("fadeOutElm", "logoSlide");
-	document.getElementById("customLogo2").classList.add("fade");
+	// document.getElementById("customLogo2").classList.replace("fadeOutElm", "logoSlide");
+	// document.getElementById("customLogo2").classList.add("fade");
 }
 
 if (localStorage.getItem("p1ScoreCtrlPanel") != null) {
@@ -205,9 +209,10 @@ if (localStorage.getItem("raceInfo") != null) {
 	document.getElementById("raceInfo").classList.remove("noShow");
 }
 
-document.getElementById("player1Name").innerHTML = localStorage.getItem("p1NameCtrlPanel");
-document.getElementById("player1Score").innerHTML = localStorage.getItem("p1ScoreCtrlPanel");
-document.getElementById("player2Name").innerHTML = localStorage.getItem("p2NameCtrlPanel");
+//Removed the following three lines as they were creating issues for name and score display on refresh
+// document.getElementById("player1Name").innerHTML = localStorage.getItem("p1NameCtrlPanel");
+// document.getElementById("player1Score").innerHTML = localStorage.getItem("p1ScoreCtrlPanel");
+// document.getElementById("player2Name").innerHTML = localStorage.getItem("p2NameCtrlPanel");
 document.getElementById("wagerInfo").innerHTML = localStorage.getItem("wagerInfo");
 document.getElementById("raceInfo").innerHTML = localStorage.getItem("raceInfo");
 
@@ -246,15 +251,17 @@ if (localStorage.getItem("b_style") != null) {
 	styleChange(localStorage.getItem("b_style"));
 } else {
 	document.styleSheets[0].disabled = true;
-	document.styleSheets[1].disabled = false;
+	document.styleSheets[1].disabled = true;
 	document.styleSheets[2].disabled = true;
+	document.styleSheets[3].disabled = false;
+	localStorage.setItem("b_style", "4");      // Store XL as default
 }
 
-if (localStorage.getItem("customLogo3") != null) {
-	document.getElementById("customLogo3").src = localStorage.getItem("customLogo3");
-	document.getElementById("customLogo4").src = localStorage.getItem("customLogo4");
-	document.getElementById("customLogo5").src = localStorage.getItem("customLogo5");
-}
+// if (localStorage.getItem("customLogo3") != null) {
+// 	document.getElementById("customLogo3").src = localStorage.getItem("customLogo3");
+// 	document.getElementById("customLogo4").src = localStorage.getItem("customLogo4");
+// 	// document.getElementById("customLogo5").src = localStorage.getItem("customLogo5");
+// }
 
 let slideIndex = 0;
 showSlides();

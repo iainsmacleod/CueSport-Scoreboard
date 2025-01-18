@@ -165,14 +165,14 @@ function extReset(player) {
 
 }
 
-function salottoShow() {
-	document.getElementById("salottoLogo").classList.replace("fadeOutElm", "fadeInElm");
+// function salottoShow() {
+// 	document.getElementById("salottoLogo").classList.replace("fadeOutElm", "fadeInElm");
 
-}
-function salottoHide() {
-	document.getElementById("salottoLogo").classList.replace("fadeInElm", "fadeOutElm");
+// }
+// function salottoHide() {
+// 	document.getElementById("salottoLogo").classList.replace("fadeInElm", "fadeOutElm");
 
-}
+// }
 
 function customShow() {
 	document.getElementById("customLogo1").style.removeProperty('display');
@@ -215,15 +215,32 @@ function custom2Hide() {
 }
 
 function showSlides() {
-	let i;
 	let slides = document.getElementsByClassName("logoSlide");
-	for (i = 0; i < slides.length; i++) {
+	let loadedSlides = []; // Array to hold loaded slides
+
+	// Hide all slides initially
+	for (let i = 0; i < slides.length; i++) {
 		slides[i].style.display = "none";
 	}
+
+	// Check which logos are loaded and add to loadedSlides
+	if (localStorage.getItem("customLogo3") && localStorage.getItem("customLogo3").startsWith("data")) loadedSlides.push(slides[0]); // Assuming customLogo3 is the first slide
+	if (localStorage.getItem("customLogo4") && localStorage.getItem("customLogo4").startsWith("data")) loadedSlides.push(slides[1]); // Assuming customLogo4 is the second slide
+	if (localStorage.getItem("customLogo5") && localStorage.getItem("customLogo5").startsWith("data")) loadedSlides.push(slides[2]); // Assuming customLogo5 is the third slide
+
+	// Increment slide index and reset if it exceeds loaded slides
 	slideIndex++;
-	if (slideIndex > slides.length) { slideIndex = 1 }
-	slides[slideIndex - 1].style.display = "block";
-	setTimeout(showSlides, 20000); // Change image every 20 seconds
+	console.log("Number of slides found:", loadedSlides.length); // Debug line
+
+	if (slideIndex > loadedSlides.length) { slideIndex = 1; } // Reset index if it exceeds loaded slides
+
+	// Show only the loaded slide
+	if (loadedSlides.length > 0) {
+		loadedSlides[slideIndex - 1].style.display = "block"; // Show the current slide
+	}
+
+	// Change image every 20 seconds
+	setTimeout(showSlides, 20000); 
 }
 
 function styleChange(n) {

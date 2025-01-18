@@ -36,6 +36,11 @@ function bsStyleChange() {
 
 }
 
+function toggleCheckbox(checkboxId, inputElement) {
+    const checkbox = document.getElementById(checkboxId);
+    checkbox.disabled = !inputElement.files.length; // Enable if file is selected, disable otherwise
+}
+
 function logoSlideshow() {
 	if (document.getElementById("logoSlideshowChk").checked == true) {
 		document.getElementById("customLogo1").checked = false;
@@ -162,45 +167,15 @@ function playerSetting(player) {
 }
 
 function clockSetting() {
+	const clockDiv = document.getElementById("clockInfo");
 	if (!document.getElementById("useClockSetting").checked) {
 		localStorage.setItem("useClock", "no");
 		bc.postMessage({ clockDisplay: 'noClock' });
-		// document.getElementById("shotClock30").classList.add("noShow");
-		// document.getElementById("shotClock60").classList.add("noShow");
-		// document.getElementById("shotClockShow").classList.add("noShow");
-		// document.getElementById("stopClockDiv").classList.add("noShow");
-		// document.getElementById("p1extensionBtn").classList.add("noShow");
-		// document.getElementById("p2extensionBtn").classList.add("noShow");
-		// document.getElementById("p1ExtReset").classList.add("noShow");
-		// document.getElementById("p2ExtReset").classList.add("noShow");
-		// document.getElementById("clockInfo").classList.add("noShow");
-		document.getElementById("resetBtn").classList.add("noShow");
-		document.getElementById("clockInfo").classList.add("noShow");
-		//document.getElementById("extensionSettingsLabel").classList.add("noShow");
-		document.getElementById("resetBtn").innerHTML = "Reset Scores";
-		if (localStorage.getItem("useCustomLogo") != "yes" && localStorage.getItem("useCustomLogo2") != "yes") {
-			document.getElementById("allCheck").checked = false;
-		}
+		clockDiv.classList.add("noShow"); // Hide the clock controls
 	} else if (document.getElementById("useClockSetting").checked) {
 		localStorage.setItem("useClock", "yes");
 		bc.postMessage({ clockDisplay: 'useClock' });
-		// document.getElementById("shotClock30").classList.remove("noShow");
-		// document.getElementById("shotClock60").classList.remove("noShow");
-		// document.getElementById("shotClockShow").classList.remove("noShow");
-		// document.getElementById("stopClockDiv").classList.remove("noShow");
-		// document.getElementById("p1extensionBtn").classList.remove("noShow");
-		// document.getElementById("p2extensionBtn").classList.remove("noShow");
-		// document.getElementById("p1ExtReset").classList.remove("noShow");
-		// document.getElementById("p2ExtReset").classList.remove("noShow");
-		// document.getElementById("clockInfo").classList.remove("noShow");
-		document.getElementById("resetBtn").classList.remove("noShow");
-		// document.getElementById("resetBtn").innerHTML = "Reset Extensions";
-		document.getElementById("clockInfo").classList.remove("noShow");
-		//document.getElementById("extensionSettingsLabel").classList.remove("noShow");
-		//document.getElementById("extensionSettingsLabel").innerHTML = "Extension Controls";
-		if (localStorage.getItem("useCustomLogo") == "yes" && localStorage.getItem("useCustomLogo2") == "yes") {
-			document.getElementById("allCheck").checked = true;
-		}
+		clockDiv.classList.remove("noShow"); // Show the clock controls
 	}
 }
 
@@ -488,13 +463,13 @@ function customLogoSetting() {
 	if (!document.getElementById("customLogo1").checked) {
 		bc.postMessage({ clockDisplay: 'hidecustomLogo' });
 		localStorage.setItem("useCustomLogo", "no");
-		if (localStorage.getItem("useCustomLogo") != "yes" || localStorage.getItem("useCustomLogo2") != "yes") { document.getElementById("allCheck").checked = false; }
+		// if (localStorage.getItem("useCustomLogo") != "yes" || localStorage.getItem("useCustomLogo2") != "yes") { document.getElementById("allCheck").checked = false; }
 	} else {
 		bc.postMessage({ clockDisplay: 'showcustomLogo' });
 		localStorage.setItem("useCustomLogo", "yes");
 		document.getElementById("logoSlideshowChk").checked = false;
 		logoSlideshow();
-		if (localStorage.getItem("useCustomLogo") == "yes" && localStorage.getItem("useCustomLogo2") == "yes") { document.getElementById("allCheck").checked = true; }
+		// if (localStorage.getItem("useCustomLogo") == "yes" && localStorage.getItem("useCustomLogo2") == "yes") { document.getElementById("allCheck").checked = true; }
 	}
 }
 
@@ -502,39 +477,39 @@ function customLogoSetting2() {
 	if (!document.getElementById("customLogo2").checked) {
 		bc.postMessage({ clockDisplay: 'hidecustomLogo2' });
 		localStorage.setItem("useCustomLogo2", "no");
-		if (localStorage.getItem("useCustomLogo") != "yes" && localStorage.getItem("useCustomLogo2") != "yes") { document.getElementById("allCheck").checked = false; }
+		// if (localStorage.getItem("useCustomLogo") != "yes" || localStorage.getItem("useCustomLogo2") != "yes") { document.getElementById("allCheck").checked = false; }
 	} else {
 		bc.postMessage({ clockDisplay: 'showcustomLogo2' });
 		localStorage.setItem("useCustomLogo2", "yes");
 		document.getElementById("logoSlideshowChk").checked = false;
 		logoSlideshow();
-		if (localStorage.getItem("useCustomLogo") == "yes" && localStorage.getItem("useCustomLogo2") == "yes") { document.getElementById("allCheck").checked = true; }
+		// if (localStorage.getItem("useCustomLogo") == "yes" && localStorage.getItem("useCustomLogo2") == "yes") { document.getElementById("allCheck").checked = true; }
 	}
 }
 
-function allCheck() {
-	if (!document.getElementById("allCheck").checked) {
-		//document.getElementById("useClockSetting").checked = true;
-		//document.getElementById("useSalottoSetting").checked = true;
-		document.getElementById("customLogo1").checked = true;
-		document.getElementById("customLogo2").checked = true;
-		//document.getElementById("useClockSetting").click();
-		//document.getElementById("useSalottoSetting").click();
-		document.getElementById("customLogo1").click();
-		document.getElementById("customLogo2").click();
-	}
-	else {
-		//document.getElementById("useClockSetting").checked = false;
-		//document.getElementById("useSalottoSetting").checked = false;
-		document.getElementById("customLogo1").checked = false;
-		document.getElementById("customLogo2").checked = false;
-		//document.getElementById("useClockSetting").click();
-		//document.getElementById("useSalottoSetting").click();
-		document.getElementById("customLogo1").click();
-		document.getElementById("customLogo2").click();
-	}
+// function allCheck() {
+// 	if (!document.getElementById("allCheck").checked) {
+// 		//document.getElementById("useClockSetting").checked = true;
+// 		//document.getElementById("useSalottoSetting").checked = true;
+// 		document.getElementById("customLogo1").checked = true;
+// 		document.getElementById("customLogo2").checked = true;
+// 		//document.getElementById("useClockSetting").click();
+// 		//document.getElementById("useSalottoSetting").click();
+// 		document.getElementById("customLogo1").click();
+// 		document.getElementById("customLogo2").click();
+// 	}
+// 	else {
+// 		//document.getElementById("useClockSetting").checked = false;
+// 		//document.getElementById("useSalottoSetting").checked = false;
+// 		document.getElementById("customLogo1").checked = false;
+// 		document.getElementById("customLogo2").checked = false;
+// 		//document.getElementById("useClockSetting").click();
+// 		//document.getElementById("useSalottoSetting").click();
+// 		document.getElementById("customLogo1").click();
+// 		document.getElementById("customLogo2").click();
+// 	}
 
-}
+// }
 
 function obsThemeChange() {
 	if (document.getElementById("obsTheme").value == "28") {

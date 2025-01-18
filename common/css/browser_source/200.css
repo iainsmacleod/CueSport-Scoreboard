@@ -1,5 +1,3 @@
-	
-					 
             body{
 				background-color: rgba(0, 0, 0, 0);
 				margin: 0px auto;
@@ -27,7 +25,8 @@
             }
 			
             #scoreBoard{
-                width: 95%;
+                width: 100%;
+                margin:auto;
             }
 			
             #player1Score, #player2Score{
@@ -75,7 +74,7 @@
             }            
             #p1ExtIcon{
                 position:absolute;
-                left:2.0px;
+                left:-20px;
                 top:31.0px;
                 background:green;
                 border: solid 2px #000;
@@ -84,11 +83,12 @@
                 font-size:9.5pt;
                 padding:5.5px;
                 text-shadow: 1px 1px 2px black, 0 0 25px black, 0 0 5px black;
+                z-index:1;
 
             }
             #p2ExtIcon {
                 position:absolute;
-                right:2.0px;
+                right:-20px;
                 top:31.0px;
                 background:green;
                 border: solid 2px #000;
@@ -97,6 +97,7 @@
                 font-size:9.5pt;
                 padding:5.5px;
                 text-shadow: 1px 1px 2px black, 0 0 25px black, 0 0 5px black;
+                z-index:1;
                 
             }
                        
@@ -157,7 +158,7 @@
                 position:absolute;
                 bottom: 7px;
                 /* left: 328px; */
-                right: 516px;
+                right: 520px;
                 z-index:9;
                 height:26px;
                 border: 2px solid black;
@@ -166,11 +167,12 @@
                 position:absolute;
                 bottom: 7px;
                 /* right: 328px; */
-                left: 516px;
+                left: 520px;
                 z-index:9;
                 height: 26px;
                 border: 2px solid black;
             }
+
            /* #player1Image {
                position:absolute;
                top:8px;
@@ -242,10 +244,19 @@
 			}
 			
 			.mySlides {
-			position:fixed;
+			/* position:fixed;
 			display: none;
 			bottom: 200px;
-            left: 200px;
+            left: 200px; */
+            position: fixed;
+            /* Adjust these values to position the slideshow where you want it */
+            top: 50%;         /* Vertical position from the top */
+            left: 50%;        /* Horizontal position from the left */
+            transform: translate(-50%, -50%);  /* Centers the div */
+            z-index: 1000;    /* Ensures it appears above other elements */
+            /* Add any other styling like width, height if needed */
+            width: auto;     /* Adjust as needed */
+            height: auto;     /* Adjust as needed */
 			}
 
 
