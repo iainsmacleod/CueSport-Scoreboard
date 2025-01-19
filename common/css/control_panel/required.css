@@ -249,7 +249,7 @@
 	}
 	
 	
-	#playerInfo, #scoreInfo, #gameInfo, #clockInfo, #generalSettings, #settingsBox0, #settingsBox1 {
+	#settingsInfo, #logoInfo, #gameInfo, #playerInfo, #scoreInfo, #clockInfo {
 	min-width:85px;
 	width:600px;
 	position:relative;
@@ -272,7 +272,7 @@
 	}
 
 	
-	#settingsBox3 {
+	/* #settingsBox3 {
 		cursor: arrow;
 		min-width:85px;
 		width:145px;
@@ -282,7 +282,7 @@
 		margin-bottom:3px;
 		font-size:7pt;
 	}	
-	
+	 */
 	text {
 	cursor: default;
 	}

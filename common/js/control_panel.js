@@ -14,25 +14,25 @@
 
 function bsStyleChange() {
 	if (document.getElementById("bsStyle").value == 1) {
-		bc.postMessage({ clockDisplay: 'style100' });
+		bc.postMessage({ clockDisplay: 'style125' });
 		localStorage.setItem("b_style", 1);
 
 	}
 	if (document.getElementById("bsStyle").value == 2) {
-		bc.postMessage({ clockDisplay: 'style125' });
+		bc.postMessage({ clockDisplay: 'style150' });
 		localStorage.setItem("b_style", 2);
 
 	}
 	if (document.getElementById("bsStyle").value == 3) {
-		bc.postMessage({ clockDisplay: 'style150' });
+		bc.postMessage({ clockDisplay: 'style200' });
 		localStorage.setItem("b_style", 3);
 
 	}
-	if (document.getElementById("bsStyle").value == 4) {
-		bc.postMessage({ clockDisplay: 'style200' });
-		localStorage.setItem("b_style", 4);
+	// if (document.getElementById("bsStyle").value == 4) {
+	// 	bc.postMessage({ clockDisplay: 'style200' });
+	// 	localStorage.setItem("b_style", 4);
 
-	}
+	// }
 
 }
 
@@ -63,7 +63,14 @@ function logoPost(input, xL) {
 		reader.addEventListener("load", function () {
 			// convert image file to base64 string and save to localStorage
 			try { localStorage.setItem("customLogo" + xL, reader.result); }
-			catch (err) { alert("the selected image exceedes the maximium file size"); }
+			catch (err) {
+				alert("the selected image exceedes the maximium file size");
+				input.value = ""; // Clear the input
+				if (xL <= 2) {
+					document.getElementById('uploadCustomLogo' + xL).style.border = "2px solid black"; // For Player 1 and Player 2
+				} else {
+					document.getElementById('logoSsImg' + xL).style.border = "2px solid black"; // For other uploads
+				}			}
 			document.getElementById("l" + xL + "Img").src = localStorage.getItem("customLogo" + xL);
 		}, false);
 		if (document.getElementById("logoSlideshowChk").checked == true) { setTimeout(slideOther, 50); };

@@ -32,7 +32,7 @@ for more information about Salotto please visit https://salotto.app
 <body>
 	<div id="mainDiv">
 		<center>
-			<div id="settingsBox0" class="obs28 four-column-container">
+			<div id="settingsInfo" class="obs28 four-column-container">
 				<!-- <div class="column">
 					<label id="generalSettingsLabel">GENERAL SETTINGS</label>
 				</div> -->
@@ -48,6 +48,19 @@ for more information about Salotto please visit https://salotto.app
 					<input type="range" min="0" max="100" value="100" class="slider" id="scoreOpacity">
 					&nbsp;&nbsp;
 					<span id="sliderValue">100%</span>
+				</div>
+			</div>
+			<br>
+			<div id="gameInfo" class="obs28 two-column-container">
+				<div class="column">
+				  Game and Race Info:<input style="font-size:10pt; width: 120px; border-radius: 0px" type="text" id="raceInfoTxt" placeholder="" maxlength="25">
+				</p>
+				  Wager / Other Info:<input style="font-size:10pt; width: 120px; border-radius: 0px" type="text" id="wagerInfoTxt" placeholder="" maxlength="25">
+				</div>
+				<p style="font-size:1pt">&nbsp;</p>
+				<div class="column">
+					<p></p>
+					<div class="hover obs28" id="sendPInfo" onclick="postInfo()">Update Info</div>
 				</div>
 			</div>
 			<br>
@@ -104,16 +117,40 @@ for more information about Salotto please visit https://salotto.app
 				</div>
 			</div>
 			<br>
-			<div id="gameInfo" class="obs28 two-column-container">
+			<div id="logoInfo" class="obs28 two-column-container">
 				<div class="column">
-				  Game and Race Info:<input style="font-size:10pt; width: 120px; border-radius: 0px" type="text" id="raceInfoTxt" placeholder="" maxlength="25">
-				</p>
-				  Wager / Other Info:<input style="font-size:10pt; width: 120px; border-radius: 0px" type="text" id="wagerInfoTxt" placeholder="" maxlength="25">
+					<label id="logoSettingsLabel">Logo Settings (Max upload size: 2.4MB)</text></label>
 				</div>
-				<p style="font-size:1pt">&nbsp;</p>
+				<br>
 				<div class="column">
-					<p></p>
-					<div class="hover obs28" id="sendPInfo" onclick="postInfo()">Update Info</div>
+					<!-- Salotto Logo<input type="checkbox" class="smallSize" id="useSalottoSetting" onchange="salottoSetting()"><p></p> -->
+					<text class="hover" onclick="cLogoNameChange()" id="logoName" style="text-decoration: underline;">Player 1 Logo</text>
+					<input class="smallSize" type="checkbox" id="customLogo1" onchange="customLogoSetting()" disabled>
+					<div class="hover obs28 tooltip" id="uploadCustomLogo" style="width: 150px">
+						Upload Player 1 Logo<input type="file" id="FileUploadL1" onchange="logoPost(this,1); toggleCheckbox('customLogo1', this)" accept="image/png, image/jpeg, image/svg+xml, image/bmp"/>
+						<span class="tooltiptext"><img id="l1Img" src="" style="height:100px; max-width:300px"></span>
+						<br>
+					</div>
+					<text class="hover" onclick="cLogoNameChange2()" id="logoName2" style="text-decoration: underline;">Player 2 Logo</text>
+					<input class="smallSize" type="checkbox" id="customLogo2" onchange="customLogoSetting()" disabled>
+					<div class="hover obs28 tooltip" id="uploadCustomLogo2" style="width: 150px">
+						Upload Player 2 Logo<input type="file" id="FileUploadL2" onchange="logoPost(this,2); toggleCheckbox('customLogo2', this)" accept="image/png, image/jpeg, image/svg+xml, image/bmp">
+						<span class="tooltiptext"><img id="l2Img" src="" style="height:100px; max-width:300px"></span>
+						<br>
+					</div>
+				</div>
+				<br>
+				<div class="column">
+					Custom/Sponsor Slideshow<input class="smallSize" type="checkbox" id="logoSlideshowChk" onchange="logoSlideshow()"></span>
+					<div class="tooltip obs28 hover" id="logoSsImg3"><input type="file" id="FileUploadL3" onchange="logoPost(this,3)" accept="image/png, image/jpeg, image/svg+xml, image/bmp"/>
+						L1 <span class="tooltiptext"><img id="l3Img" src="" style="height:100px; max-width:300px"></span>
+					</div>
+					<div class="tooltip obs28 hover" id="logoSsImg4"><input type="file" id="FileUploadL4" onchange="logoPost(this,4)" accept="image/png, image/jpeg, image/svg+xml, image/bmp">
+						L2 <span class="tooltiptext"><img id="l4Img" src="" style="height:100px; max-width:300px"></span>
+					</div>
+					<div class="tooltip obs28 hover" id="logoSsImg5"><input type="file" id="FileUploadL5" onchange="logoPost(this,5)" accept="image/png, image/jpeg, image/svg+xml, image/bmp"/>
+						L3<span class="tooltiptext"><img id="l5Img" src="" style="height:100px; max-width:300px"></span>
+					</div>
 				</div>
 			</div>
 			<br>
@@ -166,56 +203,18 @@ for more information about Salotto please visit https://salotto.app
 					<div class="hover obs28" id="resetBtn" onclick="resetExtensions()">Reset Extensions</div>
 				</div>
 			</div>
-			<br>
-			<div id="settingsBox1" class="obs28 two-column-container">
-				<div class="column">
-					<label id="logoSettingsLabel">Logo Settings (Max upload size: 2.4MB)</text></label>
-				</div>
-				<div class="column">
-					<!-- Salotto Logo<input type="checkbox" class="smallSize" id="useSalottoSetting" onchange="salottoSetting()"><p></p> -->
-					<text class="hover" onclick="cLogoNameChange()" id="logoName" style="text-decoration: underline;">Player 1 Logo</text>
-					<input class="smallSize" type="checkbox" id="customLogo1" onchange="customLogoSetting()" disabled>
-					<div class="hover obs28 tooltip" id="uploadCustomLogo" style="width: 150px">
-						Upload Player 1 Logo<input type="file" id="FileUploadL1" onchange="logoPost(this,1); toggleCheckbox('customLogo1', this)" accept="image/png, image/jpeg, image/svg+xml, image/bmp"/>
-						<span class="tooltiptext"><img id="l1Img" src="" style="height:100px; max-width:300px"></span>
-						<br>
-					</div>
-					<text class="hover" onclick="cLogoNameChange2()" id="logoName2" style="text-decoration: underline;">Player 2 Logo</text>
-					<input class="smallSize" type="checkbox" id="customLogo2" onchange="customLogoSetting()" disabled>
-					<div class="hover obs28 tooltip" id="uploadCustomLogo2" style="width: 150px">
-						Upload Player 2 Logo<input type="file" id="FileUploadL2" onchange="logoPost(this,2); toggleCheckbox('customLogo2', this)" accept="image/png, image/jpeg, image/svg+xml, image/bmp">
-						<span class="tooltiptext"><img id="l2Img" src="" style="height:100px; max-width:300px"></span>
-						<br>
-					</div>
-				</div>
-				<br>
-				<div class="column">
-					Custom/Sponsor Slideshow<input class="smallSize" type="checkbox" id="logoSlideshowChk" onchange="logoSlideshow()"></span>
-				<div class="tooltip obs28 hover" id="logoSsImg3"><input type="file" id="FileUploadL3"
-						onchange="logoPost(this,3)" accept="image/png, image/jpeg, image/svg+xml, image/bmp"/>
-					L1 <span class="tooltiptext"><img id="l3Img" src="" style="height:100px; max-width:300px"></span>
-				</div>
-				<div class="tooltip obs28 hover" id="logoSsImg4"><input type="file" id="FileUploadL4"
-						onchange="logoPost(this,4)" accept="image/png, image/jpeg, image/svg+xml, image/bmp">
-					L2 <span class="tooltiptext"><img id="l4Img" src="" style="height:100px; max-width:300px"></span>
-				</div>
-				<div class="tooltip obs28 hover" id="logoSsImg5"><input type="file" id="FileUploadL5"
-						onchange="logoPost(this,5)" accept="image/png, image/jpeg, image/svg+xml, image/bmp"/>
-					L3<span class="tooltiptext"><img id="l5Img" src="" style="height:100px; max-width:300px"></span>
-				</div>
-				
-			</div>
+			
 		</center>
-		<div class="themeSizeLabels" id="obsThemeLabel"><text id="StyleChange">size:&nbsp;</text>
+		<div class="themeSizeLabels" id="obsThemeLabel"><text id="StyleChange">Size:&nbsp;</text>
 			<select class="obs28" name="bsstyle" id="bsStyle" onchange="bsStyleChange()">
-				<option value="1">small</option>
-				<option value="2">medium</option>
-				<option value="3">large</option>
-				<option value="4" selected>XL</option>
+				<!-- <option value="1">X-small</option> -->
+				<option value="1">Small</option>
+				<option value="2">Medium</option>
+				<option value="3" selected>Large</option>
 			</select>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 		</div>
 		<div class="themeSizeLabels" id="obsThemeDiv">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-			<text>theme:&nbsp;</text>
+			<text>Theme:&nbsp;</text>
 			<select class="obs28" name="Theme" id="obsTheme" onchange="obsThemeChange()">
 				<option value="27" selected>dark</option>
 				<option value="28">yami</option>

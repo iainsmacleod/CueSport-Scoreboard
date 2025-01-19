@@ -150,10 +150,10 @@ bc.onmessage = (event) => {
 			if (localStorage.getItem("customLogo5") != null) { document.getElementById("customLogo5").src = localStorage.getItem("customLogo5"); } else { document.getElementById("customLogo5").src = "./common/images/placeholder.png"; };
 		}
 		if (event.data.clockDisplay == "logoSlideShow-hide") { document.getElementById("logoSlideshowDiv").classList.replace("fadeInElm", "fadeOutElm"); };
-		if (event.data.clockDisplay == "style100") { styleChange(1); };
-		if (event.data.clockDisplay == "style125") { styleChange(2); };
-		if (event.data.clockDisplay == "style150") { styleChange(3); };
-		if (event.data.clockDisplay == "style200") { styleChange(4); };
+		// if (event.data.clockDisplay == "style100") { styleChange(1); };
+		if (event.data.clockDisplay == "style125") { styleChange(1); };
+		if (event.data.clockDisplay == "style150") { styleChange(2); };
+		if (event.data.clockDisplay == "style200") { styleChange(3); };
 	}
 }
 
@@ -250,11 +250,11 @@ if (localStorage.getItem('p2colorSet') != "") {
 if (localStorage.getItem("b_style") != null) {
 	styleChange(localStorage.getItem("b_style"));
 } else {
+	// document.styleSheets[0].disabled = true;
 	document.styleSheets[0].disabled = true;
 	document.styleSheets[1].disabled = true;
-	document.styleSheets[2].disabled = true;
-	document.styleSheets[3].disabled = false;
-	localStorage.setItem("b_style", "4");      // Store XL as default
+	document.styleSheets[2].disabled = false;
+	localStorage.setItem("b_style", "3");      // Store XL as default
 }
 
 // if (localStorage.getItem("customLogo3") != null) {

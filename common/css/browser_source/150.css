@@ -7,7 +7,7 @@
 				-moz-transform: scale(1.50, 1.50);
                 zoom: 1.50;
                 zoom: 150%;
-                font-family:tahoma;
+                font-family:roboto;
             }
 			
             #scoreBoardDiv {
@@ -20,8 +20,8 @@
             }
     
             td {
-                border:5px solid black;
-                border-radius:10px;
+                border:2px solid black;
+                border-radius:0px;
                 vertical-align: middle;
 
             }
@@ -32,16 +32,17 @@
             }
 				
             #player1Score, #player2Score{
-                text-shadow: -1px 0 white, 0 1px white, 1px 0 white, 0 -1px white;
                 text-align:center;
                 width:9%;
                 padding-right:1px;
                 padding-left:1px;
-                background: rgba(255,255,255,1);;
+                background: #ed4e54;
                 font-size:15pt;
                 font-weight:bold;
                 vertical-align: middle;
-                text-shadow: -1px 0 white, 0 1px white, 1px 0 white, 0 -1px white;
+                color: white;			 
+                text-shadow: 1px 1px 2px black, 0 0 25px black, 0 0 5px black;
+                -webkit-text-stroke: 1px black;							   
                 box-shadow: 0 8px 16px 0 rgba(0,0,0,0.3), 0 6px 20px 0 rgba(0,0,0,0.3);
 
                 }
@@ -59,42 +60,47 @@
             }
             #player1Name, #player2Name {
                 width:250px;
-				font-size:15pt;
+				text-shadow: 1px 1px 2px black, 0 0 25px black, 0 0 5px black;
+                -webkit-text-stroke: 1px black;
 
             }
             #player1Name {
                  background-image: linear-gradient(to left, white , steelblue);
-				 text-shadow: -1px 0 white, 0 1px white, 1px 0 white, 0 -1px white;
                  box-shadow: 0 8px 16px 0 rgba(0,0,0,0.3), 0 6px 20px 0 rgba(0,0,0,0.3);
+				 position: relative;				
 
             }
             #player2Name {
                  background-image: linear-gradient(to right, white , steelblue);
-				 text-shadow: -1px 0 white, 0 1px white, 1px 0 white, 0 -1px white;
                  box-shadow: 0 8px 16px 0 rgba(0,0,0,0.3), 0 6px 20px 0 rgba(0,0,0,0.3);
 
             }            
             #p1ExtIcon{
                 position:absolute;
-                left:36.5px;
-                top:32px;
+                left:10px;
+                top:31.0px;
                 background:green;
-                border: solid 1px #000;
-                border-radius:9px 0px 0px 9px;
+                border: solid 2px #000;
+                border-radius:0px;
                 color:#fff;
-                font-size:8.75pt;
-                padding:5.55px;
+                font-size:9.5pt;
+                padding:5.5px;
+                text-shadow: 1px 1px 2px black, 0 0 25px black, 0 0 5px black;
+                z-index:1;
+
             }
             #p2ExtIcon {
                 position:absolute;
-                right:36.5px;
-                top:32px;
+                right:10px;
+                top:31.0px;
                 background:green;
-                border: solid 1px #000;
-                border-radius:0px 9px 9px 0px;
+                border: solid 2px #000;
+                border-radius:0px;
                 color:#fff;
-                font-size:8.75pt;
-                padding:5.55px;
+                font-size:9.5pt;
+                padding:5.5px;
+                text-shadow: 1px 1px 2px black, 0 0 25px black, 0 0 5px black;
+                z-index:1;
                 
             }
                        
@@ -151,19 +157,27 @@
 			
               /* end of blink code */
             
-            #salottoLogo {
+            
+            #customLogo1 {
                 position:absolute;
-                top: 35.5px;
-                right: 690px;
+                bottom: 7px;
+                /* left: 328px; */
+                right: 520px;
                 z-index:9;
+                height:26px;
+                border: 2px solid black;
             }
-			 #g4Logo {
+			 #customLogo2 {
                 position:absolute;
-                top: 35.5px;
-                left: 690px;
+                bottom: 7px;
+                /* right: 328px; */
+                left: 520px;
                 z-index:9;
+                height: 26px;
+                border: 2px solid black;
             }
-           #player1Image {
+			
+           /* #player1Image {
                position:absolute;
                top:8px;
                z-index:9;
@@ -178,9 +192,9 @@
                right:60px;
                width:50px;
                height:50px;
-            }
+            } */
             #raceInfo {
-                background-image: linear-gradient(to right, grey, white);
+                background-image: linear-gradient(to right, lightgrey, white);
 				position:fixed;
 				bottom:0px;
 				width:20%;
@@ -210,13 +224,16 @@
 				position:absolute;
 				width: 90%;
 				left:5%;
-				bottom:36px;
+				bottom:40px;
 				height: 3px;
 				background: #fff ;
 				border-radius:5px;
  
 			}
-
+			#player1Name, #player2Name {
+				font-size: 15pt;
+                color: white;
+			}	
 			.startTimer {
 				width: 0px;
 				transition: width 30s;
@@ -230,10 +247,15 @@
 			}
 			
 			.mySlides {
-			position:fixed;
-			display: none;
-			bottom: 14px;
-            left: 754px;
+			position: fixed;
+            /* Adjust these values to position the slideshow where you want it */
+            top: 50%;         /* Vertical position from the top */
+            left: 50%;        /* Horizontal position from the left */
+            transform: translate(-50%, -50%);  /* Centers the div */
+            z-index: 1000;    /* Ensures it appears above other elements */
+            /* Add any other styling like width, height if needed */
+            width: auto;     /* Adjust as needed */
+            height: auto;     /* Adjust as needed */
 			}
 
 

@@ -1,0 +1,301 @@
+			body {
+			    background-color: rgba(0, 0, 0, 0);
+			    margin: 0px auto;
+			    overflow: hidden;
+			    -moz-transform: scale(1.00, 1.00);
+			    zoom: 1.00;
+			    zoom: 100%;
+			    font-family: roboto;
+			 }
+	
+			#scoreBoardDiv {
+			    position: absolute;
+				bottom: 5px;
+			    width: 90%;
+			    left: 5%;
+				padding: 5px;
+}
+			td {
+			    border: 2px solid black;
+			    border-radius: 0px;
+			    vertical-align: middle;
+
+			}
+
+			#scoreBoard {
+			    width: 95%;
+			    margin: auto;
+			}
+
+			#player1Score,
+			#player2Score {
+			    text-align: center;
+			    width: 9%;
+			    padding-right: 1px;
+			    padding-left: 1px;
+			    background: #ed4e54;
+			    font-size: 15pt;
+			    font-weight: bold;				   
+			    vertical-align: middle;							
+                text-shadow: 1px 1px 2px black, 0 0 25px black, 0 0 5px black;
+                -webkit-text-stroke: 1px black;
+				 box-shadow: 0 8px 16px 0 rgba(0,0,0,0.3), 0 6px 20px 0 rgba(0,0,0,0.3);
+			}
+
+			.noShow {
+			    visibility: hidden;
+}
+
+			#player1Name,
+			#player2Name,
+			#shotClock {
+			    background: rgba(255, 255, 255, 1);
+			    font-size: 10pt;
+			    font-weight: bold;
+			    text-align: center;
+			    vertical-align: middle
+			}
+
+			#player1Name,
+			#player2Name {
+			    width: 250px;
+				text-shadow: 1px 1px 2px black, 0 0 25px black, 0 0 5px black;
+                -webkit-text-stroke: 1px black;
+
+			}
+
+			#player1Name {
+			    background-image: linear-gradient(to left, white, steelblue);
+			    box-shadow: 0 8px 16px 0 rgba(0,0,0,0.3), 0 6px 20px 0 rgba(0,0,0,0.3);
+                 position: relative;
+				 
+			}
+
+			#player2Name {
+			    background-image: linear-gradient(to right, white, steelblue);
+			    box-shadow: 0 8px 16px 0 rgba(0,0,0,0.3), 0 6px 20px 0 rgba(0,0,0,0.3);
+                 position: relative;
+
+			}
+
+			#p1ExtIcon {
+			    position: absolute;
+			    left: 50.5px;
+			    top: 28px;
+			    background: green;
+			    border: solid 1px #000;
+			    border-radius: 9px 0px 0px 9px;
+			    color: #fff;
+			    font-size: 8.75pt;
+			    padding: 6px;
+			}
+
+			#p2ExtIcon {
+			    position: absolute;
+			    right: 28px;
+			    top: 31.5px;
+			    background: green;
+			    border: solid 1px #000;
+			    border-radius: 0px 9px 9px 0px;
+			    color: #fff;
+			    font-size: 8.75pt;
+			    padding: 6.0px;
+
+			}
+
+			.greenBtn {
+			    background: green;
+			    color: white;
+			}
+
+			.redBtn {
+			    background: red;
+			    color: white;
+			}
+
+			.shotRed {
+			    color: white;
+			}
+
+			.fadeInElm {
+			    visibility: visible;
+			    opacity: 1;
+			    transition: opacity 1s linear;
+			}
+
+			.fadeOutElm {
+			    visibility: hidden;
+			    opacity: 0;
+			    transition: visibility 0s 1s, opacity 1s linear;
+			}
+
+			/* blink code */
+
+			@keyframes blinking {
+			    0% {
+			        background-color: #ffffff;
+			    }
+
+			    100% {
+			        background-color: lightgreen;
+			    }
+			}
+
+			.winBlink {
+			    animation: blinking .10s 4;
+			}
+
+
+			@keyframes extblinking {
+			    0% {
+			        background-color: green;
+			    }
+
+			    100% {
+			        background-color: red;
+			    }
+			}
+
+			.extBlink {
+			    animation: extblinking .15s 3;
+			}
+
+
+
+			/* end of blink code */
+
+			#customLogo1 {
+                position:absolute;
+                bottom: 7px;
+                /* left: 328px; */
+                right: 520px;
+                z-index:9;
+                height:26px;
+                border: 2px solid black;
+            }
+			 #customLogo2 {
+                position:absolute;
+                bottom: 7px;
+                /* right: 328px; */
+                left: 520px;
+                z-index:9;
+                height: 26px;
+                border: 2px solid black;
+            }
+
+			/* #player1Image {
+			    position: absolute;
+			    top: 8px;
+			    z-index: 9;
+			    left: 60px;
+			    width: 50px;
+			    height: 50px;
+			}
+
+			#player2Image {
+			    position: absolute;
+			    top: 8px;
+			    z-index: 9;
+			    right: 60px;
+			    width: 50px;
+			    height: 50px;
+			} */
+
+			#raceInfo {
+			    background-image: linear-gradient(to right, grey, white);
+			    position: fixed;
+			    bottom: 0px;
+			    width: 20%;
+			    left: 155px;
+			    border-radius: 0px 00px 10px 10px;
+			    text-align: center;
+			    font-size: 8pt;
+			    font-weight: bolder;
+			    border: 1px solid #000;
+			    z-index: -1;
+			}
+
+			#wagerInfo {
+			    background-image: linear-gradient(to left, grey, white);
+			    position: fixed;
+			    bottom: 0px;
+			    width: 20%;
+			    right: 145px;
+			    border-radius: 0px 00px 10px 10px;
+			    text-align: center;
+			    font-size: 8pt;
+			    font-weight: bolder;
+			    border: 1px solid #000;
+			    z-index: -1;
+			}
+
+			.shotclockvis {
+			    position: absolute;
+							
+			    width: 90%;
+			    left: 5%;
+			    bottom: 36px;
+			    height: 3px;
+			    background: #fff;
+			    border-radius: 5px;
+
+			}
+
+			.startTimer {
+			    width: 0px;
+			    transition: width 30s;
+			    transition-timing-function: linear;
+			}
+
+			.start60 {
+			    width: 0px;
+			    transition-property: width;
+			    transition-duration: 60s;
+			    transition-timing-function: linear;
+			}
+
+			.mySlides {
+			/* position:fixed;
+			display: none;
+			bottom: 200px;
+            left: 200px; */
+            position: fixed;
+            /* Adjust these values to position the slideshow where you want it */
+            top: 50%;         /* Vertical position from the top */
+            left: 50%;        /* Horizontal position from the left */
+            transform: translate(-50%, -50%);  /* Centers the div */
+            z-index: 1000;    /* Ensures it appears above other elements */
+            /* Add any other styling like width, height if needed */
+            width: auto;     /* Adjust as needed */
+            height: auto;     /* Adjust as needed */
+			}
+
+
+			/* Slideshow container */
+			.slideshow-container {
+			    position: relative;
+			    margin: auto;
+			}
+
+
+			/* Fading animation */
+			.fade {
+			    animation-name: fade;
+			    animation-duration: 1.5s;
+			}
+
+			@keyframes fade {
+			    from {
+			        opacity: .4
+				  
+			    }
+
+			    to {
+			        opacity: 1
+			    }
+			}
+   
+
+			.logoSlide {
+			    display: none;
+			}

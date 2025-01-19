@@ -248,24 +248,24 @@ function styleChange(n) {
 		document.styleSheets[0].disabled = false;
 		document.styleSheets[1].disabled = true;
 		document.styleSheets[2].disabled = true;
-		document.styleSheets[3].disabled = true;
+		// document.styleSheets[3].disabled = true;
 	}
 	if (n == 2) {
 		document.styleSheets[0].disabled = true;
 		document.styleSheets[1].disabled = false;
 		document.styleSheets[2].disabled = true;
-		document.styleSheets[3].disabled = true;
+		// document.styleSheets[3].disabled = true;
 	}
 	if (n == 3) {
 		document.styleSheets[0].disabled = true;
 		document.styleSheets[1].disabled = true;
 		document.styleSheets[2].disabled = false;
-		document.styleSheets[3].disabled = true;
+		// document.styleSheets[3].disabled = true;
 	}
-	if (n == 4) {
-		document.styleSheets[0].disabled = true;
-		document.styleSheets[1].disabled = true;
-		document.styleSheets[2].disabled = true;
-		document.styleSheets[3].disabled = false;
-	}
+	// if (n == 4) {
+	// 	document.styleSheets[0].disabled = true;
+	// 	document.styleSheets[1].disabled = true;
+	// 	document.styleSheets[2].disabled = true;
+	// 	document.styleSheets[3].disabled = false;
+	// }
 }
