@@ -1,16 +1,16 @@
 <div align="center"><table width="100%" border="0"><tr><td><div align="center"><p style="color:yellow; font-weight:bolder"><b>CueSport ScoreBoard</b></div></td><td>
-<div align="center"><span style="font-size: 12px"><i>(best viewed @ 1920x1080)</i></span></div></td></tr><tr><td colspan="2"><div align="center"><br><b>Made for cue sport fans by a cue sport fan, based off of the <a href="https://github.com/ngholson/g4ScoreBoard/">g4scoreboard</a><br><span style="color: yellow"><br>A clean and professional solution for displaying: player names, race and wager information, scores, logos, and sponsors.</span><br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Includes g4scoreboard shot clock inspired by the clock used during the Mosconi Cup<a href="#matchroom-pool">*</a> and European Open<a href="#matchroom-pool">*</a></b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br><br><br></div></td></tr><tr><td><div align="left">Hotkey Support<br>Add you own custom logos<br>Main OBS Themes supported<br>Custom Logo Slideshow (Sponsor Logos)<br><b><i>Docks cleanly into the OBS user interface</i></b></div></td><td><div align="right"><br>View the full Wiki <a href="https://github.com/ngholson/g4ScoreBoard/wiki">Here</a>
-<br><a href="https://github.com/ngholson/g4ScoreBoard/wiki/Installation-(Scoreboard)" target="_blank">ScoreBoard Installation Instructions</a><br><a href="https://github.com/ngholson/g4ScoreBoard/wiki/Installation-(Scoreboard)" target="_blank">Hotkey Installation Instructions</a><br>See <a href="https://github.com/ngholson/g4ScoreBoard/releases" target="_blank">Releases Page</a> for most recent official release</div></td></tr></table></div><br>
+<div align="center"><span style="font-size: 12px"><i>(best viewed @ 1920x1080)</i></span></div></td></tr><tr><td colspan="2"><div align="center"><br><b>Made for cue sport fans by a cue sport fan, based off of the <a href="https://github.com/ngholson/g4ScoreBoard/">g4scoreboard</a><br><span style="color: yellow"><br>A clean and professional solution for displaying: player names, race and wager information, scores, logos, and sponsors.</span><br><br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Includes g4scoreboard shot clock inspired by the clock used during the Mosconi Cup<a href="#matchroom-pool">*</a> and European Open<a href="#matchroom-pool">*</a></b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br><br><br></div></td></tr><tr><td><div align="left">Hotkey Support<br>Add you own custom logos<br>Main OBS Themes supported<br>Custom Logo Slideshow (Sponsor Logos)<br><b><i>Docks cleanly into the OBS user interface</i></b></div></td><td><div align="right"><br>View the full Wiki <a href="https://github.com/iainsmacleod/CueSport-Scoreboard/wiki">Here</a>
+<br><a href="https://github.com/iainsmacleod/CueSport-Scoreboard#installation" target="_blank">ScoreBoard Installation Instructions</a><br><a href="https://github.com/ngholson/g4ScoreBoard/wiki/Installation-(Scoreboard)" target="_blank">Hotkey Installation Instructions</a><br>See <a href="https://github.com/iainsmacleod/CueSport-Scoreboard/releases" target="_blank">Releases Page</a> for most recent official release</div></td></tr></table></div><br>
 
 
 ```
+
+CueSport ScoreBoard is a modified version of G4ScoreBoard by Iain MacLeod. The purpose of this modification was to simplify and enhance the UI/UX for users.
+I have removed the Salotto logo, as I myself have not asked for permission to use - but if you choose to use it, it can be uploaded as a custom logo.
+This implementation now uses 5 custom logos, 2 associated with players, and 3 for a slideshow functionality.
+
 G4ScoreBoard addon for OBS Copyright 2022-2023 Norman Gholson IV
 https://g4billiards.com http://www.g4creations.com
-
-this is a purely javascript/html/css driven pool scoreboard system for OBS Studio
-
-Salotto logo is the copyright of Salotto and is used with their permission.
-for more information about Salotto please visit https://salotto.app
 ```
 -------------------------------------------------------------
 
@@ -39,18 +39,17 @@ Zip contents:
 |   |   |   |-required.css
 |   |	|
 |   |	|-[browser_source]
-|   |       |-100.css
 |   |	    |-125.css
 |   |	    |-150.css
 |   |       |-200.css
 |   |
 |   |-[images]
-|   |   |-salotto.png
-|   |   |-g4logo.png
-|   |   |-logo.png
+|   |   |-8ball_original.png
+|   |   |-8ball_small.png
 |   |   |-8_ball_game.png <-example of other custom logo use
 |   |   |-9_ball_game.png <-example of other custom logo use
 |   |   |-template.psd
+|	|	|-placeholder.png
 |   |
 |   |-[sound]
 |       |-beep2.mp3
@@ -58,7 +57,6 @@ Zip contents:
 |
 |-shot_clock_display.html   
 |-g4ScoreBoard_hotkeys.lua
-|-browser_compact.html
 |-browser_source.html   
 |-control_panel.html
 |-hotkeys.js
@@ -159,4 +157,4 @@ Max file size 2.4 MB
 
 ```
 <br><br>
-<a id="user-content-matchroom-pool" class="anchor" aria-hidden="true" href="#matchroom-pool"></a><div align="center"><i>*Mosconi Cup and European Open are the Copyright and or Trademark of Matchroom Pool and is in no way affiliated with G4Billiards.</i><br><br><img src="https://g4billiards.com/coinflip/images/9ball_clipart_stylized_100.png"></div><br><br>
+<a id="user-content-matchroom-pool" class="anchor" aria-hidden="true" href="#matchroom-pool"></a><div align="center"><i>*Mosconi Cup and European Open are the Copyright and or Trademark of Matchroom Pool and is in no way affiliated with CueSport Scoreboard.</i><br><br><img src="https://g4billiards.com/coinflip/images/9ball_clipart_stylized_100.png"></div><br><br>
