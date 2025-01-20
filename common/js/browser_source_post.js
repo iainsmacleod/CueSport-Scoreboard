@@ -189,6 +189,20 @@ if (localStorage.getItem("slideShow") == "yes") {
 	// document.getElementById("customLogo2").classList.add("fade");
 }
 
+if (localStorage.getItem("player1Name") != "") {
+	document.getElementById("player1Name").innerHTML = localStorage.getItem("p1NameCtrlPanel");
+}
+if (localStorage.getItem("player1Name") == "" || localStorage.getItem("player1Name") == null) {
+	document.getElementById("player1Name").innerHTML = "Player 1";
+}
+
+if (localStorage.getItem("player2Name") != "") {
+	document.getElementById("player2Name").innerHTML = localStorage.getItem("p2NameCtrlPanel");
+}
+if (localStorage.getItem("player2Name") == "" || localStorage.getItem("player2Name") == null) {
+	document.getElementById("player2Name").innerHTML = "Player 2";
+}
+
 if (localStorage.getItem("p1ScoreCtrlPanel") != null) {
 	document.getElementById("player1Score").innerHTML = localStorage.getItem("p1ScoreCtrlPanel");
 } else {
@@ -209,10 +223,11 @@ if (localStorage.getItem("raceInfo") != "") {
 	document.getElementById("raceInfo").classList.remove("noShow");
 }
 
+
+
 //Removed the following three lines as they were creating issues for name and score display on refresh
-// document.getElementById("player1Name").innerHTML = localStorage.getItem("p1NameCtrlPanel");
 // document.getElementById("player1Score").innerHTML = localStorage.getItem("p1ScoreCtrlPanel");
-// document.getElementById("player2Name").innerHTML = localStorage.getItem("p2NameCtrlPanel");
+
 document.getElementById("wagerInfo").innerHTML = localStorage.getItem("wagerInfo");
 document.getElementById("raceInfo").innerHTML = localStorage.getItem("raceInfo");
 
