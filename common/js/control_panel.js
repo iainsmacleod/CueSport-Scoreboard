@@ -1,4 +1,7 @@
 'use strict';
+// CueSport ScoreBoard is a modified version of G4ScoreBoard by Iain MacLeod. The purpose of this modification was to simplify and enhance the UI/UX for users.
+// I have removed the Salotto logo, as I myself have not asked for permission to use - but if you choose to use it, it can be uploaded as a custom logo.
+// This implementation now uses 5 custom logos, 2 assocaited with players, and 3 for a slideshow functionality.
 
 //  G4ScoreBoard addon for OBS version 1.6.0 Copyright 2022-2023 Norman Gholson IV
 //  https://g4billiards.com http://www.g4creations.com
