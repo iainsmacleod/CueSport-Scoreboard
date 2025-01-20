@@ -52,6 +52,7 @@ bc.onmessage = (event) => {
 			document.getElementById("raceInfo").innerHTML = event.data.race;
 		}
 	}
+
 	if (event.data.wager != null) {
 		console.log("event.data.wager: " + event.data.wager);
 		if (event.data.wager == "") {
@@ -185,8 +186,6 @@ if (localStorage.getItem("customLogo5") != null) { document.getElementById("cust
 if (localStorage.getItem("slideShow") == "yes") {
 	document.getElementById("logoSlideshowDiv").classList.replace("fadeOutElm", "fadeInElm");
 	document.getElementById("logoSlideshowDiv").classList.replace("fadeOutElm", "fadeInElm");
-	// document.getElementById("customLogo2").classList.replace("fadeOutElm", "logoSlide");
-	// document.getElementById("customLogo2").classList.add("fade");
 }
 
 if (localStorage.getItem("player1Name") != "") {
@@ -215,28 +214,17 @@ if (localStorage.getItem("p2ScoreCtrlPanel") != null) {
 	document.getElementById("player2Score").innerHTML = 0;
 }
 
-if (localStorage.getItem("wagerInfo") != "") {
+if (localStorage.getItem("wagerInfo") != "" && localStorage.getItem("wagerInfo") != null) {
 	document.getElementById("wagerInfo").classList.remove("noShow");
 }
 
-if (localStorage.getItem("raceInfo") != "") {
+if (localStorage.getItem("raceInfo") != "" && localStorage.getItem("raceInfo") != null) {
 	document.getElementById("raceInfo").classList.remove("noShow");
 }
-
-
-
-//Removed the following three lines as they were creating issues for name and score display on refresh
-// document.getElementById("player1Score").innerHTML = localStorage.getItem("p1ScoreCtrlPanel");
 
 document.getElementById("wagerInfo").innerHTML = localStorage.getItem("wagerInfo");
 document.getElementById("raceInfo").innerHTML = localStorage.getItem("raceInfo");
 
-if (localStorage.getItem("useCustomLogo") == "yes") {
-	document.getElementById("customLogo2").classList.replace("fadeOutElm", "fadeInElm");
-}
-// if (localStorage.getItem("useSalotto") == "yes") {
-// 	document.getElementById("salottoLogo").classList.replace("fadeOutElm", "fadeInElm");
-// }
 if (localStorage.getItem("useClock") != "yes") {
 	document.getElementById("p1ExtIcon").classList.replace("fadeInElm", "fadeOutElm");
 	document.getElementById("p2ExtIcon").classList.replace("fadeInElm", "fadeOutElm");
