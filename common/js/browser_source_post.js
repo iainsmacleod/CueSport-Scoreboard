@@ -27,7 +27,7 @@ bc.onmessage = (event) => {
 			document.getElementById("player" + event.data.player + "Score").innerHTML = event.data.score;
 			document.getElementById("player" + event.data.player + "Score").classList.add("winBlink");
 			// Update the control_panel score on click
-			document.getElementById("p" + event.data.player + "Score").textContent = event.data.score;
+			document.getElementById("player" + event.data.player + "Score").textContent = event.data.score;
 			setTimeout("clearWinBlink()", 500);
 		} else {
 			document.getElementById("player" + event.data.player + "Score").innerHTML = event.data.score;

@@ -205,8 +205,8 @@ function clockDisplay(opt3) {
 		document.getElementById("shotClockShow").innerHTML = "Show Clock";
 		document.getElementById("shotClockShow").setAttribute("onclick", "clockDisplay('show')");
 		document.getElementById("shotClockShow").style.background = "none";
-		//document.getElementById("shotClockShow").style.color = "white";
-		//document.getElementById("shotClockShow").style.border = "2px solid black";
+		document.getElementById("shotClockShow").style.color = "lightgrey";
+		//document.getElementById("shotClockShow").style.border = "2px solid white";
 	}
 }
 
@@ -363,12 +363,12 @@ function shotClock(timex) {
     clockDisplay.style.position = 'fixed';
     clockDisplay.style.left = buttonRect.left + 'px';
     clockDisplay.style.top = buttonRect.top + 'px';
-    clockDisplay.style.width = '160px';
-    clockDisplay.style.height = '30px';
+    clockDisplay.style.width = '100px';
+    clockDisplay.style.height = '24px';
     clockDisplay.style.display = 'flex';
     clockDisplay.style.justifyContent = 'center';
     clockDisplay.style.alignItems = 'center';
-    clockDisplay.style.zIndex = '1000';
+    clockDisplay.style.zIndex = '1';
 
 }
 
