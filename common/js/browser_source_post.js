@@ -71,8 +71,8 @@ bc.onmessage = (event) => {
 
 	if (event.data.color != null) {
 		console.log("event.data.player: " + event.data.player + " event.data.color: " + event.data.color);
-		if (event.data.player == "1") { document.getElementById("player" + event.data.player + "Name").style.background = "linear-gradient(to left, white , " + event.data.color; };
-		if (event.data.player == "2") { document.getElementById("player" + event.data.player + "Name").style.background = "linear-gradient(to right, white , " + event.data.color; };
+		if (event.data.player == "1") { document.getElementById("player" + event.data.player + "Name").style.background = "linear-gradient(to left, white, " + event.data.color; };
+		if (event.data.player == "2") { document.getElementById("player" + event.data.player + "Name").style.background = "linear-gradient(to right, white, " + event.data.color; };
 	}
 
 	if (event.data.name != null) {
@@ -205,7 +205,7 @@ if (localStorage.getItem("wagerInfo") != "") {
 	document.getElementById("wagerInfo").classList.remove("noShow");
 }
 
-if (localStorage.getItem("raceInfo") != null) {
+if (localStorage.getItem("raceInfo") != "") {
 	document.getElementById("raceInfo").classList.remove("noShow");
 }
 
@@ -239,11 +239,11 @@ if (localStorage.getItem(("usePlayer2")) != "yes") {
 }
 
 if (localStorage.getItem('p1colorSet') != "") {
-	document.getElementById("player1Name").style.background = "linear-gradient(to left, white , " + localStorage.getItem('p1colorSet');
+	document.getElementById("player1Name").style.background = "linear-gradient(to left, white, " + localStorage.getItem('p1colorSet');
 	console.log("p1color: " + localStorage.getItem('p1colorSet'));
 }
 if (localStorage.getItem('p2colorSet') != "") {
-	document.getElementById("player2Name").style.background = "linear-gradient(to right, white , " + localStorage.getItem('p2colorSet');
+	document.getElementById("player2Name").style.background = "linear-gradient(to right, white, " + localStorage.getItem('p2colorSet');
 	console.log("p2color: " + localStorage.getItem('p2colorSet'));
 }
 

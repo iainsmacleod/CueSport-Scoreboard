@@ -45,7 +45,7 @@ for more information about Salotto please visit https://salotto.app
 				<div class="slidecontainer">
 					<label id="opacityLabel" for="scoreOpacity">Overlay Opacity</label>
 					&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-					<input type="range" min="0" max="100" value="100" class="slider" id="scoreOpacity">
+					<input type="range" min="0" max="100" value="100" class="slider" id="scoreOpacity" onchange="saveOpacity()"">
 					&nbsp;&nbsp;
 					<span id="sliderValue">100%</span>
 				</div>
@@ -132,7 +132,7 @@ for more information about Salotto please visit https://salotto.app
 						<br>
 					</div>
 					<text class="hover" onclick="cLogoNameChange2()" id="logoName2" style="text-decoration: underline;">Player 2 Logo</text>
-					<input class="smallSize" type="checkbox" id="customLogo2" onchange="customLogoSetting()" disabled>
+					<input class="smallSize" type="checkbox" id="customLogo2" onchange="customLogoSetting2()" disabled>
 					<div class="hover obs28 tooltip" id="uploadCustomLogo2" style="width: 150px">
 						Upload Player 2 Logo<input type="file" id="FileUploadL2" onchange="logoPost(this,2); toggleCheckbox('customLogo2', this)" accept="image/png, image/jpeg, image/svg+xml, image/bmp">
 						<span class="tooltiptext"><img id="l2Img" src="" style="height:100px; max-width:300px"></span>

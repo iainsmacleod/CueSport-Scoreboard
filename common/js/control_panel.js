@@ -36,6 +36,13 @@ function bsStyleChange() {
 
 }
 
+// Function to save the opacity value to localStorage
+function saveOpacity() {
+	var opacityValue = document.getElementById('scoreOpacity').value;
+	localStorage.setItem('overlayOpacity', opacityValue);
+	document.getElementById('sliderValue').innerText = opacityValue + '%'; // Update displayed value
+}
+
 function toggleCheckbox(checkboxId, inputElement) {
     const checkbox = document.getElementById(checkboxId);
     checkbox.disabled = !inputElement.files.length; // Enable if file is selected, disable otherwise
@@ -74,7 +81,7 @@ function logoPost(input, xL) {
 			document.getElementById("l" + xL + "Img").src = localStorage.getItem("customLogo" + xL);
 		}, false);
 		if (document.getElementById("logoSlideshowChk").checked == true) { setTimeout(slideOther, 50); };
-		if (xL == 0) { setTimeout(logoOther, 50); };
+		if (xL == 1 || xL == 2) { setTimeout(logoOther, 50); };
 	}
 }
 

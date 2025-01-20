@@ -83,6 +83,12 @@ window.onload = function() {
     if (localStorage.getItem("customLogo2") != null) {
         document.getElementById("customLogo2").disabled = false; // Enable checkbox for Player 2
     }
+
+	var savedOpacity = localStorage.getItem('overlayOpacity');
+		if (savedOpacity) {
+			document.getElementById('scoreOpacity').value = savedOpacity;
+			document.getElementById('sliderValue').innerText = savedOpacity + '%'; // Update displayed value
+		}
 };
 
 slider.oninput = function () {
