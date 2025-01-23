@@ -53,10 +53,10 @@ function toggleCheckbox(checkboxId, inputElement) {
 
 function logoSlideshow() {
 	if (document.getElementById("logoSlideshowChk").checked == true) {
-		document.getElementById("customLogo1").checked = false;
-		document.getElementById("customLogo2").checked = false;
-		customLogoSetting();
-		customLogoSetting2();
+		// document.getElementById("customLogo1").checked = false;
+		// document.getElementById("customLogo2").checked = false;
+		// customLogoSetting();
+		// customLogoSetting2();
 		localStorage.setItem("slideShow", "yes");
 		bc.postMessage({ clockDisplay: 'logoSlideShow-show' });
 	} else {
@@ -484,8 +484,8 @@ function customLogoSetting() {
 	} else {
 		bc.postMessage({ clockDisplay: 'showcustomLogo' });
 		localStorage.setItem("useCustomLogo", "yes");
-		document.getElementById("logoSlideshowChk").checked = false;
-		logoSlideshow();
+		// document.getElementById("logoSlideshowChk").checked = false;
+		// logoSlideshow();
 		// if (localStorage.getItem("useCustomLogo") == "yes" && localStorage.getItem("useCustomLogo2") == "yes") { document.getElementById("allCheck").checked = true; }
 	}
 }
@@ -498,8 +498,8 @@ function customLogoSetting2() {
 	} else {
 		bc.postMessage({ clockDisplay: 'showcustomLogo2' });
 		localStorage.setItem("useCustomLogo2", "yes");
-		document.getElementById("logoSlideshowChk").checked = false;
-		logoSlideshow();
+		// document.getElementById("logoSlideshowChk").checked = false;
+		// logoSlideshow();
 		// if (localStorage.getItem("useCustomLogo") == "yes" && localStorage.getItem("useCustomLogo2") == "yes") { document.getElementById("allCheck").checked = true; }
 	}
 }
