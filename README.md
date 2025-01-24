@@ -5,10 +5,13 @@
 
 ```
 
-CueSport ScoreBoard is a modified version of G4ScoreBoard by Iain MacLeod. The purpose of this modification was to simplify and enhance the UI/UX for users.
+CueSport ScoreBoard is a modified version of G4ScoreBoard. The purpose of this modification was to simplify and enhance the UI/UX for users.
 I have removed the Salotto logo, as I myself have not asked for permission to use - but if you choose to use it, it can be uploaded as a custom logo.
 This implementation now uses 5 custom logos, 2 associated with players, and 3 for a slideshow functionality.
 
+CueSport ScoreBoard addon for OBS Copyright 2025 Iain MacLeod
+
+Modified version of G$Scoreboard:-
 G4ScoreBoard addon for OBS Copyright 2022-2023 Norman Gholson IV
 https://g4billiards.com http://www.g4creations.com
 ```
@@ -157,4 +160,4 @@ Max file size 2.4 MB
 
 ```
 <br><br>
-<a id="user-content-matchroom-pool" class="anchor" aria-hidden="true" href="#matchroom-pool"></a><div align="center"><i>*Mosconi Cup and European Open are the Copyright and or Trademark of Matchroom Pool and is in no way affiliated with CueSport Scoreboard.</i><br><br><img src="https://g4billiards.com/coinflip/images/9ball_clipart_stylized_100.png"></div><br><br>
+<a id="user-content-matchroom-pool" class="anchor" aria-hidden="true" href="#matchroom-pool"></a><div align="center"><i>*Mosconi Cup and European Open are the Copyright and or Trademark of Matchroom Pool and is in no way affiliated with CueSport Scoreboard.</i><br>

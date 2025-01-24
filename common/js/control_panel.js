@@ -48,6 +48,7 @@ function saveOpacity() {
 
 function toggleCheckbox(checkboxId, inputElement) {
     const checkbox = document.getElementById(checkboxId);
+	console.log(`File size ${inputElement.files.length}`);
     checkbox.disabled = !inputElement.files.length; // Enable if file is selected, disable otherwise
 }
 
@@ -477,31 +478,75 @@ function resetExt(player, flash) {
 // }
 
 function customLogoSetting() {
-	if (!document.getElementById("customLogo1").checked) {
-		bc.postMessage({ clockDisplay: 'hidecustomLogo' });
-		localStorage.setItem("useCustomLogo", "no");
-		// if (localStorage.getItem("useCustomLogo") != "yes" || localStorage.getItem("useCustomLogo2") != "yes") { document.getElementById("allCheck").checked = false; }
-	} else {
-		bc.postMessage({ clockDisplay: 'showcustomLogo' });
-		localStorage.setItem("useCustomLogo", "yes");
-		// document.getElementById("logoSlideshowChk").checked = false;
-		// logoSlideshow();
-		// if (localStorage.getItem("useCustomLogo") == "yes" && localStorage.getItem("useCustomLogo2") == "yes") { document.getElementById("allCheck").checked = true; }
-	}
+    const checkbox = document.getElementById("customLogo1");
+    const isImageLoaded = localStorage.getItem("customLogo1") !== null;
+
+    // Initially disable the checkbox if no image is loaded
+    checkbox.disabled = !isImageLoaded;
+
+    if (!checkbox.checked) {
+        bc.postMessage({ clockDisplay: 'hidecustomLogo' });
+        localStorage.setItem("useCustomLogo", "no");
+    } else {
+        bc.postMessage({ clockDisplay: 'showcustomLogo' });
+        localStorage.setItem("useCustomLogo", "yes");
+    }
+
+    // Add event listener for checkbox toggle
+    checkbox.addEventListener('change', function() {
+        // Disable the checkbox immediately
+        checkbox.disabled = true;
+
+        // Handle the checkbox state
+        if (checkbox.checked) {
+            bc.postMessage({ clockDisplay: 'showcustomLogo' });
+            localStorage.setItem("useCustomLogo", "yes");
+        } else {
+            bc.postMessage({ clockDisplay: 'hidecustomLogo' });
+            localStorage.setItem("useCustomLogo", "no");
+        }
+
+        // Re-enable after timeout
+        setTimeout(() => {
+            checkbox.disabled = false; // Re-enable after timeout
+        }, 1100); // 1100 ms delay
+    });
 }
 
 function customLogoSetting2() {
-	if (!document.getElementById("customLogo2").checked) {
-		bc.postMessage({ clockDisplay: 'hidecustomLogo2' });
-		localStorage.setItem("useCustomLogo2", "no");
-		// if (localStorage.getItem("useCustomLogo") != "yes" || localStorage.getItem("useCustomLogo2") != "yes") { document.getElementById("allCheck").checked = false; }
-	} else {
-		bc.postMessage({ clockDisplay: 'showcustomLogo2' });
-		localStorage.setItem("useCustomLogo2", "yes");
-		// document.getElementById("logoSlideshowChk").checked = false;
-		// logoSlideshow();
-		// if (localStorage.getItem("useCustomLogo") == "yes" && localStorage.getItem("useCustomLogo2") == "yes") { document.getElementById("allCheck").checked = true; }
-	}
+    const checkbox = document.getElementById("customLogo2");
+    const isImageLoaded = localStorage.getItem("customLogo2") !== null;
+
+    // Initially disable the checkbox if no image is loaded
+    checkbox.disabled = !isImageLoaded;
+
+    if (!checkbox.checked) {
+        bc.postMessage({ clockDisplay: 'hidecustomLogo2' });
+        localStorage.setItem("useCustomLogo2", "no");
+    } else {
+        bc.postMessage({ clockDisplay: 'showcustomLogo2' });
+        localStorage.setItem("useCustomLogo2", "yes");
+    }
+
+    // Add event listener for checkbox toggle
+    checkbox.addEventListener('change', function() {
+        // Disable the checkbox immediately
+        checkbox.disabled = true;
+
+        // Handle the checkbox state
+        if (checkbox.checked) {
+            bc.postMessage({ clockDisplay: 'showcustomLogo2' });
+            localStorage.setItem("useCustomLogo2", "yes");
+        } else {
+            bc.postMessage({ clockDisplay: 'hidecustomLogo2' });
+            localStorage.setItem("useCustomLogo2", "no");
+        }
+
+        // Re-enable after timeout
+        setTimeout(() => {
+            checkbox.disabled = false; // Re-enable after timeout
+        }, 1100); // 1100 ms delay
+    });
 }
 
 // function allCheck() {

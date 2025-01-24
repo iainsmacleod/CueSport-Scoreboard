@@ -68,13 +68,14 @@ var pColormsg;
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 window.onload = function() {
-	 // Set local storage values if not previously configured
-	 if (localStorage.getItem("usePlayer1") === null) {
+	// Set local storage values if not previously configured
+	if (localStorage.getItem("usePlayer1") === null) {
 		localStorage.setItem("usePlayer1", "yes");
 	}
 	if (localStorage.getItem("usePlayer2") === null) {
 		localStorage.setItem("usePlayer2", "yes");
 	}
+	
 
 	// Call the visibility functions based on the checkbox states
     setPlayerVisibility(1);
@@ -85,7 +86,7 @@ window.onload = function() {
         document.getElementById("customLogo1").disabled = false; // Enable checkbox for Player 1
     }
     if (localStorage.getItem("customLogo2") != null) {
-        document.getElementById("customLogo2").disabled = false; // Enable checkbox for Player 2
+		document.getElementById("customLogo2").disabled = false; // Enable checkbox for Player 2
     }
 
 	var savedOpacity = localStorage.getItem('overlayOpacity');
