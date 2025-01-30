@@ -217,8 +217,8 @@ function clockDisplay(opt3) {
 }
 
 function postNames() {
-	p1namemsg = document.getElementById("p1Name").value.substring(0, 29);
-	p2namemsg = document.getElementById("p2Name").value.substring(0, 29);
+	p1namemsg = document.getElementById("p1Name").value.substring(0, 20);
+	p2namemsg = document.getElementById("p2Name").value.substring(0, 20);
 	bc.postMessage({ player: '1', name: p1namemsg });
 	bc.postMessage({ player: '2', name: p2namemsg });
 	var p1FirstName = document.getElementById("p1Name").value.split(" ")[0];

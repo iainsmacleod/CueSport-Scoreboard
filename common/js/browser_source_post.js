@@ -238,19 +238,33 @@ if (localStorage.getItem("slideShow") == "yes") {
 	document.getElementById("logoSlideshowDiv").classList.replace("fadeOutElm", "fadeInElm");
 }
 
-if (localStorage.getItem("player1Name") != "") {
+if (localStorage.getItem("p1NameCtrlPanel") != "" || localStorage.getItem("p1NameCtrlPanel") != null) {
 	document.getElementById("player1Name").innerHTML = localStorage.getItem("p1NameCtrlPanel");
 }
-if (localStorage.getItem("player1Name") == "" || localStorage.getItem("player1Name") == null) {
+if (localStorage.getItem("p1NameCtrlPanel") == "" || localStorage.getItem("p1NameCtrlPanel") == null) {
 	document.getElementById("player1Name").innerHTML = "Player 1";
 }
 
-if (localStorage.getItem("player2Name") != "") {
+if (localStorage.getItem("p2NameCtrlPanel") != "" || localStorage.getItem("p2NameCtrlPanel") != null) {
 	document.getElementById("player2Name").innerHTML = localStorage.getItem("p2NameCtrlPanel");
 }
-if (localStorage.getItem("player2Name") == "" || localStorage.getItem("player2Name") == null) {
+if (localStorage.getItem("p2NameCtrlPanel") == "" || localStorage.getItem("p2NameCtrlPanel") == null) {
 	document.getElementById("player2Name").innerHTML = "Player 2";
 }
+
+// if (localStorage.getItem("player1Name") != "" || localStorage.getItem("player1Name") != null) {
+// 	document.getElementById("player1Name").innerHTML = localStorage.getItem("p1NameCtrlPanel");
+// }
+// if (localStorage.getItem("player1Name") == "" || localStorage.getItem("player1Name") == null) {
+// 	document.getElementById("player1Name").innerHTML = "Player 1";
+// }
+
+// if (localStorage.getItem("player2Name") != "" || localStorage.getItem("player2Name") != null) {
+// 	document.getElementById("player2Name").innerHTML = localStorage.getItem("p2NameCtrlPanel");
+// }
+// if (localStorage.getItem("player2Name") == "" || localStorage.getItem("player2Name") == null) {
+// 	document.getElementById("player2Name").innerHTML = "Player 2";
+// }
 
 if (localStorage.getItem("activePlayer") == null || localStorage.getItem("activePlayer") == "1") {
 	document.getElementById("player1Image").classList.replace("fadeOutElm", "fadeInElm");
