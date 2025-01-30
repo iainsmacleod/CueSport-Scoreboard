@@ -104,14 +104,10 @@ bc.onmessage = (event) => {
 				console.log("Use clock evaluating as not enabled");
 			}
 			// Check if both players are enabled before fading in the player images
-			if (localStorage.getItem("usePlayer1") === "yes" && localStorage.getItem("usePlayer2") === "yes") {
-				if (localStorage.getItem("activePlayer") === null || (localStorage.getItem("activePlayer") ==="1")) {
-					document.getElementById("player1Image").classList.replace("fadeOutElm", "fadeInElm");
-					document.getElementById("player2Image").classList.replace("fadeInElm", "fadeOutElm");
-				} else if (localStorage.getItem("activePlayer") === "2") {
-					document.getElementById("player1Image").classList.replace("fadeInElm", "fadeOutElm");
-					document.getElementById("player2Image").classList.replace("fadeOutElm", "fadeInElm");
-				}
+			if (bothPlayersEnabled) {
+				const activePlayer = localStorage.getItem("activePlayer");
+				document.getElementById("player1Image").classList.replace(activePlayer === "1" ? "fadeOutElm" : "fadeInElm", activePlayer === "1" ? "fadeInElm" : "fadeOutElm");
+				document.getElementById("player2Image").classList.replace(activePlayer === "2" ? "fadeOutElm" : "fadeInElm", activePlayer === "2" ? "fadeInElm" : "fadeOutElm");
 			}
 			if (localStorage.getItem("usePlayer1") === "yes") {
 				document.getElementById("customLogo1").classList.replace("fadeOutElm", "fadeInElm");
