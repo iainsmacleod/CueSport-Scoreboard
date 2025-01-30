@@ -109,10 +109,10 @@ bc.onmessage = (event) => {
 				document.getElementById("player1Image").classList.replace(activePlayer === "1" ? "fadeOutElm" : "fadeInElm", activePlayer === "1" ? "fadeInElm" : "fadeOutElm");
 				document.getElementById("player2Image").classList.replace(activePlayer === "2" ? "fadeOutElm" : "fadeInElm", activePlayer === "2" ? "fadeInElm" : "fadeOutElm");
 			}
-			if (localStorage.getItem("usePlayer1") === "yes") {
+			if (player1Enabled && localStorage.getItem("useCustomLogo")=="yes") {
 				document.getElementById("customLogo1").classList.replace("fadeOutElm", "fadeInElm");
 			}
-			if (localStorage.getItem("usePlayer2") === "yes") {
+			if (player2Enabled && localStorage.getItem("useCustomLogo2")=="yes") {
 				document.getElementById("customLogo2").classList.replace("fadeOutElm", "fadeInElm");
 			}
 			showPlayer(event.data.playerNumber);
