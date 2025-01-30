@@ -198,7 +198,7 @@ function customHide() {
 	setTimeout(function () { 
 		document.getElementById("customLogo1").style.display = "none"; 
 	}, 1000);
-}
+}		
 
 function custom2Show() {
 	document.getElementById("customLogo2").style.removeProperty('display');
@@ -218,6 +218,30 @@ function custom2Hide() {
 	setTimeout(function () { 
 		document.getElementById("customLogo2").style.display = "none"; 
 	}, 1000);
+}
+
+// function showActivePlayer() {
+// 	document.getElementById("player1Image").classList.replace("fadeOutElm", "fadeInElm");
+// 	document.getElementById("player2Image").classList.replace("fadeInElm", "fadeOutElm");
+// 	console.log("Activated player 1.");
+// }
+// function hideActivePlayer() {
+// 	document.getElementById("player1Image").classList.replace("fadeInElm", "fadeOutElm");
+// 	document.getElementById("player2Image").classList.replace("fadeOutElm", "fadeInElm");
+// 	console.log("Activated player 2.");
+// }
+
+function toggleActivePlayer(activePlayer) {
+	console.log(`Active player ${activePlayer}`);
+    if (activePlayer === 1 || activePlayer === null) {
+        document.getElementById("player1Image").classList.replace("fadeOutElm", "fadeInElm");
+        document.getElementById("player2Image").classList.replace("fadeInElm", "fadeOutElm");
+        console.log("Activated player 1.");
+    } else if (activePlayer === 2) {
+        document.getElementById("player1Image").classList.replace("fadeInElm", "fadeOutElm");
+        document.getElementById("player2Image").classList.replace("fadeOutElm", "fadeInElm");
+        console.log("Activated player 2.");
+    }
 }
 
 function showSlides() {

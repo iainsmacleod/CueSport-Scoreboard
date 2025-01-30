@@ -39,14 +39,14 @@ bc.onmessage = (event) => {
 	}
 
 	if (event.data.opacity != null) {
-		console.log("event.data(opacity): " + event.data.opacity);
+		console.log("Opacity setting: " + event.data.opacity);
 		document.getElementById("scoreBoardDiv").style.opacity = event.data.opacity;
 		document.getElementById("raceInfo").style.opacity = event.data.opacity;
 		document.getElementById("wagerInfo").style.opacity = event.data.opacity;
 	}
 
 	if (event.data.race != null) {
-		console.log("event.data.race: " + event.data.race);
+		console.log("Race info: " + event.data.race);
 		if (event.data.race == "") {
 			document.getElementById("raceInfo").classList.add("noShow");
 			document.getElementById("raceInfo").classList.remove("fadeInElm");
@@ -58,7 +58,7 @@ bc.onmessage = (event) => {
 	}
 
 	if (event.data.wager != null) {
-		console.log("event.data.wager: " + event.data.wager);
+		console.log("Wager info: " + event.data.wager);
 		if (event.data.wager == "") {
 			document.getElementById("wagerInfo").classList.add("noShow");
 			document.getElementById("wagerInfo").classList.remove("fadeInElm");
@@ -75,13 +75,13 @@ bc.onmessage = (event) => {
 	}
 
 	if (event.data.color != null) {
-		console.log("event.data.player: " + event.data.player + " event.data.color: " + event.data.color);
+		console.log("Player: " + event.data.player + " using color: " + event.data.color);
 		if (event.data.player == "1") { document.getElementById("player" + event.data.player + "Name").style.background = "linear-gradient(to left, white, " + event.data.color; };
 		if (event.data.player == "2") { document.getElementById("player" + event.data.player + "Name").style.background = "linear-gradient(to right, white, " + event.data.color; };
 	}
 
 	if (event.data.name != null) {
-		console.log("event.data.player: " + event.data.player + " event.data.name: " + event.data.name);
+		console.log("ePlayer/Team: " + event.data.player + " named " + event.data.name);
 		if (!event.data.name == "") {
 			document.getElementById("player" + event.data.player + "Name").innerHTML = event.data.name;
 		} else {
@@ -91,8 +91,29 @@ bc.onmessage = (event) => {
 
 	if (event.data.playerDisplay != null) {
 		console.log("event.data.playerDisplay: " + event.data.playerDisplay + " event.data.playerNumber: " + event.data.playerNumber);
-		if (event.data.playerDisplay == "showPlayer") { 
+		if (event.data.playerDisplay == "showPlayer") {
+			if (localStorage.getItem("useClock") === "yes") {
+				console.log("Use clock evaluating as enabled");
+				document.getElementById("p1ExtIcon").classList.replace("fadeOutElm", "fadeInElm");
+				document.getElementById("p2ExtIcon").classList.replace("fadeOutElm", "fadeInElm");
+			} else {
+				console.log("Use clock evaluating as not enabled");
+			}
+			if (localStorage.getItem("activePlayer") === null || (localStorage.getItem("activePlayer") ==="1")) {
+				document.getElementById("player1Image").classList.replace("fadeOutElm", "fadeInElm");
+        		document.getElementById("player2Image").classList.replace("fadeInElm", "fadeOutElm");
+		    } else if (localStorage.getItem("activePlayer") === "2") {
+        		document.getElementById("player1Image").classList.replace("fadeInElm", "fadeOutElm");
+        		document.getElementById("player2Image").classList.replace("fadeOutElm", "fadeInElm");
+	   		}
+			if (localStorage.getItem("usePlayer1") === "yes") {
+				document.getElementById("customLogo1").classList.replace("fadeOutElm", "fadeInElm");
+			}
+			if (localStorage.getItem("usePlayer2") === "yes") {
+				document.getElementById("customLogo2").classList.replace("fadeOutElm", "fadeInElm");
+			}
 			showPlayer(event.data.playerNumber);
+
 			// Add a small delay to check after showPlayer has completed
 			setTimeout(() => {
 				// Debug logs
@@ -109,8 +130,20 @@ bc.onmessage = (event) => {
 		if (event.data.playerDisplay == "hidePlayer") { 
 			hidePlayer(event.data.playerNumber); 
 			hideScores();
+			hideClock();
+			document.getElementById("p1ExtIcon").classList.replace("fadeInElm", "fadeOutElm");
+			document.getElementById("p2ExtIcon").classList.replace("fadeInElm", "fadeOutElm");
+			document.getElementById("player1Image").classList.replace("fadeInElm", "fadeOutElm");
+			document.getElementById("player2Image").classList.replace("fadeInElm", "fadeOutElm");
+			if (localStorage.getItem("usePlayer1") === "yes") {
+				document.getElementById("customLogo2").classList.replace("fadeInElm", "fadeOutElm");
+			}
+			if (localStorage.getItem("usePlayer2") === "yes") {
+				document.getElementById("customLogo1").classList.replace("fadeInElm", "fadeOutElm");
+			}
 		};
 	}
+
 
 	// start of original clockDisplay channel 
 	if (event.data.clockDisplay != null) {
@@ -159,6 +192,19 @@ bc.onmessage = (event) => {
 		if (event.data.clockDisplay == "style125") { styleChange(1); };
 		if (event.data.clockDisplay == "style150") { styleChange(2); };
 		if (event.data.clockDisplay == "style200") { styleChange(3); };
+		// if (event.data.clockDisplay === 'showActivePlayer') {
+		// 	// Additional logic when images are shown, if needed
+		// 	console.log("Player is now showing.");
+		// 	showActivePlayer();
+		// } else if (event.data.clockDisplay === 'hideActivePlayer') {
+		// 	// Additional logic when images are hidden, if needed
+		// 	console.log("Player is now showing 2.");
+		// 	hideActivePlayer();
+		// }
+		if (event.data.clockDisplay === 'toggleActivePlayer') {
+			const activePlayer = event.data.player; // Get the active player from the message
+			toggleActivePlayer(activePlayer); // Call the function to update the display
+		}
 	}
 }
 
@@ -204,6 +250,18 @@ if (localStorage.getItem("player2Name") != "") {
 }
 if (localStorage.getItem("player2Name") == "" || localStorage.getItem("player2Name") == null) {
 	document.getElementById("player2Name").innerHTML = "Player 2";
+}
+
+if (localStorage.getItem("activePlayer") == null || localStorage.getItem("activePlayer") == "1") {
+	document.getElementById("player1Image").classList.replace("fadeOutElm", "fadeInElm");
+	document.getElementById("player2Image").classList.replace("fadeInElm", "fadeOutElm");
+} else if (localStorage.getItem("activePlayer") == "2") {
+	document.getElementById("player1Image").classList.replace("fadeInElm", "fadeOutElm");
+	document.getElementById("player2Image").classList.replace("fadeOutElm", "fadeInElm");
+} else {
+	// Consolidated logic for both players being active
+	document.getElementById("player1Image").classList.replace("fadeOutElm", "fadeInElm");
+	document.getElementById("player2Image").classList.replace("fadeOutElm", "fadeInElm");
 }
 
 if (localStorage.getItem("p1ScoreCtrlPanel") != null) {

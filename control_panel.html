@@ -43,13 +43,12 @@ for more information about Salotto please visit https://salotto.app
 				<div class="column">
 					Enable Player/Team 1<input type="checkbox" class="smallSize" id="usePlayer1Setting" onchange="playerSetting(1)" checked>
 					Enable Player/Team 2<input type="checkbox" class="smallSize" id="usePlayer2Setting" onchange="playerSetting(2)" checked>
-					Enable Clock<input type="checkbox" class="smallSize" id="useClockSetting" onchange="clockSetting()">
-					<!-- Custom Logos<input type="checkbox" class="smallSize" id="allCheck" onchange="allCheck()"> -->
+					<label for="useClockSetting" id="labelForUseClockSetting">Enable Clock</label><input type="checkbox" class="smallSize" id="useClockSetting" onchange="clockSetting()">
 				</div>
 				<div class="slidecontainer">
 					<label id="opacityLabel" for="scoreOpacity">Overlay Opacity</label>
 					&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-					<input type="range" min="0" max="100" value="100" class="slider" id="scoreOpacity" onchange="saveOpacity()"">
+					<input type="range" min="0" max="100" value="100" class="slider" id="scoreOpacity" onchange="saveOpacity()">
 					&nbsp;&nbsp;
 					<span id="sliderValue">100%</span>
 				</div>
@@ -124,6 +123,8 @@ for more information about Salotto please visit https://salotto.app
 			<div id="logoInfo" class="obs28 two-column-container">
 				<div class="column">
 					<label id="logoSettingsLabel">Logo Settings (Max upload size: 2.4MB)</text></label>
+				</p>
+					<label id="logoSettingsLabel">Player/Team logos should be square</text></label>
 				</div>
 				<br>
 				<div class="column">
@@ -159,6 +160,7 @@ for more information about Salotto please visit https://salotto.app
 			</div>
 			<br>
 			<div id="scoreInfo" class="obs28 two-column-container">
+					
 				<div class="column">
 					<label id="p1ScoreLabel" for="sendP1ScoreSub">Player/Team 1 - Score/Rack(s)/Ball(s)</label>
 					<div class="score-control">
@@ -179,7 +181,18 @@ for more information about Salotto please visit https://salotto.app
 				<p style="font-size:2pt">&nbsp;</p>
 				<div class="column">
 					<div class="hover obs28" id="sendPScores" onclick="resetScores()">Reset Scores</div>
-					</p>
+					<div class="columnn" id="playerToggle">
+						<label>Player/Team Toggle:&nbsp;</label>
+						</p>
+						<div>
+						<label class="switch toggle">
+							<span class="player1 toggle">P1</span>
+							<input type="checkbox" id="playerToggleCheckbox" onchange="togglePlayer(this.checked)">
+							<span class="slider_round"></span>
+							<span class="player2 toggle">P2</span>
+						</label>
+						</div>
+					</div>	
 					<div class="hover obs28" id="sendPScores" onclick="pushScores()">Push Scores</div>
 				</div>
 			</div>

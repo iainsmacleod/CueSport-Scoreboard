@@ -118,12 +118,16 @@ td {
     bottom: 7px;
     z-index:9;
     border: 2px solid black;
+    max-width: 30px;
+    /* height: auto; */
 }
  #customLogo2 {
     position:absolute;
     bottom: 7px;
     z-index:9;
     border: 2px solid black;
+    max-width: 30px;
+    /* height: auto; */
 }
 
 .mySlides {
@@ -217,6 +221,20 @@ td {
     box-shadow: 0 5px 10px 0 rgba(0,0,0,0.3), 0 2px 5px 0 rgba(0,0,0,0.3);
 }
 
+#player1Image {
+    position: absolute;
+    left: 3px;
+    padding: 6px;
+    height: 26px;
+}
+
+#player2Image {
+    position: absolute;
+    right: 3px;
+    padding: 6px;
+    height: 26px;
+}
+
 /* blink code */
 @keyframes blinking {
     0% {
@@ -229,7 +247,6 @@ td {
 .winBlink {
     animation: blinking .10s 4;
 }
-
 
  @keyframes extblinking {
     0% {

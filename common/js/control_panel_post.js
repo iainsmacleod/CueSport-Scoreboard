@@ -62,7 +62,6 @@ var c1value;
 var c2value;
 var pColormsg;
 
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // onload stuff
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -75,7 +74,32 @@ window.onload = function() {
 	if (localStorage.getItem("usePlayer2") === null) {
 		localStorage.setItem("usePlayer2", "yes");
 	}
-	
+
+	if (localStorage.getItem("activePlayer") === null || (localStorage.getItem("activePlayer") === "1")) {
+		localStorage.setItem("activePlayer", "1");
+		document.getElementById("playerToggleCheckbox").checked = true;
+	} else if (localStorage.getItem("activePlayer") === "2") {
+		localStorage.setItem("activePlayer", "2");
+		document.getElementById("playerToggleCheckbox").checked = false;
+	} else {
+		console.log("activePlayer =", localStorage.getItem("activePlayer"));
+	}
+
+	// else {
+	// 	localStorage.setItem("activePlayer", "2")
+	// 	console.log("activePlayer = 2");
+	// 	document.getElementById("playerToggleCheckbox").checked = false;
+	// 	//togglePlayer(false); // Pass false since the checkbox is not checked
+	// }
+
+	// if (localStorage.getItem("activePlayerSetting") == "yes") {
+	// 	console.log("activePlayerSetting = 1");
+	// // 	document.getElementById("playerToggleCheckbox").checked = true;
+	// 	togglePlayer(true); // Pass true since the checkbox is checked
+	// } else {
+	// 	console.log("activePlayerSetting = 2");
+	// 	togglePlayer(false); // Pass false since the checkbox is not checked
+	// }	
 
 	// Call the visibility functions based on the checkbox states
     setPlayerVisibility(1);
@@ -191,14 +215,6 @@ if (localStorage.getItem('p2ScoreCtrlPanel') > 0 || localStorage.getItem('p2Scor
 	bc.postMessage(msg);
 }
 
-// if (localStorage.getItem("useSalotto") == "yes") {
-// 	console.log("salotto = TRUE");
-// 	document.getElementById("useSalottoSetting").checked = true;
-// 	salottoSetting();
-// } else {
-// 	salottoSetting()
-// }
-
 if (localStorage.getItem("useCustomLogo") == "yes") {
 	console.log("customLogo1 = TRUE");
 	document.getElementById("customLogo1").checked = true;
@@ -220,10 +236,10 @@ if (localStorage.getItem("useClock") == "yes") {
 	document.getElementById("useClockSetting").checked = true;
 	clockSetting();
 } else {
-	// document.getElementById("useSalottoSetting").checked = false;
-	// document.getElementById("useSalottoSetting").removeAttribute("checked");
 	clockSetting()
 }
+
+
 
 function setPlayerVisibility(playerNumber) {
 	const usePlayer = localStorage.getItem(`usePlayer${playerNumber}`) == "yes";
