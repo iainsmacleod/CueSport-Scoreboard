@@ -31,12 +31,6 @@ function bsStyleChange() {
 		localStorage.setItem("b_style", 3);
 
 	}
-	// if (document.getElementById("bsStyle").value == 4) {
-	// 	bc.postMessage({ clockDisplay: 'style200' });
-	// 	localStorage.setItem("b_style", 4);
-
-	// }
-
 }
 
 // Function to save the opacity value to localStorage
@@ -50,6 +44,21 @@ function toggleCheckbox(checkboxId, inputElement) {
     const checkbox = document.getElementById(checkboxId);
 	console.log(`File size ${inputElement.files.length}`);
     checkbox.disabled = !inputElement.files.length; // Enable if file is selected, disable otherwise
+}
+
+function toggleSetting() {
+	const checkbox = document.getElementById("useToggleSetting");
+	const activePlayer = document.getElementById("playerToggleCheckbox").checked;
+	console.log(`${activePlayer}`);
+	if (checkbox.checked) {
+		document.getElementById("playerToggle").classList.remove("noShow");
+		localStorage.setItem("usePlayerToggle", "yes");
+		bc.postMessage({ clockDisplay: 'showActivePlayer', player: activePlayer });
+	} else {
+		document.getElementById("playerToggle").classList.add("noShow");
+		localStorage.setItem("usePlayerToggle", "no");
+		bc.postMessage({ clockDisplay: 'hideActivePlayer' });
+	}
 }
 
 function logoSlideshow() {
@@ -179,6 +188,8 @@ function playerSetting(player) {
     document.getElementById("swapBtn").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
 	document.getElementById("useClockSetting").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
 	document.getElementById("labelForUseClockSetting").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
+	document.getElementById("useToggleSetting").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
+	document.getElementById("labelForUseToggleSetting").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
 	
 	// Show/hide  elements based on individual players being enabled
 	document.getElementById("logoName").classList[player1Enabled ? "remove" : "add"]("noShow");

@@ -171,15 +171,6 @@ function extReset(player) {
 
 }
 
-// function salottoShow() {
-// 	document.getElementById("salottoLogo").classList.replace("fadeOutElm", "fadeInElm");
-
-// }
-// function salottoHide() {
-// 	document.getElementById("salottoLogo").classList.replace("fadeInElm", "fadeOutElm");
-
-// }
-
 function customShow() {
 	document.getElementById("customLogo1").style.removeProperty('display');
 	setTimeout(function () {
@@ -219,17 +210,6 @@ function custom2Hide() {
 		document.getElementById("customLogo2").style.display = "none"; 
 	}, 1000);
 }
-
-// function showActivePlayer() {
-// 	document.getElementById("player1Image").classList.replace("fadeOutElm", "fadeInElm");
-// 	document.getElementById("player2Image").classList.replace("fadeInElm", "fadeOutElm");
-// 	console.log("Activated player 1.");
-// }
-// function hideActivePlayer() {
-// 	document.getElementById("player1Image").classList.replace("fadeInElm", "fadeOutElm");
-// 	document.getElementById("player2Image").classList.replace("fadeOutElm", "fadeInElm");
-// 	console.log("Activated player 2.");
-// }
 
 function toggleActivePlayer(activePlayer) {
 	console.log(`Active player ${activePlayer}`);

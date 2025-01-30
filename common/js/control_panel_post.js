@@ -89,25 +89,16 @@ window.onload = function() {
 		console.log("activePlayer =", localStorage.getItem("activePlayer"));
 	}
 
-	// else {
-	// 	localStorage.setItem("activePlayer", "2")
-	// 	console.log("activePlayer = 2");
-	// 	document.getElementById("playerToggleCheckbox").checked = false;
-	// 	//togglePlayer(false); // Pass false since the checkbox is not checked
-	// }
-
-	// if (localStorage.getItem("activePlayerSetting") == "yes") {
-	// 	console.log("activePlayerSetting = 1");
-	// // 	document.getElementById("playerToggleCheckbox").checked = true;
-	// 	togglePlayer(true); // Pass true since the checkbox is checked
-	// } else {
-	// 	console.log("activePlayerSetting = 2");
-	// 	togglePlayer(false); // Pass false since the checkbox is not checked
-	// }	
+	if (localStorage.getItem("usePlayerToggle")==="yes" || localStorage.getItem("usePlayerToggle") === null) {
+		document.getElementById("useToggleSetting").checked = true;
+	} else {
+		document.getElementById("useToggleSetting").checked = false;
+	}
 
 	// Call the visibility functions based on the checkbox states
     setPlayerVisibility(1);
     setPlayerVisibility(2);
+	toggleSetting();
 
     // Check if custom logos exist in local storage and enable checkboxes accordingly
     if (localStorage.getItem("customLogo1") != null) {
@@ -159,10 +150,6 @@ document.getElementById('logoSsImg5').onclick = function () {
 	document.getElementById('FileUploadL5').click();
 	//setTimeout(rst_scr_btn, 100);
 };
-
-// if (localStorage.getItem("customLogo1") != "yes" || localStorage.getItem("customLogo2") != "yes" ) {
-// 	document.getElementById("allCheck").checked = false;
-// }
 
 if (localStorage.getItem('p1colorSet') !== null) {
 	var cvalue = localStorage.getItem('p1colorSet');
@@ -242,8 +229,6 @@ if (localStorage.getItem("useClock") == "yes") {
 } else {
 	clockSetting()
 }
-
-
 
 function setPlayerVisibility(playerNumber) {
 	const usePlayer = localStorage.getItem(`usePlayer${playerNumber}`) == "yes";

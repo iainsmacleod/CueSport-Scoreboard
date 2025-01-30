@@ -200,6 +200,18 @@ bc.onmessage = (event) => {
 			const activePlayer = event.data.player; // Get the active player from the message
 			toggleActivePlayer(activePlayer); // Call the function to update the display
 		}
+		if (event.data.clockDisplay === 'showActivePlayer'){
+			const activePlayer = event.data.player; // Get the active player from the message
+			const playerToToggle = activePlayer === true ? 1 : (activePlayer === false ? 2 : 1); // Convert true/false to 1/2
+			console.log(`Indicate active player, set to player ${activePlayer}`);
+			if (playerToToggle) {
+				toggleActivePlayer(playerToToggle); // Call the function to update the display
+			}
+		}
+		if (event.data.clockDisplay === 'hideActivePlayer'){
+			document.getElementById("player1Image").classList.replace("fadeInElm", "fadeOutElm");
+			document.getElementById("player2Image").classList.replace("fadeInElm", "fadeOutElm");
+		}
 	}
 }
 
@@ -243,26 +255,13 @@ if (localStorage.getItem("p2NameCtrlPanel") == "" || localStorage.getItem("p2Nam
 	document.getElementById("player2Name").innerHTML = "Player 2";
 }
 
-// if (localStorage.getItem("player1Name") != "" || localStorage.getItem("player1Name") != null) {
-// 	document.getElementById("player1Name").innerHTML = localStorage.getItem("p1NameCtrlPanel");
-// }
-// if (localStorage.getItem("player1Name") == "" || localStorage.getItem("player1Name") == null) {
-// 	document.getElementById("player1Name").innerHTML = "Player 1";
-// }
-
-// if (localStorage.getItem("player2Name") != "" || localStorage.getItem("player2Name") != null) {
-// 	document.getElementById("player2Name").innerHTML = localStorage.getItem("p2NameCtrlPanel");
-// }
-// if (localStorage.getItem("player2Name") == "" || localStorage.getItem("player2Name") == null) {
-// 	document.getElementById("player2Name").innerHTML = "Player 2";
-// }
-
 // Code to assist with displaying active player image when only tow players are enabled, on reload.
 const player1Enabled = localStorage.getItem("usePlayer1") === "yes";
 const player2Enabled = localStorage.getItem("usePlayer2") === "yes";
 const bothPlayersEnabled = player1Enabled && player2Enabled;
+const playerToggleEnabled = localStorage.getItem("usePlayerToggle") === "yes";
 
-if (bothPlayersEnabled) {
+if (bothPlayersEnabled && playerToggleEnabled) {
     const activePlayer = localStorage.getItem("activePlayer");
     document.getElementById("player1Image").classList.replace(activePlayer === "1" ? "fadeOutElm" : "fadeInElm", activePlayer === "1" ? "fadeInElm" : "fadeOutElm");
     document.getElementById("player2Image").classList.replace(activePlayer === "2" ? "fadeOutElm" : "fadeInElm", activePlayer === "2" ? "fadeInElm" : "fadeOutElm");
