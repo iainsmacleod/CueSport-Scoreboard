@@ -81,7 +81,7 @@ bc.onmessage = (event) => {
 	}
 
 	if (event.data.name != null) {
-		console.log("ePlayer/Team: " + event.data.player + " named " + event.data.name);
+		console.log("Player/Team: " + event.data.player + " named " + event.data.name);
 		if (!event.data.name == "") {
 			document.getElementById("player" + event.data.player + "Name").innerHTML = event.data.name;
 		} else {
@@ -90,22 +90,29 @@ bc.onmessage = (event) => {
 	}
 
 	if (event.data.playerDisplay != null) {
-		console.log("event.data.playerDisplay: " + event.data.playerDisplay + " event.data.playerNumber: " + event.data.playerNumber);
+		// Code to assist with displaying active player image when only tow players are enabled, on reload.
+		const player1Enabled = localStorage.getItem("usePlayer1") === "yes";
+		const player2Enabled = localStorage.getItem("usePlayer2") === "yes";
+		const bothPlayersEnabled = player1Enabled && player2Enabled;
+		console.log("Player display action: " + event.data.playerDisplay + " number " + event.data.playerNumber);
 		if (event.data.playerDisplay == "showPlayer") {
-			if (localStorage.getItem("useClock") === "yes") {
+			if (localStorage.getItem("useClock") === "yes" && bothPlayersEnabled) {
 				console.log("Use clock evaluating as enabled");
 				document.getElementById("p1ExtIcon").classList.replace("fadeOutElm", "fadeInElm");
 				document.getElementById("p2ExtIcon").classList.replace("fadeOutElm", "fadeInElm");
 			} else {
 				console.log("Use clock evaluating as not enabled");
 			}
-			if (localStorage.getItem("activePlayer") === null || (localStorage.getItem("activePlayer") ==="1")) {
-				document.getElementById("player1Image").classList.replace("fadeOutElm", "fadeInElm");
-        		document.getElementById("player2Image").classList.replace("fadeInElm", "fadeOutElm");
-		    } else if (localStorage.getItem("activePlayer") === "2") {
-        		document.getElementById("player1Image").classList.replace("fadeInElm", "fadeOutElm");
-        		document.getElementById("player2Image").classList.replace("fadeOutElm", "fadeInElm");
-	   		}
+			// Check if both players are enabled before fading in the player images
+			if (localStorage.getItem("usePlayer1") === "yes" && localStorage.getItem("usePlayer2") === "yes") {
+				if (localStorage.getItem("activePlayer") === null || (localStorage.getItem("activePlayer") ==="1")) {
+					document.getElementById("player1Image").classList.replace("fadeOutElm", "fadeInElm");
+					document.getElementById("player2Image").classList.replace("fadeInElm", "fadeOutElm");
+				} else if (localStorage.getItem("activePlayer") === "2") {
+					document.getElementById("player1Image").classList.replace("fadeInElm", "fadeOutElm");
+					document.getElementById("player2Image").classList.replace("fadeOutElm", "fadeInElm");
+				}
+			}
 			if (localStorage.getItem("usePlayer1") === "yes") {
 				document.getElementById("customLogo1").classList.replace("fadeOutElm", "fadeInElm");
 			}
@@ -135,15 +142,9 @@ bc.onmessage = (event) => {
 			document.getElementById("p2ExtIcon").classList.replace("fadeInElm", "fadeOutElm");
 			document.getElementById("player1Image").classList.replace("fadeInElm", "fadeOutElm");
 			document.getElementById("player2Image").classList.replace("fadeInElm", "fadeOutElm");
-			if (localStorage.getItem("usePlayer1") === "yes") {
-				document.getElementById("customLogo2").classList.replace("fadeInElm", "fadeOutElm");
-			}
-			if (localStorage.getItem("usePlayer2") === "yes") {
-				document.getElementById("customLogo1").classList.replace("fadeInElm", "fadeOutElm");
-			}
+			document.getElementById("customLogo"+ event.data.playerNumber).classList.replace("fadeInElm", "fadeOutElm");
 		};
 	}
-
 
 	// start of original clockDisplay channel 
 	if (event.data.clockDisplay != null) {
@@ -181,8 +182,6 @@ bc.onmessage = (event) => {
 		if (event.data.clockDisplay == "logoSlideShow-show") {
 			customHide();
 			document.getElementById("logoSlideshowDiv").classList.replace("fadeOutElm", "fadeInElm");
-			// document.getElementById("customLogo2").classList.replace("fadeOutElm", "logoSlide");
-			// setTimeout(function () { document.getElementById("customLogo2").classList.add("fade"); }, 500);
 			if (localStorage.getItem("customLogo3") != null) { document.getElementById("customLogo3").src = localStorage.getItem("customLogo3"); } else { document.getElementById("customLogo3").src = "./common/images/placeholder.png"; };
 			if (localStorage.getItem("customLogo4") != null) { document.getElementById("customLogo4").src = localStorage.getItem("customLogo4"); } else { document.getElementById("customLogo4").src = "./common/images/placeholder.png"; };
 			if (localStorage.getItem("customLogo5") != null) { document.getElementById("customLogo5").src = localStorage.getItem("customLogo5"); } else { document.getElementById("customLogo5").src = "./common/images/placeholder.png"; };
@@ -212,23 +211,19 @@ bc.onmessage = (event) => {
 //							autostart stuff
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-if (localStorage.getItem("customLogo1") !== null && localStorage.getItem("customLogo1") !== "") {
-	document.getElementById("customLogo1").src = localStorage.getItem("customLogo1");
-	if (localStorage.getItem("useCustomLogo") === "yes") {
-		document.getElementById("customLogo1").classList.replace("fadeOutElm", "fadeInElm");
-	}
-} else {
-	document.getElementById("customLogo1").src = "./common/images/placeholder.png";
+function setCustomLogo(logoId, useCustomLogoKey, usePlayerKey) {
+    if (localStorage.getItem(logoId) !== null && localStorage.getItem(logoId) !== "") {
+        document.getElementById(logoId).src = localStorage.getItem(logoId);
+        if (localStorage.getItem(useCustomLogoKey) === "yes" && localStorage.getItem(usePlayerKey) === "yes") {
+            document.getElementById(logoId).classList.replace("fadeOutElm", "fadeInElm");
+        }
+    } else {
+        document.getElementById(logoId).src = "./common/images/placeholder.png";
+    }
 }
 
-if (localStorage.getItem("customLogo2") !== null && localStorage.getItem("customLogo2") !== "") {
-	document.getElementById("customLogo2").src = localStorage.getItem("customLogo2");
-	if (localStorage.getItem("useCustomLogo2") === "yes") {
-		document.getElementById("customLogo2").classList.replace("fadeOutElm", "fadeInElm");
-	}
-} else {
-	document.getElementById("customLogo2").src = "./common/images/placeholder.png";
-}
+setCustomLogo("customLogo1", "useCustomLogo", "usePlayer1");
+setCustomLogo("customLogo2", "useCustomLogo2", "usePlayer2");
 
 if (localStorage.getItem("customLogo3") != null) { document.getElementById("customLogo3").src = localStorage.getItem("customLogo3"); } else { document.getElementById("customLogo3").src = "./common/images/placeholder.png"; };
 if (localStorage.getItem("customLogo4") != null) { document.getElementById("customLogo4").src = localStorage.getItem("customLogo4"); } else { document.getElementById("customLogo4").src = "./common/images/placeholder.png"; };
@@ -266,16 +261,19 @@ if (localStorage.getItem("p2NameCtrlPanel") == "" || localStorage.getItem("p2Nam
 // 	document.getElementById("player2Name").innerHTML = "Player 2";
 // }
 
-if (localStorage.getItem("activePlayer") == null || localStorage.getItem("activePlayer") == "1") {
-	document.getElementById("player1Image").classList.replace("fadeOutElm", "fadeInElm");
-	document.getElementById("player2Image").classList.replace("fadeInElm", "fadeOutElm");
-} else if (localStorage.getItem("activePlayer") == "2") {
-	document.getElementById("player1Image").classList.replace("fadeInElm", "fadeOutElm");
-	document.getElementById("player2Image").classList.replace("fadeOutElm", "fadeInElm");
+// Code to assist with displaying active player image when only tow players are enabled, on reload.
+const player1Enabled = localStorage.getItem("usePlayer1") === "yes";
+const player2Enabled = localStorage.getItem("usePlayer2") === "yes";
+const bothPlayersEnabled = player1Enabled && player2Enabled;
+
+if (bothPlayersEnabled) {
+    const activePlayer = localStorage.getItem("activePlayer");
+    document.getElementById("player1Image").classList.replace(activePlayer === "1" ? "fadeOutElm" : "fadeInElm", activePlayer === "1" ? "fadeInElm" : "fadeOutElm");
+    document.getElementById("player2Image").classList.replace(activePlayer === "2" ? "fadeOutElm" : "fadeInElm", activePlayer === "2" ? "fadeInElm" : "fadeOutElm");
 } else {
-	// Consolidated logic for both players being active
-	document.getElementById("player1Image").classList.replace("fadeOutElm", "fadeInElm");
-	document.getElementById("player2Image").classList.replace("fadeOutElm", "fadeInElm");
+    // Hide both players if not enabled
+    document.getElementById("player1Image").classList.replace("fadeInElm", "fadeOutElm");
+    document.getElementById("player2Image").classList.replace("fadeInElm", "fadeOutElm");
 }
 
 if (localStorage.getItem("p1ScoreCtrlPanel") != null) {
@@ -301,9 +299,18 @@ if (localStorage.getItem("raceInfo") != "" && localStorage.getItem("raceInfo") !
 document.getElementById("wagerInfo").innerHTML = localStorage.getItem("wagerInfo");
 document.getElementById("raceInfo").innerHTML = localStorage.getItem("raceInfo");
 
-if (localStorage.getItem("useClock") != "yes") {
-	document.getElementById("p1ExtIcon").classList.replace("fadeInElm", "fadeOutElm");
-	document.getElementById("p2ExtIcon").classList.replace("fadeInElm", "fadeOutElm");
+function updateIconsVisibility(show) {
+    const action = show ? "fadeInElm" : "fadeOutElm";
+    document.getElementById("p1ExtIcon").classList.replace(show ? "fadeOutElm" : "fadeInElm", action);
+    document.getElementById("p2ExtIcon").classList.replace(show ? "fadeOutElm" : "fadeInElm", action);
+}
+
+if (localStorage.getItem("useClock") == "yes" && bothPlayersEnabled) {
+    console.log("Icons shown due to conditions met.");
+    updateIconsVisibility(true);
+} else {
+    console.log("Icons not shown due to conditions not met.");
+    updateIconsVisibility(false);
 }
 
 if (localStorage.getItem(("usePlayer1")) != "yes") {
@@ -335,12 +342,6 @@ if (localStorage.getItem("b_style") != null) {
 	document.styleSheets[2].disabled = false;
 	localStorage.setItem("b_style", "3");      // Store XL as default
 }
-
-// if (localStorage.getItem("customLogo3") != null) {
-// 	document.getElementById("customLogo3").src = localStorage.getItem("customLogo3");
-// 	document.getElementById("customLogo4").src = localStorage.getItem("customLogo4");
-// 	// document.getElementById("customLogo5").src = localStorage.getItem("customLogo5");
-// }
 
 let slideIndex = 0;
 showSlides();

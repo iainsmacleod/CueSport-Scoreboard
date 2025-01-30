@@ -128,6 +128,19 @@ for more information about Salotto please visit https://salotto.app
 				</div>
 				<br>
 				<div class="column">
+					Custom/Sponsor Slideshow<input class="smallSize" type="checkbox" id="logoSlideshowChk" onchange="logoSlideshow()"></span>
+					<div class="tooltip obs28 hover" id="logoSsImg3"><input type="file" id="FileUploadL3" onchange="logoPost(this,3)" accept="image/png, image/jpeg, image/svg+xml, image/bmp"/>
+						L1 <span class="tooltiptext"><img id="l3Img" src="" style="height:100px; max-width:300px"></span>
+					</div>
+					<div class="tooltip obs28 hover" id="logoSsImg4"><input type="file" id="FileUploadL4" onchange="logoPost(this,4)" accept="image/png, image/jpeg, image/svg+xml, image/bmp">
+						L2 <span class="tooltiptext"><img id="l4Img" src="" style="height:100px; max-width:300px"></span>
+					</div>
+					<div class="tooltip obs28 hover" id="logoSsImg5"><input type="file" id="FileUploadL5" onchange="logoPost(this,5)" accept="image/png, image/jpeg, image/svg+xml, image/bmp"/>
+						L3<span class="tooltiptext"><img id="l5Img" src="" style="height:100px; max-width:300px"></span>
+					</div>
+				</div>
+				<br>
+				<div class="column">
 					<!-- Salotto Logo<input type="checkbox" class="smallSize" id="useSalottoSetting" onchange="salottoSetting()"><p></p> -->
 					<text class="hover" onclick="cLogoNameChange()" id="logoName" style="text-decoration: underline;">Player 1 Logo</text>
 					<input class="smallSize" type="checkbox" id="customLogo1" onchange="customLogoSetting()" disabled>
@@ -142,19 +155,6 @@ for more information about Salotto please visit https://salotto.app
 						Upload Player 2 Logo<input type="file" id="FileUploadL2" onchange="logoPost(this,2); toggleCheckbox('customLogo2', this)" accept="image/png, image/jpeg, image/svg+xml, image/bmp">
 						<span class="tooltiptext"><img id="l2Img" src="" style="height:100px; max-width:300px"></span>
 						<br>
-					</div>
-				</div>
-				<br>
-				<div class="column">
-					Custom/Sponsor Slideshow<input class="smallSize" type="checkbox" id="logoSlideshowChk" onchange="logoSlideshow()"></span>
-					<div class="tooltip obs28 hover" id="logoSsImg3"><input type="file" id="FileUploadL3" onchange="logoPost(this,3)" accept="image/png, image/jpeg, image/svg+xml, image/bmp"/>
-						L1 <span class="tooltiptext"><img id="l3Img" src="" style="height:100px; max-width:300px"></span>
-					</div>
-					<div class="tooltip obs28 hover" id="logoSsImg4"><input type="file" id="FileUploadL4" onchange="logoPost(this,4)" accept="image/png, image/jpeg, image/svg+xml, image/bmp">
-						L2 <span class="tooltiptext"><img id="l4Img" src="" style="height:100px; max-width:300px"></span>
-					</div>
-					<div class="tooltip obs28 hover" id="logoSsImg5"><input type="file" id="FileUploadL5" onchange="logoPost(this,5)" accept="image/png, image/jpeg, image/svg+xml, image/bmp"/>
-						L3<span class="tooltiptext"><img id="l5Img" src="" style="height:100px; max-width:300px"></span>
 					</div>
 				</div>
 			</div>

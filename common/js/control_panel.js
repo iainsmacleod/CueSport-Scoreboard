@@ -179,6 +179,22 @@ function playerSetting(player) {
     document.getElementById("swapBtn").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
 	document.getElementById("useClockSetting").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
 	document.getElementById("labelForUseClockSetting").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
+	
+	// Show/hide  elements based on individual players being enabled
+	document.getElementById("logoName").classList[player1Enabled ? "remove" : "add"]("noShow");
+	document.getElementById("customLogo1").classList[player1Enabled ? "remove" : "add"]("noShow");
+	document.getElementById("uploadCustomLogo").classList[player1Enabled ? "remove" : "add"]("noShow");
+	document.getElementById("logoName2").classList[player2Enabled ? "remove" : "add"]("noShow");
+	document.getElementById("customLogo2").classList[player2Enabled ? "remove" : "add"]("noShow");
+	document.getElementById("uploadCustomLogo2").classList[player2Enabled ? "remove" : "add"]("noShow");
+
+	// Update clockInfo visibility based on player settings and useClock
+    const useClockEnabled = localStorage.getItem("useClock") === "yes";
+    if (bothPlayersEnabled && useClockEnabled) {
+        document.getElementById("clockInfo").classList.remove("noShow");
+    } else {
+        document.getElementById("clockInfo").classList.add("noShow");
+    } 
 
 	// Hide shared elements based on both players being enabled
 	document.getElementById("playerInfo").classList[bothPlayersDisabled ? "add" : "remove"]("noShow");
@@ -212,7 +228,6 @@ function clockDisplay(opt3) {
 		document.getElementById("shotClockShow").setAttribute("onclick", "clockDisplay('show')");
 		document.getElementById("shotClockShow").style.background = "none";
 		document.getElementById("shotClockShow").style.color = "lightgrey";
-		//document.getElementById("shotClockShow").style.border = "2px solid white";
 	}
 }
 
