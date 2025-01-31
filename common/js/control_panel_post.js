@@ -42,8 +42,7 @@ var hotkey30ClockOld = hotkey30Clock;
 var hotkey60ClockOld = hotkey60Clock;
 var hotkeyStopClockOld = hotkeyStopClock;
 var hotkeySwapOld = hotkeySwap;
-var hotKeyActivatePlayer1Old = hotKeyActivatePlayer1; // Track old state
-var hotKeyActivatePlayer2Old = hotKeyActivatePlayer2; // Track old state
+var hotKeyPlayerToggleOld = hotKeyPlayerToggle; // Track old state
 var tev;
 var p1ScoreValue;
 var p2ScoreValue;
