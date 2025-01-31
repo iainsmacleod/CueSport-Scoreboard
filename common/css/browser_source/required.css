@@ -8,7 +8,6 @@ td {
     border:2px solid black;
     border-radius:0px;
     vertical-align: middle;
-
 }
     
 .noShow{
@@ -49,19 +48,34 @@ td {
      background-image: linear-gradient(to right, white , steelblue);
 }
 
-#player1Score, #player2Score{
+#player1Score, #player2Score {
     text-align:center;
-    padding-right:1px;
-    padding-left:1px;
+    padding-right:2px;
+    padding-left:2px;
     background: #ed4e54;
     font-size:15pt;
     font-weight:bold;
     vertical-align: middle;
     color: white;
-    text-shadow: 1px 1px 2px black, 0 0 25px black, 0 0 5px black;
+    /* text-shadow: 1px 1px 2px black, 0 0 25px black, 0 0 5px black; */
     -webkit-text-stroke: 1px black;
     box-shadow: 0 8px 16px 0 rgba(0,0,0,0.3), 0 6px 20px 0 rgba(0,0,0,0.3);
-    width: 9%;
+    width: 7%;
+}
+
+#raceInfo {
+    text-align:center;
+    padding-right:2px;
+    padding-left:2px;
+    background: #3679dd;
+    font-size:15pt;
+    font-weight:bold;
+    vertical-align: top;
+    color: white;
+    /* text-shadow: 1px 1px 2px black, 0 0 25px black, 0 0 5px black; */
+    -webkit-text-stroke: 1px black;
+    box-shadow: 0 8px 16px 0 rgba(0,0,0,0.3), 0 6px 20px 0 rgba(0,0,0,0.3);
+    width: 5%;
 }
 
 #p1ExtIcon{
@@ -181,43 +195,43 @@ td {
     display:none;
 }
 
-#raceInfo {
-    background-image: linear-gradient(to bottom,/* #ed4e54 5%,*/white, lightgrey);
+/* #raceInfo-old {
+    background-image: linear-gradient(to bottom,white, lightgrey);
     text-align:center;
     font-size:8pt;
     font-weight:bolder;
     border:1px solid #000;
-    position: fixed;
-    bottom: -8px;         /* Vertical position from the top */
-    left: 50%;        /* Horizontal position from the left */
-    transform: translate(-50%, -50%);  /* Centers the div */
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    transform: translate(-50%, -50%);
     padding: 0px 5px 0px 5px;
-    z-index: 2;    /* Ensures it appears above other elements */
+    z-index: 2;
     width: auto;
-    max-width: 20%;     /* Adjust as needed */
+    max-width: 20%;
     border-radius: 5px 5px 0px 0px;
     height: 12px;
     line-height: 12px;
     box-shadow: 0 5px 10px 0 rgba(0,0,0,0.3), 0 2px 5px 0 rgba(0,0,0,0.3);
+} */
 
-}
-#wagerInfo {
+#gameInfo {
     background-image: linear-gradient(to bottom, lightgrey, white);
     text-align:center;
-    font-size:8pt;
+    font-size:12pt;
     font-weight:bolder;
     border:1px solid #000;
     position: fixed;
-    top: 6px;         /* Vertical position from the top */
+    top: 10px;         /* Vertical position from the top */
     left: 50%;        /* Horizontal position from the left */
     transform: translate(-50%, -50%);  /* Centers the div */
-    padding: 0px 5px 0px 5px;
+    padding: 3px;
     z-index: 2;    /* Ensures it appears above other elements */
     width: auto;
-    max-width: 20%;     /* Adjust as needed */
+    max-width: 40%;     /* Adjust as needed */
     border-radius: 0px 0px 5px 5px;
-    height: 12px;
-    line-height: 12px;
+    height: 20px;
+    line-height: 20px;
     box-shadow: 0 5px 10px 0 rgba(0,0,0,0.3), 0 2px 5px 0 rgba(0,0,0,0.3);
 }
 

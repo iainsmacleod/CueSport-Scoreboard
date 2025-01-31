@@ -41,8 +41,8 @@ for more information about Salotto please visit https://salotto.app
 					<label id="generalSettingsLabel">GENERAL SETTINGS</label>
 				</div> -->
 				<div class="column">
-					Enable Player/Team 1<input type="checkbox" class="smallSize" id="usePlayer1Setting" onchange="playerSetting(1)" checked>
-					Enable Player/Team 2<input type="checkbox" class="smallSize" id="usePlayer2Setting" onchange="playerSetting(2)" checked>
+					Enable Player 1<input type="checkbox" class="smallSize" id="usePlayer1Setting" onchange="playerSetting(1)" checked>
+					Enable Player 2<input type="checkbox" class="smallSize" id="usePlayer2Setting" onchange="playerSetting(2)" checked>
 					<label for="useClockSetting" id="labelForUseClockSetting">Enable Clock</label><input type="checkbox" class="smallSize" id="useClockSetting" onchange="clockSetting()">
 					<label for="useToggleSetting" id="labelForUseToggleSetting">Enable Player Toggle</label><input type="checkbox" class="smallSize" id="useToggleSetting" onchange="toggleSetting()">
 				</div>
@@ -57,9 +57,11 @@ for more information about Salotto please visit https://salotto.app
 			<br>
 			<div id="gameInfo" class="obs28 two-column-container">
 				<div class="column">
-				  Game and Race Info:<input style="font-size:10pt; width: 120px; border-radius: 0px" type="text" id="raceInfoTxt" placeholder="" maxlength="25">
+				  Race Info (2P Only):<input style="font-size:10pt; width: 35px; border-radius: 0px" type="text" id="raceInfoTxt" placeholder="" maxlength="4">
 				</p>
-				  Wager / Other Info:<input style="font-size:10pt; width: 120px; border-radius: 0px" type="text" id="wagerInfoTxt" placeholder="" maxlength="25">
+				|
+				</p>
+					Game/Other Info:<input style="font-size:10pt; width: 200px; border-radius: 0px" type="text" id="gameInfoTxt" placeholder="" maxlength="25">
 				</div>
 				<p style="font-size:1pt">&nbsp;</p>
 				<div class="column">

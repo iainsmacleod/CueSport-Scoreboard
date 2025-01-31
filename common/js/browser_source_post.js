@@ -42,30 +42,33 @@ bc.onmessage = (event) => {
 		console.log("Opacity setting: " + event.data.opacity);
 		document.getElementById("scoreBoardDiv").style.opacity = event.data.opacity;
 		document.getElementById("raceInfo").style.opacity = event.data.opacity;
-		document.getElementById("wagerInfo").style.opacity = event.data.opacity;
+		document.getElementById("gameInfo").style.opacity = event.data.opacity;
 	}
 
 	if (event.data.race != null) {
 		console.log("Race info: " + event.data.race);
-		if (event.data.race == "") {
+		const player1Enabled = localStorage.getItem("usePlayer1");
+		const player2Enabled = localStorage.getItem("usePlayer2");
+		const bothPlayersEnabled = player1Enabled && player2Enabled;
+		if (event.data.race == "" || !bothPlayersEnabled) {
 			document.getElementById("raceInfo").classList.add("noShow");
 			document.getElementById("raceInfo").classList.remove("fadeInElm");
 		} else {
 			document.getElementById("raceInfo").classList.remove("noShow");
 			document.getElementById("raceInfo").classList.add("fadeInElm");
-			document.getElementById("raceInfo").innerHTML = event.data.race;
+			document.getElementById("raceInfo").innerHTML = "(" + event.data.race + ")";
 		}
 	}
 
-	if (event.data.wager != null) {
-		console.log("Wager info: " + event.data.wager);
-		if (event.data.wager == "") {
-			document.getElementById("wagerInfo").classList.add("noShow");
-			document.getElementById("wagerInfo").classList.remove("fadeInElm");
+	if (event.data.game != null) {
+		console.log("game info: " + event.data.game);
+		if (event.data.game == "") {
+			document.getElementById("gameInfo").classList.add("noShow");
+			document.getElementById("gameInfo").classList.remove("fadeInElm");
 		} else {
-			document.getElementById("wagerInfo").classList.remove("noShow");
-			document.getElementById("wagerInfo").classList.add("fadeInElm");
-			document.getElementById("wagerInfo").innerHTML = event.data.wager;
+			document.getElementById("gameInfo").classList.remove("noShow");
+			document.getElementById("gameInfo").classList.add("fadeInElm");
+			document.getElementById("gameInfo").innerHTML = event.data.game;
 		}
 	}
 
@@ -118,6 +121,10 @@ bc.onmessage = (event) => {
 			if (player2Enabled && localStorage.getItem("useCustomLogo2")=="yes") {
 				document.getElementById("customLogo2").classList.replace("fadeOutElm", "fadeInElm");
 			}
+			if (bothPlayersEnabled && localStorage.getItem("raceInfo")) {
+				document.getElementById("raceInfo").classList.replace("fadeOutElm", "fadeInElm");
+			}
+
 			showPlayer(event.data.playerNumber);
 
 			// Add a small delay to check after showPlayer has completed
@@ -288,16 +295,16 @@ if (localStorage.getItem("p2ScoreCtrlPanel") != null) {
 	document.getElementById("player2Score").innerHTML = 0;
 }
 
-if (localStorage.getItem("wagerInfo") != "" && localStorage.getItem("wagerInfo") != null) {
-	document.getElementById("wagerInfo").classList.remove("noShow");
+if (localStorage.getItem("gameInfo") != "" && localStorage.getItem("gameInfo") != null) {
+	document.getElementById("gameInfo").classList.remove("noShow");
 }
 
-if (localStorage.getItem("raceInfo") != "" && localStorage.getItem("raceInfo") != null) {
+if (localStorage.getItem("raceInfo") != "" && localStorage.getItem("raceInfo") != null && bothPlayersEnabled) {
 	document.getElementById("raceInfo").classList.remove("noShow");
 }
 
-document.getElementById("wagerInfo").innerHTML = localStorage.getItem("wagerInfo");
-document.getElementById("raceInfo").innerHTML = localStorage.getItem("raceInfo");
+document.getElementById("gameInfo").innerHTML = localStorage.getItem("gameInfo");
+document.getElementById("raceInfo").innerHTML = "(" + localStorage.getItem("raceInfo") + ")";
 
 function updateIconsVisibility(show) {
     const action = show ? "fadeInElm" : "fadeOutElm";

@@ -125,11 +125,13 @@ function hidePlayer(playerNumber) {
 function showScores() {
 	document.getElementById("player1Score").classList.replace("fadeOutElm", "fadeInElm");
 	document.getElementById("player2Score").classList.replace("fadeOutElm", "fadeInElm");
+	document.getElementById("raceInfo").classList.replace("fadeOutElm", "fadeInElm");
 }
 
 function hideScores() {
 	document.getElementById("player1Score").classList.replace("fadeInElm", "fadeOutElm");
 	document.getElementById("player2Score").classList.replace("fadeInElm", "fadeOutElm");
+	document.getElementById("raceInfo").classList.replace("fadeInElm", "fadeOutElm");
 }
 
 

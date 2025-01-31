@@ -52,7 +52,7 @@ var timerIsRunning;
 var msg;
 var msg2;
 var racemsg;
-var wagermsg;
+var gamemsg;
 var slider = document.getElementById("scoreOpacity");
 var sliderValue;
 var countDownTime;
@@ -262,7 +262,7 @@ document.getElementById("p2Name").value = localStorage.getItem("p2NameCtrlPanel"
 document.getElementById("p2Score").value = localStorage.getItem("p2ScoreCtrlPanel");
 // if (localStorage.getItem("raceInfo") != null) {document.getElementById("raceInfoTxt").value = localStorage.getItem("raceInfo")}
 document.getElementById("raceInfoTxt").value = localStorage.getItem("raceInfo");
-document.getElementById("wagerInfoTxt").value = localStorage.getItem("wagerInfo");
+document.getElementById("gameInfoTxt").value = localStorage.getItem("gameInfo");
 document.getElementById("verNum").innerHTML = versionNum;
 postNames(); postInfo(); startThemeCheck();
 

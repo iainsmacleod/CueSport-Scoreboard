@@ -5,7 +5,7 @@ body{
     -moz-transform: scale(1.50, 1.50);
     zoom: 1.50;
     zoom: 150%;
-    font-family:roboto;
+    font-family: Arial, Helvetica, sans-serif;
 }
 
 #scoreBoardDiv {

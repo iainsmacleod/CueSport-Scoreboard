@@ -261,22 +261,22 @@ function postInfo() {
 	if (raceInfoTxt.value == " ") {
 		raceInfoTxt.value = "&nbsp;";
 	}
-	if (wagerInfoTxt.value == " ") {
-		wagerInfoTxt.value = "&nbsp;";
+	if (gameInfoTxt.value == " ") {
+		gameInfoTxt.value = "&nbsp;";
 	}
 	racemsg = document.getElementById("raceInfoTxt").value;
-	wagermsg = document.getElementById("wagerInfoTxt").value;
+	gamemsg = document.getElementById("gameInfoTxt").value;
 	bc.postMessage({ race: racemsg });
-	bc.postMessage({ wager: wagermsg });	
+	bc.postMessage({ game: gamemsg });	
 	localStorage.setItem("raceInfo", raceInfoTxt.value);
-	localStorage.setItem("wagerInfo", wagerInfoTxt.value);
+	localStorage.setItem("gameInfo", gameInfoTxt.value);
 }
 
 
 function pushScores() {
 	// Send current scores
-    const p1Score = document.getElementById("p1Score").value;
-    const p2Score = document.getElementById("p2Score").value;
+    const p1Score = document.getElementById("p1Score").value || 0;
+    const p2Score = document.getElementById("p2Score").value || 0;
     bc.postMessage({ player: '1', score: p1Score });
     bc.postMessage({ player: '2', score: p2Score });
     
