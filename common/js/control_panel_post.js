@@ -233,15 +233,12 @@ if (localStorage.getItem("useClock") == "yes") {
 function setPlayerVisibility(playerNumber) {
 	const usePlayer = localStorage.getItem(`usePlayer${playerNumber}`) == "yes";
 	const checkbox = document.getElementById(`usePlayer${playerNumber}Setting`);
-	
 	checkbox.checked = usePlayer;
-	
 	if (usePlayer) {
-	  console.log(`Use Player ${playerNumber} = TRUE`);
+		console.log(`Use Player ${playerNumber} = TRUE`);
 	}
-	
 	playerSetting(playerNumber);
-  }
+}
   
 //   setPlayerVisibility(1);
 //   setPlayerVisibility(2);

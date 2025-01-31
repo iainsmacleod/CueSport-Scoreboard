@@ -90,13 +90,15 @@ bc.onmessage = (event) => {
 	}
 
 	if (event.data.playerDisplay != null) {
-		// Code to assist with displaying active player image when only tow players are enabled, on reload.
-		const player1Enabled = localStorage.getItem("usePlayer1") === "yes";
-		const player2Enabled = localStorage.getItem("usePlayer2") === "yes";
+		// Code to assist with displaying active player image when only two players are enabled, on reload.
+		const player1Enabled = localStorage.getItem("usePlayer1");
+		const player2Enabled = localStorage.getItem("usePlayer2");
 		const bothPlayersEnabled = player1Enabled && player2Enabled;
-		console.log("Player display action: " + event.data.playerDisplay + " number " + event.data.playerNumber);
+		const playerToggleEnabled = localStorage.getItem("usePlayerToggle") === "yes";
+		const useclockEnabled = localStorage.getItem("useClock") === "yes";
+		console.log("Player 1 enabled: " + player1Enabled + ". Player 2 enabled: " + player2Enabled + ". Both players enabled: " + bothPlayersEnabled);
 		if (event.data.playerDisplay == "showPlayer") {
-			if (localStorage.getItem("useClock") === "yes" && bothPlayersEnabled) {
+			if ( useclockEnabled && bothPlayersEnabled) {
 				console.log("Use clock evaluating as enabled");
 				document.getElementById("p1ExtIcon").classList.replace("fadeOutElm", "fadeInElm");
 				document.getElementById("p2ExtIcon").classList.replace("fadeOutElm", "fadeInElm");
@@ -104,8 +106,9 @@ bc.onmessage = (event) => {
 				console.log("Use clock evaluating as not enabled");
 			}
 			// Check if both players are enabled before fading in the player images
-			if (bothPlayersEnabled) {
+			if (bothPlayersEnabled && playerToggleEnabled) {
 				const activePlayer = localStorage.getItem("activePlayer");
+				console.log(`Show player image in event condition`);
 				document.getElementById("player1Image").classList.replace(activePlayer === "1" ? "fadeOutElm" : "fadeInElm", activePlayer === "1" ? "fadeInElm" : "fadeOutElm");
 				document.getElementById("player2Image").classList.replace(activePlayer === "2" ? "fadeOutElm" : "fadeInElm", activePlayer === "2" ? "fadeInElm" : "fadeOutElm");
 			}
@@ -256,13 +259,15 @@ if (localStorage.getItem("p2NameCtrlPanel") == "" || localStorage.getItem("p2Nam
 }
 
 // Code to assist with displaying active player image when only tow players are enabled, on reload.
-const player1Enabled = localStorage.getItem("usePlayer1") === "yes";
-const player2Enabled = localStorage.getItem("usePlayer2") === "yes";
+const player1Enabled = localStorage.getItem("usePlayer1") == "yes";
+const player2Enabled = localStorage.getItem("usePlayer2") == "yes";
 const bothPlayersEnabled = player1Enabled && player2Enabled;
-const playerToggleEnabled = localStorage.getItem("usePlayerToggle") === "yes";
+const playerToggleEnabled = localStorage.getItem("usePlayerToggle") == "yes";
+console.log(`PlayerToggle: ${playerToggleEnabled}. Players both enabled: ${bothPlayersEnabled}`)
 
 if (bothPlayersEnabled && playerToggleEnabled) {
     const activePlayer = localStorage.getItem("activePlayer");
+	console.log(`Show player image in autostart condition. PlayerToggle: ${playerToggleEnabled}. Players both enabled: ${bothPlayersEnabled}`);
     document.getElementById("player1Image").classList.replace(activePlayer === "1" ? "fadeOutElm" : "fadeInElm", activePlayer === "1" ? "fadeInElm" : "fadeOutElm");
     document.getElementById("player2Image").classList.replace(activePlayer === "2" ? "fadeOutElm" : "fadeInElm", activePlayer === "2" ? "fadeInElm" : "fadeOutElm");
 } else {
