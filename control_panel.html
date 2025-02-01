@@ -264,6 +264,17 @@ for more information about Salotto please visit https://salotto.app
 			head.appendChild(script);
 		}
 		
+		const toggleState = localStorage.getItem("toggleState");
+		// Get the checkbox element
+		var playerToggleCheckbox = document.getElementById("playerToggleCheckbox");
+		// Get the state of the checkbox
+		var isChecked = playerToggleCheckbox.checked;
+		// Log the state to the console
+		console.log("Checkbox is checked:", isChecked);
+		console.log(`Toggle state sent to function togglePlayer ${toggleState}`)
+		console.log(`Toggle checkbox state before ${playerToggleCheckbox}`)
+		playerToggleCheckbox.checked = !toggleState;
+		console.log(`Toggle checkbox state after ${playerToggleCheckbox}`)
 
 		//Toggle the switches if a hotkey is pressed
 		function checkHotkeys() {
