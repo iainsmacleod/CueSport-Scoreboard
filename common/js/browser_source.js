@@ -214,15 +214,17 @@ function custom2Hide() {
 }
 
 function toggleActivePlayer(activePlayer) {
-	console.log(`Active player ${activePlayer}`);
-    if (activePlayer === 1 || activePlayer === null) {
+    if (activePlayer === true || activePlayer === null) {
+		console.log(`Show player 1`);
         document.getElementById("player1Image").classList.replace("fadeOutElm", "fadeInElm");
         document.getElementById("player2Image").classList.replace("fadeInElm", "fadeOutElm");
-        console.log("Activated player 1.");
-    } else if (activePlayer === 2) {
+    } else if (activePlayer === false) {
+		console.log(`Show player 2`);
         document.getElementById("player1Image").classList.replace("fadeInElm", "fadeOutElm");
         document.getElementById("player2Image").classList.replace("fadeOutElm", "fadeInElm");
-        console.log("Activated player 2.");
+    }else {
+        console.log(`No valid player selected`); // Log if no valid player
+		console.log(typeof activePlayer);
     }
 }
 

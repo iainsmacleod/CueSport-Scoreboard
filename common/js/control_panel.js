@@ -47,13 +47,15 @@ function toggleCheckbox(checkboxId, inputElement) {
 }
 
 function toggleSetting() {
-	const checkbox = document.getElementById("useToggleSetting");
+	const checkbox = document.getElementById("useToggleSetting").checked;
 	const activePlayer = document.getElementById("playerToggleCheckbox").checked;
-	console.log(`${activePlayer}`);
-	if (checkbox.checked) {
+	console.log(`toggleSetting function checkbox: ${checkbox}`);
+	console.log(`toggleSetting function activePlayer: ${activePlayer}`);
+	if (checkbox) {
 		document.getElementById("playerToggle").classList.remove("noShow");
 		localStorage.setItem("usePlayerToggle", "yes");
 		bc.postMessage({ clockDisplay: 'showActivePlayer', player: activePlayer });
+		console.log(`Toggled player and passed ${activePlayer} to showActivePlayer BC message`);
 	} else {
 		document.getElementById("playerToggle").classList.add("noShow");
 		localStorage.setItem("usePlayerToggle", "no");
@@ -503,10 +505,11 @@ function customLogoSetting2() {
 }
 
 function togglePlayer(isChecked) {
-	const activePlayer = isChecked ? 1 : 2; // Determine active player based on checkbox state
+	const activePlayer = isChecked
+	const player = isChecked ? 1 : 2; // Determine active player based on checkbox state
     bc.postMessage({ clockDisplay: 'toggleActivePlayer', player: activePlayer }); 	// Send a message to the broadcast channel with the active player
-	localStorage.setItem("activePlayer", activePlayer);
-    console.log(`Activated player ${activePlayer}.`); // Log the active player
+	localStorage.setItem("activePlayer", player);
+    console.log(`Activated player ${player}.`); // Log the active player
 }
 
 function obsThemeChange() {

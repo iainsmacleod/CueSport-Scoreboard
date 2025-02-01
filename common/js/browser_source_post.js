@@ -208,15 +208,24 @@ bc.onmessage = (event) => {
 		// }
 		if (event.data.clockDisplay === 'toggleActivePlayer') {
 			const activePlayer = event.data.player; // Get the active player from the message
+			console.log(`Broadcast to toggle player to player number: ${activePlayer}`);
 			toggleActivePlayer(activePlayer); // Call the function to update the display
 		}
 		if (event.data.clockDisplay === 'showActivePlayer'){
 			const activePlayer = event.data.player; // Get the active player from the message
-			const player1Enabled = localStorage.getItem("usePlayer1");
-			const player2Enabled = localStorage.getItem("usePlayer2");
-			const bothPlayersEnabled = player1Enabled && player2Enabled == true;
-			const playerToggle = (activePlayer === 1 || activePlayer === 2); // true if activePlayer is 1 or 2, otherwise false			console.log(`Indicate active player, set to player ${activePlayer} and value of bothplayers enabled: ${bothPlayersEnabled} and playerstotoggle: ${playerToToggle}`);
-			if (playerToggle && bothPlayersEnabled) {
+			console.log(`activePlayer: ${activePlayer}`);
+			const player1Enabled = localStorage.getItem("usePlayer1") === "yes";
+			console.log(`player1Enabled: ${player1Enabled}`);
+			const player2Enabled = localStorage.getItem("usePlayer2") === "yes";
+			console.log(`player2Enabled: ${player2Enabled}`);
+			const bothPlayersEnabled = player1Enabled && player2Enabled;
+			console.log(`bothPlayersEnabled: ${bothPlayersEnabled}`);
+			// const playerToggle = (activePlayer === 1 || activePlayer === 2); // true if activePlayer is 1 or 2, otherwise false
+			// console.log(`playerToggle: ${playerToggle}`);
+			if (bothPlayersEnabled) {
+				//const activePlayer = localStorage.getItem("activePlayer");
+				console.log(`showActivePlayer: ${activePlayer}`);
+				console.log(typeof activePlayer);
 				toggleActivePlayer(activePlayer); // Call the function to update the display
 			}
 		}
