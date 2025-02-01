@@ -282,6 +282,7 @@ for more information about Salotto please visit https://salotto.app
 				var playerToggleCheckbox = document.getElementById("playerToggleCheckbox");
 				console.log(`Toggle state before ${toggleState}`)
 				playerToggleCheckbox.checked = !toggleState;
+				togglePlayer(!toggleState);
 				localStorage.setItem("toggleState", !toggleState);
 				console.log(`Toggle state after ${toggleState}`)
 				hotkeyPlayerToggleOld = hotkeyPlayerToggle;
