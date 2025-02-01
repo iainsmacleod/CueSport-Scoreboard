@@ -298,6 +298,14 @@ function postScore(opt1, player) {
     let p1ScoreValue = parseInt(localStorage.getItem("p1ScoreCtrlPanel")) || 0;
     let p2ScoreValue = parseInt(localStorage.getItem("p2ScoreCtrlPanel")) || 0;
 
+	// var toggleState = localStorage.getItem("toggleState") === "true";
+	// var playerToggleCheckbox = document.getElementById("playerToggleCheckbox");
+	// console.log(`Toggle state before ${toggleState}`)
+	// playerToggleCheckbox.checked = !toggleState;
+	// togglePlayer(!toggleState);
+	// localStorage.setItem("toggleState", !toggleState);
+	// console.log(`Toggle state after ${toggleState}`)
+
     if (player == "1") {
         if (opt1 == "add") {
             if (p1ScoreValue < 9999) {
@@ -513,7 +521,12 @@ function customLogoSetting2() {
 function togglePlayer(isChecked) {
 	const activePlayer = isChecked
 	const player = isChecked ? 1 : 2; // Determine active player based on checkbox state
-    bc.postMessage({ clockDisplay: 'toggleActivePlayer', player: activePlayer }); 	// Send a message to the broadcast channel with the active player
+	const useToggleCheckbox = document.getElementById("useToggleSetting");
+	if (useToggleCheckbox.checked){
+		bc.postMessage({ clockDisplay: 'toggleActivePlayer', player: activePlayer }); 	// Send a message to the broadcast channel with the active player
+	} else {
+		console.log(`Not changing visual player indicator UI, due to useToggleSetting being disabled`);
+	}
 	localStorage.setItem("activePlayer", player);
 	localStorage.setItem("toggleState", activePlayer);
     console.log(`Activated player ${player}.`); // Log the active player
