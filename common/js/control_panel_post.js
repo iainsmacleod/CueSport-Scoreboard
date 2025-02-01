@@ -95,6 +95,16 @@ window.onload = function() {
 		document.getElementById("useToggleSetting").checked = false;
 	}
 
+	if (localStorage.getItem("p1Score") === null) {
+		localStorage.setItem("p1Score", "0");
+	}
+	if (localStorage.getItem("p2Score") === null) {
+		localStorage.setItem("p2Score", "0");
+	}
+
+	console.log(`p1ScoreValue on startup= ${p1ScoreValue}`)
+
+
 	// Call the visibility functions based on the checkbox states
     setPlayerVisibility(1);
     setPlayerVisibility(2);

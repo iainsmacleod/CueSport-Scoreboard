@@ -288,12 +288,16 @@ function pushScores() {
     
     // Store scores in localStorage
     localStorage.setItem("p1ScoreCtrlPanel", p1ScoreValue);
-	//localStorage.setItem("p1Score", p1ScoreValue);
+	localStorage.setItem("p1Score", p1ScoreValue);
     localStorage.setItem("p2ScoreCtrlPanel", p2ScoreValue);
-	//localStorage.setItem("p2Score", p1ScoreValue);
+	localStorage.setItem("p2Score", p2ScoreValue);
 }
 
 function postScore(opt1, player) {
+	// Parse stored scores as integers
+    let p1ScoreValue = parseInt(localStorage.getItem("p1ScoreCtrlPanel")) || 0;
+    let p2ScoreValue = parseInt(localStorage.getItem("p2ScoreCtrlPanel")) || 0;
+
     if (player == "1") {
         if (opt1 == "add") {
             if (p1ScoreValue < 9999) {
@@ -301,7 +305,7 @@ function postScore(opt1, player) {
                 msg = { player: player, score: p1ScoreValue };
                 bc.postMessage(msg);
                 localStorage.setItem("p" + player + "ScoreCtrlPanel", p1ScoreValue);
-                //localStorage.setItem("p" + player + "Score", p1ScoreValue);
+                localStorage.setItem("p" + player + "Score", p1ScoreValue);
                 stopClock();
                 document.getElementById("sendP" + player + "Score").style.border = "2px solid lightgreen";
                 document.getElementById("p"+player+"Score").value = p1ScoreValue;
