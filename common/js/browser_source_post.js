@@ -154,7 +154,6 @@ bc.onmessage = (event) => {
 
 	// start of original clockDisplay channel 
 	if (event.data.clockDisplay != null) {
-		console.log("event.data.clockDisplay: " + event.data.clockDisplay);
 		if (event.data.clockDisplay == "show") { showClock(); };
 		if (event.data.clockDisplay == "hide") { hideClock(); };
 		if (event.data.clockDisplay == "stopClock") { stopClock(); };
@@ -208,7 +207,7 @@ bc.onmessage = (event) => {
 		// }
 		if (event.data.clockDisplay === 'toggleActivePlayer') {
 			const activePlayer = event.data.player; // Get the active player from the message
-			console.log(`Broadcast to toggle player to player number: ${activePlayer}`);
+			console.log(`Toggle changed to: ${activePlayer}`);
 			toggleActivePlayer(activePlayer); // Call the function to update the display
 		}
 		if (event.data.clockDisplay === 'showActivePlayer'){

@@ -263,18 +263,6 @@ for more information about Salotto please visit https://salotto.app
 			script.src = src;
 			head.appendChild(script);
 		}
-		
-		const toggleState = localStorage.getItem("toggleState");
-		// Get the checkbox element
-		var playerToggleCheckbox = document.getElementById("playerToggleCheckbox");
-		// Get the state of the checkbox
-		var isChecked = playerToggleCheckbox.checked;
-		// Log the state to the console
-		console.log("Checkbox is checked:", isChecked);
-		console.log(`Toggle state sent to function togglePlayer ${toggleState}`)
-		console.log(`Toggle checkbox state before ${playerToggleCheckbox}`)
-		playerToggleCheckbox.checked = !toggleState;
-		console.log(`Toggle checkbox state after ${playerToggleCheckbox}`)
 
 		//Toggle the switches if a hotkey is pressed
 		function checkHotkeys() {
@@ -290,14 +278,12 @@ for more information about Salotto please visit https://salotto.app
 			if (hotkeyStopClock != hotkeyStopClockOld) { stopClock(); hotkeyStopClockOld = hotkeyStopClock; }
 			if (hotkeySwap != hotkeySwapOld) { swapColors(); hotkeySwapOld = hotkeySwap; }
 			if (hotkeyPlayerToggle != hotkeyPlayerToggleOld) {
-				const toggleState = localStorage.getItem("toggleState");
-				const playerToggleCheckbox = document.getElementById("playerToggleCheckbox");
-				console.log(`Toggle state sent to function togglePlayer ${!toggleState}`)
-				console.log(`Toggle checkbox state before ${playerToggleCheckbox.checked}`)
+				var toggleState = localStorage.getItem("toggleState") === "true";
+				var playerToggleCheckbox = document.getElementById("playerToggleCheckbox");
+				console.log(`Toggle state before ${toggleState}`)
 				playerToggleCheckbox.checked = !toggleState;
-				console.log(`Toggle checkbox state after ${playerToggleCheckbox.checked}`)
-				togglePlayer(!toggleState);
-				toggleState = !toggleState;
+				localStorage.setItem("toggleState", !toggleState);
+				console.log(`Toggle state after ${toggleState}`)
 				hotkeyPlayerToggleOld = hotkeyPlayerToggle;
 			}
 			

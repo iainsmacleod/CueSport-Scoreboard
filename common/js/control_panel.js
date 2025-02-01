@@ -307,7 +307,7 @@ function postScore(opt1, player) {
                 localStorage.setItem("p" + player + "ScoreCtrlPanel", p1ScoreValue);
                 localStorage.setItem("p" + player + "Score", p1ScoreValue);
                 stopClock();
-                document.getElementById("sendP" + player + "Score").style.border = "2px solid lightgreen";
+                //document.getElementById("sendP" + player + "Score").style.border = "2px solid lightgreen";
                 document.getElementById("p"+player+"Score").value = p1ScoreValue;
                 resetExt('p1', 'noflash');
                 resetExt('p2', 'noflash');
@@ -318,7 +318,7 @@ function postScore(opt1, player) {
             bc.postMessage(msg);
             localStorage.setItem("p" + player + "ScoreCtrlPanel", p1ScoreValue);
             localStorage.setItem("p" + player + "Score", p1ScoreValue);
-            document.getElementById("sendP" + player + "ScoreSub").style.border = "2px solid tomato";
+            //document.getElementById("sendP" + player + "ScoreSub").style.border = "2px solid tomato";
             document.getElementById("p"+player+"Score").value = p1ScoreValue;
         }
     }
@@ -331,7 +331,7 @@ function postScore(opt1, player) {
                 localStorage.setItem("p" + player + "ScoreCtrlPanel", p2ScoreValue);
                 localStorage.setItem("p" + player + "Score", p2ScoreValue);
                 stopClock();
-                document.getElementById("sendP" + player + "Score").style.border = "2px solid lightgreen";
+                //document.getElementById("sendP" + player + "Score").style.border = "2px solid lightgreen";
                 document.getElementById("p"+player+"Score").value = p2ScoreValue;
                 resetExt('p1', 'noflash');
                 resetExt('p2', 'noflash');
@@ -342,7 +342,7 @@ function postScore(opt1, player) {
             bc.postMessage(msg2);
             localStorage.setItem("p" + player + "ScoreCtrlPanel", p2ScoreValue);
             localStorage.setItem("p" + player + "Score", p2ScoreValue);
-            document.getElementById("sendP" + player + "ScoreSub").style.border = "2px solid tomato";
+            //document.getElementById("sendP" + player + "ScoreSub").style.border = "2px solid tomato";
             document.getElementById("p"+player+"Score").value = p2ScoreValue;
         }
     }
