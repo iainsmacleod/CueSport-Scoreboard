@@ -509,6 +509,7 @@ function togglePlayer(isChecked) {
 	const player = isChecked ? 1 : 2; // Determine active player based on checkbox state
     bc.postMessage({ clockDisplay: 'toggleActivePlayer', player: activePlayer }); 	// Send a message to the broadcast channel with the active player
 	localStorage.setItem("activePlayer", player);
+	localStorage.setItem("toggleState", activePlayer);
     console.log(`Activated player ${player}.`); // Log the active player
 }
 
