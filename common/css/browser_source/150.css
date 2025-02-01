@@ -32,12 +32,20 @@ body{
 } 
 
 #p1ExtIcon{
-    top:9.0px;
-    left: -19px;
+    top: 9.0px;
+    left: -30px;
 }
 #p2ExtIcon {
-    top:9.0px;
-    right: -19px;
+    top: 9.0px;
+    right: -30px;
+}
+
+#player1Image {
+    top: 9px;
+}
+
+#player2Image {
+    top: 9px;
 }
 
 .shotclockvis {
