@@ -212,10 +212,12 @@ bc.onmessage = (event) => {
 		}
 		if (event.data.clockDisplay === 'showActivePlayer'){
 			const activePlayer = event.data.player; // Get the active player from the message
-			const playerToToggle = activePlayer === true ? 1 : (activePlayer === false ? 2 : 1); // Convert true/false to 1/2
-			console.log(`Indicate active player, set to player ${activePlayer}`);
-			if (playerToToggle) {
-				toggleActivePlayer(playerToToggle); // Call the function to update the display
+			const player1Enabled = localStorage.getItem("usePlayer1");
+			const player2Enabled = localStorage.getItem("usePlayer2");
+			const bothPlayersEnabled = player1Enabled && player2Enabled == true;
+			const playerToggle = (activePlayer === 1 || activePlayer === 2); // true if activePlayer is 1 or 2, otherwise false			console.log(`Indicate active player, set to player ${activePlayer} and value of bothplayers enabled: ${bothPlayersEnabled} and playerstotoggle: ${playerToToggle}`);
+			if (playerToggle && bothPlayersEnabled) {
+				toggleActivePlayer(activePlayer); // Call the function to update the display
 			}
 		}
 		if (event.data.clockDisplay === 'hideActivePlayer'){

@@ -266,6 +266,7 @@ for more information about Salotto please visit https://salotto.app
 
 		//Toggle the switches if a hotkey is pressed
 		function checkHotkeys() {
+			var toggleState = document.getElementById('playerToggleCheckbox').checked; // Get the current checked state
 
 			if (hotkeyP1ScoreUp != hotkeyP1ScoreUpOld) { postScore('add', '1'); hotkeyP1ScoreUpOld = hotkeyP1ScoreUp; }
 			if (hotkeyP2ScoreUp != hotkeyP2ScoreUpOld) { postScore('add', '2'); hotkeyP2ScoreUpOld = hotkeyP2ScoreUp; }
@@ -278,7 +279,7 @@ for more information about Salotto please visit https://salotto.app
 			if (hotkey60Clock != hotkey60ClockOld) { shotClock(61000); hotkey60ClockOld = hotkey60Clock; }
 			if (hotkeyStopClock != hotkeyStopClockOld) { stopClock(); hotkeyStopClockOld = hotkeyStopClock; }
 			if (hotkeySwap != hotkeySwapOld) { swapColors(); hotkeySwapOld = hotkeySwap; }
-			if (hotkeyPlayerToggle != hotkeyPlayerToggleOld) { togglePlayer(true); hotkeyPlayerToggleOld = hotkeyPlayerToggle; }
+			if (hotkeyPlayerToggle != hotkeyPlayerToggleOld) { togglePlayer(toggleState); hotkeyPlayerToggleOld = hotkeyPlayerToggle; }
 		}
 
 		function refreshData() {
