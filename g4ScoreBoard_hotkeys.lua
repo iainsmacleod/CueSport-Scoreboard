@@ -117,7 +117,6 @@ local function onHotKey(action)
 			hotkeySwap = 0
 		end
 		update_hotkeys_js()
-	end
 	elseif action == "PLY_SWAP" then
 		if hotkeySwap == 0 then
 			hotkeySwap = 1
