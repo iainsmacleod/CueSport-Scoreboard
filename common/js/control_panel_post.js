@@ -80,9 +80,11 @@ window.onload = function() {
 	if (localStorage.getItem("activePlayer") === null || (localStorage.getItem("activePlayer") === "1")) {
 		localStorage.setItem("activePlayer", "1");
 		document.getElementById("playerToggleCheckbox").checked = true;
+		localStorage.setItem("toggleState", true);
 	} else if (localStorage.getItem("activePlayer") === "2") {
 		localStorage.setItem("activePlayer", "2");
 		document.getElementById("playerToggleCheckbox").checked = false;
+		localStorage.setItem("toggleState", false);
 	} else {
 		console.log("activePlayer =", localStorage.getItem("activePlayer"));
 	}

@@ -317,8 +317,6 @@ function postScore(opt1, player) {
             document.getElementById("sendP" + player + "ScoreSub").style.border = "2px solid tomato";
             document.getElementById("p"+player+"Score").value = p1ScoreValue;
         }
-		const toggleState = localStorage.getItem("toggleState")
-		console.log(`Toggle state: ${toggleState}`)
     }
     if (player == "2") {
         if (opt1 == "add") {
