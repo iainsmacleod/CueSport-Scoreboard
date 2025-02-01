@@ -17,7 +17,7 @@ local hotkey30Clock = 0;
 local hotkey60Clock = 0;
 local hotkeyStopClock = 0;
 local hotkeySwap = 0;
-local hotKeyPlayerToggle = 0;
+local hotkeyPlayerToggle = 0;
 
 
 local hotkeys = {
@@ -118,10 +118,10 @@ local function onHotKey(action)
 		end
 		update_hotkeys_js()
 	elseif action == "PLY_SWAP" then
-		if hotKeyPlayerToggle == 0 then
-			hotKeyPlayerToggle = 1
+		if hotkeyPlayerToggle == 0 then
+			hotkeyPlayerToggle = 1
 		else
-			hotKeyPlayerToggle = 0
+			hotkeyPlayerToggle = 0
 		end
 		update_hotkeys_js()
 	end
@@ -142,7 +142,7 @@ function update_hotkeys_js()
 	output:write('hotkey60Clock = '.. hotkey60Clock .. ';\n')
 	output:write('hotkeyStopClock = '.. hotkeyStopClock .. ';\n')
 	output:write('hotkeySwap = '.. hotkeySwap .. ';\n')
-	output:write('hotkeyPlayerToggle = '.. hotkeySwap .. ';\n')
+	output:write('hotkeyPlayerToggle = '.. hotkeyPlayerToggle .. ';\n')
 	output:close()
 end
 

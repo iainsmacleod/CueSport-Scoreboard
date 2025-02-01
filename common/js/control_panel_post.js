@@ -29,7 +29,7 @@ var hotkey30Clock;
 var hotkey60Clock;
 var hotkeyStopClock;
 var hotkeySwap;
-var hotKeyPlayerToggle;
+var hotkeyPlayerToggle;
 var hotkeyP1ScoreUpOld = hotkeyP1ScoreUp;
 var hotkeyP2ScoreUpOld = hotkeyP2ScoreUp;
 var hotkeyP1ScoreDownOld = hotkeyP1ScoreDown;
@@ -41,7 +41,7 @@ var hotkey30ClockOld = hotkey30Clock;
 var hotkey60ClockOld = hotkey60Clock;
 var hotkeyStopClockOld = hotkeyStopClock;
 var hotkeySwapOld = hotkeySwap;
-var hotKeyPlayerToggleOld = hotKeyPlayerToggle; // Track old state
+var hotkeyPlayerToggleOld = hotkeyPlayerToggle; // Track old state
 var tev;
 var p1ScoreValue;
 var p2ScoreValue;

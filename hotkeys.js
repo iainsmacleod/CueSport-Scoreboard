@@ -9,5 +9,5 @@ hotkey30Clock = 0;
 hotkey60Clock = 0;
 hotkeyStopClock = 0;
 hotkeySwap = 0;
-hotKeyPlayerToggle = 0;
+hotkeyPlayerToggle = 0;
 
