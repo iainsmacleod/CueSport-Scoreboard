@@ -284,6 +284,7 @@ for more information about Salotto please visit https://salotto.app
 				console.log(`Toggle state sent to function togglePlayer ${!toggleState}`)
 				playerToggleCheckbox.checked = toggleState;
 				togglePlayer(!toggleState);
+				toggleState = !toggleState;
 				hotkeyPlayerToggleOld = hotkeyPlayerToggle;
 			}
 			
