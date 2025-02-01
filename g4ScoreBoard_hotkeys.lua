@@ -118,10 +118,10 @@ local function onHotKey(action)
 		end
 		update_hotkeys_js()
 	elseif action == "PLY_SWAP" then
-		if hotkeySwap == 0 then
-			hotkeySwap = 1
+		if hotKeyPlayerToggle == 0 then
+			hotKeyPlayerToggle = 1
 		else
-			hotkeySwap = 0
+			hotKeyPlayerToggle = 0
 		end
 		update_hotkeys_js()
 	end
