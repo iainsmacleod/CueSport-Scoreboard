@@ -57,7 +57,7 @@ for more information about Salotto please visit https://salotto.app
 			<br>
 			<div id="gameInfo" class="obs28 two-column-container">
 				<div class="column">
-				  Race Info (2P Only):<input style="font-size:10pt; width: 35px; border-radius: 0px" type="text" id="raceInfoTxt" placeholder="" maxlength="4">
+				  Race Info (2P Only):<input style="font-size:10pt; width: 35px; border-radius: 0px" type="text" id="raceInfoTxt" placeholder="" maxlength="3">
 				</p>
 				|
 				</p>
@@ -168,7 +168,7 @@ for more information about Salotto please visit https://salotto.app
 					<label id="p1ScoreLabel" for="sendP1ScoreSub">Player/Team 1 - Score/Rack(s)/Ball(s)</label>
 					<div class="score-control">
 					  <button id="sendP1ScoreSub" onclick="postScore('sub','1')">-</button>
-					  <input style="text-shadow: 1px 1px 2px black, 0 0 25px black, 0 0 5px black; font-weight:bold; text-align: center; vertical-align: middle; color:white; -webkit-text-stroke: 1px black;" type="text" pattern="[0-9]" inputmode="numeric" min="0" max="9999" maxlength="4" id="p1Score" placeholder="0">
+					  <input style="text-shadow: 1px 1px 2px black, 0 0 25px black, 0 0 5px black; font-weight:bold; text-align: center; vertical-align: middle; color:white; -webkit-text-stroke: 1px black;" type="text" pattern="[0-9]" inputmode="numeric" min="0" max="999" maxlength="3" id="p1Score" placeholder="0">
 					  <button id="sendP1Score" onclick="postScore('add','1')">+</button>
 					</div>
 				  </div>				  
@@ -177,7 +177,7 @@ for more information about Salotto please visit https://salotto.app
 					<label id="p2ScoreLabel" for="sendP2Score">Player/Team 2 - Score/Rack(s)/Ball(s)</label>
 					<div class="score-control">
 						<button id="sendP2ScoreSub" onclick="postScore('sub','2')">-</button>
-						<input style="text-shadow: 1px 1px 2px black, 0 0 25px black, 0 0 5px black; font-weight:bold; text-align: center; vertical-align: middle; color:white; -webkit-text-stroke: 1px black;" type="text" pattern="[0-9]" inputmode="numeric" min="0" max="9999" maxlength="4" id="p2Score" placeholder="0">
+						<input style="text-shadow: 1px 1px 2px black, 0 0 25px black, 0 0 5px black; font-weight:bold; text-align: center; vertical-align: middle; color:white; -webkit-text-stroke: 1px black;" type="text" pattern="[0-9]" inputmode="numeric" min="0" max="999" maxlength="3" id="p2Score" placeholder="0">
 						<button id="sendP2Score" onclick="postScore('add','2')">+</button>
 					</div>
 				</div>

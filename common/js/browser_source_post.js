@@ -53,10 +53,14 @@ bc.onmessage = (event) => {
 		if (event.data.race == "" || !bothPlayersEnabled) {
 			document.getElementById("raceInfo").classList.add("noShow");
 			document.getElementById("raceInfo").classList.remove("fadeInElm");
+			document.getElementById("customLogo1").classList.remove("customLogoWide1");
+			document.getElementById("customLogo2").classList.remove("customLogoWide2");
 		} else {
 			document.getElementById("raceInfo").classList.remove("noShow");
 			document.getElementById("raceInfo").classList.add("fadeInElm");
-			document.getElementById("raceInfo").innerHTML = "(" + event.data.race + ")";
+			document.getElementById("customLogo1").classList.add("customLogoWide1");
+			document.getElementById("customLogo2").classList.remove("customLogoWide2");
+			document.getElementById("customLogo1").innerHTML = "(" + event.data.race + ")";
 		}
 	}
 

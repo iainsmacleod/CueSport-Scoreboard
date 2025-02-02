@@ -308,7 +308,7 @@ function postScore(opt1, player) {
 
     if (player == "1") {
         if (opt1 == "add") {
-            if (p1ScoreValue < 9999) {
+            if (p1ScoreValue < 999) {
                 p1ScoreValue = p1ScoreValue + 1;
                 msg = { player: player, score: p1ScoreValue };
                 bc.postMessage(msg);
@@ -332,7 +332,7 @@ function postScore(opt1, player) {
     }
     if (player == "2") {
         if (opt1 == "add") {
-            if (p2ScoreValue < 9999) {
+            if (p2ScoreValue < 999) {
                 p2ScoreValue = p2ScoreValue + 1;
                 msg2 = { player: player, score: p2ScoreValue };
                 bc.postMessage(msg2);

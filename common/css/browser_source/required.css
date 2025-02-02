@@ -75,7 +75,7 @@ td {
     /* text-shadow: 1px 1px 2px black, 0 0 25px black, 0 0 5px black; */
     -webkit-text-stroke: 1px black;
     box-shadow: 0 8px 16px 0 rgba(0,0,0,0.3), 0 6px 20px 0 rgba(0,0,0,0.3);
-    width: 5%;
+    width: 47px;
 }
 
 #p1ExtIcon{
@@ -127,7 +127,7 @@ td {
     transition: visibility 0s 1s, opacity 1s linear;
 }
 
-#customLogo1 {
+.customLogo1 {
     position:absolute;
     bottom: 7px;
     z-index:9;
@@ -135,7 +135,7 @@ td {
     max-width: 30px;
     /* height: auto; */
 }
- #customLogo2 {
+ .customLogo2 {
     position:absolute;
     bottom: 7px;
     z-index:9;
