@@ -261,10 +261,10 @@ function postNames() {
 
 function postInfo() {
 	if (raceInfoTxt.value == " ") {
-		raceInfoTxt.value = "&nbsp;";
+		raceInfoTxt.value = null;
 	}
 	if (gameInfoTxt.value == " ") {
-		gameInfoTxt.value = "&nbsp;";
+		gameInfoTxt.value = null;
 	}
 	racemsg = document.getElementById("raceInfoTxt").value;
 	gamemsg = document.getElementById("gameInfoTxt").value;

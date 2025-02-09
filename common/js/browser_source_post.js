@@ -59,13 +59,13 @@ bc.onmessage = (event) => {
 			document.getElementById("raceInfo").classList.remove("noShow");
 			document.getElementById("raceInfo").classList.add("fadeInElm");
 			document.getElementById("customLogo1").classList.add("customLogoWide1");
-			document.getElementById("customLogo2").classList.remove("customLogoWide2");
-			document.getElementById("customLogo1").innerHTML = "(" + event.data.race + ")";
+			document.getElementById("customLogo2").classList.add("customLogoWide2");
+			document.getElementById("raceInfo").innerHTML = "(" + event.data.race + ")";
 		}
 	}
 
 	if (event.data.game != null) {
-		console.log("game info: " + event.data.game);
+		console.log("Game info: " + event.data.game);
 		if (event.data.game == "") {
 			document.getElementById("gameInfo").classList.add("noShow");
 			document.getElementById("gameInfo").classList.remove("fadeInElm");
@@ -315,6 +315,9 @@ if (localStorage.getItem("gameInfo") != "" && localStorage.getItem("gameInfo") !
 
 if (localStorage.getItem("raceInfo") != "" && localStorage.getItem("raceInfo") != null && bothPlayersEnabled) {
 	document.getElementById("raceInfo").classList.remove("noShow");
+	document.getElementById("raceInfo").classList.add("fadeInElm");
+	document.getElementById("customLogo1").classList.add("customLogoWide1");
+	document.getElementById("customLogo2").classList.add("customLogoWide2");
 }
 
 document.getElementById("gameInfo").innerHTML = localStorage.getItem("gameInfo");

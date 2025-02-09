@@ -21,15 +21,23 @@ body{
     transform: translate(-50%, -220%);  /* Centers the div */
 }
 
-#customLogo1 {
-    right: 541px;
+.customLogo1 {
+    right: 518px;
     height: 27px;
 }
+.customLogoWide1 {
+    right: 556px;
+    height: 26.5px;
+}
 
- #customLogo2 {
-    left: 541px;
+.customLogo2 {
+    left: 518px;
     height: 27px;
 } 
+.customLogoWide2 {
+    left: 556px;
+    height: 26.5px;
+}
 
 #p1ExtIcon{
     top: 9.0px;
