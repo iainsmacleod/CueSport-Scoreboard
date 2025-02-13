@@ -10,11 +10,16 @@ body{
 
 #gameInfo {
     width: auto;
-    max-width: 30%;     /* Adjust as needed */
+    max-width: 30%; 
+}
+
+#logoSlideshowDiv {
+    top: 10%;
 }
 
 #scoreBoardDiv {
     width: 70%;
+    top: 87%;
 }
 
 .customLogo1 {
@@ -46,10 +51,12 @@ body{
 
 #player1Image {
     top: 9px;
+    height: 24.5px;
 }
 
 #player2Image {
     top: 9px;
+    height: 24.5px;
 }
 
 .shotclockvis {

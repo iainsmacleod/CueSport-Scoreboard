@@ -19,25 +19,78 @@ var shotClockxr = null;
 const bcr = new BroadcastChannel('g4-recv'); // browser_source -> control_panel channel 
 const bc = new BroadcastChannel('g4-main');
 var playerNumber;
-var scaleFactor;
 
-const defaultPositions = {
-    scoreBoardDiv: {
-        left: "50%", // Define the default left position
-        top: "82%", // Define the default top position
-        transform: "translateX(-50%)" // Define the default transform
-    },
-    gameInfo: {
-        left: "50%", // Define the default left position
-        top: "-4px", // Define the default top position
-        transform: "translateX(-50%)" // Define the default transform
-    },
-    logoSlideshowDiv: {
-        left: "50%", // Define the default left position
-        top: "0%", // Define the default top position
-        transform: "translate(-50%, -50%)" // Define the default transform
-    }
-};
+// var defaultPositions = {
+//     scoreBoardDiv: {
+//         left: "50%", // Define the default left position
+//         top: "82%", // Define the default top position
+//         transform: "translateX(-50%)" // Define the default transform
+//     },
+//     gameInfo: {
+//         left: "50%", // Define the default left position
+//         top: "-4px", // Define the default top position
+//         transform: "translateX(-50%)" // Define the default transform
+//     },
+//     logoSlideshowDiv: {
+//         left: "50%", // Define the default left position
+//         top: "20%", // Define the default top position
+//         transform: "translate(-50%, -50%)" // Define the default transform
+//     }
+// };
+
+// var defaultPositions = {
+//     scoreBoardDiv: {},
+//     gameInfo: {},
+//     logoSlideshowDiv: {}
+// };
+
+// // Retrieve the b_style value from localStorage
+// var bStyle = localStorage.getItem("b_style");
+// if (bStyle == 1) {
+// 	//Scoreboard
+//     defaultPositions.scoreBoardDiv.top = "87%";
+// 	defaultPositions.scoreBoardDiv.left = "50%";
+// 	defaultPositions.scoreBoardDiv.transform =  "translateX(-50%)";
+// 	//Game Info
+// 	defaultPositions.gameInfo.top = "-4px";
+// 	defaultPositions.gameInfo.left = "50%";
+// 	defaultPositions.gameInfo.transform =  "translateX(-50%)";
+// 	//Logo Slideshow
+// 	defaultPositions.logoSlideshowDiv.top = "20%";
+// 	defaultPositions.logoSlideshowDiv.left = "50%";
+// 	defaultPositions.logoSlideshowDiv.transform =  "translate(-50%, -50%)";
+// 	//console.log(`Small defaults`);
+// } else if (bStyle == 2) {
+//     //Scoreboard
+//     defaultPositions.scoreBoardDiv.top = "86%";
+// 	defaultPositions.scoreBoardDiv.left = "50%";
+// 	defaultPositions.scoreBoardDiv.transform =  "translateX(-50%)";
+// 	//Game Info
+// 	defaultPositions.gameInfo.top = "-4px";
+// 	defaultPositions.gameInfo.left = "50%";
+// 	defaultPositions.gameInfo.transform =  "translateX(-50%)";
+// 	//Logo Slideshow
+// 	defaultPositions.logoSlideshowDiv.top = "10%";
+// 	defaultPositions.logoSlideshowDiv.left = "50%";
+// 	defaultPositions.logoSlideshowDiv.transform =  "translate(-50%, -50%)";
+// 	//console.log(`Medium defaults`);
+// } else if (bStyle == 3) {
+//     //Scoreboard
+//     defaultPositions.scoreBoardDiv.top = "82%";
+// 	defaultPositions.scoreBoardDiv.left = "50%";
+// 	defaultPositions.scoreBoardDiv.transform =  "translateX(-50%)";
+// 	//Game Info
+// 	defaultPositions.gameInfo.top = "-4px";
+// 	defaultPositions.gameInfo.left = "50%";
+// 	defaultPositions.gameInfo.transform =  "translateX(-50%)";
+// 	//Logo Slideshow
+// 	defaultPositions.logoSlideshowDiv.top = "0%";
+// 	defaultPositions.logoSlideshowDiv.left = "50%";
+// 	defaultPositions.logoSlideshowDiv.transform =  "translate(-50%, -50%)";
+// 	//console.log(`Large defaults`);
+// }
+
+
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //										broadcast channel events
@@ -46,7 +99,60 @@ const defaultPositions = {
 bc.onmessage = (event) => {
 	if (event.data.type === 'scaleChange') {
         const newScaleFactor = event.data.scaleFactor;
-        console.log(`Scale changed to: ${newScaleFactor}`);
+
+		// Retrieve the b_style value from localStorage
+		var bStyle = localStorage.getItem("b_style");
+		
+		// Declare defaultPositions
+		var defaultPositions = {
+			scoreBoardDiv: {},
+			gameInfo: {},
+			logoSlideshowDiv: {}
+		};
+
+		if (bStyle == 1) {
+			//Scoreboard
+			defaultPositions.scoreBoardDiv.top = "89%";
+			defaultPositions.scoreBoardDiv.left = "50%";
+			defaultPositions.scoreBoardDiv.transform =  "translateX(-50%)";
+			//Game Info
+			defaultPositions.gameInfo.top = "-4px";
+			defaultPositions.gameInfo.left = "50%";
+			defaultPositions.gameInfo.transform =  "translateX(-50%)";
+			//Logo Slideshow
+			defaultPositions.logoSlideshowDiv.top = "20%";
+			defaultPositions.logoSlideshowDiv.left = "50%";
+			defaultPositions.logoSlideshowDiv.transform =  "translate(-50%, -50%)";
+			//console.log(`Small defaults`);
+		} else if (bStyle == 2) {
+			//Scoreboard
+			defaultPositions.scoreBoardDiv.top = "87%";
+			defaultPositions.scoreBoardDiv.left = "50%";
+			defaultPositions.scoreBoardDiv.transform =  "translateX(-50%)";
+			//Game Info
+			defaultPositions.gameInfo.top = "-4px";
+			defaultPositions.gameInfo.left = "50%";
+			defaultPositions.gameInfo.transform =  "translateX(-50%)";
+			//Logo Slideshow
+			defaultPositions.logoSlideshowDiv.top = "10%";
+			defaultPositions.logoSlideshowDiv.left = "50%";
+			defaultPositions.logoSlideshowDiv.transform =  "translate(-50%, -50%)";
+			//console.log(`Medium defaults`);
+		} else if (bStyle == 3) {
+			//Scoreboard
+			defaultPositions.scoreBoardDiv.top = "84%";
+			defaultPositions.scoreBoardDiv.left = "50%";
+			defaultPositions.scoreBoardDiv.transform =  "translateX(-50%)";
+			//Game Info
+			defaultPositions.gameInfo.top = "-4px";
+			defaultPositions.gameInfo.left = "50%";
+			defaultPositions.gameInfo.transform =  "translateX(-50%)";
+			//Logo Slideshow
+			defaultPositions.logoSlideshowDiv.top = "0%";
+			defaultPositions.logoSlideshowDiv.left = "50%";
+			defaultPositions.logoSlideshowDiv.transform =  "translate(-50%, -50%)";
+			//console.log(`Large defaults`);
+		}
         
         // Reset positions to default
         $("#scoreBoardDiv").css({
@@ -66,7 +172,7 @@ bc.onmessage = (event) => {
         });
 
         // Update draggable elements with the new scale factor
-        updateDraggableElements(newScaleFactor);
+        // updateDraggableElements(newScaleFactor);
     }
 
 	if (event.data.score != null) {
@@ -304,16 +410,16 @@ $(document).ready(function() {
     $("#gameInfo").draggable();
     $("#logoSlideshowDiv").draggable();
 
-    // Set initial scale factor based on localStorage
-    let initialScaleFactor;
-    if (localStorage.getItem("b_style") == 1) {
-        initialScaleFactor = 1.25;
-    } else if (localStorage.getItem("b_style") == 2) {
-        initialScaleFactor = 1.50;
-    } else if (localStorage.getItem("b_style") == 3) {
-        initialScaleFactor = 2.00;
-    }
-    updateDraggableElements(initialScaleFactor);
+    // // Set initial scale factor based on localStorage
+    // let initialScaleFactor;
+    // if (localStorage.getItem("b_style") == 1) {
+    //     initialScaleFactor = 1.25;
+    // } else if (localStorage.getItem("b_style") == 2) {
+    //     initialScaleFactor = 1.50;
+    // } else if (localStorage.getItem("b_style") == 3) {
+    //     initialScaleFactor = 2.00;
+    // }
+    // updateDraggableElements(initialScaleFactor);
 });
 
 setCustomLogo("customLogo1", "useCustomLogo", "usePlayer1");

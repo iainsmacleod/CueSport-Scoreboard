@@ -206,19 +206,27 @@ td {
     left: 50%;
     transform: translate(-50%, -50%);
     padding: 3px;
-    z-index: 2;
-    border-radius: 0px 0px 5px 5px;
+    z-index: 1;
+    /* border-radius: 0px 0px 5px 5px; */
     height: 20px;
     line-height: 20px;
     box-shadow: 0 5px 10px 0 rgba(0,0,0,0.3), 0 2px 5px 0 rgba(0,0,0,0.3);
 }
 
-#scoreBoardDiv {
+/* #scoreBoardDiv {
     position: absolute;
     top: 82%;
-    left: 50%;
+    left: 60%;
     transform: translateX(-50%);
     z-index: 1;
+    padding: 5px;
+} */
+
+#scoreBoardDiv {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 3;
     padding: 5px;
 }
 
@@ -230,7 +238,6 @@ td {
     background-color: red;
     border:2px solid black;
     display: inline;
-    height: 24.5px;
     box-shadow: none;
 }
 
@@ -242,7 +249,6 @@ td {
     background-color: red;
     border:2px solid black;
     display: inline;
-    height: 24.5px;
     box-shadow: none;
 }
 

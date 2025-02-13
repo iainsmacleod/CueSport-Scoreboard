@@ -15,54 +15,54 @@
 //						functions
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////            
 
-function updateDraggableElements(scaleFactor) {
-	// Now you can safely call updateDraggableElements
-	if (localStorage.getItem("b_style") == 1) {
-		scaleFactor = 1.25;
-		console.log(`Scalefactor: ${scaleFactor}`);
-	}
-	if (localStorage.getItem("b_style") == 2) {
-		scaleFactor = 1.50;
-		console.log(`Scalefactor: ${scaleFactor}`);
-	}
-	if (localStorage.getItem("b_style") == 3) {
-		scaleFactor = 10.00;
-		console.log(`Scalefactor: ${scaleFactor}`);
-	}
-	console.log(`Scale factor applied for dragging elements is: ${scaleFactor}`)
-	// Adjust the position of draggable elements based on the new scale factor
-	$("#scoreBoardDiv").draggable("option", "start", function(event, ui) {
-		ui.position.left /= scaleFactor; // Adjust for scaling
-		ui.position.top /= scaleFactor; // Adjust for scaling
-	});
+// function updateDraggableElements(scaleFactor) {
+// 	// Now you can safely call updateDraggableElements
+// 	if (localStorage.getItem("b_style") == 1) {
+// 		scaleFactor = 1.25;
+// 		console.log(`Scalefactor: ${scaleFactor}`);
+// 	}
+// 	if (localStorage.getItem("b_style") == 2) {
+// 		scaleFactor = 1.50;
+// 		console.log(`Scalefactor: ${scaleFactor}`);
+// 	}
+// 	if (localStorage.getItem("b_style") == 3) {
+// 		scaleFactor = 10.00;
+// 		console.log(`Scalefactor: ${scaleFactor}`);
+// 	}
+// 	console.log(`Scale factor applied for dragging elements is: ${scaleFactor}`)
+// 	// Adjust the position of draggable elements based on the new scale factor
+// 	$("#scoreBoardDiv").draggable("option", "start", function(event, ui) {
+// 		ui.position.left /= scaleFactor; // Adjust for scaling
+// 		ui.position.top /= scaleFactor; // Adjust for scaling
+// 	});
 
-	$("#scoreBoardDiv").draggable("option", "stop", function(event, ui) {
-		ui.position.left *= scaleFactor; // Reset position for scaling
-		ui.position.top *= scaleFactor; // Reset position for scaling
-	});
+// 	$("#scoreBoardDiv").draggable("option", "stop", function(event, ui) {
+// 		ui.position.left *= scaleFactor; // Reset position for scaling
+// 		ui.position.top *= scaleFactor; // Reset position for scaling
+// 	});
 
-	// Repeat for other draggable elements
-	$("#gameInfo").draggable("option", "start", function(event, ui) {
-		ui.position.left /= scaleFactor; // Adjust for scaling
-		ui.position.top /= scaleFactor; // Adjust for scaling
-	});
+// 	// Repeat for other draggable elements
+// 	$("#gameInfo").draggable("option", "start", function(event, ui) {
+// 		ui.position.left /= scaleFactor; // Adjust for scaling
+// 		ui.position.top /= scaleFactor; // Adjust for scaling
+// 	});
 
-	$("#gameInfo").draggable("option", "stop", function(event, ui) {
-		ui.position.left *= scaleFactor; // Reset position for scaling
-		ui.position.top *= scaleFactor; // Reset position for scaling
-	});
+// 	$("#gameInfo").draggable("option", "stop", function(event, ui) {
+// 		ui.position.left *= scaleFactor; // Reset position for scaling
+// 		ui.position.top *= scaleFactor; // Reset position for scaling
+// 	});
 
-	$("#logoSlideshowDiv").draggable("option", "start", function(event, ui) {
-		ui.position.left /= scaleFactor; // Adjust for scaling
-		ui.position.top /= scaleFactor; // Adjust for scaling
-	});
+// 	$("#logoSlideshowDiv").draggable("option", "start", function(event, ui) {
+// 		ui.position.left /= scaleFactor; // Adjust for scaling
+// 		ui.position.top /= scaleFactor; // Adjust for scaling
+// 	});
 
-	$("#logoSlideshowDiv").draggable("option", "stop", function(event, ui) {
-		ui.position.left *= scaleFactor; // Reset position for scaling
-		ui.position.top *= scaleFactor; // Reset position for scaling
-	});
-	console.log(`Scalefactor: ${scaleFactor}`)
-}
+// 	$("#logoSlideshowDiv").draggable("option", "stop", function(event, ui) {
+// 		ui.position.left *= scaleFactor; // Reset position for scaling
+// 		ui.position.top *= scaleFactor; // Reset position for scaling
+// 	});
+// 	console.log(`Scalefactor: ${scaleFactor}`)
+// }
 
 function postLogo() {
 	if (localStorage.getItem("customLogo1") != null && localStorage.getItem("customLogo1") != "") {
