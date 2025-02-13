@@ -1,5 +1,9 @@
+html, body {
+    height: 100%;
+    margin: 0;
+}
+
 #scoreBoard{
-    bottom: 20px;
     width: 100%;
     margin: auto;
 }
@@ -28,7 +32,6 @@ td {
 }
 
 #player1Name, #player2Name {
-    /* position: relative; */
     background: rgba(255,255,255,1);
     text-shadow: 1px 1px 2px black, 0 0 25px black, 0 0 5px black;
     -webkit-text-stroke: 1px black;
@@ -51,14 +54,11 @@ td {
 
 #player1Score, #player2Score {
     text-align:center;
-    /* padding-right:2px;
-    padding-left:2px; */
     background: #ed4e54;
     font-size:15pt;
     font-weight:bold;
     vertical-align: middle;
     color: white;
-    /* text-shadow: 1px 1px 2px black, 0 0 25px black, 0 0 5px black; */
     -webkit-text-stroke: 1px black;
     box-shadow: 0 8px 16px 0 rgba(0,0,0,0.3), 0 6px 20px 0 rgba(0,0,0,0.3);
     width: 7%;
@@ -72,7 +72,6 @@ td {
     font-weight:bold;
     vertical-align: middle;
     color: white;
-    /* text-shadow: 1px 1px 2px black, 0 0 25px black, 0 0 5px black; */
     -webkit-text-stroke: 1px black;
     box-shadow: 0 8px 16px 0 rgba(0,0,0,0.3), 0 6px 20px 0 rgba(0,0,0,0.3);
     width: 47px;
@@ -145,8 +144,9 @@ td {
 }
 
 .mySlides {
-    position: fixed;
+    position: absolute;
     left: 50%;
+    transform: translate(-50%, 50%);
     z-index: 3;
     width: auto;
     height: auto;
@@ -201,18 +201,25 @@ td {
     font-size:12pt;
     font-weight:bolder;
     border:1px solid #000;
-    position: fixed;
-    top: 10px;         /* Vertical position from the top */
-    left: 50%;        /* Horizontal position from the left */
-    transform: translate(-50%, -50%);  /* Centers the div */
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translate(-50%, -50%);
     padding: 3px;
-    z-index: 2;    /* Ensures it appears above other elements */
-    width: auto;
-    max-width: 40%;     /* Adjust as needed */
+    z-index: 2;
     border-radius: 0px 0px 5px 5px;
     height: 20px;
     line-height: 20px;
     box-shadow: 0 5px 10px 0 rgba(0,0,0,0.3), 0 2px 5px 0 rgba(0,0,0,0.3);
+}
+
+#scoreBoardDiv {
+    position: absolute;
+    top: 82%;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1;
+    padding: 5px;
 }
 
 #player1Image {

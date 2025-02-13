@@ -8,17 +8,13 @@ body{
     font-family: Arial, Helvetica, sans-serif;
 }
 
-#scoreBoardDiv {
-    position: absolute;
-    bottom: 7px;
-    width: 50%;
-    left: 50%;        /* Horizontal position from the left */
-    transform: translate(-50%);  /* Centers the div */
-    padding: 5px;
+#gameInfo {
+    width: auto;
+    max-width: 20%;     /* Adjust as needed */
 }
 
-.mySlides {
-    transform: translate(-50%, -250%);  /* Centers the div */
+#scoreBoardDiv {
+    width: 50%;
 }
 
 .customLogo1 {

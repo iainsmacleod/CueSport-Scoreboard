@@ -17,16 +17,28 @@ for more information about Salotto please visit https://salotto.app
 <head>
 	<script src="./common/js/jquery.js"></script>
 	<script src="./common/js/browser_source.js"></script>
+	<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
 	<!-- <link rel="stylesheet" href="./common/css/browser_source/100.css" /> -->
 	<link rel="stylesheet" href="./common/css/browser_source/125.css" />
 	<link rel="stylesheet" href="./common/css/browser_source/150.css" />
 	<link rel="stylesheet" href="./common/css/browser_source/200.css" />
 	<link rel="stylesheet" href="./common/css/browser_source/required.css" />
+	<link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+	<style>
+		#scoreBoardDiv, #gameInfo, #logoSlideshowDiv {
+			position: relative; /* or absolute */
+		}
+	</style>
 </head>
 
 <body>
 	<!-- <div class="noShow fadeInElm" id="raceInfo"></div> -->
 	<div class="noShow fadeInElm" id="gameInfo"></div>
+	<div id="logoSlideshowDiv" class="slideshow-container fadeOutElm">
+		<div class="mySlides logoSlide fade"><img id="customLogo3" src="" style="height:200px"></div>
+		<div class="mySlides logoSlide fade"><img id="customLogo4" src="" style="height:200px"></div>
+		<div class="mySlides logoSlide fade"><img id="customLogo5" src="" style="height:200px"></div>
+	</div>
 	<div id="scoreBoardDiv" class="fadeInElm">
 		<div class="shotclockvis fadeOutElm" id="shotClockVis"></div>
 		<img class="fadeOutElm customLogo1" id="customLogo1" height="20px" src="">
@@ -55,11 +67,6 @@ for more information about Salotto please visit https://salotto.app
 				<div id="player2Image" class="fadeOutElm"></div>
 			</tr>
 		</table>
-		<div id="logoSlideshowDiv" class="slideshow-container fadeOutElm">
-			<div class="mySlides logoSlide fade"><img id="customLogo3" src="" style="height:200px"></div>
-			<div class="mySlides logoSlide fade"><img id="customLogo4" src="" style="height:200px"></div>
-			<div class="mySlides logoSlide fade"><img id="customLogo5" src="" style="height:200px"></div>
-		</div>
 	</div>
 	<script src="./common/js/browser_source_post.js"></script>
 </body>

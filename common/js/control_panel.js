@@ -19,17 +19,17 @@ function bsStyleChange() {
 	if (document.getElementById("bsStyle").value == 1) {
 		bc.postMessage({ clockDisplay: 'style125' });
 		localStorage.setItem("b_style", 1);
-
+		bc.postMessage({ type: 'scaleChange', scaleFactor: 1.25 });
 	}
 	if (document.getElementById("bsStyle").value == 2) {
 		bc.postMessage({ clockDisplay: 'style150' });
 		localStorage.setItem("b_style", 2);
-
+		bc.postMessage({ type: 'scaleChange', scaleFactor: 1.50 });
 	}
 	if (document.getElementById("bsStyle").value == 3) {
 		bc.postMessage({ clockDisplay: 'style200' });
 		localStorage.setItem("b_style", 3);
-
+		bc.postMessage({ type: 'scaleChange', scaleFactor: 2.00 });
 	}
 }
 

@@ -19,12 +19,56 @@ var shotClockxr = null;
 const bcr = new BroadcastChannel('g4-recv'); // browser_source -> control_panel channel 
 const bc = new BroadcastChannel('g4-main');
 var playerNumber;
+var scaleFactor;
+
+const defaultPositions = {
+    scoreBoardDiv: {
+        left: "50%", // Define the default left position
+        top: "82%", // Define the default top position
+        transform: "translateX(-50%)" // Define the default transform
+    },
+    gameInfo: {
+        left: "50%", // Define the default left position
+        top: "-4px", // Define the default top position
+        transform: "translateX(-50%)" // Define the default transform
+    },
+    logoSlideshowDiv: {
+        left: "50%", // Define the default left position
+        top: "0%", // Define the default top position
+        transform: "translate(-50%, -50%)" // Define the default transform
+    }
+};
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //										broadcast channel events
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////			
 
 bc.onmessage = (event) => {
+	if (event.data.type === 'scaleChange') {
+        const newScaleFactor = event.data.scaleFactor;
+        console.log(`Scale changed to: ${newScaleFactor}`);
+        
+        // Reset positions to default
+        $("#scoreBoardDiv").css({
+            left: defaultPositions.scoreBoardDiv.left,
+            top: defaultPositions.scoreBoardDiv.top,
+            transform: defaultPositions.scoreBoardDiv.transform // Use the defined transform
+        });
+        $("#gameInfo").css({
+            left: defaultPositions.gameInfo.left,
+            top: defaultPositions.gameInfo.top,
+            transform: defaultPositions.gameInfo.transform // Use the defined transform
+        });
+        $("#logoSlideshowDiv").css({
+            left: defaultPositions.logoSlideshowDiv.left,
+            top: defaultPositions.logoSlideshowDiv.top,
+            transform: defaultPositions.logoSlideshowDiv.transform // Use the defined transform
+        });
+
+        // Update draggable elements with the new scale factor
+        updateDraggableElements(newScaleFactor);
+    }
+
 	if (event.data.score != null) {
 		console.log("event.data.player: " + event.data.player + "  event.data.score: " + event.data.score);
 		if (event.data.score > document.getElementById("player" + event.data.player + "Score").innerHTML) {
@@ -254,8 +298,27 @@ function setCustomLogo(logoId, useCustomLogoKey, usePlayerKey) {
     }
 }
 
+$(document).ready(function() {
+    // Initialize draggable elements
+    $("#scoreBoardDiv").draggable();
+    $("#gameInfo").draggable();
+    $("#logoSlideshowDiv").draggable();
+
+    // Set initial scale factor based on localStorage
+    let initialScaleFactor;
+    if (localStorage.getItem("b_style") == 1) {
+        initialScaleFactor = 1.25;
+    } else if (localStorage.getItem("b_style") == 2) {
+        initialScaleFactor = 1.50;
+    } else if (localStorage.getItem("b_style") == 3) {
+        initialScaleFactor = 2.00;
+    }
+    updateDraggableElements(initialScaleFactor);
+});
+
 setCustomLogo("customLogo1", "useCustomLogo", "usePlayer1");
 setCustomLogo("customLogo2", "useCustomLogo2", "usePlayer2");
+
 
 if (localStorage.getItem("customLogo3") != null) { document.getElementById("customLogo3").src = localStorage.getItem("customLogo3"); } else { document.getElementById("customLogo3").src = "./common/images/placeholder.png"; };
 if (localStorage.getItem("customLogo4") != null) { document.getElementById("customLogo4").src = localStorage.getItem("customLogo4"); } else { document.getElementById("customLogo4").src = "./common/images/placeholder.png"; };
