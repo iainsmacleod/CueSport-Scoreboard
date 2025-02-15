@@ -41,17 +41,33 @@ for more information about Salotto please visit https://salotto.app
 					<label id="generalSettingsLabel">GENERAL SETTINGS</label>
 				</div> -->
 				<div class="column">
-					Enable Player 1<input type="checkbox" class="smallSize" id="usePlayer1Setting" onchange="playerSetting(1)" checked>
-					Enable Player 2<input type="checkbox" class="smallSize" id="usePlayer2Setting" onchange="playerSetting(2)" checked>
-					<label for="useClockSetting" id="labelForUseClockSetting">Enable Clock</label><input type="checkbox" class="smallSize" id="useClockSetting" onchange="clockSetting()">
-					<label for="useToggleSetting" id="labelForUseToggleSetting">Enable Player Toggle</label><input type="checkbox" class="smallSize" id="useToggleSetting" onchange="toggleSetting()">
-				</div>
-				<div class="slidecontainer">
-					<label id="opacityLabel" for="scoreOpacity">Overlay Opacity</label>
+					Game Type
+					<select class="dropdown" id="gameType" onchange="gameType(this.value)">
+						<option value="game1">Practice</option>
+						<option value="game2">8-Ball</option>
+						<option value="game3">9-Ball</option>
+						<option value="game3">10-Ball</option>
+						<option value="game4">Straight</option>
+						<option value="game5">Bank</option>
+						<option value="game6">One Pocket</option>
+						<option value="game7">Snooker</option>
+						<option value="game8">Custom</option>
+					</select>
+				</p>
+				|
+				</p>
+					<label class="slidecontainer" id="opacityLabel" for="scoreOpacity">Overlay Opacity</label>
 					&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 					<input type="range" min="0" max="100" value="100" class="slider" id="scoreOpacity" onchange="saveOpacity()">
 					&nbsp;&nbsp;
 					<span id="sliderValue">100%</span>
+				</div>
+				<br>
+				<div class="column">
+					Enable Player 1<input type="checkbox" class="smallSize" id="usePlayer1Setting" onchange="playerSetting(1)" checked>
+					Enable Player 2<input type="checkbox" class="smallSize" id="usePlayer2Setting" onchange="playerSetting(2)" checked>
+					<label for="useClockSetting" id="labelForUseClockSetting">Enable Clock</label><input type="checkbox" class="smallSize" id="useClockSetting" onchange="clockSetting()">
+					<label for="useToggleSetting" id="labelForUseToggleSetting">Enable Player Toggle</label><input type="checkbox" class="smallSize" id="useToggleSetting" onchange="toggleSetting()">
 				</div>
 			</div>
 			<br>

@@ -123,7 +123,6 @@ bc.onmessage = (event) => {
 			defaultPositions.logoSlideshowDiv.top = "20%";
 			defaultPositions.logoSlideshowDiv.left = "50%";
 			defaultPositions.logoSlideshowDiv.transform =  "translate(-50%, -50%)";
-			//console.log(`Small defaults`);
 		} else if (bStyle == 2) {
 			//Scoreboard
 			defaultPositions.scoreBoardDiv.top = "87%";
@@ -137,7 +136,6 @@ bc.onmessage = (event) => {
 			defaultPositions.logoSlideshowDiv.top = "10%";
 			defaultPositions.logoSlideshowDiv.left = "50%";
 			defaultPositions.logoSlideshowDiv.transform =  "translate(-50%, -50%)";
-			//console.log(`Medium defaults`);
 		} else if (bStyle == 3) {
 			//Scoreboard
 			defaultPositions.scoreBoardDiv.top = "84%";
@@ -151,7 +149,6 @@ bc.onmessage = (event) => {
 			defaultPositions.logoSlideshowDiv.top = "0%";
 			defaultPositions.logoSlideshowDiv.left = "50%";
 			defaultPositions.logoSlideshowDiv.transform =  "translate(-50%, -50%)";
-			//console.log(`Large defaults`);
 		}
         
         // Reset positions to default
@@ -170,13 +167,10 @@ bc.onmessage = (event) => {
             top: defaultPositions.logoSlideshowDiv.top,
             transform: defaultPositions.logoSlideshowDiv.transform // Use the defined transform
         });
-
-        // Update draggable elements with the new scale factor
-        // updateDraggableElements(newScaleFactor);
     }
 
 	if (event.data.score != null) {
-		console.log("event.data.player: " + event.data.player + "  event.data.score: " + event.data.score);
+		console.log("Player: " + event.data.player + ", Score: " + event.data.score);
 		if (event.data.score > document.getElementById("player" + event.data.player + "Score").innerHTML) {
 			document.getElementById("player" + event.data.player + "Score").innerHTML = event.data.score;
 			document.getElementById("player" + event.data.player + "Score").classList.add("winBlink");
@@ -386,6 +380,41 @@ bc.onmessage = (event) => {
 			document.getElementById("player1Image").classList.replace("fadeInElm", "fadeOutElm");
 			document.getElementById("player2Image").classList.replace("fadeInElm", "fadeOutElm");
 		}
+
+		if (event.data.clockDisplay == "showGameType") {
+			console.log("GameType: " + event.data.gameType);
+			// Update the image based on the selected game type
+			switch (event.data.gameType) {
+				case "game1":
+					gameTypeImage.src = "./common/images/placeholder.png"; // Replace with actual image path
+					break;
+				case "game2":
+					gameTypeImage.src = "./common/images/8ball_game.png"; // Replace with actual image path
+					break;
+				case "game3":
+					gameTypeImage.src = "./common/images/9ball_game.png"; // Replace with actual image path
+					break;
+				case "game4":
+					gameTypeImage.src = "./common/images/10ball_image.png"; // Replace with actual image path
+					break;
+				case "game5":
+					gameTypeImage.src = "./common/images/straight_image.png"; // Replace with actual image path
+					break;
+				case "game6":
+					gameTypeImage.src = "./common/images/bank_image.png"; // Replace with actual image path
+					break;
+				case "game7":
+					gameTypeImage.src = "./common/images/onepocket_image.png"; // Replace with actual image path
+					break;
+				case "game8":
+					gameTypeImage.src = "./common/images/snooker_image.png"; // Replace with actual image path
+					break;
+				default:
+					gameTypeImage.src = ""; // Clear the image if no valid game type is selected
+					break;
+			}
+			gameTypeImage.style.display = event.data.gameType ? "block" : "none";
+		}
 	}
 }
 
@@ -409,18 +438,44 @@ $(document).ready(function() {
     $("#scoreBoardDiv").draggable();
     $("#gameInfo").draggable();
     $("#logoSlideshowDiv").draggable();
+    $("#gameTypeImage").draggable();
 
-    // // Set initial scale factor based on localStorage
-    // let initialScaleFactor;
-    // if (localStorage.getItem("b_style") == 1) {
-    //     initialScaleFactor = 1.25;
-    // } else if (localStorage.getItem("b_style") == 2) {
-    //     initialScaleFactor = 1.50;
-    // } else if (localStorage.getItem("b_style") == 3) {
-    //     initialScaleFactor = 2.00;
-    // }
-    // updateDraggableElements(initialScaleFactor);
 });
+
+if (localStorage.getItem('gameType') != null) {
+	// Update the image based on the selected game type
+	var value = localStorage.getItem('gameType');
+	switch (value) {
+		case "game1":
+			gameTypeImage.src = "./common/images/placeholder.png"; // Replace with actual image path
+			break;
+		case "game2":
+			gameTypeImage.src = "./common/images/8ball_game.png"; // Replace with actual image path
+			break;
+		case "game3":
+			gameTypeImage.src = "./common/images/9ball_game.png"; // Replace with actual image path
+			break;
+		case "game4":
+			gameTypeImage.src = "./common/images/10ball_image.png"; // Replace with actual image path
+			break;
+		case "game5":
+			gameTypeImage.src = "./common/images/straight_image.png"; // Replace with actual image path
+			break;
+		case "game6":
+			gameTypeImage.src = "./common/images/bank_image.png"; // Replace with actual image path
+			break;
+		case "game7":
+			gameTypeImage.src = "./common/images/onepocket_image.png"; // Replace with actual image path
+			break;
+		case "game8":
+			gameTypeImage.src = "./common/images/snooker_image.png"; // Replace with actual image path
+			break;
+		default:
+			gameTypeImage.src = ""; // Clear the image if no valid game type is selected
+			break;
+	}
+	gameTypeImage.style.display = value ? "block" : "none";
+}
 
 setCustomLogo("customLogo1", "useCustomLogo", "usePlayer1");
 setCustomLogo("customLogo2", "useCustomLogo2", "usePlayer2");

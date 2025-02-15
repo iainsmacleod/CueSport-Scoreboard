@@ -13,6 +13,10 @@ body{
     max-width: 20%;     /* Adjust as needed */
 }
 
+#gameTypeImage {
+    zoom: 80%;
+}
+
 #logoSlideshowDiv {
     top: 20%;
 }

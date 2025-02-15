@@ -101,6 +101,9 @@ window.onload = function() {
 	if (localStorage.getItem("p2Score") === null) {
 		localStorage.setItem("p2Score", "0");
 	}
+	if (localStorage.getItem("gameType") === null) {
+		localStorage.setItem("gameType", "game1");
+	}
 
 	console.log(`p1ScoreValue on startup= ${p1ScoreValue}`)
 
@@ -271,7 +274,7 @@ document.getElementById("p1Name").value = localStorage.getItem("p1NameCtrlPanel"
 document.getElementById("p1Score").value = localStorage.getItem("p1ScoreCtrlPanel");
 document.getElementById("p2Name").value = localStorage.getItem("p2NameCtrlPanel");
 document.getElementById("p2Score").value = localStorage.getItem("p2ScoreCtrlPanel");
-//if (localStorage.getItem("raceInfo") != null) {document.getElementById("raceInfoTxt").value = localStorage.getItem("raceInfo")}
+document.getElementById("gameType").value = localStorage.getItem("gameType");
 document.getElementById("raceInfoTxt").value = localStorage.getItem("raceInfo");
 document.getElementById("gameInfoTxt").value = localStorage.getItem("gameInfo");
 document.getElementById("verNum").innerHTML = versionNum;

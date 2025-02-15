@@ -1,13 +1,13 @@
     .slidecontainer {
 	  width: auto;
 	  position:relative;
-	  bottom:-10px;
+	  /* bottom:-10px; */
 	} 
 
 	.slider {
 		-webkit-appearance: none;
 		appearance: none;
-		width: 70%;
+		width: 25%;
 		height: 5px;
 		border-radius: 5px;
 		background: lightgrey; 

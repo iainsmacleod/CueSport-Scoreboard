@@ -3,7 +3,6 @@ body{
     margin: 0px auto;
     overflow: hidden;
     -moz-transform: scale(2.00, 2.00);
-    zoom: 2.00;
     zoom: 200%;
     font-family:Arial, Helvetica, sans-serif;
 }
@@ -11,6 +10,10 @@ body{
 #gameInfo {
     width: auto;
     max-width: 40%;
+}
+
+#gameTypeImage {
+    zoom: 50%;
 }
 
 #scoreBoardDiv {

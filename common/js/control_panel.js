@@ -33,6 +33,11 @@ function bsStyleChange() {
 	}
 }
 
+function gameType(value) {
+	localStorage.setItem("gameType", value);
+	bc.postMessage({ clockDisplay: 'showGameType', gameType: value });
+}
+
 // Function to save the opacity value to localStorage
 function saveOpacity() {
 	var opacityValue = document.getElementById('scoreOpacity').value;
