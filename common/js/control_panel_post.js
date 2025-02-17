@@ -126,7 +126,69 @@ window.onload = function() {
 		document.getElementById('scoreOpacity').value = savedOpacity;
 		document.getElementById('sliderValue').innerText = savedOpacity + '%'; // Update displayed value
 	}
+
+	// Initialize the logo status for each logo (players + slideshow logos)
+	initializeLogoStatus();
 };
+
+function initializeLogoStatus() {
+	// Loop through the logos (in this example logos 1 through 5)
+	for (let xL = 1; xL <= 5; xL++) {
+		let savedLogo = localStorage.getItem("customLogo" + xL);
+		let containerId;
+		if (xL === 1) {
+			containerId = "uploadCustomLogo";
+		} else if (xL === 2) {
+			containerId = "uploadCustomLogo2";
+		} else {
+			containerId = "logoSsImg" + xL;
+		}
+		let container = document.getElementById(containerId);
+		let fileInput = document.getElementById("FileUploadL" + xL);
+		let label  = document.getElementById("FileUploadLText" + xL);
+		let imgElem = document.getElementById("l" + xL + "Img");
+
+		if (savedLogo) {
+			// A custom logo exists for this slot.
+			// Update the preview image.
+			if (imgElem) {
+				imgElem.src = savedLogo;
+			}
+			// Display "Clear" on the label
+			if (label) {
+				label.textContent = "Clear";
+			}
+			// Bind the container's click to call clearLogo.
+			if (container && fileInput) {
+				container.onclick = function(e) {
+					e.preventDefault();
+					clearLogo(xL);
+				};
+				// Change styling to indicate clear mode (red background, light text)
+				container.style.backgroundColor = "red";
+				container.style.color = "white";
+			}
+		} else {
+			// No custom logo; restore default settings.
+			if (imgElem) {
+				imgElem.src = "./common/images/placeholder.png";
+			}
+			if (label) {
+				label.textContent = (xL === 1) ? "Upload Player 1 Logo" :
+									(xL === 2) ? "Upload Player 2 Logo" : "L" + (xL-2);
+			}
+			if (container && fileInput) {
+				container.onclick = function(e) {
+					// e.preventDefault();
+					fileInput.click();
+				};
+				// Reset any inline styles applied previously.
+				container.style.backgroundColor = "";
+				container.style.color = "";
+			}
+		}
+	}
+}
 
 slider.oninput = function () {
 	sliderValue = this.value / 100;
