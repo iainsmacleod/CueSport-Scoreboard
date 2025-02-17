@@ -127,8 +127,9 @@ window.onload = function() {
 		document.getElementById('sliderValue').innerText = savedOpacity + '%'; // Update displayed value
 	}
 
-	// Initialize the logo status for each logo (players + slideshow logos)
+	// Initialize the logo and extension status for each logo (players + slideshow logos) and player
 	initializeLogoStatus();
+	initializeExtensionButtonStatus();
 };
 
 function initializeLogoStatus() {
@@ -192,33 +193,41 @@ function initializeLogoStatus() {
 
 function initializeExtensionButtonStatus() {
     // Player 1 Extension Button
-    let extBtn1 = document.getElementById("playerExtensionBtn1");
+    let extBtn1 = document.getElementById("p1extensionBtn");
     // Use a key to store if the extension is enabled. Here "enabled" means it is active.
     // If the key is not present, then consider it not enabled.
     let extStatus1 = localStorage.getItem("p1Extension"); // e.g., "enabled" or "disabled"
     if (extBtn1) {
         if (extStatus1 && extStatus1 === "enabled") {
             // When enabled, show Reset
-            extBtn1.textContent = "Reset";
+            //extBtn1.textContent = "Reset";
+			document.getElementById("p1extensionBtn").setAttribute("onclick", "resetExt('p1')");
+			document.getElementById("p1extensionBtn").classList.add("clkd");
+			var playerName = document.getElementById("p1Name").value.split(" ")[0] || "P1";
+			document.getElementById("p1extensionBtn").innerHTML = "Reset " + playerName.substring(0, 9) + "'s Ext";
             extBtn1.style.backgroundColor = "red";
-            extBtn1.style.color = "white";
+            extBtn1.style.color = "black";
         } else {
-            extBtn1.textContent = "Extend";
+            //extBtn1.textContent = "Extend";
             extBtn1.style.backgroundColor = "";
             extBtn1.style.color = "";
         }
     }
 
     // Player 2 Extension Button
-    let extBtn2 = document.getElementById("playerExtensionBtn2");
+    let extBtn2 = document.getElementById("p2extensionBtn");
     let extStatus2 = localStorage.getItem("p2Extension");
     if (extBtn2) {
         if (extStatus2 && extStatus2 === "enabled") {
-            extBtn2.textContent = "Reset";
+            //extBtn2.textContent = "Reset";
+			document.getElementById("p2extensionBtn").setAttribute("onclick", "resetExt('p2')");
+			document.getElementById("p2extensionBtn").classList.add("clkd");
+			var playerName = document.getElementById("p2Name").value.split(" ")[0] || "P1";
+			document.getElementById("p2extensionBtn").innerHTML = "Reset " + playerName.substring(0, 9) + "'s Ext";
             extBtn2.style.backgroundColor = "red";
-            extBtn2.style.color = "white";
+            extBtn2.style.color = "black";
         } else {
-            extBtn2.textContent = "Extend";
+            //extBtn2.textContent = "Extend";
             extBtn2.style.backgroundColor = "";
             extBtn2.style.color = "";
         }
@@ -338,6 +347,14 @@ if (localStorage.getItem("useClock") == "yes") {
 	clockSetting();
 } else {
 	clockSetting()
+}
+
+if (localStorage.getItem("winAnimation") == "no") {
+	console.log("Win animation disabled");
+	document.getElementById("winAnimation").checked = false;
+} else {
+	console.log("Win animation enabled");
+	document.getElementById("winAnimation").checked = true;
 }
 
 function setPlayerVisibility(playerNumber) {

@@ -386,34 +386,34 @@ bc.onmessage = (event) => {
 			// Update the image based on the selected game type
 			switch (event.data.gameType) {
 				case "game1":
-					gameTypeImage.src = "./common/images/placeholder.png"; // Replace with actual image path
+					gameTypeImage.src = "";
 					break;
 				case "game2":
-					gameTypeImage.src = "./common/images/8ball_gametype.png"; // Replace with actual image path
+					gameTypeImage.src = "./common/images/8ball_gametype.png";
 					break;
 				case "game3":
-					gameTypeImage.src = "./common/images/9ball_gametype.png"; // Replace with actual image path
+					gameTypeImage.src = "./common/images/9ball_gametype.png";
 					break;
 				case "game4":
-					gameTypeImage.src = "./common/images/10ball_gametype.png"; // Replace with actual image path
+					gameTypeImage.src = "./common/images/10ball_gametype.png";
 					break;
 				case "game5":
-					gameTypeImage.src = "./common/images/straight_image.png"; // Replace with actual image path
+					gameTypeImage.src = "";
 					break;
 				case "game6":
-					gameTypeImage.src = "./common/images/bank_image.png"; // Replace with actual image path
+					gameTypeImage.src = "";
 					break;
 				case "game7":
-					gameTypeImage.src = "./common/images/onepocket_image.png"; // Replace with actual image path
+					gameTypeImage.src = "";
 					break;
 				case "game8":
-					gameTypeImage.src = "./common/images/snooker_image.png"; // Replace with actual image path
+					gameTypeImage.src = "";
 					break;
 				case "game9":
-					gameTypeImage.src = "./common/images/placeholder.png"; // Replace with actual image path
+					gameTypeImage.src = "";
 					break;
 				default:
-					gameTypeImage.src = ""; // Clear the image if no valid game type is selected
+					gameTypeImage.src = "";
 					break;
 			}
 			gameTypeImage.style.display = event.data.gameType ? "block" : "none";
@@ -619,7 +619,7 @@ function initializeBrowserSourceExtensionStatus() {
 
     // Update styling for Player 1's extension element
     if (p1ExtIcon) {
-        if (extStatus1 === "enabled") {
+        if (extStatus1 && extStatus1 === "enabled") {
             // p1ExtIcon.textContent = "Reset";
             p1ExtIcon.style.backgroundColor = "darkred";
             p1ExtIcon.style.color = "white";
@@ -632,7 +632,7 @@ function initializeBrowserSourceExtensionStatus() {
     
     // Update styling for Player 2's extension element
     if (p2ExtIcon) {
-        if (extStatus2 === "enabled") {
+        if (extStatus2 && extStatus2 === "enabled") {
             // p2ExtIcon.textContent = "Reset";
             p2ExtIcon.style.backgroundColor = "darkred";
             p2ExtIcon.style.color = "white";

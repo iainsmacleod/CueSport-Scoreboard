@@ -28,7 +28,19 @@ function clearWinBlink() {
 	document.getElementById("player1Score").classList.remove("winBlink");
 	document.getElementById("player2Score").classList.remove("winBlink");
 	var gameType = localStorage.getItem("gameType");
-	playWebmAnimation(gameType, '#videoContainer');
+
+	// Check if an animation is already in progress
+    const container = document.querySelector('#videoContainer');
+    if (container && container.querySelector('.webm-animation')) {
+        console.log("Animation already in progress. Skipping new animation.");
+        return;
+    }
+	
+	if (localStorage.getItem("winAnimation")== "yes") {
+		playWebmAnimation(gameType, '#videoContainer');
+	} else {
+		console.log(`Animation flag disabled`)
+	}
 }
 
 function sleep(milliseconds) {

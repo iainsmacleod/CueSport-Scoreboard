@@ -33,6 +33,14 @@ function bsStyleChange() {
 	}
 }
 
+function toggleAnimationSetting(){
+	if (!document.getElementById("winAnimation").checked) {
+		localStorage.setItem("winAnimation", "no");
+	} else if (document.getElementById("winAnimation").checked) {
+		localStorage.setItem("winAnimation", "yes");
+	}	
+}
+
 function gameType(value) {
 	localStorage.setItem("gameType", value);
 	bc.postMessage({ clockDisplay: 'showGameType', gameType: value });

@@ -43,7 +43,7 @@ for more information about Salotto please visit https://salotto.app
 				<div class="column">
 					Game Type
 					<select class="dropdown" id="gameType" onchange="gameType(this.value)">
-						<option value="game1">Practice</option>
+						<option value="game1">None</option>
 						<option value="game2">8-Ball</option>
 						<option value="game3">9-Ball</option>
 						<option value="game4">10-Ball</option>
@@ -64,10 +64,12 @@ for more information about Salotto please visit https://salotto.app
 				</div>
 				<br>
 				<div class="column">
-					Enable Player 1<input type="checkbox" class="smallSize" id="usePlayer1Setting" onchange="playerSetting(1)" checked>
-					Enable Player 2<input type="checkbox" class="smallSize" id="usePlayer2Setting" onchange="playerSetting(2)" checked>
-					<label for="useClockSetting" id="labelForUseClockSetting">Enable Clock</label><input type="checkbox" class="smallSize" id="useClockSetting" onchange="clockSetting()">
-					<label for="useToggleSetting" id="labelForUseToggleSetting">Enable Player Toggle</label><input type="checkbox" class="smallSize" id="useToggleSetting" onchange="toggleSetting()">
+					Enable:</p>
+					Player 1<input type="checkbox" class="smallSize" id="usePlayer1Setting" onchange="playerSetting(1)" checked>
+					Player 2<input type="checkbox" class="smallSize" id="usePlayer2Setting" onchange="playerSetting(2)" checked>
+					<label for="useClockSetting" id="labelForUseClockSetting">Clock</label><input type="checkbox" class="smallSize" id="useClockSetting" onchange="clockSetting()">
+					<label for="useToggleSetting" id="labelForUseToggleSetting">Player Toggle</label><input type="checkbox" class="smallSize" id="useToggleSetting" onchange="toggleSetting()">
+					Win Animation<input type="checkbox" class="smallSize" id="winAnimation" onchange="toggleAnimationSetting()" checked>
 				</div>
 			</div>
 			<br>
