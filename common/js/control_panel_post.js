@@ -113,13 +113,13 @@ window.onload = function() {
     setPlayerVisibility(2);
 	toggleSetting();
 
-    // Check if custom logos exist in local storage and enable checkboxes accordingly
-    if (localStorage.getItem("customLogo1") != null) {
-        document.getElementById("customLogo1").disabled = false; // Enable checkbox for Player 1
-    }
-    if (localStorage.getItem("customLogo2") != null) {
-		document.getElementById("customLogo2").disabled = false; // Enable checkbox for Player 2
-    }
+    // // Check if custom logos exist in local storage and enable checkboxes accordingly
+    // if (localStorage.getItem("customLogo1") != null) {
+    //     document.getElementById("customLogo1").disabled = false; // Enable checkbox for Player 1
+    // }
+    // if (localStorage.getItem("customLogo2") != null) {
+	// 	document.getElementById("customLogo2").disabled = false; // Enable checkbox for Player 2
+    // }
 
 	var savedOpacity = localStorage.getItem('overlayOpacity');
 	if (savedOpacity) {
