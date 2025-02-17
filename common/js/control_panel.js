@@ -458,6 +458,8 @@ function add30(player) {
 	var playerName = document.getElementById(player + "Name").value.split(" ")[0] || player.toUpperCase();
 	document.getElementById(player + "extensionBtn").innerHTML = "Reset " + playerName.substring(0, 9) + "'s Ext";
 	
+	localStorage.setItem(player + "Extension", "enabled");
+	
 	clockDisplay("hide");
 }
 
@@ -473,9 +475,12 @@ function resetExt(player, flash) {
 	var playerName = document.getElementById(player + "Name").value.split(" ")[0] || player.toUpperCase();
 	document.getElementById(player + "extensionBtn").innerHTML = playerName.substring(0, 9) + "'s Extension";
 	
-	if (flash != "noflash") {
-		document.getElementById(player + "extensionBtn").style.border = "2px solid blue";
-	}
+	// if (flash != "noflash") {
+	// 	document.getElementById(player + "extensionBtn").style.border = "2px solid blue";
+	// }
+
+	localStorage.setItem(player + "Extension", "disabled");
+
 }
 
 function customLogoSetting() {

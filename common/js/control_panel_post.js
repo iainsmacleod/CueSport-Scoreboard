@@ -190,6 +190,41 @@ function initializeLogoStatus() {
 	}
 }
 
+function initializeExtensionButtonStatus() {
+    // Player 1 Extension Button
+    let extBtn1 = document.getElementById("playerExtensionBtn1");
+    // Use a key to store if the extension is enabled. Here "enabled" means it is active.
+    // If the key is not present, then consider it not enabled.
+    let extStatus1 = localStorage.getItem("p1Extension"); // e.g., "enabled" or "disabled"
+    if (extBtn1) {
+        if (extStatus1 && extStatus1 === "enabled") {
+            // When enabled, show Reset
+            extBtn1.textContent = "Reset";
+            extBtn1.style.backgroundColor = "red";
+            extBtn1.style.color = "white";
+        } else {
+            extBtn1.textContent = "Extend";
+            extBtn1.style.backgroundColor = "";
+            extBtn1.style.color = "";
+        }
+    }
+
+    // Player 2 Extension Button
+    let extBtn2 = document.getElementById("playerExtensionBtn2");
+    let extStatus2 = localStorage.getItem("p2Extension");
+    if (extBtn2) {
+        if (extStatus2 && extStatus2 === "enabled") {
+            extBtn2.textContent = "Reset";
+            extBtn2.style.backgroundColor = "red";
+            extBtn2.style.color = "white";
+        } else {
+            extBtn2.textContent = "Extend";
+            extBtn2.style.backgroundColor = "";
+            extBtn2.style.color = "";
+        }
+    }
+}
+
 slider.oninput = function () {
 	sliderValue = this.value / 100;
 	document.getElementById("sliderValue").innerHTML = this.value + "%";  // Add this line

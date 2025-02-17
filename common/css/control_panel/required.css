@@ -126,7 +126,7 @@
 		font-size: 12pt;
 		}
 	
-	#usePlayer1Setting, #usePlayer2Setting, #useClockSetting, #allCheck, #useSalottoSetting, #customLogo1, #customLogo2 #logoSlideshowChk{
+	#usePlayer1Setting, #usePlayer2Setting, #useClockSetting, #allCheck, #useSalottoSetting, #customLogo1, #customLogo2, #logoSlideshowChk {
 		cursor: pointer;
 		width: 15px;
         height: 15px;

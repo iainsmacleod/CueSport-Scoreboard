@@ -425,17 +425,6 @@ bc.onmessage = (event) => {
 //							autostart stuff
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-function setCustomLogo(logoId, useCustomLogoKey, usePlayerKey) {
-    if (localStorage.getItem(logoId) !== null && localStorage.getItem(logoId) !== "") {
-        document.getElementById(logoId).src = localStorage.getItem(logoId);
-        if (localStorage.getItem(useCustomLogoKey) === "yes" && localStorage.getItem(usePlayerKey) === "yes") {
-            document.getElementById(logoId).classList.replace("fadeOutElm", "fadeInElm");
-        }
-    } else {
-        document.getElementById(logoId).src = "./common/images/placeholder.png";
-    }
-}
-
 $(document).ready(function() {
     // Initialize draggable elements
     $("#scoreBoardDiv").draggable();
@@ -599,3 +588,58 @@ if (localStorage.getItem("b_style") != null) {
 
 let slideIndex = 0;
 showSlides();
+
+// Functions
+
+function setCustomLogo(logoId, useCustomLogoKey, usePlayerKey) {
+    if (localStorage.getItem(logoId) !== null && localStorage.getItem(logoId) !== "") {
+        document.getElementById(logoId).src = localStorage.getItem(logoId);
+        if (localStorage.getItem(useCustomLogoKey) === "yes" && localStorage.getItem(usePlayerKey) === "yes") {
+            document.getElementById(logoId).classList.replace("fadeOutElm", "fadeInElm");
+        }
+    } else {
+        document.getElementById(logoId).src = "./common/images/placeholder.png";
+    }
+}
+
+// Call the initialization function on window load
+window.addEventListener("load", initializeBrowserSourceExtensionStatus);
+
+
+// Add this function to initialize and update the player extension button styling
+function initializeBrowserSourceExtensionStatus() {
+    // Get the extension icon elements for player 1 and 2
+    let p1ExtIcon = document.getElementById("p1ExtIcon");
+    let p2ExtIcon = document.getElementById("p2ExtIcon");
+
+    // Check localStorage for stored extension status values
+    // (Assuming you set "playerExtension1" and "playerExtension2" to "enabled" when active)
+    let extStatus1 = localStorage.getItem("p1Extension");
+    let extStatus2 = localStorage.getItem("p2Extension");
+
+    // Update styling for Player 1's extension element
+    if (p1ExtIcon) {
+        if (extStatus1 === "enabled") {
+            // p1ExtIcon.textContent = "Reset";
+            p1ExtIcon.style.backgroundColor = "darkred";
+            p1ExtIcon.style.color = "white";
+        } else {
+            // p1ExtIcon.textContent = "Extend";
+            p1ExtIcon.style.backgroundColor = "";
+            p1ExtIcon.style.color = "";
+        }
+    }
+    
+    // Update styling for Player 2's extension element
+    if (p2ExtIcon) {
+        if (extStatus2 === "enabled") {
+            // p2ExtIcon.textContent = "Reset";
+            p2ExtIcon.style.backgroundColor = "darkred";
+            p2ExtIcon.style.color = "white";
+        } else {
+            // p2ExtIcon.textContent = "Extend";
+            p2ExtIcon.style.backgroundColor = "";
+            p2ExtIcon.style.color = "";
+        }
+    }
+}
