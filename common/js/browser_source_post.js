@@ -384,9 +384,11 @@ bc.onmessage = (event) => {
 		if (event.data.clockDisplay == "showGameType") {
 			console.log("GameType: " + event.data.gameType);
 			// Update the image based on the selected game type
+			let imageAvailable = true;
 			switch (event.data.gameType) {
 				case "game1":
 					gameTypeImage.src = "";
+					imageAvailable = false;
 					break;
 				case "game2":
 					gameTypeImage.src = "./common/images/8ball_gametype.png";
@@ -399,24 +401,30 @@ bc.onmessage = (event) => {
 					break;
 				case "game5":
 					gameTypeImage.src = "";
+					imageAvailable = false;
 					break;
 				case "game6":
 					gameTypeImage.src = "";
+					imageAvailable = false;
 					break;
 				case "game7":
 					gameTypeImage.src = "";
+					imageAvailable = false;
 					break;
 				case "game8":
 					gameTypeImage.src = "";
+					imageAvailable = false;
 					break;
 				case "game9":
 					gameTypeImage.src = "";
+					imageAvailable = false;
 					break;
 				default:
 					gameTypeImage.src = "";
+					imageAvailable = false;
 					break;
 			}
-			gameTypeImage.style.display = event.data.gameType ? "block" : "none";
+			gameTypeImage.style.display = imageAvailable ? "block" : "none";
 		}
 	}
 }

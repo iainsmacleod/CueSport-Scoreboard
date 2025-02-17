@@ -77,17 +77,11 @@ window.onload = function() {
 		localStorage.setItem("usePlayer2", "yes");
 	}
 
-	if (localStorage.getItem("activePlayer") === null || (localStorage.getItem("activePlayer") === "1")) {
-		localStorage.setItem("activePlayer", "1");
-		document.getElementById("playerToggleCheckbox").checked = true;
-		localStorage.setItem("toggleState", true);
-	} else if (localStorage.getItem("activePlayer") === "2") {
-		localStorage.setItem("activePlayer", "2");
-		document.getElementById("playerToggleCheckbox").checked = false;
-		localStorage.setItem("toggleState", false);
-	} else {
-		console.log("activePlayer =", localStorage.getItem("activePlayer"));
-	}
+	// Simplified activePlayer initialization
+	const activePlayer = localStorage.getItem("activePlayer") === "2" ? "2" : "1";
+	localStorage.setItem("activePlayer", activePlayer);
+	document.getElementById("playerToggleCheckbox").checked = activePlayer === "1";
+	localStorage.setItem("toggleState", activePlayer === "1");
 
 	if (localStorage.getItem("usePlayerToggle")==="yes" || localStorage.getItem("usePlayerToggle") === null) {
 		document.getElementById("useToggleSetting").checked = true;
@@ -101,25 +95,11 @@ window.onload = function() {
 	if (localStorage.getItem("p2Score") === null) {
 		localStorage.setItem("p2Score", "0");
 	}
+
 	if (localStorage.getItem("gameType") === null) {
 		localStorage.setItem("gameType", "game1");
+		document.getElementById("gameType").value = localStorage.getItem("gameType");
 	}
-
-	console.log(`p1ScoreValue on startup= ${p1ScoreValue}`)
-
-
-	// Call the visibility functions based on the checkbox states
-    setPlayerVisibility(1);
-    setPlayerVisibility(2);
-	toggleSetting();
-
-    // // Check if custom logos exist in local storage and enable checkboxes accordingly
-    // if (localStorage.getItem("customLogo1") != null) {
-    //     document.getElementById("customLogo1").disabled = false; // Enable checkbox for Player 1
-    // }
-    // if (localStorage.getItem("customLogo2") != null) {
-	// 	document.getElementById("customLogo2").disabled = false; // Enable checkbox for Player 2
-    // }
 
 	var savedOpacity = localStorage.getItem('overlayOpacity');
 	if (savedOpacity) {
@@ -127,6 +107,10 @@ window.onload = function() {
 		document.getElementById('sliderValue').innerText = savedOpacity + '%'; // Update displayed value
 	}
 
+	// Call the visibility functions based on the checkbox states
+    setPlayerVisibility(1);
+    setPlayerVisibility(2);
+	toggleSetting();
 	// Initialize the logo and extension status for each logo (players + slideshow logos) and player
 	initializeLogoStatus();
 	initializeExtensionButtonStatus();
@@ -342,19 +326,22 @@ if (localStorage.getItem("useCustomLogo2") == "yes") {
 }
 
 if (localStorage.getItem("useClock") == "yes") {
-	console.log("Clock = TRUE");
+	console.log("Clock enabled");
 	document.getElementById("useClockSetting").checked = true;
 	clockSetting();
 } else {
+	console.log("Clock disabled");
 	clockSetting()
 }
 
-if (localStorage.getItem("winAnimation") == "no") {
+if (localStorage.getItem("winAnimation") === "no" || localStorage.getItem("winAnimation") === null) {
 	console.log("Win animation disabled");
 	document.getElementById("winAnimation").checked = false;
+	localStorage.setItem("winAnimation", "no");
 } else {
 	console.log("Win animation enabled");
 	document.getElementById("winAnimation").checked = true;
+	localStorage.setItem("winAnimation", "yes");
 }
 
 function setPlayerVisibility(playerNumber) {
@@ -362,7 +349,7 @@ function setPlayerVisibility(playerNumber) {
 	const checkbox = document.getElementById(`usePlayer${playerNumber}Setting`);
 	checkbox.checked = usePlayer;
 	if (usePlayer) {
-		console.log(`Use Player ${playerNumber} = TRUE`);
+		console.log(`Enable player/team ${playerNumber}`);
 	}
 	playerSetting(playerNumber);
 }

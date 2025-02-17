@@ -36,8 +36,10 @@ function bsStyleChange() {
 function toggleAnimationSetting(){
 	if (!document.getElementById("winAnimation").checked) {
 		localStorage.setItem("winAnimation", "no");
+		console.log("Win animation disabled");
 	} else if (document.getElementById("winAnimation").checked) {
 		localStorage.setItem("winAnimation", "yes");
+		console.log("Win animation enabled");
 	}	
 }
 
@@ -62,13 +64,12 @@ function toggleCheckbox(checkboxId, inputElement) {
 function toggleSetting() {
 	const checkbox = document.getElementById("useToggleSetting").checked;
 	const activePlayer = document.getElementById("playerToggleCheckbox").checked;
-	console.log(`toggleSetting function checkbox: ${checkbox}`);
-	console.log(`toggleSetting function activePlayer: ${activePlayer}`);
+	console.log(`Player/team toggle ${checkbox ? "enabled" : "disabled"}`);
 	if (checkbox) {
 		document.getElementById("playerToggle").classList.remove("noShow");
 		localStorage.setItem("usePlayerToggle", "yes");
 		bc.postMessage({ clockDisplay: 'showActivePlayer', player: activePlayer });
-		console.log(`Toggled player and passed ${activePlayer} to showActivePlayer BC message`);
+		console.log(`Player ${activePlayer ? 1 : 2} is active`);
 	} else {
 		document.getElementById("playerToggle").classList.add("noShow");
 		localStorage.setItem("usePlayerToggle", "no");
@@ -338,14 +339,6 @@ function postScore(opt1, player) {
     let p1ScoreValue = parseInt(localStorage.getItem("p1ScoreCtrlPanel")) || 0;
     let p2ScoreValue = parseInt(localStorage.getItem("p2ScoreCtrlPanel")) || 0;
 
-	// var toggleState = localStorage.getItem("toggleState") === "true";
-	// var playerToggleCheckbox = document.getElementById("playerToggleCheckbox");
-	// console.log(`Toggle state before ${toggleState}`)
-	// playerToggleCheckbox.checked = !toggleState;
-	// togglePlayer(!toggleState);
-	// localStorage.setItem("toggleState", !toggleState);
-	// console.log(`Toggle state after ${toggleState}`)
-
     if (player == "1") {
         if (opt1 == "add") {
             if (p1ScoreValue < 999) {
@@ -574,7 +567,7 @@ function togglePlayer(isChecked) {
 	}
 	localStorage.setItem("activePlayer", player);
 	localStorage.setItem("toggleState", activePlayer);
-    console.log(`Activated player ${player}.`); // Log the active player
+    console.log(`Player ${player} is active`); // Log the active player
 }
 
 function obsThemeChange() {
