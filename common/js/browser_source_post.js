@@ -389,13 +389,13 @@ bc.onmessage = (event) => {
 					gameTypeImage.src = "./common/images/placeholder.png"; // Replace with actual image path
 					break;
 				case "game2":
-					gameTypeImage.src = "./common/images/8ball_game.png"; // Replace with actual image path
+					gameTypeImage.src = "./common/images/8ball_gametype.png"; // Replace with actual image path
 					break;
 				case "game3":
-					gameTypeImage.src = "./common/images/9ball_game.png"; // Replace with actual image path
+					gameTypeImage.src = "./common/images/9ball_gametype.png"; // Replace with actual image path
 					break;
 				case "game4":
-					gameTypeImage.src = "./common/images/10ball_image.png"; // Replace with actual image path
+					gameTypeImage.src = "./common/images/10ball_gametype.png"; // Replace with actual image path
 					break;
 				case "game5":
 					gameTypeImage.src = "./common/images/straight_image.png"; // Replace with actual image path
@@ -408,6 +408,9 @@ bc.onmessage = (event) => {
 					break;
 				case "game8":
 					gameTypeImage.src = "./common/images/snooker_image.png"; // Replace with actual image path
+					break;
+				case "game9":
+					gameTypeImage.src = "./common/images/placeholder.png"; // Replace with actual image path
 					break;
 				default:
 					gameTypeImage.src = ""; // Clear the image if no valid game type is selected
@@ -450,13 +453,13 @@ if (localStorage.getItem('gameType') != null) {
 			gameTypeImage.src = "./common/images/placeholder.png"; // Replace with actual image path
 			break;
 		case "game2":
-			gameTypeImage.src = "./common/images/8ball_game.png"; // Replace with actual image path
+			gameTypeImage.src = "./common/images/8ball_gametype.png"; // Replace with actual image path
 			break;
 		case "game3":
-			gameTypeImage.src = "./common/images/9ball_game.png"; // Replace with actual image path
+			gameTypeImage.src = "./common/images/9ball_gametype.png"; // Replace with actual image path
 			break;
 		case "game4":
-			gameTypeImage.src = "./common/images/10ball_image.png"; // Replace with actual image path
+			gameTypeImage.src = "./common/images/10ball_gametype.png"; // Replace with actual image path
 			break;
 		case "game5":
 			gameTypeImage.src = "./common/images/straight_image.png"; // Replace with actual image path
@@ -469,6 +472,9 @@ if (localStorage.getItem('gameType') != null) {
 			break;
 		case "game8":
 			gameTypeImage.src = "./common/images/snooker_image.png"; // Replace with actual image path
+			break;
+		case "game9":
+				gameTypeImage.src = "./common/images/placeholder.png"; // Replace with actual image path
 			break;
 		default:
 			gameTypeImage.src = ""; // Clear the image if no valid game type is selected

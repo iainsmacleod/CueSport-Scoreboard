@@ -122,10 +122,10 @@ window.onload = function() {
     }
 
 	var savedOpacity = localStorage.getItem('overlayOpacity');
-		if (savedOpacity) {
-			document.getElementById('scoreOpacity').value = savedOpacity;
-			document.getElementById('sliderValue').innerText = savedOpacity + '%'; // Update displayed value
-		}
+	if (savedOpacity) {
+		document.getElementById('scoreOpacity').value = savedOpacity;
+		document.getElementById('sliderValue').innerText = savedOpacity + '%'; // Update displayed value
+	}
 };
 
 slider.oninput = function () {
@@ -135,31 +135,31 @@ slider.oninput = function () {
 }
 
 document.getElementById('uploadCustomLogo').onclick = function () {
-	document.getElementById('uploadCustomLogo').style.border = "2px solid blue";
+	// document.getElementById('uploadCustomLogo').style.border = "2px solid blue";
 	document.getElementById('FileUploadL1').click();
 	//setTimeout(rst_scr_btn, 100);
 };
 
 document.getElementById('uploadCustomLogo2').onclick = function () {
-	document.getElementById('uploadCustomLogo2').style.border = "2px solid blue";
+	//document.getElementById('uploadCustomLogo2').style.border = "2px solid blue";
 	document.getElementById('FileUploadL2').click();
 	//setTimeout(rst_scr_btn, 100);
 };
 
 document.getElementById('logoSsImg3').onclick = function () {
-	document.getElementById('logoSsImg3').style.border = "2px solid blue";
+	//document.getElementById('logoSsImg3').style.border = "2px solid blue";
 	document.getElementById('FileUploadL3').click();
 	//setTimeout(rst_scr_btn, 100);
 };
 
 document.getElementById('logoSsImg4').onclick = function () {
-	document.getElementById('logoSsImg4').style.border = "2px solid blue";
+	//document.getElementById('logoSsImg4').style.border = "2px solid blue";
 	document.getElementById('FileUploadL4').click();
 	//setTimeout(rst_scr_btn, 100);
 };
 
 document.getElementById('logoSsImg5').onclick = function () {
-	document.getElementById('logoSsImg5').style.border = "2px solid blue";
+	//document.getElementById('logoSsImg5').style.border = "2px solid blue";
 	document.getElementById('FileUploadL5').click();
 	//setTimeout(rst_scr_btn, 100);
 };

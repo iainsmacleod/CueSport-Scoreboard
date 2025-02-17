@@ -27,6 +27,8 @@ function postLogo() {
 function clearWinBlink() {
 	document.getElementById("player1Score").classList.remove("winBlink");
 	document.getElementById("player2Score").classList.remove("winBlink");
+	var gameType = localStorage.getItem("gameType");
+	playWebmAnimation(gameType, '#videoContainer');
 }
 
 function sleep(milliseconds) {
@@ -273,4 +275,67 @@ function styleChange(n) {
 		document.styleSheets[1].disabled = true;
 		document.styleSheets[2].disabled = false;
 	}
+}
+
+function playWebmAnimation(gameType, containerSelector = '#videoContainer') {
+	// Determine which video URL to use based on the gameType value.
+    let videoUrl;
+    switch (gameType) {
+        case 'game1':
+            videoUrl = './common/video/defaultanimation.webm';
+            break;
+		case 'game2':
+            videoUrl = './common/video/8ballwin.webm';
+            break;
+        case 'game3':
+            videoUrl = './common/video/9ballwin.webm';
+            break;
+        case 'game4':
+            videoUrl = './common/video/10ballwin.webm';
+            break;
+        // Add more cases as needed
+        default:
+            videoUrl = './common/video/defaultanimation.webm';
+            break;
+    }
+
+    // Get the container element where the video will be appended.
+    const container = document.querySelector(containerSelector);
+    if (!container) {
+        console.warn("Container not found for selector: " + containerSelector);
+        return;
+    }
+    
+	// Optionally, give the container a high z-index and proper positioning
+    container.style.position = 'absolute';  // or fixed/absolute, depending on your layout
+    container.style.zIndex = '4';         // Ensure the container is over other content
+
+    // Create and configure the video element.
+    const video = document.createElement('video');
+    video.src = videoUrl;
+    video.autoplay = true;
+    video.playsInline = true;  // Helps with mobile devices.
+    video.muted = true;        // Muted is often required for autoplay.
+
+	// Ensure the video element itself has a transparent background
+	// video.style.backgroundColor = 'transparent';
+    
+    // Add a CSS class so you can style the video through required.css.
+    video.classList.add('webm-animation');
+    
+    // Append the video element to the specified container.
+    container.appendChild(video);
+    
+    // Remove the video element once the animation has finished playing.
+    video.addEventListener('ended', () => {
+        container.removeChild(video);
+    });
+    
+    // (Optional) Allow early removal on click.
+    video.addEventListener('click', () => {
+        container.removeChild(video);
+    });
+    
+    // Return the video element for further manipulation if needed.
+    return video;
 }

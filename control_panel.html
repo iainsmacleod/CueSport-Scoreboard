@@ -46,12 +46,12 @@ for more information about Salotto please visit https://salotto.app
 						<option value="game1">Practice</option>
 						<option value="game2">8-Ball</option>
 						<option value="game3">9-Ball</option>
-						<option value="game3">10-Ball</option>
-						<option value="game4">Straight</option>
-						<option value="game5">Bank</option>
-						<option value="game6">One Pocket</option>
-						<option value="game7">Snooker</option>
-						<option value="game8">Custom</option>
+						<option value="game4">10-Ball</option>
+						<option value="game5">Straight</option>
+						<option value="game6">Bank</option>
+						<option value="game7">One Pocket</option>
+						<option value="game8">Snooker</option>
+						<option value="game9">Custom</option>
 					</select>
 				</p>
 				|
@@ -149,13 +149,13 @@ for more information about Salotto please visit https://salotto.app
 				<div class="column">
 					Custom/Sponsor Slideshow<input class="smallSize" type="checkbox" id="logoSlideshowChk" onchange="logoSlideshow()"></span>
 					<div class="tooltip obs28 hover" id="logoSsImg3"><input type="file" id="FileUploadL3" onchange="logoPost(this,3)" accept="image/png, image/jpeg, image/svg+xml, image/bmp"/>
-						L1 <span class="tooltiptext"><img id="l3Img" src="" style="height:100px; max-width:300px"></span>
+						<span id="FileUploadLText3">L1</span><span class="tooltiptext"><img id="l3Img" src="" style="height:100px; max-width:300px"></span>
 					</div>
 					<div class="tooltip obs28 hover" id="logoSsImg4"><input type="file" id="FileUploadL4" onchange="logoPost(this,4)" accept="image/png, image/jpeg, image/svg+xml, image/bmp">
-						L2 <span class="tooltiptext"><img id="l4Img" src="" style="height:100px; max-width:300px"></span>
+						<span id="FileUploadLText4">L2</span><span class="tooltiptext"><img id="l4Img" src="" style="height:100px; max-width:300px"></span>
 					</div>
 					<div class="tooltip obs28 hover" id="logoSsImg5"><input type="file" id="FileUploadL5" onchange="logoPost(this,5)" accept="image/png, image/jpeg, image/svg+xml, image/bmp"/>
-						L3<span class="tooltiptext"><img id="l5Img" src="" style="height:100px; max-width:300px"></span>
+						<span id="FileUploadLText5">L3</span><span class="tooltiptext"><img id="l5Img" src="" style="height:100px; max-width:300px"></span>
 					</div>
 				</div>
 				<br>
@@ -164,15 +164,21 @@ for more information about Salotto please visit https://salotto.app
 					<text class="hover" onclick="cLogoNameChange()" id="logoName" style="text-decoration: underline;">Player 1 Logo</text>
 					<input class="smallSize" type="checkbox" id="customLogo1" onchange="customLogoSetting()" disabled>
 					<div class="hover obs28 tooltip" id="uploadCustomLogo" style="width: 150px">
-						Upload Player 1 Logo<input type="file" id="FileUploadL1" onchange="logoPost(this,1); toggleCheckbox('customLogo1', this)" accept="image/png, image/jpeg, image/svg+xml, image/bmp"/>
-						<span class="tooltiptext"><img id="l1Img" src="" style="height:100px; max-width:300px"></span>
+						<span id="FileUploadLText1">Upload Player 1 Logo</span>
+						<input type="file" id="FileUploadL1" onchange="logoPost(this,1); toggleCheckbox('customLogo1', this)" accept="image/png, image/jpeg, image/svg+xml, image/bmp"/>
+						<span class="tooltiptext">
+							<img id="l1Img" src="" style="height:100px; max-width:300px">
+						</span>
 						<br>
 					</div>
 					<text class="hover" onclick="cLogoNameChange2()" id="logoName2" style="text-decoration: underline;">Player 2 Logo</text>
 					<input class="smallSize" type="checkbox" id="customLogo2" onchange="customLogoSetting2()" disabled>
 					<div class="hover obs28 tooltip" id="uploadCustomLogo2" style="width: 150px">
-						Upload Player 2 Logo<input type="file" id="FileUploadL2" onchange="logoPost(this,2); toggleCheckbox('customLogo2', this)" accept="image/png, image/jpeg, image/svg+xml, image/bmp">
-						<span class="tooltiptext"><img id="l2Img" src="" style="height:100px; max-width:300px"></span>
+						<span id="FileUploadLText2">Upload Player 2 Logo</span>
+						<input type="file" id="FileUploadL2" onchange="logoPost(this,2); toggleCheckbox('customLogo2', this)" accept="image/png, image/jpeg, image/svg+xml, image/bmp">
+						<span class="tooltiptext">
+							<img id="l2Img" src="" style="height:100px; max-width:300px">
+						</span>
 						<br>
 					</div>
 				</div>

@@ -135,7 +135,7 @@ td {
 .customLogo1 {
     position:absolute;
     bottom: 7px;
-    z-index:9;
+    z-index:2;
     border: 2px solid black;
     max-width: 30px;
     /* height: auto; */
@@ -143,7 +143,7 @@ td {
  .customLogo2 {
     position:absolute;
     bottom: 7px;
-    z-index:9;
+    z-index:2;
     border: 2px solid black;
     max-width: 30px;
     /* height: auto; */
@@ -283,3 +283,10 @@ td {
     animation: extblinking .15s 3;
 }
 /* end of blink code */
+
+.webm-animation {
+    width: 100%;
+    height: 100%;
+    /* object-fit: cover; */
+    background: transparent;
+}

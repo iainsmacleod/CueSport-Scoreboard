@@ -80,21 +80,48 @@ function logoSlideshow() {
 
 function logoPost(input, xL) {
 	if (input.files && input.files[0]) {
-		const imgPath = document.getElementById('FileUploadL' + xL).files[0];
 		const reader = new FileReader();
 		reader.readAsDataURL(input.files[0]);
 		reader.addEventListener("load", function () {
-			// convert image file to base64 string and save to localStorage
-			try { localStorage.setItem("customLogo" + xL, reader.result); }
-			catch (err) {
-				alert("the selected image exceedes the maximium file size");
+			try {
+				localStorage.setItem("customLogo" + xL, reader.result);
+			} catch (err) {
+				alert("The selected image exceeds the maximum file size");
 				input.value = ""; // Clear the input
-				if (xL <= 2) {
-					document.getElementById('uploadCustomLogo' + xL).style.border = "2px solid black"; // For Player 1 and Player 2
-				} else {
-					document.getElementById('logoSsImg' + xL).style.border = "2px solid black"; // For other uploads
-				}			}
+				// Additional error handling here if needed
+			}
 			document.getElementById("l" + xL + "Img").src = localStorage.getItem("customLogo" + xL);
+			
+			// Update label and rebind container click to clearLogo
+			if (xL >= 1 && xL <= 5) {
+				var textElem = document.getElementById(`FileUploadLText${xL}`);
+				if (textElem) {
+					textElem.textContent = "Clear";
+				}
+				// Choose the correct container ID based on the logo type
+				var containerId;
+				if (xL === 1) {
+					containerId = "uploadCustomLogo";
+				} else if (xL === 2) {
+					containerId = "uploadCustomLogo2";
+				} else {
+					containerId = "logoSsImg" + xL;
+				}
+				var container = document.getElementById(containerId);
+				if (container) {
+					container.onclick = function(e) {
+						e.preventDefault();
+						clearLogo(xL);
+					};
+					// Apply the red background and white text to indicate "clear" mode
+                    container.style.backgroundColor = "red";
+                    container.style.color = "black";
+				}
+			} else {
+				console.log(`No related element for changing innerHtml to clear`);
+			}
+			
+			// Additional logic for slideshows or other settings...
 		}, false);
 		if (document.getElementById("logoSlideshowChk").checked == true) { setTimeout(slideOther, 50); };
 		if (xL == 1 || xL == 2) { setTimeout(logoOther, 50); };
@@ -709,4 +736,66 @@ function resetScores() {
 		resetExt('p1', 'noflash');
 		resetExt('p2', 'noflash');
 	} else { }
+}
+
+function clearLogo(xL) {
+    // Remove the custom logo from localStorage
+    localStorage.removeItem("customLogo" + xL);
+
+    // Clear the preview image source
+    var imgElem = document.getElementById("l" + xL + "Img");
+    if (imgElem) {
+        imgElem.src = "./common/images/placeholder.png";
+    }
+
+    // Reset the file input field so that a file can be re-selected
+    var fileInput = document.getElementById("FileUploadL" + xL);
+    if (fileInput) {
+        fileInput.value = "";
+    }
+
+    // Reset the label text to its default state
+    var defaultText = (xL === 1) ? "Upload Player 1 Logo" :
+                      (xL === 2) ? "Upload Player 2 Logo" :
+                      "L" + (xL-2);
+    var textElem = document.getElementById("FileUploadLText" + xL);
+    if (textElem) {
+        textElem.textContent = defaultText;
+    }
+
+	// For player logos (1 and 2), uncheck their associated checkbuttons
+    if (xL === 1 || xL === 2) {
+        var checkbox = document.getElementById("customLogo" + xL);
+        if (checkbox) {
+            checkbox.checked = false;
+        }
+		if (xL ===1) {
+			localStorage.setItem("useCustomLogo", "no");
+			customLogoSetting();
+		} else {
+			localStorage.setItem("useCustomLogo2","no");
+			customLogoSetting2();
+		}
+		var fileInput = document.getElementById("FileUploadL" + xL);
+		toggleCheckbox("customLogo"+ xL, fileInput)
+    }
+
+    // Rebind the container's click so that it triggers a file input click
+    var containerId;
+    if (xL === 1) {
+        containerId = "uploadCustomLogo";
+    } else if (xL === 2) {
+        containerId = "uploadCustomLogo2";
+    } else {
+        containerId = "logoSsImg" + xL;
+    }
+    var container = document.getElementById(containerId);
+    if (container && fileInput) {
+        container.onclick = function (e) {
+            fileInput.click();
+        };
+		// Restore original styling by removing inline styles
+        container.style.backgroundColor = "";
+        container.style.color = "";
+    }
 }
