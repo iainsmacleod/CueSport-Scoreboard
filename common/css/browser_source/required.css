@@ -32,9 +32,9 @@ td {
 }
 
 #gameTypeImage {
-    /* height: auto;
-    width: auto; */
     position: fixed;
+    top:1%;
+    left:1%;
 }
 
 #player1Name, #player2Name {
