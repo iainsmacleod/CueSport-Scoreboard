@@ -13,7 +13,11 @@ body{
     max-width: 20%;     /* Adjust as needed */
 }
 
-#gameTypeImage {
+/* #gameTypeImage {
+    zoom: 80%;
+} */
+
+#ballTracker {
     zoom: 80%;
 }
 
@@ -23,7 +27,7 @@ body{
 
 #scoreBoardDiv {
     width: 50%;
-    top: 89%;
+    top: 91%;
 }
 
 

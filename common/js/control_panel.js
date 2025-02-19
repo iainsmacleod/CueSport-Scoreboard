@@ -19,17 +19,14 @@ function bsStyleChange() {
 	if (document.getElementById("bsStyle").value == 1) {
 		bc.postMessage({ clockDisplay: 'style125' });
 		localStorage.setItem("b_style", 1);
-		bc.postMessage({ type: 'scaleChange', scaleFactor: 1.25 });
 	}
 	if (document.getElementById("bsStyle").value == 2) {
 		bc.postMessage({ clockDisplay: 'style150' });
 		localStorage.setItem("b_style", 2);
-		bc.postMessage({ type: 'scaleChange', scaleFactor: 1.50 });
 	}
 	if (document.getElementById("bsStyle").value == 3) {
 		bc.postMessage({ clockDisplay: 'style200' });
 		localStorage.setItem("b_style", 3);
-		bc.postMessage({ type: 'scaleChange', scaleFactor: 2.00 });
 	}
 }
 
@@ -45,7 +42,42 @@ function toggleAnimationSetting(){
 
 function gameType(value) {
 	localStorage.setItem("gameType", value);
-	bc.postMessage({ clockDisplay: 'showGameType', gameType: value });
+	// bc.postMessage({ clockDisplay: 'showGameType', gameType: value });
+}
+
+function togglePot(element) {
+    // Toggle the 'faded' class on the element
+    element.classList.toggle('faded');
+
+    // Parse the current ball state from localStorage or default to an empty object
+    const ballState = JSON.parse(localStorage.getItem('ballState') || '{}');
+    
+    // Update the state by reading the current status from the element
+    ballState[element.id] = element.classList.contains('faded');
+    
+    // Save the updated state back to localStorage
+    localStorage.setItem('ballState', JSON.stringify(ballState));
+
+    // Broadcast the change if needed
+    bc.postMessage({ toggle: element.id });
+    console.log(`Toggle pot state of`, element.id);
+}
+
+function applySavedBallStates() {
+    // Retrieve the ballState object from localStorage (or default to an empty object)
+    const ballState = JSON.parse(localStorage.getItem('ballState') || '{}');
+
+    // Get all ball elements (assuming each ball has the class 'ball')
+    const balls = document.querySelectorAll('.ball');
+
+    // Iterate over each ball element and apply or remove the 'faded' class
+    balls.forEach(function(ball) {
+        if (ballState[ball.id]) {
+            ball.classList.add("faded");
+        } else {
+            // ball.classList.remove("faded");
+        }
+    });
 }
 
 // Function to save the opacity value to localStorage

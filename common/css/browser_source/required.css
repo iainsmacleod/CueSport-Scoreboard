@@ -5,7 +5,7 @@ html, body {
 
 #scoreBoard{
     width: 100%;
-    margin: auto;
+    /* margin: auto; */
 }
 
 td {
@@ -31,11 +31,11 @@ td {
     transform: translate(-50%, -125%);  /* Centers the div */
 }
 
-#gameTypeImage {
+/* #gameTypeImage {
     position: fixed;
     top:1%;
     left:1%;
-}
+} */
 
 #player1Name, #player2Name {
     background: rgba(255,255,255,1);
@@ -207,7 +207,7 @@ td {
     font-size:12pt;
     font-weight:bolder;
     border:1px solid #000;
-    position: absolute;
+    position: fixed;
     top: 10px;
     left: 50%;
     transform: translate(-50%, -50%);
@@ -219,17 +219,9 @@ td {
     box-shadow: 0 5px 10px 0 rgba(0,0,0,0.3), 0 2px 5px 0 rgba(0,0,0,0.3);
 }
 
-/* #scoreBoardDiv {
-    position: absolute;
-    top: 82%;
-    left: 60%;
-    transform: translateX(-50%);
-    z-index: 1;
-    padding: 5px;
-} */
-
 #scoreBoardDiv {
-    position: absolute;
+    position: fixed;
+    /* top: 85%; */
     left: 50%;
     transform: translateX(-50%);
     z-index: 3;
@@ -256,6 +248,18 @@ td {
     border:2px solid black;
     display: inline;
     box-shadow: none;
+}
+
+#ballTracker {
+    position: fixed;
+    top: 1%;
+    right: 1%; 
+    /* display: flex;
+    flex-direction: row; */
+}
+
+.faded {
+    opacity: 0.2;
 }
 
 /* blink code */

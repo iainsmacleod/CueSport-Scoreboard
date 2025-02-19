@@ -271,6 +271,23 @@ function showSlides() {
 	setTimeout(showSlides, 20000); 
 }
 
+function applySavedBallStates() {
+    // Retrieve the ballState object from localStorage (or default to an empty object)
+    const ballState = JSON.parse(localStorage.getItem('ballState') || '{}');
+
+    // Get all ball elements (assuming each ball has the class 'ball')
+    const balls = document.querySelectorAll('.ball');
+
+    // Iterate over each ball element and apply or remove the 'faded' class
+    balls.forEach(function(ball) {
+        if (ballState[ball.id]) {
+            ball.classList.add("faded");
+        } else {
+            // ball.classList.remove("faded");
+        }
+    });
+}
+
 function styleChange(n) {
 	if (n == 1) {
 		document.styleSheets[0].disabled = false;
@@ -328,9 +345,6 @@ function playWebmAnimation(gameType, containerSelector = '#videoContainer') {
     video.autoplay = true;
     video.playsInline = true;  // Helps with mobile devices.
     video.muted = true;        // Muted is often required for autoplay.
-
-	// Ensure the video element itself has a transparent background
-	// video.style.backgroundColor = 'transparent';
     
     // Add a CSS class so you can style the video through required.css.
     video.classList.add('webm-animation');

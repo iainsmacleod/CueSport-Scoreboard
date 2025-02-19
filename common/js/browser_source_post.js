@@ -20,155 +20,11 @@ const bcr = new BroadcastChannel('g4-recv'); // browser_source -> control_panel 
 const bc = new BroadcastChannel('g4-main');
 var playerNumber;
 
-// var defaultPositions = {
-//     scoreBoardDiv: {
-//         left: "50%", // Define the default left position
-//         top: "82%", // Define the default top position
-//         transform: "translateX(-50%)" // Define the default transform
-//     },
-//     gameInfo: {
-//         left: "50%", // Define the default left position
-//         top: "-4px", // Define the default top position
-//         transform: "translateX(-50%)" // Define the default transform
-//     },
-//     logoSlideshowDiv: {
-//         left: "50%", // Define the default left position
-//         top: "20%", // Define the default top position
-//         transform: "translate(-50%, -50%)" // Define the default transform
-//     }
-// };
-
-// var defaultPositions = {
-//     scoreBoardDiv: {},
-//     gameInfo: {},
-//     logoSlideshowDiv: {}
-// };
-
-// // Retrieve the b_style value from localStorage
-// var bStyle = localStorage.getItem("b_style");
-// if (bStyle == 1) {
-// 	//Scoreboard
-//     defaultPositions.scoreBoardDiv.top = "87%";
-// 	defaultPositions.scoreBoardDiv.left = "50%";
-// 	defaultPositions.scoreBoardDiv.transform =  "translateX(-50%)";
-// 	//Game Info
-// 	defaultPositions.gameInfo.top = "-4px";
-// 	defaultPositions.gameInfo.left = "50%";
-// 	defaultPositions.gameInfo.transform =  "translateX(-50%)";
-// 	//Logo Slideshow
-// 	defaultPositions.logoSlideshowDiv.top = "20%";
-// 	defaultPositions.logoSlideshowDiv.left = "50%";
-// 	defaultPositions.logoSlideshowDiv.transform =  "translate(-50%, -50%)";
-// 	//console.log(`Small defaults`);
-// } else if (bStyle == 2) {
-//     //Scoreboard
-//     defaultPositions.scoreBoardDiv.top = "86%";
-// 	defaultPositions.scoreBoardDiv.left = "50%";
-// 	defaultPositions.scoreBoardDiv.transform =  "translateX(-50%)";
-// 	//Game Info
-// 	defaultPositions.gameInfo.top = "-4px";
-// 	defaultPositions.gameInfo.left = "50%";
-// 	defaultPositions.gameInfo.transform =  "translateX(-50%)";
-// 	//Logo Slideshow
-// 	defaultPositions.logoSlideshowDiv.top = "10%";
-// 	defaultPositions.logoSlideshowDiv.left = "50%";
-// 	defaultPositions.logoSlideshowDiv.transform =  "translate(-50%, -50%)";
-// 	//console.log(`Medium defaults`);
-// } else if (bStyle == 3) {
-//     //Scoreboard
-//     defaultPositions.scoreBoardDiv.top = "82%";
-// 	defaultPositions.scoreBoardDiv.left = "50%";
-// 	defaultPositions.scoreBoardDiv.transform =  "translateX(-50%)";
-// 	//Game Info
-// 	defaultPositions.gameInfo.top = "-4px";
-// 	defaultPositions.gameInfo.left = "50%";
-// 	defaultPositions.gameInfo.transform =  "translateX(-50%)";
-// 	//Logo Slideshow
-// 	defaultPositions.logoSlideshowDiv.top = "0%";
-// 	defaultPositions.logoSlideshowDiv.left = "50%";
-// 	defaultPositions.logoSlideshowDiv.transform =  "translate(-50%, -50%)";
-// 	//console.log(`Large defaults`);
-// }
-
-
-
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //										broadcast channel events
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////			
 
 bc.onmessage = (event) => {
-	if (event.data.type === 'scaleChange') {
-        const newScaleFactor = event.data.scaleFactor;
-
-		// Retrieve the b_style value from localStorage
-		var bStyle = localStorage.getItem("b_style");
-		
-		// Declare defaultPositions
-		var defaultPositions = {
-			scoreBoardDiv: {},
-			gameInfo: {},
-			logoSlideshowDiv: {}
-		};
-
-		if (bStyle == 1) {
-			//Scoreboard
-			defaultPositions.scoreBoardDiv.top = "89%";
-			defaultPositions.scoreBoardDiv.left = "50%";
-			defaultPositions.scoreBoardDiv.transform =  "translateX(-50%)";
-			//Game Info
-			defaultPositions.gameInfo.top = "-4px";
-			defaultPositions.gameInfo.left = "50%";
-			defaultPositions.gameInfo.transform =  "translateX(-50%)";
-			//Logo Slideshow
-			defaultPositions.logoSlideshowDiv.top = "20%";
-			defaultPositions.logoSlideshowDiv.left = "50%";
-			defaultPositions.logoSlideshowDiv.transform =  "translate(-50%, -50%)";
-		} else if (bStyle == 2) {
-			//Scoreboard
-			defaultPositions.scoreBoardDiv.top = "87%";
-			defaultPositions.scoreBoardDiv.left = "50%";
-			defaultPositions.scoreBoardDiv.transform =  "translateX(-50%)";
-			//Game Info
-			defaultPositions.gameInfo.top = "-4px";
-			defaultPositions.gameInfo.left = "50%";
-			defaultPositions.gameInfo.transform =  "translateX(-50%)";
-			//Logo Slideshow
-			defaultPositions.logoSlideshowDiv.top = "10%";
-			defaultPositions.logoSlideshowDiv.left = "50%";
-			defaultPositions.logoSlideshowDiv.transform =  "translate(-50%, -50%)";
-		} else if (bStyle == 3) {
-			//Scoreboard
-			defaultPositions.scoreBoardDiv.top = "84%";
-			defaultPositions.scoreBoardDiv.left = "50%";
-			defaultPositions.scoreBoardDiv.transform =  "translateX(-50%)";
-			//Game Info
-			defaultPositions.gameInfo.top = "-4px";
-			defaultPositions.gameInfo.left = "50%";
-			defaultPositions.gameInfo.transform =  "translateX(-50%)";
-			//Logo Slideshow
-			defaultPositions.logoSlideshowDiv.top = "0%";
-			defaultPositions.logoSlideshowDiv.left = "50%";
-			defaultPositions.logoSlideshowDiv.transform =  "translate(-50%, -50%)";
-		}
-        
-        // Reset positions to default
-        $("#scoreBoardDiv").css({
-            left: defaultPositions.scoreBoardDiv.left,
-            top: defaultPositions.scoreBoardDiv.top,
-            transform: defaultPositions.scoreBoardDiv.transform // Use the defined transform
-        });
-        $("#gameInfo").css({
-            left: defaultPositions.gameInfo.left,
-            top: defaultPositions.gameInfo.top,
-            transform: defaultPositions.gameInfo.transform // Use the defined transform
-        });
-        $("#logoSlideshowDiv").css({
-            left: defaultPositions.logoSlideshowDiv.left,
-            top: defaultPositions.logoSlideshowDiv.top,
-            transform: defaultPositions.logoSlideshowDiv.transform // Use the defined transform
-        });
-    }
-
 	if (event.data.score != null) {
 		console.log("Player: " + event.data.player + ", Score: " + event.data.score);
 		if (event.data.score > document.getElementById("player" + event.data.player + "Score").innerHTML) {
@@ -381,50 +237,64 @@ bc.onmessage = (event) => {
 			document.getElementById("player2Image").classList.replace("fadeInElm", "fadeOutElm");
 		}
 
-		if (event.data.clockDisplay == "showGameType") {
-			console.log("GameType: " + event.data.gameType);
-			// Update the image based on the selected game type
-			let imageAvailable = true;
-			switch (event.data.gameType) {
-				case "game1":
-					gameTypeImage.src = "";
-					imageAvailable = false;
-					break;
-				case "game2":
-					gameTypeImage.src = "./common/images/8ball_gametype.png";
-					break;
-				case "game3":
-					gameTypeImage.src = "./common/images/9ball_gametype.png";
-					break;
-				case "game4":
-					gameTypeImage.src = "./common/images/10ball_gametype.png";
-					break;
-				case "game5":
-					gameTypeImage.src = "";
-					imageAvailable = false;
-					break;
-				case "game6":
-					gameTypeImage.src = "";
-					imageAvailable = false;
-					break;
-				case "game7":
-					gameTypeImage.src = "";
-					imageAvailable = false;
-					break;
-				case "game8":
-					gameTypeImage.src = "";
-					imageAvailable = false;
-					break;
-				case "game9":
-					gameTypeImage.src = "";
-					imageAvailable = false;
-					break;
-				default:
-					gameTypeImage.src = "";
-					imageAvailable = false;
-					break;
-			}
-			gameTypeImage.style.display = imageAvailable ? "block" : "none";
+		// if (event.data.clockDisplay == "showGameType") {
+		// 	console.log("GameType: " + event.data.gameType);
+		// 	// Update the image based on the selected game type
+		// 	let imageAvailable = true;
+		// 	switch (event.data.gameType) {
+		// 		case "game1":
+		// 			gameTypeImage.src = "";
+		// 			imageAvailable = false;
+		// 			break;
+		// 		case "game2":
+		// 			gameTypeImage.src = "./common/images/8ball_gametype.png";
+		// 			break;
+		// 		case "game3":
+		// 			gameTypeImage.src = "./common/images/9ball_gametype.png";
+		// 			break;
+		// 		case "game4":
+		// 			gameTypeImage.src = "./common/images/10ball_gametype.png";
+		// 			break;
+		// 		case "game5":
+		// 			gameTypeImage.src = "";
+		// 			imageAvailable = false;
+		// 			break;
+		// 		case "game6":
+		// 			gameTypeImage.src = "";
+		// 			imageAvailable = false;
+		// 			break;
+		// 		case "game7":
+		// 			gameTypeImage.src = "";
+		// 			imageAvailable = false;
+		// 			break;
+		// 		case "game8":
+		// 			gameTypeImage.src = "";
+		// 			imageAvailable = false;
+		// 			break;
+		// 		case "game9":
+		// 			gameTypeImage.src = "";
+		// 			imageAvailable = false;
+		// 			break;
+		// 		default:
+		// 			gameTypeImage.src = "";
+		// 			imageAvailable = false;
+		// 			break;
+		// 	}
+		// 	gameTypeImage.style.display = imageAvailable ? "block" : "none";
+		// }
+	}
+
+	// Check if the message contains a 'toggle' property
+	if (event.data.toggle) {
+		const elementId = event.data.toggle;
+		// Find the element on this page with the corresponding id
+		const elementToToggle = document.getElementById(elementId);
+		if (elementToToggle) {
+			// Toggle the 'faded' class on this element
+			elementToToggle.classList.toggle('faded');
+			console.log('Toggled element with id:', elementId, 'on browser_source.html');
+		} else {
+			console.log('Element with id', elementId, 'not found on browser_source.html');
 		}
 	}
 }
@@ -438,47 +308,48 @@ $(document).ready(function() {
     $("#scoreBoardDiv").draggable();
     $("#gameInfo").draggable();
     $("#logoSlideshowDiv").draggable();
-    $("#gameTypeImage").draggable();
+    // $("#gameTypeImage").draggable();
+	$("#ballTracker").draggable();
 
 });
 
-if (localStorage.getItem('gameType') != null) {
-	// Update the image based on the selected game type
-	var value = localStorage.getItem('gameType');
-	switch (value) {
-		case "game1":
-			gameTypeImage.src = "./common/images/placeholder.png"; // Replace with actual image path
-			break;
-		case "game2":
-			gameTypeImage.src = "./common/images/8ball_gametype.png"; // Replace with actual image path
-			break;
-		case "game3":
-			gameTypeImage.src = "./common/images/9ball_gametype.png"; // Replace with actual image path
-			break;
-		case "game4":
-			gameTypeImage.src = "./common/images/10ball_gametype.png"; // Replace with actual image path
-			break;
-		case "game5":
-			gameTypeImage.src = "./common/images/straight_image.png"; // Replace with actual image path
-			break;
-		case "game6":
-			gameTypeImage.src = "./common/images/bank_image.png"; // Replace with actual image path
-			break;
-		case "game7":
-			gameTypeImage.src = "./common/images/onepocket_image.png"; // Replace with actual image path
-			break;
-		case "game8":
-			gameTypeImage.src = "./common/images/snooker_image.png"; // Replace with actual image path
-			break;
-		case "game9":
-				gameTypeImage.src = "./common/images/placeholder.png"; // Replace with actual image path
-			break;
-		default:
-			gameTypeImage.src = ""; // Clear the image if no valid game type is selected
-			break;
-	}
-	gameTypeImage.style.display = value ? "block" : "none";
-}
+// if (localStorage.getItem('gameType') != null) {
+// 	// Update the image based on the selected game type
+// 	var value = localStorage.getItem('gameType');
+// 	switch (value) {
+// 		case "game1":
+// 			gameTypeImage.src = "./common/images/placeholder.png"; // Replace with actual image path
+// 			break;
+// 		case "game2":
+// 			gameTypeImage.src = "./common/images/8ball_gametype.png"; // Replace with actual image path
+// 			break;
+// 		case "game3":
+// 			gameTypeImage.src = "./common/images/9ball_gametype.png"; // Replace with actual image path
+// 			break;
+// 		case "game4":
+// 			gameTypeImage.src = "./common/images/10ball_gametype.png"; // Replace with actual image path
+// 			break;
+// 		case "game5":
+// 			gameTypeImage.src = "./common/images/straight_image.png"; // Replace with actual image path
+// 			break;
+// 		case "game6":
+// 			gameTypeImage.src = "./common/images/bank_image.png"; // Replace with actual image path
+// 			break;
+// 		case "game7":
+// 			gameTypeImage.src = "./common/images/onepocket_image.png"; // Replace with actual image path
+// 			break;
+// 		case "game8":
+// 			gameTypeImage.src = "./common/images/snooker_image.png"; // Replace with actual image path
+// 			break;
+// 		case "game9":
+// 				gameTypeImage.src = "./common/images/placeholder.png"; // Replace with actual image path
+// 			break;
+// 		default:
+// 			gameTypeImage.src = ""; // Clear the image if no valid game type is selected
+// 			break;
+// 	}
+// 	gameTypeImage.style.display = value ? "block" : "none";
+// }
 
 setCustomLogo("customLogo1", "useCustomLogo", "usePlayer1");
 setCustomLogo("customLogo2", "useCustomLogo2", "usePlayer2");
@@ -596,6 +467,7 @@ if (localStorage.getItem("b_style") != null) {
 
 let slideIndex = 0;
 showSlides();
+applySavedBallStates();
 
 // Functions
 

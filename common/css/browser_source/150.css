@@ -12,7 +12,11 @@ body{
     max-width: 30%; 
 }
 
-#gameTypeImage {
+/* #gameTypeImage {
+    zoom: 66.666%;
+} */
+
+#ballTracker {
     zoom: 66.666%;
 }
 
@@ -22,7 +26,7 @@ body{
 
 #scoreBoardDiv {
     width: 70%;
-    top: 87%;
+    top:89%;
 }
 
 .customLogo1 {
