@@ -196,19 +196,23 @@ bc.onmessage = (event) => {
 			if (localStorage.getItem("customLogo5") != null) { document.getElementById("customLogo5").src = localStorage.getItem("customLogo5"); } else { document.getElementById("customLogo5").src = "./common/images/placeholder.png"; };
 		}
 		if (event.data.clockDisplay == "logoSlideShow-hide") { document.getElementById("logoSlideshowDiv").classList.replace("fadeInElm", "fadeOutElm"); };
-		// if (event.data.clockDisplay == "style100") { styleChange(1); };
-		if (event.data.clockDisplay == "style125") { styleChange(1); };
-		if (event.data.clockDisplay == "style150") { styleChange(2); };
-		if (event.data.clockDisplay == "style200") { styleChange(3); };
-		// if (event.data.clockDisplay === 'showActivePlayer') {
-		// 	// Additional logic when images are shown, if needed
-		// 	console.log("Player is now showing.");
-		// 	showActivePlayer();
-		// } else if (event.data.clockDisplay === 'hideActivePlayer') {
-		// 	// Additional logic when images are hidden, if needed
-		// 	console.log("Player is now showing 2.");
-		// 	hideActivePlayer();
-		// }
+
+		if (event.data.clockDisplay == "style125") {
+			styleChange(1); 
+			// Reload the specific HTML file
+			window.location.href = 'browser_source.html'; // This line redirects to browser_source.html
+		 };
+		if (event.data.clockDisplay == "style150") {
+			styleChange(2);
+			// Reload the specific HTML file
+			window.location.href = 'browser_source.html'; // This line redirects to browser_source.html
+		 };
+		if (event.data.clockDisplay == "style200") {
+			styleChange(3);
+			// Reload the specific HTML file
+			window.location.href = 'browser_source.html'; // This line redirects to browser_source.html
+		 };
+
 		if (event.data.clockDisplay === 'toggleActivePlayer') {
 			const activePlayer = event.data.player; // Get the active player from the message
 			console.log(`Toggle changed to: ${activePlayer}`);
