@@ -125,14 +125,30 @@ window.onload = function() {
 	if (localStorage.getItem("enableBallTracker") === "true"){
 		document.getElementById("ballTrackerCheckbox").checked = true;
 		document.getElementById("ballTracker").classList.remove("noShow");
+		document.getElementById("ballTrackerDirection").classList.remove("noShow");
 		console.log(`Ball tracker enabled`);
 		bc.postMessage({ displayBallTracker: true });
 	} else {
 		document.getElementById("ballTrackerCheckbox").checked = false;
 		localStorage.setItem("enableBallTracker", "false");
 		document.getElementById("ballTracker").classList.add("noShow");
+		document.getElementById("ballTrackerDirection").classList.add("noShow");
 		console.log(`Ball tracker disabled`);
 		bc.postMessage({ displayBallTracker: false });
+	}
+
+	if (localStorage.getItem("ballTrackerDirection") === null) {
+		// Initialize with default value if not set
+		localStorage.setItem("ballTrackerDirection", "vertical");
+		document.getElementById("ballTrackerDirection").innerHTML = "Horizontal Ball Tracker";
+		bc.postMessage({ ballTracker: "vertical" });
+		console.log(`Ball tracker initialized vertical`);
+	} else {
+		// Use existing stored value
+		const direction = localStorage.getItem("ballTrackerDirection");
+		document.getElementById("ballTrackerDirection").innerHTML = direction === "vertical" ? "Horizontal Ball Tracker" : "Vertical Ball Tracker";
+		bc.postMessage({ ballTracker: direction });
+		console.log(`Ball tracker initialized ${direction}`);
 	}
 
 	// Call the visibility functions based on the checkbox states

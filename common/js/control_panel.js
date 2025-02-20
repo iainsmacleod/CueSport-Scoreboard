@@ -47,14 +47,29 @@ function gameType(value) {
 
 function useBallTracker(){
 	localStorage.setItem("enableBallTracker", document.getElementById("ballTrackerCheckbox").checked);
-	// if (document.getElementById("ballTrackerCheckbox").checked) {
-	// 	document.getElementById("ballTracker").classList.remove("noShow");
-	// } else {
-	// 	document.getElementById("ballTracker").classList.add("noShow");
-	// }
-	document.getElementById("ballTracker").classList.toggle("noShow");
+	if (document.getElementById("ballTrackerCheckbox").checked) {
+		document.getElementById("ballTracker").classList.remove("noShow");
+		document.getElementById("ballTrackerDirection").classList.remove("noShow");
+	} else {
+		document.getElementById("ballTracker").classList.add("noShow");
+		document.getElementById("ballTrackerDirection").classList.add("noShow");
+	}
+	//document.getElementById("ballTracker").classList.toggle("noShow");
 	bc.postMessage({ displayBallTracker: document.getElementById("ballTrackerCheckbox").checked});
 
+}
+
+function toggleBallTrackerDirection() {
+    // Get current direction from localStorage or default to "horizontal"
+    const currentDirection = localStorage.getItem("ballTrackerDirection") || "vertical";
+    // Toggle direction
+    const newDirection = currentDirection === "horizontal" ? "vertical" : "horizontal";
+    // Send message to browser source
+    bc.postMessage({ ballTracker: newDirection });
+    // Update localStorage
+    localStorage.setItem("ballTrackerDirection", newDirection);
+    console.log(`Changed ball tracker to ${newDirection} orientation`);
+	document.getElementById("ballTrackerDirection").innerHTML = currentDirection.charAt(0).toUpperCase() + currentDirection.slice(1).toLowerCase() + " Ball Tracker";
 }
 
 function togglePot(element) {
