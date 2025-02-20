@@ -45,6 +45,18 @@ function gameType(value) {
 	// bc.postMessage({ clockDisplay: 'showGameType', gameType: value });
 }
 
+function useBallTracker(){
+	localStorage.setItem("enableBallTracker", document.getElementById("ballTrackerCheckbox").checked);
+	// if (document.getElementById("ballTrackerCheckbox").checked) {
+	// 	document.getElementById("ballTracker").classList.remove("noShow");
+	// } else {
+	// 	document.getElementById("ballTracker").classList.add("noShow");
+	// }
+	document.getElementById("ballTracker").classList.toggle("noShow");
+	bc.postMessage({ displayBallTracker: document.getElementById("ballTrackerCheckbox").checked});
+
+}
+
 function togglePot(element) {
     // Toggle the 'faded' class on the element
     element.classList.toggle('faded');
@@ -96,7 +108,7 @@ function toggleCheckbox(checkboxId, inputElement) {
 function toggleSetting() {
 	const checkbox = document.getElementById("useToggleSetting").checked;
 	const activePlayer = document.getElementById("playerToggleCheckbox").checked;
-	console.log(`Player/team toggle ${checkbox ? "enabled" : "disabled"}`);
+	console.log(`Display active player ${checkbox ? "enabled" : "disabled"}`);
 	if (checkbox) {
 		document.getElementById("playerToggle").classList.remove("noShow");
 		localStorage.setItem("usePlayerToggle", "yes");
@@ -419,6 +431,7 @@ function postScore(opt1, player) {
             document.getElementById("p"+player+"Score").value = p2ScoreValue;
         }
     }
+	resetBallTracker()
 }
 
 function shotClock(timex) {
@@ -773,7 +786,30 @@ function resetScores() {
 
 		resetExt('p1', 'noflash');
 		resetExt('p2', 'noflash');
+		resetBallTracker();
 	} else { }
+}
+
+function resetBallTracker() {
+    // Retrieve the saved ball state from localStorage
+    let ballState = JSON.parse(localStorage.getItem('ballState') || '{}');
+
+    // Select all ball elements within the .ballTracker container
+    const ballElements = document.querySelectorAll('.ball');
+
+    ballElements.forEach(function(ball) {
+        // Remove the 'faded' class to reset the ball
+        ball.classList.remove('faded');
+        
+        // Update the ball state to false (not faded)
+        ballState[ball.id] = false;
+		bc.postMessage({ resetBall: ball.id });
+    });
+
+    // Save the updated state back to localStorage
+    localStorage.setItem('ballState', JSON.stringify(ballState));
+
+    console.log("All balls have been reset to their default condition.");
 }
 
 function clearLogo(xL) {

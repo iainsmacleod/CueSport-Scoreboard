@@ -103,7 +103,11 @@ bc.onmessage = (event) => {
 		const bothPlayersEnabled = player1Enabled && player2Enabled;
 		const playerToggleEnabled = localStorage.getItem("usePlayerToggle") === "yes";
 		const useclockEnabled = localStorage.getItem("useClock") === "yes";
+
+		console.log(`player1Enabled:${player1Enabled} player2Enabled:${player2Enabled} bothPlayersEnabled:${bothPlayersEnabled} playerToggleEnabled:${player1Enabled} useclockEnabled${useclockEnabled}`)
+		
 		console.log("Player 1 enabled: " + player1Enabled + ". Player 2 enabled: " + player2Enabled + ". Both players enabled: " + bothPlayersEnabled);
+		
 		if (event.data.playerDisplay == "showPlayer") {
 			if ( useclockEnabled && bothPlayersEnabled) {
 				console.log("Use clock evaluating as enabled");
@@ -115,7 +119,7 @@ bc.onmessage = (event) => {
 			// Check if both players are enabled before fading in the player images
 			if (bothPlayersEnabled && playerToggleEnabled) {
 				const activePlayer = localStorage.getItem("activePlayer");
-				console.log(`Show player image in event condition`);
+				console.log(`Show player ${activePlayer} as active`);
 				document.getElementById("player1Image").classList.replace(activePlayer === "1" ? "fadeOutElm" : "fadeInElm", activePlayer === "1" ? "fadeInElm" : "fadeOutElm");
 				document.getElementById("player2Image").classList.replace(activePlayer === "2" ? "fadeOutElm" : "fadeInElm", activePlayer === "2" ? "fadeInElm" : "fadeOutElm");
 			}
@@ -134,16 +138,17 @@ bc.onmessage = (event) => {
 			// Add a small delay to check after showPlayer has completed
 			setTimeout(() => {
 				// Debug logs
-				console.log("Player1 status:", localStorage.getItem("usePlayer1"));
-				console.log("Player2 status:", localStorage.getItem("usePlayer2"));
+				console.log("Display player 1:", localStorage.getItem("usePlayer1"));
+				console.log("Display player 2:", localStorage.getItem("usePlayer2"));
 				if (localStorage.getItem("usePlayer1") === "yes" && localStorage.getItem("usePlayer2") === "yes") {
-					console.log("Both players enabled, showing scores");
+					console.log("Both players enabled, so scores are enabled");
 					showScores();
 				} else {
 					console.log("Not all players enabled, scores remain hidden");
 				}
 			}, 50); // Small delay to ensure localStorage is updated
 		};
+
 		if (event.data.playerDisplay == "hidePlayer") { 
 			hidePlayer(event.data.playerNumber); 
 			hideScores();
@@ -214,26 +219,23 @@ bc.onmessage = (event) => {
 		 };
 
 		if (event.data.clockDisplay === 'toggleActivePlayer') {
-			const activePlayer = event.data.player; // Get the active player from the message
-			console.log(`Toggle changed to: ${activePlayer}`);
-			toggleActivePlayer(activePlayer); // Call the function to update the display
+			const playerToggle = event.data.player; // Get the active player from the message
+			var activePlayer = playerToggle ? "1": "2";
+			console.log(`Toggle to player ${activePlayer}`);
+			changeActivePlayer(playerToggle); // Call the function to update the display
 		}
+
 		if (event.data.clockDisplay === 'showActivePlayer'){
 			const activePlayer = event.data.player; // Get the active player from the message
-			console.log(`activePlayer: ${activePlayer}`);
 			const player1Enabled = localStorage.getItem("usePlayer1") === "yes";
-			console.log(`player1Enabled: ${player1Enabled}`);
 			const player2Enabled = localStorage.getItem("usePlayer2") === "yes";
-			console.log(`player2Enabled: ${player2Enabled}`);
 			const bothPlayersEnabled = player1Enabled && player2Enabled;
-			console.log(`bothPlayersEnabled: ${bothPlayersEnabled}`);
 			// const playerToggle = (activePlayer === 1 || activePlayer === 2); // true if activePlayer is 1 or 2, otherwise false
 			// console.log(`playerToggle: ${playerToggle}`);
+			console.log(`Display active player: ${bothPlayersEnabled}`)
 			if (bothPlayersEnabled) {
 				//const activePlayer = localStorage.getItem("activePlayer");
-				console.log(`showActivePlayer: ${activePlayer}`);
-				console.log(typeof activePlayer);
-				toggleActivePlayer(activePlayer); // Call the function to update the display
+				changeActivePlayer(activePlayer); // Call the function to update the display
 			}
 		}
 		if (event.data.clockDisplay === 'hideActivePlayer'){
@@ -301,6 +303,33 @@ bc.onmessage = (event) => {
 			console.log('Element with id', elementId, 'not found on browser_source.html');
 		}
 	}
+
+	if (event.data.resetBall) {
+		const elementId = event.data.resetBall;
+		// Find the element on this page with the corresponding id
+		const elementToToggle = document.getElementById(elementId);
+		if (elementToToggle) {
+			// Toggle the 'faded' class on this 
+			elementToToggle.classList.remove('faded');
+			console.log('Removed faded class from', elementId, 'on browser_source.html');
+		} else {
+			console.log('Element with id', elementId, 'not found on browser_source.html');
+		}
+	}
+
+	const ballTracker = document.getElementById("ballTracker");
+	if (ballTracker) {
+		if (event.data.displayBallTracker === true) {
+			ballTracker.classList.remove("noShow");
+			console.log('Show ball tracker');
+		} else if (event.data.displayBallTracker === false) {
+			ballTracker.classList.add("noShow");
+			console.log('Hide ball tracker');
+		}
+	} else {
+		console.warn('Ball tracker element not found in DOM');
+	}
+	
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////			
@@ -381,7 +410,7 @@ if (localStorage.getItem("p2NameCtrlPanel") == "" || localStorage.getItem("p2Nam
 	document.getElementById("player2Name").innerHTML = "Player 2";
 }
 
-// Code to assist with displaying active player image when only tow players are enabled, on reload.
+// Code to assist with displaying active player image when only two players are enabled, on reload.
 const player1Enabled = localStorage.getItem("usePlayer1") == "yes";
 const player2Enabled = localStorage.getItem("usePlayer2") == "yes";
 const bothPlayersEnabled = player1Enabled && player2Enabled;
@@ -439,6 +468,21 @@ if (localStorage.getItem("useClock") == "yes" && bothPlayersEnabled) {
     updateIconsVisibility(false);
 }
 
+// Setting defaults in storage so functions execute correctly, in the event values are not being retrieved from storage successfully due to initialization or similar
+if (localStorage.getItem("usePlayer1") === null) {
+    localStorage.setItem("usePlayer1", "yes");
+}
+if (localStorage.getItem("usePlayer2") === null) {
+    localStorage.setItem("usePlayer2", "yes");
+}
+if (localStorage.getItem("usePlayerToggle") === null) {
+    localStorage.setItem("usePlayerToggle", "yes");
+}
+if (localStorage.getItem("activePlayer") === null) {
+    localStorage.setItem("activePlayer", "1");
+}
+
+
 if (localStorage.getItem(("usePlayer1")) != "yes") {
 	document.getElementById("player1Name").classList.replace("fadeInElm", "fadeOutElm");
 	document.getElementById("player1Score").classList.replace("fadeInElm", "fadeOutElm");
@@ -467,6 +511,14 @@ if (localStorage.getItem("b_style") != null) {
 	document.styleSheets[1].disabled = true;
 	document.styleSheets[2].disabled = false;
 	localStorage.setItem("b_style", "3");      // Store XL as default
+}
+
+if (localStorage.getItem("enableBallTracker") === "false" || localStorage.getItem("enableBallTracker") === null){
+	document.getElementById("ballTracker").classList.add("noShow");
+	console.log(`Ball tracker disabled on overlay`);
+} else {
+	document.getElementById("ballTracker").classList.remove("noShow");
+	console.log(`Ball tracker enabled on overlay`);
 }
 
 let slideIndex = 0;

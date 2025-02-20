@@ -227,7 +227,7 @@ function custom2Hide() {
 	}, 1000);
 }
 
-function toggleActivePlayer(activePlayer) {
+function changeActivePlayer(activePlayer) {
     if (activePlayer === true || activePlayer === null) {
 		console.log(`Show player 1`);
         document.getElementById("player1Image").classList.replace("fadeOutElm", "fadeInElm");
@@ -238,7 +238,6 @@ function toggleActivePlayer(activePlayer) {
         document.getElementById("player2Image").classList.replace("fadeOutElm", "fadeInElm");
     }else {
         console.log(`No valid player selected`); // Log if no valid player
-		console.log(typeof activePlayer);
     }
 }
 

@@ -67,7 +67,8 @@ for more information about Salotto please visit https://salotto.app
 						Player 2<input type="checkbox" class="smallSize" id="usePlayer2Setting" onchange="playerSetting(2)" checked>
 						<label for="useClockSetting" id="labelForUseClockSetting">Clock</label><input type="checkbox" class="smallSize" id="useClockSetting" onchange="clockSetting()">
 						<label for="useToggleSetting" id="labelForUseToggleSetting">Player Toggle</label><input type="checkbox" class="smallSize" id="useToggleSetting" onchange="toggleSetting()">
-						Win Animation<input type="checkbox" class="smallSize" id="winAnimation" onchange="toggleAnimationSetting()">
+						Win Video<input type="checkbox" class="smallSize" id="winAnimation" onchange="toggleAnimationSetting()">
+						Ball Tracker<input type="checkbox" class="smallSize" id="ballTrackerCheckbox" onchange="useBallTracker()">
 					</div>
 				</details>
 			</div>
@@ -215,25 +216,8 @@ for more information about Salotto please visit https://salotto.app
 							<button id="sendP2Score" onclick="postScore('add','2')">+</button>
 						</div>
 					</div>
-					<p style="font-size:2pt">&nbsp;</p>
-					<div class="column">
-						<div class="hover obs28" id="sendPScores" onclick="resetScores()">Reset Scores</div>
-						<div class="columnn" id="playerToggle">
-							<label>Player/Team Toggle:&nbsp;</label>
-							<span></span>
-							<div>
-							<label class="switch toggle">
-								<span class="player1 toggle">P1</span>
-								<input type="checkbox" id="playerToggleCheckbox" onchange="togglePlayer(this.checked)">
-								<span class="slider_round"></span>
-								<span class="player2 toggle">P2</span>
-							</label>
-							</div>
-						</div>	
-						<div class="hover obs28" id="sendPScores" onclick="pushScores()">Push Scores</div>
-					</div>
 					<br>
-					<div id="ballTracker">
+					<div id="ballTracker" class="noShow">
 						<div class="ball" id="ball 1" onclick="togglePot(this)"><img src="./common/images/1ball_small.png"></div>
 						<div class="ball" id="ball 2" onclick="togglePot(this)"><img src="./common/images/2ball_small.png"></div>
 						<div class="ball" id="ball 3" onclick="togglePot(this)"><img src="./common/images/3ball_small.png"></div>
@@ -249,6 +233,23 @@ for more information about Salotto please visit https://salotto.app
 						<div class="ball" id="ball 13" onclick="togglePot(this)"><img src="./common/images/13ball_small.png"></div>
 						<div class="ball" id="ball 14" onclick="togglePot(this)"><img src="./common/images/14ball_small.png"></div>
 						<div class="ball" id="ball 15" onclick="togglePot(this)"><img src="./common/images/15ball_small.png"></div>
+					</div>
+					<br>
+					<div class="column">
+						<div class="hover obs28" id="sendPScores" onclick="resetScores()">Reset Scores</div>
+						<div class="columnn" id="playerToggle">
+							<label>Player/Team Toggle:&nbsp;</label>
+							<span></span>
+							<div>
+							<label class="switch toggle">
+								<span class="player1 toggle">P1</span>
+								<input type="checkbox" id="playerToggleCheckbox" onchange="togglePlayer(this.checked)">
+								<span class="slider_round"></span>
+								<span class="player2 toggle">P2</span>
+							</label>
+							</div>
+						</div>	
+						<div class="hover obs28" id="sendPScores" onclick="pushScores()">Push Scores</div>
 					</div>
 				</details>
 			</div>

@@ -77,17 +77,32 @@ window.onload = function() {
 		localStorage.setItem("usePlayer2", "yes");
 	}
 
-	// Simplified activePlayer initialization
-	const activePlayer = localStorage.getItem("activePlayer") === "2" ? "2" : "1";
-	localStorage.setItem("activePlayer", activePlayer);
-	document.getElementById("playerToggleCheckbox").checked = activePlayer === "1";
-	localStorage.setItem("toggleState", activePlayer === "1");
-
 	if (localStorage.getItem("usePlayerToggle")==="yes" || localStorage.getItem("usePlayerToggle") === null) {
 		document.getElementById("useToggleSetting").checked = true;
+		localStorage.setItem("usePlayerToggle", "yes");
+		toggleSetting();
 	} else {
 		document.getElementById("useToggleSetting").checked = false;
+		localStorage.setItem("usePlayerToggle", "no");
+		toggleSetting();
 	}
+
+	if (localStorage.getItem("usePlayer1") === "yes" && localStorage.getItem("usePlayer2") === "yes" && localStorage.getItem("usePlayerToggle") === "yes"){
+		console.log(`We should be showing active player identifier`);
+		const activePlayer = localStorage.getItem("activePlayer") === "2" ? "2" : "1";
+		localStorage.setItem("activePlayer", activePlayer);
+		document.getElementById("playerToggleCheckbox").checked = activePlayer === "1";
+		localStorage.setItem("toggleState", activePlayer === "1");
+		console.log(`activePlayer: ${activePlayer}`);
+		bc.postMessage({ clockDisplay: 'showActivePlayer', player: activePlayer });
+	}
+
+	// Simplified activePlayer initialization
+	// const activePlayer = localStorage.getItem("activePlayer") === "2" ? "2" : "1";
+	// localStorage.setItem("activePlayer", activePlayer);
+	// document.getElementById("playerToggleCheckbox").checked = activePlayer === "1";
+	// localStorage.setItem("toggleState", activePlayer === "1");
+	// bc.postMessage({ clockDisplay: 'showActivePlayer', player: activePlayer });
 
 	if (localStorage.getItem("p1Score") === null) {
 		localStorage.setItem("p1Score", "0");
@@ -107,10 +122,22 @@ window.onload = function() {
 		document.getElementById('sliderValue').innerText = savedOpacity + '%'; // Update displayed value
 	}
 
+	if (localStorage.getItem("enableBallTracker") === "true"){
+		document.getElementById("ballTrackerCheckbox").checked = true;
+		document.getElementById("ballTracker").classList.remove("noShow");
+		console.log(`Ball tracker enabled`);
+		bc.postMessage({ displayBallTracker: true });
+	} else {
+		document.getElementById("ballTrackerCheckbox").checked = false;
+		localStorage.setItem("enableBallTracker", "false");
+		document.getElementById("ballTracker").classList.add("noShow");
+		console.log(`Ball tracker disabled`);
+		bc.postMessage({ displayBallTracker: false });
+	}
+
 	// Call the visibility functions based on the checkbox states
     setPlayerVisibility(1);
     setPlayerVisibility(2);
-	toggleSetting();
 	applySavedBallStates();
 
 	// Initialize the logo and extension status for each logo (players + slideshow logos) and player
