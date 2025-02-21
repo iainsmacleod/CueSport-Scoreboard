@@ -97,13 +97,6 @@ window.onload = function() {
 		bc.postMessage({ clockDisplay: 'showActivePlayer', player: activePlayer });
 	}
 
-	// Simplified activePlayer initialization
-	// const activePlayer = localStorage.getItem("activePlayer") === "2" ? "2" : "1";
-	// localStorage.setItem("activePlayer", activePlayer);
-	// document.getElementById("playerToggleCheckbox").checked = activePlayer === "1";
-	// localStorage.setItem("toggleState", activePlayer === "1");
-	// bc.postMessage({ clockDisplay: 'showActivePlayer', player: activePlayer });
-
 	if (localStorage.getItem("p1Score") === null) {
 		localStorage.setItem("p1Score", "0");
 	}
@@ -398,9 +391,6 @@ function setPlayerVisibility(playerNumber) {
 	}
 	playerSetting(playerNumber);
 }
-  
-//   setPlayerVisibility(1);
-//   setPlayerVisibility(2);
 
 if (localStorage.getItem("customLogo1") != null) { document.getElementById("l1Img").src = localStorage.getItem("customLogo1"); } else { document.getElementById("l1Img").src = "./common/images/placeholder.png"; };
 if (localStorage.getItem("customLogo2") != null) { document.getElementById("l2Img").src = localStorage.getItem("customLogo2"); } else { document.getElementById("l2Img").src = "./common/images/placeholder.png"; };
@@ -421,6 +411,28 @@ document.getElementById("p1Score").value = localStorage.getItem("p1ScoreCtrlPane
 document.getElementById("p2Name").value = localStorage.getItem("p2NameCtrlPanel");
 document.getElementById("p2Score").value = localStorage.getItem("p2ScoreCtrlPanel");
 document.getElementById("gameType").value = localStorage.getItem("gameType");
+if (localStorage.getItem("gameType") === "game3"){
+	document.getElementById("ball 10").classList.add("noShow");
+	document.getElementById("ball 11").classList.add("noShow");
+	document.getElementById("ball 12").classList.add("noShow");
+	document.getElementById("ball 13").classList.add("noShow");
+	document.getElementById("ball 14").classList.add("noShow");
+	document.getElementById("ball 15").classList.add("noShow");
+} else if (localStorage.getItem("gameType") === "game4"){
+	document.getElementById("ball 10").classList.remove("noShow");
+	document.getElementById("ball 11").classList.add("noShow");
+	document.getElementById("ball 12").classList.add("noShow");
+	document.getElementById("ball 13").classList.add("noShow");
+	document.getElementById("ball 14").classList.add("noShow");
+	document.getElementById("ball 15").classList.add("noShow");
+} else {
+	document.getElementById("ball 10").classList.remove("noShow");
+	document.getElementById("ball 11").classList.remove("noShow");
+	document.getElementById("ball 12").classList.remove("noShow");
+	document.getElementById("ball 13").classList.remove("noShow");
+	document.getElementById("ball 14").classList.remove("noShow");
+	document.getElementById("ball 15").classList.remove("noShow");
+}
 document.getElementById("raceInfoTxt").value = localStorage.getItem("raceInfo");
 document.getElementById("gameInfoTxt").value = localStorage.getItem("gameInfo");
 document.getElementById("verNum").innerHTML = versionNum;

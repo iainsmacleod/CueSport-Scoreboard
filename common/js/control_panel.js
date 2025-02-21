@@ -42,10 +42,35 @@ function toggleAnimationSetting(){
 
 function gameType(value) {
 	localStorage.setItem("gameType", value);
-	// bc.postMessage({ clockDisplay: 'showGameType', gameType: value });
+	if (localStorage.getItem("gameType") === "game3"){
+		document.getElementById("ball 10").classList.add("noShow");
+		document.getElementById("ball 11").classList.add("noShow");
+		document.getElementById("ball 12").classList.add("noShow");
+		document.getElementById("ball 13").classList.add("noShow");
+		document.getElementById("ball 14").classList.add("noShow");
+		document.getElementById("ball 15").classList.add("noShow");
+	} else if (localStorage.getItem("gameType") === "game4"){
+		document.getElementById("ball 10").classList.remove("noShow");
+		document.getElementById("ball 11").classList.add("noShow");
+		document.getElementById("ball 12").classList.add("noShow");
+		document.getElementById("ball 13").classList.add("noShow");
+		document.getElementById("ball 14").classList.add("noShow");
+		document.getElementById("ball 15").classList.add("noShow");
+	} else {
+		document.getElementById("ball 10").classList.remove("noShow");
+		document.getElementById("ball 11").classList.remove("noShow");
+		document.getElementById("ball 12").classList.remove("noShow");
+		document.getElementById("ball 13").classList.remove("noShow");
+		document.getElementById("ball 14").classList.remove("noShow");
+		document.getElementById("ball 15").classList.remove("noShow");
+	}
+	bc.postMessage({ gameType: value });
 }
 
 function useBallTracker(){
+	const player1Enabled = localStorage.getItem("usePlayer1") === "yes";
+    const player2Enabled = localStorage.getItem("usePlayer2") === "yes";
+    const bothPlayersEnabled = player1Enabled && player2Enabled;
 	localStorage.setItem("enableBallTracker", document.getElementById("ballTrackerCheckbox").checked);
 	if (document.getElementById("ballTrackerCheckbox").checked) {
 		document.getElementById("ballTracker").classList.remove("noShow");
@@ -54,9 +79,10 @@ function useBallTracker(){
 		document.getElementById("ballTracker").classList.add("noShow");
 		document.getElementById("ballTrackerDirection").classList.add("noShow");
 	}
-	//document.getElementById("ballTracker").classList.toggle("noShow");
-	bc.postMessage({ displayBallTracker: document.getElementById("ballTrackerCheckbox").checked});
-
+	if (bothPlayersEnabled){
+		bc.postMessage({ displayBallTracker: document.getElementById("ballTrackerCheckbox").checked});
+	}
+	console.log(`Both players are not enabled so we are not enabling the ball tracker`)
 }
 
 function toggleBallTrackerDirection() {
@@ -292,6 +318,7 @@ function playerSetting(player) {
 	document.getElementById("labelForUseClockSetting").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
 	document.getElementById("useToggleSetting").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
 	document.getElementById("labelForUseToggleSetting").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
+	document.getElementById("ballTrackerCheckbox").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
 	
 	// Show/hide  elements based on individual players being enabled
 	document.getElementById("logoName").classList[player1Enabled ? "remove" : "add"]("noShow");

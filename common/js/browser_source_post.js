@@ -146,6 +146,10 @@ const handlers = {
                 document.getElementById("raceInfo").classList.replace("fadeOutElm", "fadeInElm");
             }
 
+			if (localStorage.getItem("enableBallTracker") === "true"){
+				document.getElementById("ballTracker").classList.remove("noShow");
+			}
+
             showPlayer(data.playerNumber);
 
             // Add a small delay to check after showPlayer has completed
@@ -171,6 +175,7 @@ const handlers = {
             document.getElementById("player1Image").classList.replace("fadeInElm", "fadeOutElm");
             document.getElementById("player2Image").classList.replace("fadeInElm", "fadeOutElm");
             document.getElementById("customLogo"+ data.playerNumber).classList.replace("fadeInElm", "fadeOutElm");
+			document.getElementById("ballTracker").classList.add("noShow");
         };
     },
 
@@ -302,6 +307,27 @@ const handlers = {
             ballTracker.classList.add("noShow");
             console.log('Hide ball tracker');
         }
+    },
+
+	gameType(data) {
+        console.log('Game type value:', data.gameType);
+        if (data.gameType === "game3") {
+            // 9-ball
+            ["10", "11", "12", "13", "14", "15"].forEach(num => {
+                document.getElementById(`ball ${num}`).classList.add("noShow");
+            });
+        } else if (data.gameType === "game4") {
+            // 10-ball
+            document.getElementById("ball 10").classList.remove("noShow");
+            ["11", "12", "13", "14", "15"].forEach(num => {
+                document.getElementById(`ball ${num}`).classList.add("noShow");
+            });
+        } else {
+            // All balls
+            ["10", "11", "12", "13", "14", "15"].forEach(num => {
+                document.getElementById(`ball ${num}`).classList.remove("noShow");
+            });
+        }
     }
 };
 
@@ -372,6 +398,28 @@ $(document).ready(function() {
 setCustomLogo("customLogo1", "useCustomLogo", "usePlayer1");
 setCustomLogo("customLogo2", "useCustomLogo2", "usePlayer2");
 
+if (localStorage.getItem("gameType") === "game3"){
+	document.getElementById("ball 10").classList.add("noShow");
+	document.getElementById("ball 11").classList.add("noShow");
+	document.getElementById("ball 12").classList.add("noShow");
+	document.getElementById("ball 13").classList.add("noShow");
+	document.getElementById("ball 14").classList.add("noShow");
+	document.getElementById("ball 15").classList.add("noShow");
+} else if (localStorage.getItem("gameType") === "game4"){
+	document.getElementById("ball 10").classList.remove("noShow");
+	document.getElementById("ball 11").classList.add("noShow");
+	document.getElementById("ball 12").classList.add("noShow");
+	document.getElementById("ball 13").classList.add("noShow");
+	document.getElementById("ball 14").classList.add("noShow");
+	document.getElementById("ball 15").classList.add("noShow");
+} else {
+	document.getElementById("ball 10").classList.remove("noShow");
+	document.getElementById("ball 11").classList.remove("noShow");
+	document.getElementById("ball 12").classList.remove("noShow");
+	document.getElementById("ball 13").classList.remove("noShow");
+	document.getElementById("ball 14").classList.remove("noShow");
+	document.getElementById("ball 15").classList.remove("noShow");
+}
 
 if (localStorage.getItem("customLogo3") != null) { document.getElementById("customLogo3").src = localStorage.getItem("customLogo3"); } else { document.getElementById("customLogo3").src = "./common/images/placeholder.png"; };
 if (localStorage.getItem("customLogo4") != null) { document.getElementById("customLogo4").src = localStorage.getItem("customLogo4"); } else { document.getElementById("customLogo4").src = "./common/images/placeholder.png"; };
