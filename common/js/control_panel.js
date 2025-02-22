@@ -319,6 +319,7 @@ function playerSetting(player) {
 	document.getElementById("useToggleSetting").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
 	document.getElementById("labelForUseToggleSetting").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
 	document.getElementById("ballTrackerCheckbox").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
+	document.getElementById("labelForBallTrackerCheckbox").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
 	
 	// Show/hide  elements based on individual players being enabled
 	document.getElementById("logoName").classList[player1Enabled ? "remove" : "add"]("noShow");
