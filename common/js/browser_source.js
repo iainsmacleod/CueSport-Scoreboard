@@ -16,18 +16,18 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////            
 
 function postLogo() {
-	if (localStorage.getItem("customLogo1") != null && localStorage.getItem("customLogo1") != "") {
-		document.getElementById("customLogo1").src = localStorage.getItem("customLogo1");
+	if (getStorageItem("customLogo1") != null && getStorageItem("customLogo1") != "") {
+		document.getElementById("customLogo1").src = getStorageItem("customLogo1");
 	}
-	if (localStorage.getItem("customLogo2") != null && localStorage.getItem("customLogo2") != "") {
-		document.getElementById("customLogo2").src = localStorage.getItem("customLogo2");
+	if (getStorageItem("customLogo2") != null && getStorageItem("customLogo2") != "") {
+		document.getElementById("customLogo2").src = getStorageItem("customLogo2");
 	}
 }
 
 function clearWinBlink() {
 	document.getElementById("player1Score").classList.remove("winBlink");
 	document.getElementById("player2Score").classList.remove("winBlink");
-	var gameType = localStorage.getItem("gameType");
+	var gameType = getStorageItem("gameType");
 
 	// Check if an animation is already in progress
     const container = document.querySelector('#videoContainer');
@@ -36,7 +36,7 @@ function clearWinBlink() {
         return;
     }
 	
-	if (localStorage.getItem("winAnimation")== "yes") {
+	if (getStorageItem("winAnimation")== "yes") {
 		playWebmAnimation(gameType, '#videoContainer');
 	} else {
 		console.log(`Animation flag disabled`)
@@ -251,9 +251,9 @@ function showSlides() {
 	}
 
 	// Check which logos are loaded and add to loadedSlides
-	if (localStorage.getItem("customLogo3") && localStorage.getItem("customLogo3").startsWith("data")) loadedSlides.push(slides[0]); // Assuming customLogo3 is the first slide
-	if (localStorage.getItem("customLogo4") && localStorage.getItem("customLogo4").startsWith("data")) loadedSlides.push(slides[1]); // Assuming customLogo4 is the second slide
-	if (localStorage.getItem("customLogo5") && localStorage.getItem("customLogo5").startsWith("data")) loadedSlides.push(slides[2]); // Assuming customLogo5 is the third slide
+	if (getStorageItem("customLogo3") && getStorageItem("customLogo3").startsWith("data")) loadedSlides.push(slides[0]); // Assuming customLogo3 is the first slide
+	if (getStorageItem("customLogo4") && getStorageItem("customLogo4").startsWith("data")) loadedSlides.push(slides[1]); // Assuming customLogo4 is the second slide
+	if (getStorageItem("customLogo5") && getStorageItem("customLogo5").startsWith("data")) loadedSlides.push(slides[2]); // Assuming customLogo5 is the third slide
 
 	// Increment slide index and reset if it exceeds loaded slides
 	slideIndex++;
@@ -272,7 +272,7 @@ function showSlides() {
 
 function applySavedBallStates() {
     // Retrieve the ballState object from localStorage (or default to an empty object)
-    const ballState = JSON.parse(localStorage.getItem('ballState') || '{}');
+    const ballState = JSON.parse(getStorageItem('ballState') || '{}');
 
     // Get all ball elements (assuming each ball has the class 'ball')
     const balls = document.querySelectorAll('.ball');
@@ -363,4 +363,15 @@ function playWebmAnimation(gameType, containerSelector = '#videoContainer') {
     
     // Return the video element for further manipulation if needed.
     return video;
+}
+
+function setStorageItem(key, value) {
+    const instanceId = localStorage.getItem('scoreboardInstanceId');
+    localStorage.setItem(`${instanceId}_${key}`, value);
+}
+
+function getStorageItem(key, defaultValue = null) {
+    const instanceId = localStorage.getItem('scoreboardInstanceId');
+    const value = localStorage.getItem(`${instanceId}_${key}`);
+    return value !== null ? value : defaultValue;
 }

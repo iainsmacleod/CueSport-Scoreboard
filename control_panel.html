@@ -275,6 +275,9 @@ for more information about Salotto please visit https://salotto.app
 					</div>
 				</details>
 			</div>
+			<div>
+				<button onclick="resetAll()" class="resetBtn">Reset All Data</button>
+			</div>
 		</center>
 		<div class="themeSizeLabels" id="obsThemeLabel"><text id="StyleChange">Size:&nbsp;</text>
 			<select class="obs28" name="bsstyle" id="bsStyle" onchange="bsStyleChange()">
@@ -328,14 +331,14 @@ for more information about Salotto please visit https://salotto.app
 			if (hotkeyStopClock != hotkeyStopClockOld) { stopClock(); hotkeyStopClockOld = hotkeyStopClock; }
 			if (hotkeySwap != hotkeySwapOld) { swapColors(); hotkeySwapOld = hotkeySwap; }
 			if (hotkeyPlayerToggle != hotkeyPlayerToggleOld && (useToggleSetting.checked==true && usePlayer1Setting.checked==true && usePlayer2Setting.checked==true)) {
-				var toggleState = localStorage.getItem("toggleState") === "true";
+				var toggleState = getStorageItem("toggleState") === "true";
 				var playerToggleCheckbox = document.getElementById("playerToggleCheckbox");
 				console.log(`Toggle state before ${toggleState}`)
 				playerToggleCheckbox.checked = !toggleState;
 
 
 				togglePlayer(!toggleState);
-				localStorage.setItem("toggleState", !toggleState);
+				setStorageItem("toggleState", !toggleState);
 				console.log(`Toggle state after ${toggleState}`)
 				hotkeyPlayerToggleOld = hotkeyPlayerToggle;
 			}

@@ -18,38 +18,38 @@
 function bsStyleChange() {
 	if (document.getElementById("bsStyle").value == 1) {
 		bc.postMessage({ clockDisplay: 'style125' });
-		localStorage.setItem("b_style", 1);
+		setStorageItem("b_style", 1);
 	}
 	if (document.getElementById("bsStyle").value == 2) {
 		bc.postMessage({ clockDisplay: 'style150' });
-		localStorage.setItem("b_style", 2);
+		setStorageItem("b_style", 2);
 	}
 	if (document.getElementById("bsStyle").value == 3) {
 		bc.postMessage({ clockDisplay: 'style200' });
-		localStorage.setItem("b_style", 3);
+		setStorageItem("b_style", 3);
 	}
 }
 
 function toggleAnimationSetting(){
 	if (!document.getElementById("winAnimation").checked) {
-		localStorage.setItem("winAnimation", "no");
+		setStorageItem("winAnimation", "no");
 		console.log("Win animation disabled");
 	} else if (document.getElementById("winAnimation").checked) {
-		localStorage.setItem("winAnimation", "yes");
+		setStorageItem("winAnimation", "yes");
 		console.log("Win animation enabled");
 	}	
 }
 
 function gameType(value) {
-	localStorage.setItem("gameType", value);
-	if (localStorage.getItem("gameType") === "game3"){
+	setStorageItem("gameType", value);
+	if (getStorageItem("gameType") === "game3"){
 		document.getElementById("ball 10").classList.add("noShow");
 		document.getElementById("ball 11").classList.add("noShow");
 		document.getElementById("ball 12").classList.add("noShow");
 		document.getElementById("ball 13").classList.add("noShow");
 		document.getElementById("ball 14").classList.add("noShow");
 		document.getElementById("ball 15").classList.add("noShow");
-	} else if (localStorage.getItem("gameType") === "game4"){
+	} else if (getStorageItem("gameType") === "game4"){
 		document.getElementById("ball 10").classList.remove("noShow");
 		document.getElementById("ball 11").classList.add("noShow");
 		document.getElementById("ball 12").classList.add("noShow");
@@ -68,10 +68,10 @@ function gameType(value) {
 }
 
 function useBallTracker(){
-	const player1Enabled = localStorage.getItem("usePlayer1") === "yes";
-    const player2Enabled = localStorage.getItem("usePlayer2") === "yes";
+	const player1Enabled = getStorageItem("usePlayer1") === "yes";
+    const player2Enabled = getStorageItem("usePlayer2") === "yes";
     const bothPlayersEnabled = player1Enabled && player2Enabled;
-	localStorage.setItem("enableBallTracker", document.getElementById("ballTrackerCheckbox").checked);
+	setStorageItem("enableBallTracker", document.getElementById("ballTrackerCheckbox").checked);
 	if (document.getElementById("ballTrackerCheckbox").checked) {
 		document.getElementById("ballTracker").classList.remove("noShow");
 		document.getElementById("ballTrackerDirection").classList.remove("noShow");
@@ -87,13 +87,13 @@ function useBallTracker(){
 
 function toggleBallTrackerDirection() {
     // Get current direction from localStorage or default to "horizontal"
-    const currentDirection = localStorage.getItem("ballTrackerDirection") || "vertical";
+    const currentDirection = getStorageItem("ballTrackerDirection") || "vertical";
     // Toggle direction
     const newDirection = currentDirection === "horizontal" ? "vertical" : "horizontal";
     // Send message to browser source
     bc.postMessage({ ballTracker: newDirection });
     // Update localStorage
-    localStorage.setItem("ballTrackerDirection", newDirection);
+    setStorageItem("ballTrackerDirection", newDirection);
     console.log(`Changed ball tracker to ${newDirection} orientation`);
 	document.getElementById("ballTrackerDirection").innerHTML = currentDirection.charAt(0).toUpperCase() + currentDirection.slice(1).toLowerCase() + " Ball Tracker";
 }
@@ -103,13 +103,13 @@ function togglePot(element) {
     element.classList.toggle('faded');
 
     // Parse the current ball state from localStorage or default to an empty object
-    const ballState = JSON.parse(localStorage.getItem('ballState') || '{}');
+    const ballState = JSON.parse(getStorageItem('ballState') || '{}');
     
     // Update the state by reading the current status from the element
     ballState[element.id] = element.classList.contains('faded');
     
     // Save the updated state back to localStorage
-    localStorage.setItem('ballState', JSON.stringify(ballState));
+    setStorageItem('ballState', JSON.stringify(ballState));
 
     // Broadcast the change if needed
     bc.postMessage({ toggle: element.id });
@@ -118,7 +118,7 @@ function togglePot(element) {
 
 function applySavedBallStates() {
     // Retrieve the ballState object from localStorage (or default to an empty object)
-    const ballState = JSON.parse(localStorage.getItem('ballState') || '{}');
+    const ballState = JSON.parse(getStorageItem('ballState') || '{}');
 
     // Get all ball elements (assuming each ball has the class 'ball')
     const balls = document.querySelectorAll('.ball');
@@ -136,7 +136,7 @@ function applySavedBallStates() {
 // Function to save the opacity value to localStorage
 function saveOpacity() {
 	var opacityValue = document.getElementById('scoreOpacity').value;
-	localStorage.setItem('overlayOpacity', opacityValue);
+	setStorageItem('overlayOpacity', opacityValue);
 	document.getElementById('sliderValue').innerText = opacityValue + '%'; // Update displayed value
 }
 
@@ -152,23 +152,23 @@ function toggleSetting() {
 	console.log(`Display active player ${checkbox ? "enabled" : "disabled"}`);
 	if (checkbox) {
 		document.getElementById("playerToggle").classList.remove("noShow");
-		localStorage.setItem("usePlayerToggle", "yes");
+		setStorageItem("usePlayerToggle", "yes");
 		bc.postMessage({ clockDisplay: 'showActivePlayer', player: activePlayer });
 		console.log(`Player ${activePlayer ? 1 : 2} is active`);
 	} else {
 		document.getElementById("playerToggle").classList.add("noShow");
-		localStorage.setItem("usePlayerToggle", "no");
+		setStorageItem("usePlayerToggle", "no");
 		bc.postMessage({ clockDisplay: 'hideActivePlayer' });
 	}
 }
 
 function logoSlideshow() {
 	if (document.getElementById("logoSlideshowChk").checked == true) {
-		localStorage.setItem("slideShow", "yes");
+		setStorageItem("slideShow", "yes");
 		bc.postMessage({ clockDisplay: 'logoSlideShow-show' });
 	} else {
 		bc.postMessage({ clockDisplay: 'logoSlideShow-hide' });
-		localStorage.setItem("slideShow", "no");
+		setStorageItem("slideShow", "no");
 	}
 }
 
@@ -178,13 +178,13 @@ function logoPost(input, xL) {
 		reader.readAsDataURL(input.files[0]);
 		reader.addEventListener("load", function () {
 			try {
-				localStorage.setItem("customLogo" + xL, reader.result);
+				setStorageItem("customLogo" + xL, reader.result);
 			} catch (err) {
 				alert("The selected image exceeds the maximum file size");
 				input.value = ""; // Clear the input
 				// Additional error handling here if needed
 			}
-			document.getElementById("l" + xL + "Img").src = localStorage.getItem("customLogo" + xL);
+			document.getElementById("l" + xL + "Img").src = getStorageItem("customLogo" + xL);
 			
 			// Update label and rebind container click to clearLogo
 			if (xL >= 1 && xL <= 5) {
@@ -232,8 +232,8 @@ function slideOther() {
 
 function swapColors() {
 	// Get current colors with default "white"
-	const p1original = localStorage.getItem('p1colorSet') || "white";
-	const p2original = localStorage.getItem('p2colorSet') || "white";
+	const p1original = getStorageItem('p1colorSet') || "white";
+	const p2original = getStorageItem('p2colorSet') || "white";
 	
 	// If colors are identical, don't swap
 	if (p1original === p2original) {
@@ -247,8 +247,8 @@ function swapColors() {
 		bc.postMessage({ player: '2', color: p1original });
 		document.getElementById("p2colorDiv").style.background = p1original;
 		document.getElementById("p1colorDiv").style.background = p2original;
-		localStorage.setItem('p1colorSet', p2original);
-		localStorage.setItem('p2colorSet', p1original);
+		setStorageItem('p1colorSet', p2original);
+		setStorageItem('p2colorSet', p1original);
 		document.getElementById("p2Name").style.background = `linear-gradient(to left, ${p1original}, white)`;
 		document.getElementById("p1Name").style.background = `linear-gradient(to right, ${p2original}, white)`;
 		document.getElementsByTagName("select")[0].options[0].value = p2original;
@@ -274,7 +274,7 @@ function playerColorChange(player) {
 
 		//if (cvalue == "cadetblue" || cvalue == "steelblue" || cvalue == "grey" || cvalue == "lightgrey" || cvalue == "green" || cvalue == "khaki" || cvalue == "tomato" || cvalue == "red" || cvalue == "orangered" || cvalue == "white" || cvalue == "orange" || cvalue == "lightgreen" || cvalue == "lightseagreen") { document.getElementById("p1colorDiv").style.color = "#000"; } else { document.getElementById("p1colorDiv").style.color = "lightgrey"; };
 		if (cvalue == "white") { document.getElementById("p1colorDiv").style.color = "black"; } else { document.getElementById("p1colorDiv").style.color = "white"; };
-		localStorage.setItem("p1colorSet", document.getElementById("p" + player + "colorDiv").value);
+		setStorageItem("p1colorSet", document.getElementById("p" + player + "colorDiv").value);
 		document.getElementsByTagName("select")[0].options[0].value = cvalue;
 	} else {
 		playerx = player;
@@ -286,7 +286,7 @@ function playerColorChange(player) {
 
 		//if (cvalue == "cadetblue" || cvalue == "steelblue" || cvalue == "grey" || cvalue == "lightgrey" || cvalue == "green" || cvalue == "khaki" || cvalue == "tomato" || cvalue == "red" || cvalue == "orangered" || cvalue == "white" || cvalue == "orange" || cvalue == "lightgreen" || cvalue == "lightseagreen") { document.getElementById("p2colorDiv").style.color = "#000"; } else { document.getElementById("p2colorDiv").style.color = "lightgrey"; };
 		if (cvalue == "white") { document.getElementById("p2colorDiv").style.color = "black"; } else { document.getElementById("p2colorDiv").style.color = "white"; };
-		localStorage.setItem("p2colorSet", document.getElementById("p" + player + "colorDiv").value);
+		setStorageItem("p2colorSet", document.getElementById("p" + player + "colorDiv").value);
 		document.getElementsByTagName("select")[1].options[0].value = cvalue;
 	}
 }
@@ -298,7 +298,7 @@ function playerSetting(player) {
     var storageValue = isChecked ? "yes" : "no";
     var usePlayer = isChecked ? "showPlayer" : "hidePlayer";
     
-    localStorage.setItem("usePlayer" + player, storageValue);
+    setStorageItem("usePlayer" + player, storageValue);
     
     // Handle player-specific elements
     ["Name", "NameLabel", "colorDiv", "ColorLabel"].forEach(function(elem) {
@@ -306,8 +306,8 @@ function playerSetting(player) {
     });
 
     // Check if both players are enabled
-    const player1Enabled = localStorage.getItem("usePlayer1") === "yes";
-    const player2Enabled = localStorage.getItem("usePlayer2") === "yes";
+    const player1Enabled = getStorageItem("usePlayer1") === "yes";
+    const player2Enabled = getStorageItem("usePlayer2") === "yes";
     const bothPlayersEnabled = player1Enabled && player2Enabled;
 	const bothPlayersDisabled = !player1Enabled && !player2Enabled;
 
@@ -330,7 +330,7 @@ function playerSetting(player) {
 	document.getElementById("uploadCustomLogo2").classList[player2Enabled ? "remove" : "add"]("noShow");
 
 	// Update clockInfo visibility based on player settings and useClock
-    const useClockEnabled = localStorage.getItem("useClock") === "yes";
+    const useClockEnabled = getStorageItem("useClock") === "yes";
     if (bothPlayersEnabled && useClockEnabled) {
         document.getElementById("clockInfo").classList.remove("noShow");
     } else {
@@ -346,11 +346,11 @@ function playerSetting(player) {
 function clockSetting() {
 	const clockDiv = document.getElementById("clockInfo");
 	if (!document.getElementById("useClockSetting").checked) {
-		localStorage.setItem("useClock", "no");
+		setStorageItem("useClock", "no");
 		bc.postMessage({ clockDisplay: 'noClock' });
 		clockDiv.classList.add("noShow"); // Hide the clock controls
 	} else if (document.getElementById("useClockSetting").checked) {
-		localStorage.setItem("useClock", "yes");
+		setStorageItem("useClock", "yes");
 		bc.postMessage({ clockDisplay: 'useClock' });
 		clockDiv.classList.remove("noShow"); // Show the clock controls
 	}
@@ -383,8 +383,8 @@ function postNames() {
 	if (!p2Name.value == "") { document.getElementById("p2extensionBtn").innerHTML = p2FirstName.substring(0, 9) + "'s Extension"; } else { document.getElementById("p2extensionBtn").innerHTML = "P2's Extension"; }
 	if (!p1Name.value == "") { document.getElementById("p1ScoreLabel").innerHTML = p1namemsg + " - Score/Rack(s)/Ball(s)"; } else { document.getElementById("p1ScoreLabel").innerHTML = "Player/Team 1 - Score/Rack(s)/Ball(s)";}
 	if (!p2Name.value == "") { document.getElementById("p2ScoreLabel").innerHTML = p2namemsg + " - Score/Rack(s)/Ball(s)"; } else { document.getElementById("p2ScoreLabel").innerHTML = "Player/Team 2 - Score/Rack(s)/Ball(s)";}
-	localStorage.setItem("p1NameCtrlPanel", p1Name.value);
-	localStorage.setItem("p2NameCtrlPanel", p2Name.value);
+	setStorageItem("p1NameCtrlPanel", p1Name.value);
+	setStorageItem("p2NameCtrlPanel", p2Name.value);
 }
 
 function postInfo() {
@@ -398,8 +398,8 @@ function postInfo() {
 	gamemsg = document.getElementById("gameInfoTxt").value;
 	bc.postMessage({ race: racemsg });
 	bc.postMessage({ game: gamemsg });	
-	localStorage.setItem("raceInfo", raceInfoTxt.value);
-	localStorage.setItem("gameInfo", gameInfoTxt.value);
+	setStorageItem("raceInfo", raceInfoTxt.value);
+	setStorageItem("gameInfo", gameInfoTxt.value);
 }
 
 
@@ -415,16 +415,16 @@ function pushScores() {
     p2ScoreValue = parseInt(p2Score) || 0;
     
     // Store scores in localStorage
-    localStorage.setItem("p1ScoreCtrlPanel", p1ScoreValue);
-	localStorage.setItem("p1Score", p1ScoreValue);
-    localStorage.setItem("p2ScoreCtrlPanel", p2ScoreValue);
-	localStorage.setItem("p2Score", p2ScoreValue);
+    setStorageItem("p1ScoreCtrlPanel", p1ScoreValue);
+	setStorageItem("p1Score", p1ScoreValue);
+    setStorageItem("p2ScoreCtrlPanel", p2ScoreValue);
+	setStorageItem("p2Score", p2ScoreValue);
 }
 
 function postScore(opt1, player) {
 	// Parse stored scores as integers
-    let p1ScoreValue = parseInt(localStorage.getItem("p1ScoreCtrlPanel")) || 0;
-    let p2ScoreValue = parseInt(localStorage.getItem("p2ScoreCtrlPanel")) || 0;
+    let p1ScoreValue = parseInt(getStorageItem("p1ScoreCtrlPanel")) || 0;
+    let p2ScoreValue = parseInt(getStorageItem("p2ScoreCtrlPanel")) || 0;
 
     if (player == "1") {
         if (opt1 == "add") {
@@ -432,8 +432,8 @@ function postScore(opt1, player) {
                 p1ScoreValue = p1ScoreValue + 1;
                 msg = { player: player, score: p1ScoreValue };
                 bc.postMessage(msg);
-                localStorage.setItem("p" + player + "ScoreCtrlPanel", p1ScoreValue);
-                localStorage.setItem("p" + player + "Score", p1ScoreValue);
+                setStorageItem("p" + player + "ScoreCtrlPanel", p1ScoreValue);
+                setStorageItem("p" + player + "Score", p1ScoreValue);
                 stopClock();
                 //document.getElementById("sendP" + player + "Score").style.border = "2px solid lightgreen";
                 document.getElementById("p"+player+"Score").value = p1ScoreValue;
@@ -444,8 +444,8 @@ function postScore(opt1, player) {
             p1ScoreValue = p1ScoreValue - 1;
             msg = { player: player, score: p1ScoreValue };
             bc.postMessage(msg);
-            localStorage.setItem("p" + player + "ScoreCtrlPanel", p1ScoreValue);
-            localStorage.setItem("p" + player + "Score", p1ScoreValue);
+            setStorageItem("p" + player + "ScoreCtrlPanel", p1ScoreValue);
+            setStorageItem("p" + player + "Score", p1ScoreValue);
             //document.getElementById("sendP" + player + "ScoreSub").style.border = "2px solid tomato";
             document.getElementById("p"+player+"Score").value = p1ScoreValue;
         }
@@ -456,8 +456,8 @@ function postScore(opt1, player) {
                 p2ScoreValue = p2ScoreValue + 1;
                 msg2 = { player: player, score: p2ScoreValue };
                 bc.postMessage(msg2);
-                localStorage.setItem("p" + player + "ScoreCtrlPanel", p2ScoreValue);
-                localStorage.setItem("p" + player + "Score", p2ScoreValue);
+                setStorageItem("p" + player + "ScoreCtrlPanel", p2ScoreValue);
+                setStorageItem("p" + player + "Score", p2ScoreValue);
                 stopClock();
                 //document.getElementById("sendP" + player + "Score").style.border = "2px solid lightgreen";
                 document.getElementById("p"+player+"Score").value = p2ScoreValue;
@@ -468,8 +468,8 @@ function postScore(opt1, player) {
             p2ScoreValue = p2ScoreValue - 1;
             msg2 = { player: player, score: p2ScoreValue };
             bc.postMessage(msg2);
-            localStorage.setItem("p" + player + "ScoreCtrlPanel", p2ScoreValue);
-            localStorage.setItem("p" + player + "Score", p2ScoreValue);
+            setStorageItem("p" + player + "ScoreCtrlPanel", p2ScoreValue);
+            setStorageItem("p" + player + "Score", p2ScoreValue);
             //document.getElementById("sendP" + player + "ScoreSub").style.border = "2px solid tomato";
             document.getElementById("p"+player+"Score").value = p2ScoreValue;
         }
@@ -518,7 +518,7 @@ function stopClock() {
 	document.getElementById("shotClock60").setAttribute("onclick", "shotClock(61000)");
 	document.getElementById("clockLocalDisplay").style.display = 'none';
 	clockDisplay("hide");
-	if (localStorage.getItem("obsTheme") == "light") {
+	if (getStorageItem("obsTheme") == "light") {
 		document.getElementById("shotClock30").classList.remove("clkd");
 		document.getElementById("shotClock60").classList.remove("clkd");
 	} else {
@@ -547,7 +547,7 @@ function add30(player) {
 	var playerName = document.getElementById(player + "Name").value.split(" ")[0] || player.toUpperCase();
 	document.getElementById(player + "extensionBtn").innerHTML = "Reset " + playerName.substring(0, 9) + "'s Ext";
 	
-	localStorage.setItem(player + "Extension", "enabled");
+	setStorageItem(player + "Extension", "enabled");
 	
 	clockDisplay("hide");
 }
@@ -568,23 +568,23 @@ function resetExt(player, flash) {
 	// 	document.getElementById(player + "extensionBtn").style.border = "2px solid blue";
 	// }
 
-	localStorage.setItem(player + "Extension", "disabled");
+	setStorageItem(player + "Extension", "disabled");
 
 }
 
 function customLogoSetting() {
     const checkbox = document.getElementById("customLogo1");
-    const isImageLoaded = localStorage.getItem("customLogo1") !== null;
+    const isImageLoaded = getStorageItem("customLogo1") !== null;
 
     // Initially disable the checkbox if no image is loaded
     checkbox.disabled = !isImageLoaded;
 
     if (!checkbox.checked) {
         bc.postMessage({ clockDisplay: 'hidecustomLogo' });
-        localStorage.setItem("useCustomLogo", "no");
+        setStorageItem("useCustomLogo", "no");
     } else {
         bc.postMessage({ clockDisplay: 'showcustomLogo' });
-        localStorage.setItem("useCustomLogo", "yes");
+        setStorageItem("useCustomLogo", "yes");
     }
 
     // Add event listener for checkbox toggle
@@ -595,10 +595,10 @@ function customLogoSetting() {
         // Handle the checkbox state
         if (checkbox.checked) {
             bc.postMessage({ clockDisplay: 'showcustomLogo' });
-            localStorage.setItem("useCustomLogo", "yes");
+            setStorageItem("useCustomLogo", "yes");
         } else {
             bc.postMessage({ clockDisplay: 'hidecustomLogo' });
-            localStorage.setItem("useCustomLogo", "no");
+            setStorageItem("useCustomLogo", "no");
         }
 
         // Re-enable after timeout
@@ -610,17 +610,17 @@ function customLogoSetting() {
 
 function customLogoSetting2() {
     const checkbox = document.getElementById("customLogo2");
-    const isImageLoaded = localStorage.getItem("customLogo2") !== null;
+    const isImageLoaded = getStorageItem("customLogo2") !== null;
 
     // Initially disable the checkbox if no image is loaded
     checkbox.disabled = !isImageLoaded;
 
     if (!checkbox.checked) {
         bc.postMessage({ clockDisplay: 'hidecustomLogo2' });
-        localStorage.setItem("useCustomLogo2", "no");
+        setStorageItem("useCustomLogo2", "no");
     } else {
         bc.postMessage({ clockDisplay: 'showcustomLogo2' });
-        localStorage.setItem("useCustomLogo2", "yes");
+        setStorageItem("useCustomLogo2", "yes");
     }
 
     // Add event listener for checkbox toggle
@@ -631,10 +631,10 @@ function customLogoSetting2() {
         // Handle the checkbox state
         if (checkbox.checked) {
             bc.postMessage({ clockDisplay: 'showcustomLogo2' });
-            localStorage.setItem("useCustomLogo2", "yes");
+            setStorageItem("useCustomLogo2", "yes");
         } else {
             bc.postMessage({ clockDisplay: 'hidecustomLogo2' });
-            localStorage.setItem("useCustomLogo2", "no");
+            setStorageItem("useCustomLogo2", "no");
         }
 
         // Re-enable after timeout
@@ -653,14 +653,14 @@ function togglePlayer(isChecked) {
 	} else {
 		console.log(`Not changing visual player indicator UI, due to useToggleSetting being disabled`);
 	}
-	localStorage.setItem("activePlayer", player);
-	localStorage.setItem("toggleState", activePlayer);
+	setStorageItem("activePlayer", player);
+	setStorageItem("toggleState", activePlayer);
     console.log(`Player ${player} is active`); // Log the active player
 }
 
 function obsThemeChange() {
 	if (document.getElementById("obsTheme").value == "28") {
-		localStorage.setItem("obsTheme", "28");
+		setStorageItem("obsTheme", "28");
 		document.getElementById("obsTheme").value = "28";
 		document.getElementsByTagName("body")[0].style.background = "#2b2e38";
 		document.styleSheets[0].disabled = false;
@@ -672,7 +672,7 @@ function obsThemeChange() {
 
 	}
 	if (document.getElementById("obsTheme").value == "27") {
-		localStorage.setItem("obsTheme", "27");
+		setStorageItem("obsTheme", "27");
 		document.getElementById("obsTheme").value = "27";
 		document.getElementsByTagName("body")[0].style.background = "#1f1e1f";
 		document.styleSheets[0].disabled = true;
@@ -683,7 +683,7 @@ function obsThemeChange() {
 		document.styleSheets[5].disabled = true;
 	}
 	if (document.getElementById("obsTheme").value == "acri") {
-		localStorage.setItem("obsTheme", "acri");
+		setStorageItem("obsTheme", "acri");
 		document.getElementById("obsTheme").value = "acri";
 		document.getElementsByTagName("body")[0].style.background = "#181819";
 		document.styleSheets[0].disabled = true;
@@ -694,7 +694,7 @@ function obsThemeChange() {
 		document.styleSheets[5].disabled = true;
 	}
 	if (document.getElementById("obsTheme").value == "grey") {
-		localStorage.setItem("obsTheme", "grey");
+		setStorageItem("obsTheme", "grey");
 		document.getElementById("obsTheme").value = "grey";
 		document.getElementsByTagName("body")[0].style.background = "#2f2f2f";
 		document.styleSheets[0].disabled = true;
@@ -705,7 +705,7 @@ function obsThemeChange() {
 		document.styleSheets[5].disabled = true;
 	}
 	if (document.getElementById("obsTheme").value == "light") {
-		localStorage.setItem("obsTheme", "light");
+		setStorageItem("obsTheme", "light");
 		document.getElementById("obsTheme").value = "light";
 		document.getElementsByTagName("body")[0].style.background = "#e5e5e5";
 		document.styleSheets[0].disabled = true;
@@ -716,7 +716,7 @@ function obsThemeChange() {
 		document.styleSheets[5].disabled = true;
 	}
 	if (document.getElementById("obsTheme").value == "rachni") {
-		localStorage.setItem("obsTheme", "rachni");
+		setStorageItem("obsTheme", "rachni");
 		document.getElementById("obsTheme").value = "rachni";
 		document.getElementsByTagName("body")[0].style.background = "#232629";
 		document.styleSheets[0].disabled = true;
@@ -729,8 +729,8 @@ function obsThemeChange() {
 }
 
 function startThemeCheck() {
-	if (localStorage.getItem("obsTheme") == null) { localStorage.setItem("obsTheme", "28"); document.getElementById("obsTheme").value = "28"; };
-	if (localStorage.getItem("obsTheme") == "28") {
+	if (getStorageItem("obsTheme") == null) { setStorageItem("obsTheme", "28"); document.getElementById("obsTheme").value = "28"; };
+	if (getStorageItem("obsTheme") == "28") {
 		document.getElementById("obsTheme").value = "28";
 		document.getElementsByTagName("body")[0].style.background = "#2b2e38";
 		document.styleSheets[0].disabled = false;
@@ -740,7 +740,7 @@ function startThemeCheck() {
 		document.styleSheets[4].disabled = true;
 		document.styleSheets[5].disabled = true;
 	}
-	if (localStorage.getItem("obsTheme") == "27") {
+	if (getStorageItem("obsTheme") == "27") {
 		document.getElementById("obsTheme").value = "27";
 		document.getElementsByTagName("body")[0].style.background = "#1f1e1f";
 		document.styleSheets[0].disabled = true;
@@ -750,7 +750,7 @@ function startThemeCheck() {
 		document.styleSheets[4].disabled = true;
 		document.styleSheets[5].disabled = true;
 	}
-	if (localStorage.getItem("obsTheme") == "acri") {
+	if (getStorageItem("obsTheme") == "acri") {
 		document.getElementById("obsTheme").value = "acri";
 		document.getElementsByTagName("body")[0].style.background = "#181819";
 		document.styleSheets[0].disabled = true;
@@ -760,7 +760,7 @@ function startThemeCheck() {
 		document.styleSheets[4].disabled = true;
 		document.styleSheets[5].disabled = true;
 	}
-	if (localStorage.getItem("obsTheme") == "grey") {
+	if (getStorageItem("obsTheme") == "grey") {
 		document.getElementById("obsTheme").value = "grey";
 		document.getElementsByTagName("body")[0].style.background = "#2f2f2f";
 		document.styleSheets[0].disabled = true;
@@ -770,7 +770,7 @@ function startThemeCheck() {
 		document.styleSheets[4].disabled = true;
 		document.styleSheets[5].disabled = true;
 	}
-	if (localStorage.getItem("obsTheme") == "light") {
+	if (getStorageItem("obsTheme") == "light") {
 		document.getElementById("obsTheme").value = "light";
 		document.getElementsByTagName("body")[0].style.background = "#e5e5e5";
 		document.styleSheets[0].disabled = true;
@@ -780,7 +780,7 @@ function startThemeCheck() {
 		document.styleSheets[4].disabled = false;
 		document.styleSheets[5].disabled = true;
 	}
-	if (localStorage.getItem("obsTheme") == "rachni") {
+	if (getStorageItem("obsTheme") == "rachni") {
 		document.getElementById("obsTheme").value = "rachni";
 		document.getElementsByTagName("body")[0].style.background = "#232629";
 		document.styleSheets[0].disabled = true;
@@ -795,7 +795,7 @@ function startThemeCheck() {
 function cLogoNameChange() {
 	cLogoName = prompt("Rename \'Player 1 Logo\' checkbox label (13 character maximum)");
 	if (cLogoName != null && cLogoName != "") {
-		localStorage.setItem("clogoNameStored", cLogoName.substring(0, 13));
+		setStorageItem("clogoNameStored", cLogoName.substring(0, 13));
 		document.getElementById("logoName").innerHTML = cLogoName.substring(0, 13);
 	}
 }
@@ -803,7 +803,7 @@ function cLogoNameChange() {
 function cLogoNameChange2() {
 	cLogoName2 = prompt("Rename \'Player 2 Logo\' checkbox label (13 character maximum)");
 	if (cLogoName2 != null && cLogoName2 != "") {
-		localStorage.setItem("clogoName2Stored", cLogoName2.substring(0, 13));
+		setStorageItem("clogoName2Stored", cLogoName2.substring(0, 13));
 		document.getElementById("logoName2").innerHTML = cLogoName2.substring(0, 13);
 	}
 }
@@ -824,8 +824,8 @@ function resetScores() {
     p2ScoreValue = 0;
     
     // Store reset scores in localStorage
-    localStorage.setItem("p1ScoreCtrlPanel", 0);
-    localStorage.setItem("p2ScoreCtrlPanel", 0);
+    setStorageItem("p1ScoreCtrlPanel", 0);
+    setStorageItem("p2ScoreCtrlPanel", 0);
 
 		resetExt('p1', 'noflash');
 		resetExt('p2', 'noflash');
@@ -835,7 +835,7 @@ function resetScores() {
 
 function resetBallTracker() {
     // Retrieve the saved ball state from localStorage
-    let ballState = JSON.parse(localStorage.getItem('ballState') || '{}');
+    let ballState = JSON.parse(getStorageItem('ballState') || '{}');
 
     // Select all ball elements within the .ballTracker container
     const ballElements = document.querySelectorAll('.ball');
@@ -850,7 +850,7 @@ function resetBallTracker() {
     });
 
     // Save the updated state back to localStorage
-    localStorage.setItem('ballState', JSON.stringify(ballState));
+    setStorageItem('ballState', JSON.stringify(ballState));
 
     console.log("All balls have been reset to their default condition.");
 }
@@ -887,10 +887,10 @@ function clearLogo(xL) {
             checkbox.checked = false;
         }
 		if (xL ===1) {
-			localStorage.setItem("useCustomLogo", "no");
+			setStorageItem("useCustomLogo", "no");
 			customLogoSetting();
 		} else {
-			localStorage.setItem("useCustomLogo2","no");
+			setStorageItem("useCustomLogo2","no");
 			customLogoSetting2();
 		}
 		var fileInput = document.getElementById("FileUploadL" + xL);
@@ -915,4 +915,55 @@ function clearLogo(xL) {
         container.style.backgroundColor = "";
         container.style.color = "";
     }
+}
+
+function setStorageItem(key, value) {
+    const instanceId = localStorage.getItem('scoreboardInstanceId');
+    localStorage.setItem(`${instanceId}_${key}`, value);
+}
+
+function getStorageItem(key, defaultValue = null) {
+    const instanceId = localStorage.getItem('scoreboardInstanceId');
+    const value = localStorage.getItem(`${instanceId}_${key}`);
+    return value !== null ? value : defaultValue;
+}
+
+function removeInstanceData(instanceId) {
+    // Remove all localStorage items for this instance
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key.startsWith(instanceId + '_') || key === 'scoreboardInstanceId') {
+            localStorage.removeItem(key);
+        }
+    }
+}
+
+// Add a manual cleanup function that can be called from UI
+function clearAllData() {
+    if (confirm('Are you sure you want to clear all stored data for this scoreboard?')) {
+        const instanceId = generateInstanceId();
+        removeInstanceData(instanceId);
+        location.reload(); // Reload the page to start fresh
+    }
+}
+
+function resetAll() {
+    if (confirm("Click OK to confirm complete reset. This will clear all stored data for this scoreboard instance.")) {
+        clearAllData();
+    }
+}
+
+// Modify generateInstanceId to include cleanup
+function generateInstanceId() {
+    // Try to get existing instance ID from localStorage
+    let instanceId = getStorageItem('scoreboardInstanceId');
+    if (!instanceId) {
+        instanceId = `scoreboard_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        setStorageItem('scoreboardInstanceId', instanceId);
+    }
+    
+    // Run cleanup periodically (once per session when generating instance ID)
+    //cleanupOldInstances();
+    
+    return instanceId;
 }
