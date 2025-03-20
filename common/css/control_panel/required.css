@@ -170,6 +170,16 @@
 		border:2px solid black;
 	}
 
+	#resetDataBtn{
+		cursor: pointer;
+		width: 150px;
+		font-size: 10pt;
+		padding: 0px 0px 0px 0px;
+		background: red;
+		color: black;
+		border:2px solid black;
+	}
+
 	#p1extensionBtn, #p2extensionBtn  {
 		cursor: pointer;
 		width:120px;
@@ -209,7 +219,7 @@
 	}
 	
 	
-	#settingsInfo, #logoInfo, #gameInfo, #playerInfo, #scoreInfo, #clockInfo {
+	#settingsInfo, #logoInfo, #gameInfo, #playerInfo, #scoreInfo, #clockInfo, #resetData{
 	min-width:85px;
 	width:600px;
 	position:relative;

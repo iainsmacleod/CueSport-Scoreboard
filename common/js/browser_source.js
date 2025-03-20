@@ -366,12 +366,12 @@ function playWebmAnimation(gameType, containerSelector = '#videoContainer') {
 }
 
 function setStorageItem(key, value) {
-    const instanceId = localStorage.getItem('scoreboardInstanceId');
-    localStorage.setItem(`${instanceId}_${key}`, value);
+    const prefix = INSTANCE_ID ? `${INSTANCE_ID}_` : '';
+    localStorage.setItem(`${prefix}${key}`, value);
 }
 
 function getStorageItem(key, defaultValue = null) {
-    const instanceId = localStorage.getItem('scoreboardInstanceId');
-    const value = localStorage.getItem(`${instanceId}_${key}`);
+    const prefix = INSTANCE_ID ? `${INSTANCE_ID}_` : '';
+    const value = localStorage.getItem(`${prefix}${key}`);
     return value !== null ? value : defaultValue;
 }

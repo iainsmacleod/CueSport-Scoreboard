@@ -36,6 +36,17 @@ for more information about Salotto please visit https://salotto.app
 <body>
 	<div id="mainDiv">
 		<center>
+			<div id="resetData" class="obs28 two-column-container">
+				<div class="column">
+					<div class="hover obs28" onclick="resetInstance()" id="resetDataBtn">
+						Reset Instance Data
+					</div>
+					<div class="hover obs28" onclick="resetAll()" id="resetDataBtn">
+						Reset All Data
+					</div>
+				</div>
+			</div>
+			<br>
 			<div id="settingsInfo" class="obs28 four-column-container">
 				<details open>
 					<summary style="cursor:pointer; font-weight:bold;">GENERAL SETTINGS</summary>
@@ -275,9 +286,6 @@ for more information about Salotto please visit https://salotto.app
 					</div>
 				</details>
 			</div>
-			<div>
-				<button onclick="resetAll()" class="resetBtn">Reset All Data</button>
-			</div>
 		</center>
 		<div class="themeSizeLabels" id="obsThemeLabel"><text id="StyleChange">Size:&nbsp;</text>
 			<select class="obs28" name="bsstyle" id="bsStyle" onchange="bsStyleChange()">
@@ -302,7 +310,6 @@ for more information about Salotto please visit https://salotto.app
 				id="verNum"></text></text>
 	</div>
 	<script src="./common/js/control_panel_post.js"></script>
-
 	<script>
 		//////////////////// HotKey scripts
 

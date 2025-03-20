@@ -918,52 +918,61 @@ function clearLogo(xL) {
 }
 
 function setStorageItem(key, value) {
-    const instanceId = localStorage.getItem('scoreboardInstanceId');
-    localStorage.setItem(`${instanceId}_${key}`, value);
+    const prefix = INSTANCE_ID ? `${INSTANCE_ID}_` : '';
+    localStorage.setItem(`${prefix}${key}`, value);
 }
 
 function getStorageItem(key, defaultValue = null) {
-    const instanceId = localStorage.getItem('scoreboardInstanceId');
-    const value = localStorage.getItem(`${instanceId}_${key}`);
+    const prefix = INSTANCE_ID ? `${INSTANCE_ID}_` : '';
+    const value = localStorage.getItem(`${prefix}${key}`);
     return value !== null ? value : defaultValue;
 }
 
-function removeInstanceData(instanceId) {
-    // Remove all localStorage items for this instance
-    for (let i = localStorage.length - 1; i >= 0; i--) {
-        const key = localStorage.key(i);
-        if (key.startsWith(instanceId + '_') || key === 'scoreboardInstanceId') {
-            localStorage.removeItem(key);
-        }
-    }
-}
-
-// Add a manual cleanup function that can be called from UI
-function clearAllData() {
-    if (confirm('Are you sure you want to clear all stored data for this scoreboard?')) {
-        const instanceId = generateInstanceId();
-        removeInstanceData(instanceId);
-        location.reload(); // Reload the page to start fresh
-    }
-}
-
 function resetAll() {
-    if (confirm("Click OK to confirm complete reset. This will clear all stored data for this scoreboard instance.")) {
+    if (confirm("Click OK to confirm complete reset. This will clear all stored data for ALL scoreboard instance.")) {
         clearAllData();
     }
 }
-
-// Modify generateInstanceId to include cleanup
-function generateInstanceId() {
-    // Try to get existing instance ID from localStorage
-    let instanceId = getStorageItem('scoreboardInstanceId');
-    if (!instanceId) {
-        instanceId = `scoreboard_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        setStorageItem('scoreboardInstanceId', instanceId);
+function clearAllData() {
+    if (confirm('Are you sure you want to clear ALL locally stored data for CueSports Scoreboard, and reset to defaults?')) {
+		removeAllData(INSTANCE_ID );
+        location.reload(); // Reload the page to start fresh
     }
-    
-    // Run cleanup periodically (once per session when generating instance ID)
-    //cleanupOldInstances();
-    
-    return instanceId;
+}
+function removeAllData() {
+    // Remove all localStorage items for this instance
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        localStorage.removeItem(key);
+    }
+}
+
+function resetInstance() {
+    if (confirm("Click OK to confirm complete reset. This will clear stored data for this scoreboard instance.")) {
+        clearInstanceData();
+    }
+}
+function clearInstanceData() {
+    if (confirm('Are you sure you want to clear stored data for this scoreboard instance, and reset to defaults?')) {
+		const INSTANCE_ID = urlParams.get('instance') || '';
+		removeInstanceData(INSTANCE_ID);
+        location.reload(); // Reload the page to start fresh
+    }
+}
+function removeInstanceData(instanceId) {
+    if (instanceId === null || instanceId === undefined) {
+        // Remove all localStorage items
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+            const key = localStorage.key(i);
+            localStorage.removeItem(key);
+        }
+    } else {
+        // Remove only items for this instance
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+            const key = localStorage.key(i);
+            if (key.startsWith(instanceId)) {
+                localStorage.removeItem(key);
+            }
+        }
+    }
 }

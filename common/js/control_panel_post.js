@@ -16,23 +16,11 @@
 
 var cLogoName = "Player 1 Logo";  // 13 character limit. it will auto trim to 13 characters.
 var cLogoName2 = "Player 2 Logo";
-function generateInstanceId() {
-    // Try to get existing instance ID from localStorage first
-    let instanceId = localStorage.getItem('scoreboardInstanceId');
-    if (!instanceId) {
-        // Only create new instance ID if one doesn't exist
-        const timestamp = Date.now();
-        const randomString = Math.random().toString(36).slice(2, 11); // Using slice instead of substring
-        instanceId = `scoreboard_${timestamp}_${randomString}`;
-        localStorage.setItem('scoreboardInstanceId', instanceId);
-    }
-    return instanceId;
-}
-
-const INSTANCE_ID = generateInstanceId();
-const bc = new BroadcastChannel(INSTANCE_ID);
-//const bc = new BroadcastChannel('g4-main');
-const bcr = new BroadcastChannel('g4-recv'); // return channel from browser_source 
+// Get instance from URL or use 'default'
+const urlParams = new URLSearchParams(window.location.search);
+const INSTANCE_ID = urlParams.get('instance') || '';
+const bc = new BroadcastChannel(`main_${INSTANCE_ID}`);
+const bcr = new BroadcastChannel(`recv_${INSTANCE_ID}`); // return channel from browser_source 
 var hotkeyP1ScoreUp;
 var hotkeyP1ScoreDown;
 var hotkeyP2ScoreUp;
@@ -167,6 +155,7 @@ window.onload = function() {
 	// Initialize the logo and extension status for each logo (players + slideshow logos) and player
 	initializeLogoStatus();
 	initializeExtensionButtonStatus();
+	console.log(`Print: ${INSTANCE_ID}`)
 };
 
 function initializeLogoStatus() {

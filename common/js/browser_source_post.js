@@ -16,16 +16,10 @@
 
 var countDownTime;
 var shotClockxr = null;
-const bcr = new BroadcastChannel('g4-recv'); // browser_source -> control_panel channel 
-//const bc = new BroadcastChannel('g4-main');
-// Add this function at the top level
-function getInstanceId() {
-    return localStorage.getItem('scoreboardInstanceId');
-}
-
-// Initialize broadcast channels with the instance ID
-const INSTANCE_ID = getInstanceId();
-const bc = new BroadcastChannel(INSTANCE_ID);
+const urlParams = new URLSearchParams(window.location.search);
+const INSTANCE_ID = urlParams.get('instance') || '';
+const bcr = new BroadcastChannel(`recv_${INSTANCE_ID}`); // browser_source -> control_panel channel 
+const bc = new BroadcastChannel(`main_${INSTANCE_ID}`);
 var playerNumber;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
