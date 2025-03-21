@@ -1,3 +1,6 @@
+div {
+	color:black !important; /*override white div font color */
+	}
 	.blue28 {
 		background: #3345a3;
 		border:0px;
