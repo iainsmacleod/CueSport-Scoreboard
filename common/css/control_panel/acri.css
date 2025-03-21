@@ -1,68 +1,43 @@
-	.blue28 {
-		background: maroon;
-		border:0px;
-		}
-	.obs28 {
-		background: #162458;
-		border:0px;
-		color:lightgrey;
-		}
-	#swapBtn {
-		cursor:pointer;
-		position:relative;
-		border: 1px solid #3345a3;
-		padding-bottom:2px;
-		width:10%;
-		min-width:30px;
-		min-height:15px;
-		font-size:7pt;
+.blue28 {
+	background: maroon;
+	border:0px;
 	}
-	#mainDiv {
-		background: #181819;
-		}
-	
-	hr {
-		border-bottom:0px;
-		border-top: 1px solid #3345a3;
-		border-left: 0px;
-		border-right: 0px;
-		
-		}
-	
-	.hover {
+.obs28 {
+	background: #162458;
+	border:0px;
+	color:lightgrey;
 	}
-	.hover:hover {
-		background:#2a3a75;
+#swapBtn {
+	cursor:pointer;
+	position:relative;
+	border: 1px solid #3345a3;
+	padding-bottom:2px;
+	width:10%;
+	min-width:30px;
+	min-height:15px;
+	font-size:7pt;
+}
+#mainDiv {
+	background: #181819;
 	}
+
+hr {
+	border-bottom:0px;
+	border-top: 1px solid #3345a3;
+	border-left: 0px;
+	border-right: 0px;
 	
-	.clkd {
-		color: dimgrey;
 	}
-	.themeSizeLabels{
-		color:lightgrey;
-	}
-	
-	
-	.slider {
-	  -webkit-appearance: none;
-	  width: 100%;
-	  height: 5px;
-	  border-radius: 5px;
-	  background: #3305a9; 
-	  outline: none;
-	  opacity: 1;
-	  -webkit-transition: .2s;
-	  transition: opacity .2s;
-	}
-	
-	
-	
-	
-	
-	
-	
-	
-		
-		
-		
-		
+
+/* .hover {
+} */
+.hover:hover {
+	background:#2a3a75;
+}
+
+.clkd {
+	color: dimgrey;
+}
+.themeSizeLabels{
+	color:lightgrey;
+}
