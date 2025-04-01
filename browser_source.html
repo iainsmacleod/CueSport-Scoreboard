@@ -19,9 +19,9 @@ for more information about Salotto please visit https://salotto.app
 	<script src="./common/js/browser_source.js"></script>
 	<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
 	<!-- <link rel="stylesheet" href="./common/css/browser_source/100.css" /> -->
-	<link rel="stylesheet" href="./common/css/browser_source/125.css" />
+	<!-- <link rel="stylesheet" href="./common/css/browser_source/125.css" />
 	<link rel="stylesheet" href="./common/css/browser_source/150.css" />
-	<link rel="stylesheet" href="./common/css/browser_source/200.css" />
+	<link rel="stylesheet" href="./common/css/browser_source/200.css" /> -->
 	<link rel="stylesheet" href="./common/css/browser_source/required.css" />
 	<link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
 	<!-- <style>
@@ -59,34 +59,39 @@ for more information about Salotto please visit https://salotto.app
 		<div class="mySlides logoSlide fade"><img id="customLogo5" src="" style="height:200px"></div>
 	</div>
 	<div id="scoreBoardDiv" class="fadeInElm">
-		<div class="shotclockvis fadeOutElm" id="shotClockVis"></div>
-		<img class="fadeOutElm customLogo1" id="customLogo1" height="20px" src="">
-		<img class="fadeOutElm customLogo2" id="customLogo2" height="20px" src="">
-		<div class="fadeInElm" id="p1ExtIcon">Ex</div>
-		<div class="fadeInElm" id="p2ExtIcon">Ex</div>
-		<table id="scoreBoard">
-			<tr>
-				<td class="noShow"></td>
-				<td class="noShow"></td>
-				<td class="noShow"></td>
-				<td class="fadeOutElm" colspan="2" width="30px" id="shotClock">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td>
-				<td class="noShow"></td>
-				<td class="noShow"></td>
-				<td class="noShow"></td>
-			</tr>
-			<tr>
-				<!-- <img id="player1Image" class="fadeInElm" src="./common/images/8ball_small.png" style="display:inline;" /> -->
-				<div id="player1Image" class="fadeInElm"></div>
-				<td id="player1Name" class="fadeInElm">Player 1</td>
-				<td id="player1Score" class="fadeInElm" colspan="3">0</td>
-				<td class="noShow fadeInElm" id="raceInfo"></td>
-				<td id="player2Score" class="fadeInElm" colspan="3">0</td>
-				<td id="player2Name" class="fadeInElm">Player 2</td>
-				<!-- <img id="player2Image" class="fadeOutElm" src="./common/images/8ball_small.png" style="display:inline;" /> -->
-				<div id="player2Image" class="fadeOutElm"></div>
-			</tr>
-		</table>
-	</div>
+		<!-- Shot clock at top -->
+		<div id="shotClock" class="fadeOutElm">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+		  <div class="shotclockvis fadeOutElm" id="shotClockVis"></div>
+		</div>
+		<!-- Main scoreboard container -->
+		<div id="scoreBoard">
+		  <!-- Player 1 section -->
+		  <div class="player-container left">
+			<div id="p1ExtIcon" class="fadeInElm">Ex</div>
+			<div id="player1Name" class="fadeInElm">
+			  <div id="player1Image" class="fadeInElm"></div>
+			  <span>Player 1</span>
+			  <img class="fadeOutElm customLogo1" id="customLogo1" height="20px" src="">
+			</div>
+			<div id="player1Score" class="fadeInElm">0</div>
+		  </div>
+		  
+		  <!-- Race info in center -->
+		  <div id="raceInfo" class="noShow fadeInElm"></div>
+		  
+		  <!-- Player 2 section -->
+		  <div class="player-container right">
+			<div id="player2Score" class="fadeInElm">0</div>
+			<div id="player2Name" class="fadeInElm">
+			  <img class="fadeOutElm customLogo2" id="customLogo2" height="20px" src="">
+			  <span>Player 2</span>
+			  <div id="player2Image" class="fadeOutElm"></div>
+			</div>
+			<div id="p2ExtIcon" class="fadeInElm">Ex</div>
+		  </div>
+		</div>
+	  </div>
+	  
 	<script src="./common/js/browser_source_post.js"></script>
 </body>
 
