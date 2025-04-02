@@ -137,6 +137,8 @@ html, body {
     height: 25px;
     width: 25px;
     z-index: 15;
+    left: 7px;
+    top: 50%;
 }
 
 #player1Image {

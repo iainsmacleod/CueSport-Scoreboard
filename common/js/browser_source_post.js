@@ -223,21 +223,21 @@ const handlers = {
             }
             if (data.clockDisplay == "logoSlideShow-hide") { document.getElementById("logoSlideshowDiv").classList.replace("fadeInElm", "fadeOutElm"); };
 
-            if (data.clockDisplay == "style125") {
-                styleChange(1); 
-                // Reload the specific HTML file
-                window.location.href = 'browser_source.html'; // This line redirects to browser_source.html
-             };
-            if (data.clockDisplay == "style150") {
-                styleChange(2);
-                // Reload the specific HTML file
-                window.location.href = 'browser_source.html'; // This line redirects to browser_source.html
-             };
-            if (data.clockDisplay == "style200") {
-                styleChange(3);
-                // Reload the specific HTML file
-                window.location.href = 'browser_source.html'; // This line redirects to browser_source.html
-             };
+            // if (data.clockDisplay == "style125") {
+            //     styleChange(1); 
+            //     // Reload the specific HTML file
+            //     window.location.href = 'browser_source.html'; // This line redirects to browser_source.html
+            //  };
+            // if (data.clockDisplay == "style150") {
+            //     styleChange(2);
+            //     // Reload the specific HTML file
+            //     window.location.href = 'browser_source.html'; // This line redirects to browser_source.html
+            //  };
+            // if (data.clockDisplay == "style200") {
+            //     styleChange(3);
+            //     // Reload the specific HTML file
+            //     window.location.href = 'browser_source.html'; // This line redirects to browser_source.html
+            //  };
 
             if (data.clockDisplay === 'toggleActivePlayer') {
                 const playerToggle = data.player; // Get the active player from the message
