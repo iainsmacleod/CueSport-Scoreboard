@@ -538,15 +538,15 @@ if (getStorageItem('p2colorSet') != "") {
 	console.log("p2color: " + getStorageItem('p2colorSet'));
 }
 
-if (getStorageItem("b_style") != null) {
-	styleChange(getStorageItem("b_style"));
-} else {
-	// document.styleSheets[0].disabled = true;
-	document.styleSheets[0].disabled = true;
-	document.styleSheets[1].disabled = true;
-	document.styleSheets[2].disabled = false;
-	setStorageItem("b_style", "3");      // Store XL as default
-}
+// if (getStorageItem("b_style") != null) {
+// 	styleChange(getStorageItem("b_style"));
+// } else {
+// 	// document.styleSheets[0].disabled = true;
+// 	document.styleSheets[0].disabled = true;
+// 	document.styleSheets[1].disabled = true;
+// 	document.styleSheets[2].disabled = false;
+// 	setStorageItem("b_style", "3");      // Store XL as default
+// }
 
 if (getStorageItem("enableBallTracker") === "false" || getStorageItem("enableBallTracker") === null){
 	document.getElementById("ballTracker").classList.add("noShow");
