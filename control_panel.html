@@ -38,10 +38,10 @@ for more information about Salotto please visit https://salotto.app
 		<center>
 			<div id="resetData" class="obs28 two-column-container">
 				<div class="column">
-					<div class="hover obs28" onclick="resetInstance()" id="resetDataBtn">
+					<div class="hover obs28" onclick="resetInstance()" id="resetDataBtn" style="color:white">
 						Reset Instance Data
 					</div>
-					<div class="hover obs28" onclick="resetAll()" id="resetDataBtn">
+					<div class="hover obs28" onclick="resetAll()" id="resetDataBtn" style="color:white">
 						Reset All Data
 					</div>
 				</div>
@@ -271,8 +271,8 @@ for more information about Salotto please visit https://salotto.app
 					<br>
 					<div class="column">
 						<label id="useClockSettingLabel">Clock Controls:&nbsp;</label>
-						<div class="hover obs28" id="shotClock30" onclick="shotClock(31000)">30s Shot Clock</div>
-						<div class="hover obs28" id="shotClock60" onclick="shotClock(61000)">60s Shot Clock</div>
+						<div class="hover obs28" id="shotClock30" onclick="shotClock(30000)">30s Shot Clock</div>
+						<div class="hover obs28" id="shotClock60" onclick="shotClock(60000)">60s Shot Clock</div>
 						<div id="clockLocalDisplay" onclick="" style="display: none;"></div>
 						<div class="hover obs28" id="stopClockDiv" onclick="stopClock()">Stop Clock</div>
 						<div class="hover obs28" id="shotClockShow" onclick="clockDisplay('show')">Show Clock</div>
@@ -333,8 +333,8 @@ for more information about Salotto please visit https://salotto.app
 			if (hotkeyScoreReset != hotkeyScoreResetOld) { resetScores(); hotkeyScoreResetOld = hotkeyScoreReset; }
 			if (hotkeyP1Extension != hotkeyP1ExtensionOld) { add30('p1'); hotkeyP1ExtensionOld = hotkeyP1Extension; }
 			if (hotkeyP2Extension != hotkeyP2ExtensionOld) { add30('p2'); hotkeyP2ExtensionOld = hotkeyP2Extension; }
-			if (hotkey30Clock != hotkey30ClockOld) { shotClock(31000); hotkey30ClockOld = hotkey30Clock; }
-			if (hotkey60Clock != hotkey60ClockOld) { shotClock(61000); hotkey60ClockOld = hotkey60Clock; }
+			if (hotkey30Clock != hotkey30ClockOld) { shotClock(30000); hotkey30ClockOld = hotkey30Clock; }
+			if (hotkey60Clock != hotkey60ClockOld) { shotClock(60000); hotkey60ClockOld = hotkey60Clock; }
 			if (hotkeyStopClock != hotkeyStopClockOld) { stopClock(); hotkeyStopClockOld = hotkeyStopClock; }
 			if (hotkeySwap != hotkeySwapOld) { swapColors(); hotkeySwapOld = hotkeySwap; }
 			if (hotkeyPlayerToggle != hotkeyPlayerToggleOld && (useToggleSetting.checked==true && usePlayer1Setting.checked==true && usePlayer2Setting.checked==true)) {

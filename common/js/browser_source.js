@@ -53,71 +53,131 @@ function sleep(milliseconds) {
 }
 
 function shotTimer(shottime) {
-	countDownTime = new Date().getTime() + shottime;
-	sleep(1); //fixes clock 0 glitch. 1ms wait time. allows time for countdowntime to reliably update.
-	if (shottime == 61000) {
-		document.getElementById("shotClockVis").classList.add("start60");
-		document.getElementById("shotClockVis").classList.replace("fadeOutElm", "fadeInElm");
-	} else {
-		document.getElementById("shotClockVis").classList.add("startTimer");
-	}
-	shotClockxr = setInterval(function () {
-		var now = new Date().getTime();
-		var distance = countDownTime - now;
-		var seconds = Math.floor((distance % (1000 * 60)) / 1000);
-		document.getElementById("shotClockVis").style.background = "lime";
-		document.getElementById("shotClock").style.background = "green";
-		if (distance > 21000) { document.getElementById("shotClock").style.color = "white"; };
-		if (distance > 5000 && distance < 21000) { document.getElementById("shotClock").style.color = "black"; };
-		if (distance > 60000) { seconds = seconds + 60; };
-		document.getElementById("shotClock").innerHTML = seconds + "s";
-		if (distance < 31000) {
-			document.getElementById("shotClockVis").classList.replace("fadeOutElm", "fadeInElm");
-			document.getElementById("shotClockVis").style.background = "lime";
-			document.getElementById("shotClockVis").classList.add("startTimer");
-		}
-		if (distance < 26000) {
-			document.getElementById("shotClockVis").style.opacity = "0.7";
-		}
-		if (distance < 21000) {
-			document.getElementById("shotClockVis").style.background = "orange";
-			document.getElementById("shotClock").style.background = "orange";
-		}
-		if (distance < 16000) {
-			document.getElementById("shotClock").style.background = "yellow";
-			document.getElementById("shotClockVis").style.background = "yellow";
-		}
-		if (distance < 11000) {
-			document.getElementById("shotClock").style.background = "tomato";
-			document.getElementById("shotClockVis").style.background = "tomato";
-			document.getElementById("shotClockVis").style.opacity = "1";
-		}
-		if (distance < 11000 && distance > 9700) { showClock(); };
-		if (distance < 6000 && distance > 999) {
-			document.getElementById("shotClock").classList.add("shotRed");
-			document.getElementById("shotClock").style.background = "red";
-			document.getElementById("shotClockVis").style.background = "red";
-			document.getElementById("shotClock").style.color = "white";
-		}
-		if (distance < 1000) {
-			clearInterval(shotClockxr);
-			document.getElementById("shotClock").style.background = "red";
-			document.getElementById("shotClockVis").style.background = "red";
-			document.getElementById("shotClock").style.color = "white";
-		}
-		if (seconds == tev) {
-			var ntev = seconds-- - 1;
-			document.getElementById("shotClock").innerHTML = ntev + "s";
-			var tev = ntev;
-			console.log("dup Detected - corrected tev:" + tev);
-			bcr.postMessage(tev);
-		} else {
-			document.getElementById("shotClock").innerHTML = seconds + "s";
-			tev = seconds;
-			console.log("tev:" + tev);
-			bcr.postMessage(tev);
-		}
-	}, 1000);
+    // Clear any existing timer
+    if (shotClockxr) {
+        clearInterval(shotClockxr);
+    }
+    
+    // Cache DOM elements
+    const shotClockVis = document.getElementById("shotClockVis");
+    const shotClock = document.getElementById("shotClock");
+    
+    // Initialize variables
+    const startTime = new Date().getTime();
+    countDownTime = startTime + shottime;
+    let tev; // Define tev at function scope
+    
+    // Reset visual elements
+    shotClockVis.style.width = "100%"; // Explicitly set starting width
+    shotClockVis.classList.remove("startTimer", "start60");
+    shotClockVis.classList.replace("fadeOutElm", "fadeInElm");
+    
+    // Force a reflow
+    void shotClockVis.offsetWidth;
+    
+    // Set initial width explicitly
+    shotClockVis.style.width = "100%";
+    
+    // Force another reflow
+    void shotClockVis.offsetWidth;
+    
+    // Apply the appropriate transition class
+    requestAnimationFrame(() => {
+        if (shottime == 60000) {
+            shotClockVis.classList.add("start60");
+        } else {
+            shotClockVis.classList.add("startTimer");
+        }
+    });
+    
+    // Use setTimeout instead of sleep
+    setTimeout(() => {
+        // Start the timer
+        shotClockxr = setInterval(() => {
+            const now = new Date().getTime();
+            const distance = countDownTime - now;
+            let seconds = Math.floor((distance % (1000 * 60)) / 1000);
+            
+            // Add 60 seconds if needed
+            if (distance > 60000) { 
+                seconds = seconds + 60; 
+            }
+            
+            // Update visual elements based on time
+            updateVisuals(distance, seconds);
+            
+            // Handle duplicate seconds
+            if (seconds == tev) {
+                const ntev = seconds - 1;
+                shotClock.innerHTML = ntev + "s";
+                tev = ntev;
+                console.log("dup Detected - corrected tev:" + tev);
+                bcr.postMessage(tev);
+            } else {
+                shotClock.innerHTML = seconds + "s";
+                tev = seconds;
+                console.log("tev:" + tev);
+                bcr.postMessage(tev);
+            }
+            
+            // Check if timer is complete
+            if (distance < 1000) {
+                clearInterval(shotClockxr);
+                setTimerStyle("red", "red", "white");
+            }
+        }, 1000);
+    }, 10);
+    
+    // Helper function to update visuals
+    function updateVisuals(distance, seconds) {
+        // Set base appearance
+        setTimerStyle("lime", "green", "white");
+        
+        // Apply time-based styles
+        if (distance > 5000 && distance < 21000) {
+            shotClock.style.color = "black";
+        }
+        
+        if (distance < 30000) {
+            shotClockVis.classList.replace("fadeOutElm", "fadeInElm");
+            shotClockVis.style.background = "lime";
+        }
+        
+        if (distance < 26000) {
+            shotClockVis.style.opacity = "0.7";
+        }
+        
+        if (distance < 21000) {
+            setTimerStyle("orange", "orange");
+        }
+        
+        if (distance < 16000) {
+            setTimerStyle("yellow", "yellow");
+        }
+        
+        if (distance < 11000) {
+            setTimerStyle("tomato", "tomato");
+            shotClockVis.style.opacity = "1";
+        }
+        
+        if (distance < 11000 && distance > 9700) {
+            showClock();
+        }
+        
+        if (distance < 6000 && distance > 999) {
+            shotClock.classList.add("shotRed");
+            setTimerStyle("red", "red", "white");
+        }
+    }
+    
+    // Helper function to set timer styles
+    function setTimerStyle(visBackground, clockBackground, textColor) {
+        shotClockVis.style.background = visBackground;
+        shotClock.style.background = clockBackground;
+        if (textColor) {
+            shotClock.style.color = textColor;
+        }
+    }
 }
 
 function showClock() {

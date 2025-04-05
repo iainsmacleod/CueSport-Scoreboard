@@ -96,7 +96,7 @@ html, body {
     flex-direction: column;
     align-items: center;
     width: 90%;
-    max-width: 800px;
+    /* max-width: 800px; */
     z-index: 3;
     bottom: 1%;
     left: 0;
@@ -107,11 +107,13 @@ html, body {
 
 /* Add this new class */
 .shotclock-container {
-    display: fixed;
-    /* flex-direction: column; */
-    /* align-items: center; */
-    width: 100%;
+    position: relative;
+    width: 90%;  /* This will match scoreboard width */
     margin-bottom: 10px;
+    overflow: visible;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
 /* Update shotClock styling */
@@ -125,18 +127,39 @@ html, body {
     border: 1px solid black;
     padding: 0 10px;
     margin-bottom: 3px;
+    left: 0;
+    right: 0;
+    margin-left: auto;
+    margin-right: auto;
+    align-items: center;
+    max-width: fit-content;
 }
 
 /* Update shotclockvis styling */
 #shotClockVis {
-    /* position:absolute; */
-    width: 100%;
+    position: absolute;  /* Change to absolute positioning */
+    width: 100%;        /* This will be 100% of the scoreboard width */
     height: 3px;
     background: #fff;
     border-radius: 5px;
+    transform-origin: left center;
+    left: 0;           /* Align to left edge */
+    bottom: 0;         /* Position at bottom of container */
 }
 
 .startTimer {
+    width: 0 !important;
+    transition: width 30s linear !important;
+    transform-origin: left center;
+}
+
+.start60 {
+    width: 0 !important;
+    transition: width 60s linear !important;
+    transform-origin: left center;
+}
+
+/* .startTimer {
     width: 0px;
     transition: width 30s;
     transition-timing-function: linear;
@@ -146,7 +169,7 @@ html, body {
     transition-property: width;
     transition-duration: 60s;
     transition-timing-function: linear;
-}
+} */
 
 /* .greenBtn {
     background:green;

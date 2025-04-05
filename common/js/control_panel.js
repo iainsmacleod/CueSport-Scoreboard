@@ -209,7 +209,7 @@ function logoPost(input, xL) {
 					};
 					// Apply the red background and white text to indicate "clear" mode
                     container.style.backgroundColor = "red";
-                    container.style.color = "black";
+                    container.style.color = "white";
 				}
 			} else {
 				console.log(`No related element for changing innerHtml to clear`);
@@ -478,22 +478,39 @@ function postScore(opt1, player) {
 }
 
 function shotClock(timex) {
-	timerIsRunning = true;
-	var stime = timex;
-	bc.postMessage({ time: stime });
+    // First, stop any existing timer
+    stopClock();
+    
+    timerIsRunning = true;
+    var stime = timex;
+    bc.postMessage({ time: stime });
 
-	// Store which button was clicked
-    const buttonId = timex === 31000 ? 'shotClock30' : 'shotClock60';
+    // Store which button was clicked
+    const buttonId = timex === 30000 ? 'shotClock30' : 'shotClock60';
     const button = document.getElementById(buttonId);
     const clockDisplay = document.getElementById("clockLocalDisplay");
 
-	if (timex == 31000) { document.getElementById("shotClock30").style.border = "2px solid black"; } else { document.getElementById("shotClock60").style.border = "2px solid black"; };
-	document.getElementById("shotClock30").setAttribute("onclick", "");
-	document.getElementById("shotClock60").setAttribute("onclick", "");
-	document.getElementById("shotClock30").classList.add("clkd");
-	document.getElementById("shotClock60").classList.add("clkd");
-	document.getElementById("stopClockDiv").classList.replace("obs28", "blue28");
-	document.getElementById("stopClockDiv").classList.remove("hover");
+    // Reset both buttons first
+    document.getElementById("shotClock30").style.border = "2px solid black";
+    document.getElementById("shotClock60").style.border = "2px solid black";
+    document.getElementById("shotClock30").classList.remove("clkd");
+    document.getElementById("shotClock60").classList.remove("clkd");
+
+    // Then style only the clicked button
+    if (timex == 30000) {
+        document.getElementById("shotClock30").style.border = "2px solid black";
+        document.getElementById("shotClock30").classList.add("clkd");
+    } else {
+        document.getElementById("shotClock60").style.border = "2px solid black";
+        document.getElementById("shotClock60").classList.add("clkd");
+    }
+
+    // Disable both buttons while timer is running
+    document.getElementById("shotClock30").setAttribute("onclick", "");
+    document.getElementById("shotClock60").setAttribute("onclick", "");
+    
+    document.getElementById("stopClockDiv").classList.replace("obs28", "blue28");
+    document.getElementById("stopClockDiv").classList.remove("hover");
     
     // Position clockLocalDisplay over the button that was clicked
     const buttonRect = button.getBoundingClientRect();
@@ -506,7 +523,6 @@ function shotClock(timex) {
     clockDisplay.style.justifyContent = 'center';
     clockDisplay.style.alignItems = 'center';
     clockDisplay.style.zIndex = '1';
-
 }
 
 function stopClock() {
@@ -514,8 +530,8 @@ function stopClock() {
 	timerIsRunning = false;
 	document.getElementById("shotClock30").style.border = "2px solid black";
 	document.getElementById("shotClock60").style.border = "2px solid black";
-	document.getElementById("shotClock30").setAttribute("onclick", "shotClock(31000)");
-	document.getElementById("shotClock60").setAttribute("onclick", "shotClock(61000)");
+	document.getElementById("shotClock30").setAttribute("onclick", "shotClock(30000)");
+	document.getElementById("shotClock60").setAttribute("onclick", "shotClock(60000)");
 	document.getElementById("clockLocalDisplay").style.display = 'none';
 	clockDisplay("hide");
 	if (getStorageItem("obsTheme") == "light") {
