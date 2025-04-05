@@ -31,8 +31,9 @@ html, body {
 }
 
 #customLogo3, #customLogo4, #customLogo5 {
-    height: 400px;
+    height: 50vh;
     width: auto;
+    max-width: 80vw;
     object-fit: contain;
     position: relative;
 }
@@ -85,15 +86,12 @@ html, body {
     background-color: rgba(128, 128, 128, 0.7); /* Opaque grey with 70% opacity */
     border: 2px solid black;
     border-radius: 30px; /* Rounded on left side only */
-    /* padding: 5px; */
     min-width: fit-content; 
     max-width: fit-content; 
-    /* overflow: hidden; */
 }
 
 .ball {
     padding: 4px;
-    z-index: 3;
     display: flex;  /* Add flex display */
     align-items: center;  /* Center vertically */
     line-height: 1;  /* Reset line height */
@@ -111,7 +109,6 @@ html, body {
     flex-direction: column;
     align-items: center;
     width: 90%;
-    /* max-width: 800px; */
     z-index: 2;
     bottom: 1%;
     left: 0;
