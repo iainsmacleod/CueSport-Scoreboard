@@ -354,48 +354,9 @@ $(document).ready(function() {
     $("#scoreBoardDiv").draggable();
     $("#gameInfo").draggable();
     $("#logoSlideshowDiv").draggable();
-    // $("#gameTypeImage").draggable();
 	$("#ballTracker").draggable();
 
 });
-
-// if (getStorageItem('gameType') != null) {
-// 	// Update the image based on the selected game type
-// 	var value = getStorageItem('gameType');
-// 	switch (value) {
-// 		case "game1":
-// 			gameTypeImage.src = "./common/images/placeholder.png"; // Replace with actual image path
-// 			break;
-// 		case "game2":
-// 			gameTypeImage.src = "./common/images/8ball_gametype.png"; // Replace with actual image path
-// 			break;
-// 		case "game3":
-// 			gameTypeImage.src = "./common/images/9ball_gametype.png"; // Replace with actual image path
-// 			break;
-// 		case "game4":
-// 			gameTypeImage.src = "./common/images/10ball_gametype.png"; // Replace with actual image path
-// 			break;
-// 		case "game5":
-// 			gameTypeImage.src = "./common/images/straight_image.png"; // Replace with actual image path
-// 			break;
-// 		case "game6":
-// 			gameTypeImage.src = "./common/images/bank_image.png"; // Replace with actual image path
-// 			break;
-// 		case "game7":
-// 			gameTypeImage.src = "./common/images/onepocket_image.png"; // Replace with actual image path
-// 			break;
-// 		case "game8":
-// 			gameTypeImage.src = "./common/images/snooker_image.png"; // Replace with actual image path
-// 			break;
-// 		case "game9":
-// 				gameTypeImage.src = "./common/images/placeholder.png"; // Replace with actual image path
-// 			break;
-// 		default:
-// 			gameTypeImage.src = ""; // Clear the image if no valid game type is selected
-// 			break;
-// 	}
-// 	gameTypeImage.style.display = value ? "block" : "none";
-// }
 
 setCustomLogo("customLogo1", "useCustomLogo", "usePlayer1");
 setCustomLogo("customLogo2", "useCustomLogo2", "usePlayer2");

@@ -309,7 +309,6 @@ function changeActivePlayer(activePlayer) {
 function showSlides() {
 	let slides = document.getElementsByClassName("logoSlide");
 	let loadedSlides = []; // Array to hold loaded slides
-
 	// Hide all slides initially
 	for (let i = 0; i < slides.length; i++) {
 		slides[i].style.display = "none";
