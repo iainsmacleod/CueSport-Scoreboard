@@ -85,15 +85,23 @@ html, body {
     background-color: rgba(128, 128, 128, 0.7); /* Opaque grey with 70% opacity */
     border: 2px solid black;
     border-radius: 30px; /* Rounded on left side only */
-    padding: 5px 5px 0 10px;
+    /* padding: 5px; */
     min-width: fit-content; 
     max-width: fit-content; 
     /* overflow: hidden; */
 }
 
 .ball {
-    margin: 0 5px 5px 0;
+    padding: 4px;
     z-index: 3;
+    display: flex;  /* Add flex display */
+    align-items: center;  /* Center vertically */
+    line-height: 1;  /* Reset line height */
+    vertical-align: top;  /* Reset vertical alignment */
+}
+
+.ball img {
+    display: block;  /* Make image block-level */
 }
 
 /* Main container */
