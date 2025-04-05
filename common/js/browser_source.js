@@ -53,9 +53,13 @@ function sleep(milliseconds) {
 }
 
 function shotTimer(shottime) {
+    // Add debug logging
+    console.log("Starting timer with:", shottime, "milliseconds");
+	
     // Clear any existing timer
     if (shotClockxr) {
         clearInterval(shotClockxr);
+		shotClockxr = null;
     }
     
     // Cache DOM elements
@@ -210,9 +214,10 @@ function hideScores() {
 
 
 function stopClock() {
+	console.log("Stopping clock");
 	clearInterval(shotClockxr);
 	hideClock();
-	document.getElementById("shotClock").innerHTML = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;";
+	// document.getElementById("shotClock").innerHTML = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;";
 	document.getElementById("shotClock").classList.remove("shotRed");
 	document.getElementById("shotClock").style.background = "";
 	document.getElementById("shotClockVis").classList.replace("fadeInElm", "fadeOutElm");

@@ -478,8 +478,12 @@ function postScore(opt1, player) {
 }
 
 function shotClock(timex) {
-    // First, stop any existing timer
+    // Stop any existing timer
     stopClock();
+
+	// Explicitly set tev based on the new timer
+    tev = timex === 30000 ? 30 : 60;  // Set initial time explicitly
+    console.log("Starting new timer with:", tev, "seconds");
     
     timerIsRunning = true;
     var stime = timex;
@@ -526,8 +530,16 @@ function shotClock(timex) {
 }
 
 function stopClock() {
-	bc.postMessage({ clockDisplay: 'stopClock' });
+	console.log("Stopping clock - Current tev:", tev); // Log before clearing
+
+	// Reset ALL timer-related variables
 	timerIsRunning = false;
+	tev = null;  // Reset the time event variable
+	countDownTime = null;  // Reset countdown time
+	shotClockxr = null;  // Reset interval timer
+
+	bc.postMessage({ clockDisplay: 'stopClock' });
+	
 	document.getElementById("shotClock30").style.border = "2px solid black";
 	document.getElementById("shotClock60").style.border = "2px solid black";
 	document.getElementById("shotClock30").setAttribute("onclick", "shotClock(30000)");
