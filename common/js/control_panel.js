@@ -140,6 +140,13 @@ function saveOpacity() {
 	document.getElementById('sliderValue').innerText = opacityValue + '%'; // Update displayed value
 }
 
+// Function to save the uiScaling localStorage
+function saveScaling() {
+	var scalingValue = document.getElementById('uiScaling').value;
+	setStorageItem('uiScalingValue', scalingValue);
+	document.getElementById('sliderUiScalingValue').innerText = scalingValue + '%';
+}
+
 function toggleCheckbox(checkboxId, inputElement) {
     const checkbox = document.getElementById(checkboxId);
 	console.log(`File size ${inputElement.files.length}`);

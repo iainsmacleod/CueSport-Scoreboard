@@ -55,6 +55,8 @@ var msg;
 var msg2;
 var racemsg;
 var gamemsg;
+var uiScalingSlider = document.getElementById("uiScaling")
+var sliderUiScalingValue;
 var slider = document.getElementById("scoreOpacity");
 var sliderValue;
 var countDownTime;
@@ -116,6 +118,12 @@ window.onload = function() {
 	if (savedOpacity) {
 		document.getElementById('scoreOpacity').value = savedOpacity;
 		document.getElementById('sliderValue').innerText = savedOpacity + '%'; // Update displayed value
+	}
+
+	var savedScaling = getStorageItem('uiScalingValue');
+	if (savedScaling) {
+		document.getElementById('uiScaling').value = savedScaling;
+		document.getElementById('sliderUiScalingValue').innerText = savedScaling + '%'; // Update displayed value
 	}
 
 	if (getStorageItem("enableBallTracker") === "true"){
@@ -264,6 +272,12 @@ slider.oninput = function () {
 	sliderValue = this.value / 100;
 	document.getElementById("sliderValue").innerHTML = this.value + "%";  // Add this line
 	bc.postMessage({ opacity: sliderValue });
+}
+
+uiScalingSlider.oninput = function () {
+	sliderUiScalingValue = this.value / 100;
+	document.getElementById("sliderUiScalingValue").innerHTML = this.value + "%";  // Add this line
+	bc.postMessage({ scaling: sliderUiScalingValue });
 }
 
 document.getElementById('uploadCustomLogo').onclick = function () {

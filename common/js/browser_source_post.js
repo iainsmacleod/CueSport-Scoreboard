@@ -62,6 +62,11 @@ const handlers = {
         });
     },
 
+    scaling(data) {
+        console.log(`Scaling setting: ${data.scaling}`);
+        document.documentElement.style.setProperty('--ui-scaling', data.scaling);
+    },
+
     race(data) {
         console.log("Race info: " + data.race);
         const player1Enabled = getStorageItem("usePlayer1");

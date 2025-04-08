@@ -1,3 +1,8 @@
+:root {
+    --standard-font-size: 32pt;
+    --small-font-size: 24pt;
+}
+
 html, body {
     height: 100%;
     margin: 0;
@@ -62,7 +67,7 @@ html, body {
     position: fixed;
     background-image: linear-gradient(to bottom, lightgrey, white);
     text-align: center;
-    font-size: 24pt;
+    font-size: calc(var(--small-font-size) * var(--ui-scaling));
     font-weight: bolder;
     border: 1px solid #000;
     top: -2px;
@@ -79,26 +84,30 @@ html, body {
 
 #ballTracker {
     position: fixed;
-    top: 1%;
-    right: 1%; 
+    /* top: 1%;
+    right: 1%;  */
+    top: 5px;
+    /* right: 5px; */
     z-index: 3;
     background-color: rgba(128, 128, 128, 0.7); /* Opaque grey with 70% opacity */
     border: 2px solid black;
-    border-radius: 30px; /* Rounded on left side only */
-    min-width: fit-content; 
-    max-width: fit-content; 
+    /* border-radius: 30px; */
+    /* min-width: fit-content; */
+    max-width: fit-content;
+    width: calc(fit-content * var(--ui-scaling));
 }
 
 .ball {
     padding: 4px;
-    display: flex;  /* Add flex display */
+    /* display: flex;  Add flex display */
     align-items: center;  /* Center vertically */
     line-height: 1;  /* Reset line height */
     vertical-align: top;  /* Reset vertical alignment */
 }
 
 .ball img {
-    display: block;  /* Make image block-level */
+    /* display: block; */
+    width: calc(100% * var(--ui-scaling));
 }
 
 /* Main container */
@@ -119,7 +128,7 @@ html, body {
 /* Add this new class */
 .shotclock-container {
     position: relative;
-    width: 90%;  /* This will match scoreboard width */
+    width: calc(100% * var(--ui-scaling));
     margin-bottom: 10px;
     overflow: visible;
     display: flex;
@@ -133,7 +142,7 @@ html, body {
     display: flex;
     justify-content: center;
     background: rgba(255,255,255,1);
-    font-size: 24pt;
+    font-size: calc(var(--small-font-size) * var(--ui-scaling));
     font-weight: bold;
     text-align: center;
     border: 1px solid black;
@@ -211,12 +220,14 @@ html, body {
     background: rgba(255,255,255,1);
     text-shadow: 1px 1px 2px black, 0 0 25px black, 0 0 5px black;
     -webkit-text-stroke: 1px black;
-    font-size: 32pt;
+    font-size: calc(var(--standard-font-size) * var(--ui-scaling));
+    /* font-size: calc(32px * var(--ui-scaling)); */
+    /* font-size: 32px; */
     color: white;
     box-shadow: 0 8px 16px 0 rgba(0,0,0,0.6);
     font-weight: bold;
     text-align: center;
-    width: 550px;
+    width: calc(550px * var(--ui-scaling));
     overflow: hidden;
     text-overflow: ellipsis;
     border: 2px solid black;
@@ -243,7 +254,7 @@ html, body {
     position: relative;
     text-align: center;
     background: #ed4e54;
-    font-size: 32pt;
+    font-size: calc(var(--standard-font-size) * var(--ui-scaling));
     font-weight: bold;
     color: white;
     -webkit-text-stroke: 1px black;
@@ -290,7 +301,7 @@ html, body {
     position: relative;
     text-align: center;
     background: #3679dd;
-    font-size: 32pt;
+    font-size: calc(var(--standard-font-size) * var(--ui-scaling));
     font-weight: bold;
     color: white;
     -webkit-text-stroke: 1px black;
@@ -310,7 +321,7 @@ html, body {
     background: green;
     border: solid black;
     color: white;
-    font-size: 32pt;
+    font-size: calc(var(--standard-font-size) * var(--ui-scaling));
     top: 50%;
     padding: 5px 10px;
     -webkit-text-stroke: 1px black;

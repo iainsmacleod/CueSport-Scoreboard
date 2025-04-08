@@ -4,7 +4,7 @@
 	  /* bottom:-10px; */
 	} 
 
-	.slider {
+	.slider, .uiScalingSlider{
 		-webkit-appearance: none;
 		appearance: none;
 		width: 25%;

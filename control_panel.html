@@ -52,6 +52,13 @@ for more information about Salotto please visit https://salotto.app
 					<summary style="cursor:pointer; font-weight:bold;">GENERAL SETTINGS</summary>
 					<br>
 					<div class="column">
+						Scale
+						<span></span>
+						<input type="range" min="50" max="100" value="100" class="uiScalingSlider" id="uiScaling" onchange="saveScaling()">
+						<span></span>
+						<span id="sliderUiScalingValue">100%</span>
+					</div>
+					<div class="column">
 						Game Type
 						<select class="dropdown" id="gameType" onchange="gameType(this.value)">
 							<option value="game1">None</option>
