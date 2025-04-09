@@ -117,7 +117,7 @@ html, body {
 #scoreBoardDiv {
     position: fixed;
     display: flex;
-    flex-direction: column;
+    flex-direction: column; /* Stack shotclock-container and scoreBoard vertically */
     align-items: center;
     width: 90%;
     z-index: 2;
@@ -130,14 +130,11 @@ html, body {
 
 /* Add this new class */
 .shotclock-container {
-    position: relative;
-    width: calc(100% * var(--ui-scaling));
-    margin-bottom: 10px;
-    overflow: visible;
     display: flex;
-    flex-direction: column;
+    flex-direction: column; /* Stack shotClock and shotClockVis vertically */
     align-items: center;
-    z-index: 2;
+    width: calc(85% * var(--ui-scaling));
+    margin-bottom: calc(5px * var(--ui-scaling));; /* Space between shotclock-container and scoreBoard */
 }
 
 /* Update shotClock styling */
@@ -150,25 +147,16 @@ html, body {
     text-align: center;
     border: 1px solid black;
     padding: 0 10px;
-    margin-bottom: 3px;
-    left: 0;
-    right: 0;
-    margin-left: auto;
-    margin-right: auto;
+    margin-bottom: calc(5px * var(--ui-scaling));;
     align-items: center;
-    max-width: fit-content;
+    width: fit-content;
 }
 
 /* Update shotclockvis styling */
 #shotClockVis {
-    position: absolute;  /* Change to absolute positioning */
-    width: 100%;        /* This will be 100% of the scoreboard width */
     height: 3px;
     background: #fff;
     border-radius: 5px;
-    transform-origin: left center;
-    left: 0;           /* Align to left edge */
-    bottom: 0;         /* Position at bottom of container */
 }
 
 .startTimer {
@@ -191,8 +179,8 @@ html, body {
 #scoreBoard {
     position: relative;
     display: flex;
-    flex-direction: row;
-    justify-content: center;
+    flex-direction: row; /* Keep the row layout for player sections */
+    justify-content: flex-start;
     align-items: center;
     width: fit-content;
     gap: 0; /* No gap between flex items */
