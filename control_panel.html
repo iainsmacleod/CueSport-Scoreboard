@@ -36,13 +36,21 @@ for more information about Salotto please visit https://salotto.app
 <body>
 	<div id="mainDiv">
 		<center>
+			<div class="column" style="display: flex; justify-content: space-between;">
+				<a href="https://github.com/iainsmacleod/CueSport-Scoreboard/wiki">
+				  <span style="font-size:7pt; color:red; top: 4px;">CueSport Scoreboard v<span id="verNum"></span></span>
+				</a>
+				<a href="https://buymeacoffee.com/iainmacleod">
+					<span style="font-size:7pt; color:red; top: 4px;">Support</span>
+				</a>
+			</div>
 			<div id="resetData" class="obs28 two-column-container">
 				<div class="column">
 					<div class="hover obs28" onclick="resetInstance()" id="resetDataBtn" style="color:white">
-						Reset Instance Data
+						Clear Instance Data
 					</div>
 					<div class="hover obs28" onclick="resetAll()" id="resetDataBtn" style="color:white">
-						Reset All Data
+						Clear All Data
 					</div>
 				</div>
 			</div>
@@ -64,7 +72,7 @@ for more information about Salotto please visit https://salotto.app
 						<span></span>
 						Overlay Scaling
 						<span></span>
-						<input type="range" min="50" max="100" value="100" class="uiScalingSlider" id="uiScaling" onchange="saveScaling()">
+						<input type="range" min="40" max="100" value="100" class="uiScalingSlider" id="uiScaling" onchange="saveScaling()">
 						<span></span>
 						<span id="sliderUiScalingValue">100%</span>
 					</div>
@@ -304,8 +312,6 @@ for more information about Salotto please visit https://salotto.app
 				</details>
 			</div>
 		</center>
-		<!-- <p style="font-size:2px">&nbsp;</p> -->
-		<text style="font-size:7pt; color:#818181; position:fixed; top:4px; ">CueSport Scoreboard v<text id="verNum"></text></text>
 	</div>
 	<script src="./common/js/control_panel_post.js"></script>
 	<script>

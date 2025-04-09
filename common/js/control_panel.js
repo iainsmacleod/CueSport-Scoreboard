@@ -65,6 +65,7 @@ function gameType(value) {
 		document.getElementById("ball 15").classList.remove("noShow");
 	}
 	bc.postMessage({ gameType: value });
+	resetBallTracker();
 }
 
 function useBallTracker(){

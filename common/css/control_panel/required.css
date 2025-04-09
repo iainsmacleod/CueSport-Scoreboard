@@ -81,9 +81,9 @@ div {
 	justify-content: center;
 	font-size: 10pt;
 	padding:0px;
-	/* padding-right:60px;
+	padding-right:60px;
 	padding-left:60px;
-	padding-top:2px; */
+	padding-top:2px;
 }
 
 #p1Score, #p2Score {
