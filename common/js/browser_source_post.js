@@ -56,7 +56,7 @@ const handlers = {
 
     opacity(data) {
         console.log(`Opacity setting: ${data.opacity}`);
-        const elements = ["scoreBoardDiv", "raceInfo", "gameInfo"];
+        const elements = ["scoreBoardDiv", "gameInfo", "ballTracker"];
         elements.forEach(id => {
             document.getElementById(id).style.opacity = data.opacity;
         });

@@ -1,5 +1,5 @@
 :root {
-    --standard-font-size: 32pt;
+    --standard-font-size: 42px;
     --small-font-size: 24pt;
 }
 
@@ -7,7 +7,7 @@ html, body {
     height: 100%;
     margin: 0;
     font-family: Arial, sans-serif;
-    background: #333232;
+    /* background: #333232;  For testing */
 }
 
 /* Slideshow container */
@@ -78,36 +78,35 @@ html, body {
     max-width: fit-content; 
     padding: 5px 20px;
     overflow: hidden;
+    white-space: nowrap;
     z-index: 2;
     box-shadow: 0 8px 16px 0 rgba(0,0,0,0.6);
 }
 
 #ballTracker {
     position: fixed;
-    /* top: 1%;
-    right: 1%;  */
-    top: 5px;
-    /* right: 5px; */
+    padding: 4px;
+    top: 1%;
+    right: 1%; 
     z-index: 3;
     background-color: rgba(128, 128, 128, 0.7); /* Opaque grey with 70% opacity */
     border: 2px solid black;
-    /* border-radius: 30px; */
-    /* min-width: fit-content; */
+    border-radius: 30px;
+    min-width: fit-content;
     max-width: fit-content;
-    width: calc(fit-content * var(--ui-scaling));
 }
 
 .ball {
     padding: 4px;
-    /* display: flex;  Add flex display */
-    align-items: center;  /* Center vertically */
-    line-height: 1;  /* Reset line height */
-    vertical-align: top;  /* Reset vertical alignment */
+    display: flex;
+    align-items: center;
+    line-height: 1;
+    vertical-align: top;
 }
 
 .ball img {
     /* display: block; */
-    width: calc(100% * var(--ui-scaling));
+    width: calc(41px * var(--ui-scaling));
 }
 
 /* Main container */
