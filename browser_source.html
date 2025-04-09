@@ -17,8 +17,19 @@ for more information about Salotto please visit https://salotto.app
 <head>
 	<script>
 		// Apply scaling immediately before page renders
-		const uiScaling = localStorage.getItem('uiScalingValue') || 1;
+		const uiScaling = localStorage.getItem('uiScalingValue') || 100;
 		document.documentElement.style.setProperty('--ui-scaling', uiScaling/100);
+		// Add event listener for when DOM is fully loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            const opacity = localStorage.getItem('overlayOpacity') || 100;
+            const elements = ["scoreBoardDiv", "gameInfo", "ballTracker"];
+            elements.forEach(id => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.style.opacity = opacity/100;
+                }
+            });
+        });
 	</script><script src="./common/js/jquery.js"></script>
 	<script src="./common/js/browser_source.js"></script>
 	<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
