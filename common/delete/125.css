@@ -1,0 +1,74 @@
+body{
+    background-color: rgba(0, 0, 0, 0);
+    margin: 0px auto;
+    overflow: hidden;
+    -moz-transform: scale(1.25, 1.25);
+    zoom: 1.25;
+    zoom: 125%;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+#gameInfo {
+    width: auto;
+    max-width: 20%;     /* Adjust as needed */
+}
+
+/* #gameTypeImage {
+    zoom: 80%;
+} */
+
+#ballTracker {
+    zoom: 80%;
+}
+
+#logoSlideshowDiv {
+    top: 20%;
+}
+
+#scoreBoardDiv {
+    width: 50%;
+    top: 91%;
+}
+
+
+.customLogo1 {
+    right: 444.5px;
+    height: 26px;
+}
+.customLogoWide1 {
+    right: 476.5px;
+    height: 26.5px;
+}
+
+.customLogo2 {
+    left: 444.5px;
+    height: 26px;
+}
+.customLogoWide2 {
+    left: 476.5px;
+    height: 26.5px;
+}
+
+#p1ExtIcon{
+    top:8.5px;
+    left: -30px;
+    height: 25px;
+}
+#p2ExtIcon {
+    top:8.5px;
+    right: -30px;
+    height: 25px;
+}
+
+#player1Image {
+    top:8.5px;
+    height: 25px;
+}
+
+#player2Image {
+    top:8.5px;
+    height: 25px;
+}
+.shotclockvis {
+    bottom: 38px;
+}

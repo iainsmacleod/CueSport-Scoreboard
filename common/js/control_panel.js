@@ -15,20 +15,20 @@
 // functions
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////			
 
-function bsStyleChange() {
-	if (document.getElementById("bsStyle").value == 1) {
-		bc.postMessage({ clockDisplay: 'style125' });
-		setStorageItem("b_style", 1);
-	}
-	if (document.getElementById("bsStyle").value == 2) {
-		bc.postMessage({ clockDisplay: 'style150' });
-		setStorageItem("b_style", 2);
-	}
-	if (document.getElementById("bsStyle").value == 3) {
-		bc.postMessage({ clockDisplay: 'style200' });
-		setStorageItem("b_style", 3);
-	}
-}
+// function bsStyleChange() {
+// 	if (document.getElementById("bsStyle").value == 1) {
+// 		bc.postMessage({ clockDisplay: 'style125' });
+// 		setStorageItem("b_style", 1);
+// 	}
+// 	if (document.getElementById("bsStyle").value == 2) {
+// 		bc.postMessage({ clockDisplay: 'style150' });
+// 		setStorageItem("b_style", 2);
+// 	}
+// 	if (document.getElementById("bsStyle").value == 3) {
+// 		bc.postMessage({ clockDisplay: 'style200' });
+// 		setStorageItem("b_style", 3);
+// 	}
+// }
 
 function toggleAnimationSetting(){
 	if (!document.getElementById("winAnimation").checked) {

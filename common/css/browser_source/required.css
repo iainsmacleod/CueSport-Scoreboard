@@ -57,8 +57,8 @@ html, body {
 /* Win animation */
 .webm-animation {
     position: relative;
-    width: 100%;
-    height: 100%;
+    width: 50%;
+    height: 50%;
     background: transparent;
 }
 

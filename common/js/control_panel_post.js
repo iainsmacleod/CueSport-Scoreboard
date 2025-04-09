@@ -417,9 +417,9 @@ if (getStorageItem("customLogo4") != null) { document.getElementById("l4Img").sr
 if (getStorageItem("customLogo5") != null) { document.getElementById("l5Img").src = getStorageItem("customLogo5"); } else { document.getElementById("l5Img").src = "./common/images/placeholder.png"; };
 if (getStorageItem("slideShow") == "yes") { document.getElementById("logoSlideshowChk").checked = true; logoSlideshow(); };
 if (getStorageItem("obsTheme") == "28") { document.getElementById("obsTheme").value = "28"; }
-if (getStorageItem("b_style") == "1") { document.getElementById("bsStyle").value = "1"; }
-if (getStorageItem("b_style") == "2") { document.getElementById("bsStyle").value = "2"; }
-if (getStorageItem("b_style") == "3") { document.getElementById("bsStyle").value = "3"; }
+// if (getStorageItem("b_style") == "1") { document.getElementById("bsStyle").value = "1"; }
+// if (getStorageItem("b_style") == "2") { document.getElementById("bsStyle").value = "2"; }
+// if (getStorageItem("b_style") == "3") { document.getElementById("bsStyle").value = "3"; }
 if (getStorageItem("clogoNameStored") != null) { cLogoName = getStorageItem("clogoNameStored"); }
 if (getStorageItem("clogoName2Stored") != null) { cLogoName2 = getStorageItem("clogoName2Stored"); }
 document.getElementById("logoName").innerHTML = cLogoName.substring(0, 13);

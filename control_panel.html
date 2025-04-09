@@ -24,7 +24,7 @@ for more information about Salotto please visit https://salotto.app
 	<link rel="stylesheet" href="./common/css/control_panel/required.css" />
 	<script>
 	//---------------------------------------------------------------------------------------------
-		var versionNum = "1.6.1";
+		var versionNum = "1.7.0";
  	 //---------------------------------------------------------------------------------------------
 	</script>
 	<script src="./common/js/jquery.js"></script>
@@ -52,7 +52,17 @@ for more information about Salotto please visit https://salotto.app
 					<summary style="cursor:pointer; font-weight:bold;">GENERAL SETTINGS</summary>
 					<br>
 					<div class="column">
-						Scale
+						OBS Theme
+						<select class="dropdown" id="obsTheme" onchange="obsThemeChange()">
+							<option value="27" selected>Dark</option>
+							<option value="28">Yami</option>
+							<option value="acri">Acri</option>
+							<option value="grey">Grey</option>
+							<option value="light">Light</option>
+							<option value="rachni">Rachni</option>
+						</select>
+						<span></span>
+						Overlay Scaling
 						<span></span>
 						<input type="range" min="50" max="100" value="100" class="uiScalingSlider" id="uiScaling" onchange="saveScaling()">
 						<span></span>
@@ -294,27 +304,8 @@ for more information about Salotto please visit https://salotto.app
 				</details>
 			</div>
 		</center>
-		<div class="themeSizeLabels" id="obsThemeLabel"><text id="StyleChange">Size:&nbsp;</text>
-			<select class="obs28" name="bsstyle" id="bsStyle" onchange="bsStyleChange()">
-				<option value="1">Small</option>
-				<option value="2">Medium</option>
-				<option value="3" selected>Large</option>
-			</select>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-		</div>
-		<div class="themeSizeLabels" id="obsThemeDiv">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-			<text>Theme:&nbsp;</text>
-			<select class="obs28" name="Theme" id="obsTheme" onchange="obsThemeChange()">
-				<option value="27" selected>dark</option>
-				<option value="28">yami</option>
-				<option value="acri">acri</option>
-				<option value="grey">grey</option>
-				<option value="light">light</option>
-				<option value="rachni">rachni</option>
-			</select>
-		</div>
-		<p style="font-size:2px">&nbsp;</p><text
-			style="font-size:7pt; color:#818181; position:fixed; top:4px; ">CueSport SCoreboard v<text
-				id="verNum"></text></text>
+		<!-- <p style="font-size:2px">&nbsp;</p> -->
+		<text style="font-size:7pt; color:#818181; position:fixed; top:4px; ">CueSport Scoreboard v<text id="verNum"></text></text>
 	</div>
 	<script src="./common/js/control_panel_post.js"></script>
 	<script>

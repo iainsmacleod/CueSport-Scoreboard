@@ -1,202 +1,206 @@
-    .slidecontainer {
-	  width: auto;
-	  position:relative;
-	  /* bottom:-10px; */
-	} 
+#sliderValue, #sliderUiScalingValue {
+    min-width: 45px;  /* Fixed width for the percentage display */
+    text-align: left; /* Align text to the left */
+    display: inline-block;  /* Ensure the width is respected */
+}
 
-	.slider, .uiScalingSlider{
-		-webkit-appearance: none;
-		appearance: none;
-		width: 25%;
-		height: 5px;
-		border-radius: 5px;
-		background: lightgrey; 
-		outline: none;
-		opacity: 1;
-		-webkit-transition: .2s;
-		transition: opacity .2s;
-	  }
+.slidecontainer {
+	width: auto;
+	position:relative;
+	/* bottom:-10px; */
+} 
 
-	.slider::-webkit-slider-thumb {
-	  -webkit-appearance: none;
-	  appearance: none;
-	  width: 20px;
-	  height: 20px;
-	  /* border-radius: 50%; */
-	  background-image: url('../../images/8ball_small.png');
-	  background-size: cover;
-	  /* background: #3345a3; */
-	  cursor: pointer;
+.slider, .uiScalingSlider{
+	-webkit-appearance: none;
+	appearance: none;
+	width: 25%;
+	height: 5px;
+	border-radius: 5px;
+	background: lightgrey; 
+	outline: none;
+	opacity: 1;
+	-webkit-transition: .2s;
+	transition: opacity .2s;
 	}
 
-	.slider::-moz-range-thumb {
-	  width: 20px;
-	  height: 20px;
-	  /* border-radius: 50%; */
-	  background-image: url('../../images/8ball_small.png');
-	  background-size: cover;
-	  /* background: #3345a3; */
-	  cursor: pointer;
-	}
+.slider::-webkit-slider-thumb, .uiScalingSlider::-webkit-slider-thumb {
+	-webkit-appearance: none;
+	appearance: none;
+	width: 20px;
+	height: 20px;
+	/* border-radius: 50%; */
+	background-image: url('../../images/8ball_small.png');
+	background-size: cover;
+	/* background: #3345a3; */
+	cursor: pointer;
+}
+
+.slider::-moz-range-thumb, .uiScalingSlider::-moz-range-thumb {
+	width: 20px;
+	height: 20px;
+	/* border-radius: 50%; */
+	background-image: url('../../images/8ball_small.png');
+	background-size: cover;
+	/* background: #3345a3; */
+	cursor: pointer;
+}
 	
 	
-	body{
-		font-family: Arial, Helvetica, sans-serif;
-		background: #2b2e38;
-		margin-left:auto;
-		margin-right:auto;
-		margin-bottom:auto;
-		margin-top:1px;
-		}
+body{
+	font-family: Arial, Helvetica, sans-serif;
+	background: #2b2e38;
+	margin-left:auto;
+	margin-right:auto;
+	margin-bottom:auto;
+	margin-top:0px;
+}
+	
+
+div {
+	color:white;
+	min-height: 24px;
+	border: 0px solid #000;
+	border-radius: 5px;
+	display: flex;
+	justify-content: center; /* align horizontal */
+	align-items: center; /* align vertical */
+	font-size: 10pt;
+}
+	
+#mainDiv {
+	margin-top: 0px;
+	margin-right: auto;
+	margin-left: auto;
+	margin-bottom: 0px;
+	display: flex;
+	flex-direction: column; /* or row, depending on your layout */
+	/* min-height: 95%; */
+	border: 0px solid #000;
+	border-radius: 0px;
+	min-width:50px;
+	justify-content: center;
+	font-size: 10pt;
+	padding:0px;
+	/* padding-right:60px;
+	padding-left:60px;
+	padding-top:2px; */
+}
+
+#p1Score, #p2Score {
+	cursor: pointer;
+	position: sticky;
+	width:50px;
+	height:26px;
+	border: 0px solid #000;
+	border-radius: 0px;
+	background-color: #ed4e54;
+	font-size: 12pt;
+}
+
+.score-control {
+	display: flex;
+	align-items: center;
+}
+	
+.score-control input {
+	flex: 1;
+}
+	
+/* .score-control button {
+font-size: 100pt;
+} */
+
+/* Add to one of your CSS files */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+	-webkit-appearance: none;
+	margin: 0;
+}
+
+/* input[type="number"] {
+	-moz-appearance: textfield;
+} */
 		
-	
-	div {
-		color:white;
-		min-height: 24px;
-		border: 0px solid #000;
-		border-radius: 5px;
-		display: flex;
-		justify-content: center; /* align horizontal */
-		align-items: center; /* align vertical */
-		font-size: 10pt;
-		}
-		
-	#mainDiv {
-		margin-top: 0px;
-		margin-right: auto;
-		margin-left: auto;
-		margin-bottom: auto;
-		display: flex;
-		min-height: 95%;
-		border: 0px solid #000;
-		border-radius: 0px;
-		min-width:50px;
-		justify-content: center; /* align horizontal */
-		font-size: 10pt;
-		padding:20px;
-		padding-right:60px;
-		padding-left:60px;
-		padding-top:2px;
-		display: flex; /* or display: grid; */
-		flex-direction: column; /* or row, depending on your layout */
-	
-		}
+#sendP2Score, #sendP2ScoreSub, #sendP1Score, #sendP1ScoreSub{
+	cursor: pointer;
+	width:40px;
+	height:28px;
+	border: 0px solid #000;
+	border-radius: 0px;
+	font-size: 12pt;
+}
 
-	#p1Score, #p2Score {
-		cursor: pointer;
-		position: sticky;
-		width:50px;
-		height:26px;
-		border: 0px solid #000;
-		border-radius: 0px;
-		background-color: #ed4e54;
-		font-size: 12pt;
-		}
-	
-	.score-control {
-		display: flex;
-		align-items: center;
-		}
-		
-		.score-control input {
-		flex: 1;
-		}
-		
-		/* .score-control button {
-		font-size: 100pt;
-		} */
-	
-		/* Add to one of your CSS files */
-		input[type="number"]::-webkit-inner-spin-button,
-		input[type="number"]::-webkit-outer-spin-button {
-			-webkit-appearance: none;
-			margin: 0;
-		}
+#usePlayer1Setting, #usePlayer2Setting, #useClockSetting, #customLogo1, #customLogo2, #logoSlideshowChk {
+	cursor: pointer;
+	width: 15px;
+	height: 15px;
+}
 
-		/* input[type="number"] {
-			-moz-appearance: textfield;
-		} */
-		  
-	#sendP2Score, #sendP2ScoreSub, #sendP1Score, #sendP1ScoreSub{
-		cursor: pointer;
-		width:40px;
-		height:28px;
-		border: 0px solid #000;
-		border-radius: 0px;
-		font-size: 12pt;
-		}
-	
-	#usePlayer1Setting, #usePlayer2Setting, #useClockSetting, #allCheck, #useSalottoSetting, #customLogo1, #customLogo2, #logoSlideshowChk {
-		cursor: pointer;
-		width: 15px;
-        height: 15px;
-	}
-	
-	#ballTracker {
-		/* width: auto; */
-		scale: 95%;
-		white-space: nowrap;
-	}
+#ballTracker {
+	/* width: auto; */
+	scale: 95%;
+	white-space: nowrap;
+}
 
-	.faded {
-		opacity: 0.2;
-	}
-	
-	#p1colorDiv, #p2colorDiv {
-		cursor: pointer;
-		width:120px;
-		font-size: 12pt;
-		font-weight: bold;
-		text-shadow: 1px 1px 2px black, 0 0 25px black, 0 0 5px black;
-		text-align: center;
-		vertical-align: middle;
-		color:white;
-		-webkit-text-stroke: 1px black;
-	}
-	
-	#shotClock30, #shotClock60, #stopClockDiv, #sendPNames, #sendPInfo, #sendPScores, #swapBtn, #shotClockShow, #logoSsImg1, #logoSsImg2, #logoSsImg3, #logoSsImg4, #logoSsImg5, #ballTrackerDirection{
-			cursor: pointer;
-			width: 100px;
-			font-size: 10pt;
-			padding: 0px 0px 0px 0px;
-			border:2px solid black;
-		}
+.faded {
+	opacity: 0.2;
+}
 
-	#resetBtn, #uploadCustomLogo, #uploadCustomLogo2{
+#p1colorDiv, #p2colorDiv {
+	cursor: pointer;
+	width:120px;
+	font-size: 12pt;
+	font-weight: bold;
+	text-shadow: 1px 1px 2px black, 0 0 25px black, 0 0 5px black;
+	text-align: center;
+	vertical-align: middle;
+	color:white;
+	-webkit-text-stroke: 1px black;
+}
+
+#shotClock30, #shotClock60, #stopClockDiv, #sendPNames, #sendPInfo, #sendPScores, #swapBtn, #shotClockShow, #logoSsImg1, #logoSsImg2, #logoSsImg3, #logoSsImg4, #logoSsImg5, #ballTrackerDirection{
 		cursor: pointer;
-		width: 150px;
+		width: 100px;
 		font-size: 10pt;
 		padding: 0px 0px 0px 0px;
 		border:2px solid black;
 	}
 
-	#resetDataBtn{
-		cursor: pointer;
-		width: 150px;
-		font-size: 10pt;
-		padding: 0px 0px 0px 0px;
-		background: red;
-		color: black;
-		border:2px solid black;
-	}
+#resetBtn, #uploadCustomLogo, #uploadCustomLogo2{
+	cursor: pointer;
+	width: 150px;
+	font-size: 10pt;
+	padding: 0px 0px 0px 0px;
+	border:2px solid black;
+}
 
-	#p1extensionBtn, #p2extensionBtn  {
-		cursor: pointer;
-		width:120px;
-		font-size: 10pt;
-		padding: 0px 5px 0px 5px;
-		border:2px solid black;
-		color:black;
-		background: green;
-	}
-	
-	
-	.noShow{
-        visibility:hidden;
-		display: none;
-        }
-	
-	#footer {
+#resetDataBtn{
+	cursor: pointer;
+	width: 150px;
+	font-size: 10pt;
+	padding: 0px 0px 0px 0px;
+	background: red;
+	color: black;
+	border:2px solid black;
+}
+
+#p1extensionBtn, #p2extensionBtn  {
+	cursor: pointer;
+	width:120px;
+	font-size: 10pt;
+	padding: 0px 5px 0px 5px;
+	border:2px solid black;
+	color:black;
+	background: green;
+}
+
+
+.noShow{
+	visibility:hidden;
+	display: none;
+}
+
+/* #footer {
 	width:90%;
 	left:5%;
 	border: none;
@@ -204,150 +208,150 @@
 	position: absolute;
 	bottom: 5px;
 	text-align:center;
-	}
-	#FileUploadL1, #FileUploadL2, #FileUploadL3, #FileUploadL4, #FileUploadL5 {
-    display: none;
-	}
+} */
 
-	#btnFile {
+#FileUploadL1, #FileUploadL2, #FileUploadL3, #FileUploadL4, #FileUploadL5 {
+	display: none;
+}
+
+#btnFile {
 	font-size: 10pt;
 
 	color: white;
 	border: none;
 	padding:0px;
 	cursor: pointer;
-	}
-	
-	
-	#settingsInfo, #logoInfo, #gameInfo, #playerInfo, #scoreInfo, #clockInfo, #resetData{
+}
+
+
+#settingsInfo, #logoInfo, #gameInfo, #playerInfo, #scoreInfo, #clockInfo, #resetData{
 	min-width:85px;
 	width:600px;
 	position:relative;
-	top:33px;
+	top:17px;
 	display:block;
-	padding-top:5px;
-	}
+	padding:5px;
+}
 
+#obsTheme{
+	width: 86px;
+}
 
-	#logoSlideShowDiv { 
-		min-width:85px;
-		width:125px;
-		position:absolute;
-		right:50%;
-		padding-left:10px;
-		padding-right:10px;
-		padding-bottom:2px;
-		margin-right:2px;
-		font-size: 10pt;
-	}
+#logoSlideShowDiv { 
+	min-width:85px;
+	width:125px;
+	position:absolute;
+	right:50%;
+	padding-left:10px;
+	padding-right:10px;
+	padding-bottom:2px;
+	margin-right:2px;
+	font-size: 10pt;
+}
 
 	
-	/* #settingsBox3 {
-		cursor: arrow;
-		min-width:85px;
-		width:145px;
-		position:static;
-		left:50%;
-		margin-left:150px;
-		margin-bottom:3px;
-		font-size:7pt;
-	}	
-	 */
-	text {
+/* #settingsBox3 {
+	cursor: arrow;
+	min-width:85px;
+	width:145px;
+	position:static;
+	left:50%;
+	margin-left:150px;
+	margin-bottom:3px;
+	font-size:7pt;
+}	
+	*/
+text {
 	cursor: default;
-	}
-	
-	input.smallSize {
+}
+
+input.smallSize {
 	height: 15px;
 	width: 15px;
 	color:red;
-	}
-		 
-	
-	#bsStyle{
-		position:relative;
-		font-size: 8pt;
-		cursor: pointer;
-		border-radius:5px;
-		font-family:tahoma;
-	 
-		bottom:0px;
-		border:0px;
-		text-align:justify
+}
 		
-	}
-	#obsThemeDiv {
-		position:fixed;
-		font-size: 8pt;
-		cursor: pointer;
-		border-radius:5px;
-		font-family:tahoma;
-		top:10px;
-		border:0px;
-		left:50%;
-		text-align:justify
-	}
+/* #bsStyle{
+	position:relative;
+	font-size: 8pt;
+	cursor: pointer;
+	border-radius:5px;
+	font-family:tahoma;
 	
-	#obsTheme{
-		font-size: 8pt;
-		cursor: pointer;
-		border-radius:5px;
-		font-family:tahoma;
-		text-align:justify
-	}
+	bottom:0px;
+	border:0px;
+	text-align:justify
 	
-	#obsThemeLabel {
-		position:fixed;
-		font-size: 8pt;
-		right:50%;
-		font-family:tahoma;
-		font-size: 10pt;
-		top:10px;
-	}
-	input {
-		border-radius:3px;
-		border:0px;
-	}
-	
-		/* .tooltip {
-		} */
-				
-		.tooltip .tooltiptext {
-		visibility: hidden;
-		background: rgba(0,0,0,0.6);
-		border-radius: 6px;
-		padding: 5px;
-	  
-		/* Position the tooltip */
-		position: absolute;
-		z-index: 1;
-		bottom: 100%;
-		left: 50%;
-		margin-left: -80px;
-		}
+} */
 
-		.tooltip:hover .tooltiptext {
-		  visibility: visible;
-		}
+/* #obsThemeDiv {
+	position:fixed;
+	font-size: 8pt;
+	cursor: pointer;
+	border-radius:5px;
+	font-family:tahoma;
+	top:10px;
+	border:0px;
+	left:50%;
+	text-align:justify
+}
 
-		.two-column-container{
-			/* display: flex; */
-			justify-content: space-between;
-			padding: 10px;
-			clear: both;
-		  }
+#obsTheme{
+	font-size: 8pt;
+	cursor: pointer;
+	border-radius:5px;
+	font-family:tahoma;
+	text-align:justify
+}
+
+#obsThemeLabel {
+	position:fixed;
+	font-size: 8pt;
+	right:50%;
+	font-family:tahoma;
+	font-size: 10pt;
+	top:10px;
+} */
+
+input {
+	border-radius:3px;
+	border:0px;
+}
 		
-		  .four-column-container{
-			/* display: flex; */
-			justify-content: space-between;
-			padding: 10px;
-			clear: both;
-		  }
-		  
-		  .column {
-			width: 100%;
-			justify-content: space-between;
-		  }
+.tooltip .tooltiptext {
+	visibility: hidden;
+	background: rgba(0,0,0,0.6);
+	border-radius: 6px;
+	padding: 5px;
+	position: absolute;
+	z-index: 1;
+	bottom: 100%;
+	left: 50%;
+	margin-left: -80px;
+}
+
+.tooltip:hover .tooltiptext {
+	visibility: visible;
+}
+
+.two-column-container{
+	/* display: flex; */
+	justify-content: space-between;
+	padding: 10px;
+	clear: both;
+}
+
+.four-column-container{
+	/* display: flex; */
+	justify-content: space-between;
+	padding: 10px;
+	clear: both;
+}
+
+.column {
+	width: 100%;
+	justify-content: space-between;
+}
 
 /* Basic placeholder styling */
 ::placeholder { /* Chrome, Firefox, Opera, Safari */
@@ -378,8 +382,6 @@
     width: 0;
     height: 0;
 }
-/*  */
-
 
 .slider_round {
     position: absolute;
@@ -433,8 +435,8 @@ input:checked + .slider_round:before {
 /* Rounded sliders */
 .slider_round {
 	border-radius: 26px;
-  }
-  
-  .slider_round:before {
+}
+
+.slider_round:before {
 	border-radius: 50%;
-  }
+}
