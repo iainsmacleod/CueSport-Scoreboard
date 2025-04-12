@@ -326,7 +326,11 @@ if (getStorageItem('p1colorSet') !== null) {
 	document.getElementById('p1colorDiv').style.background = getStorageItem('p1colorSet');
 	document.getElementById('p1Name').style.background = `linear-gradient(to right, ${getStorageItem('p1colorSet')}, white)`;
 	document.getElementsByTagName("select")[0].options[0].value = cvalue;
-	if (cvalue == "white" || cvalue == "") { document.getElementById("p1colorDiv").style.color = "black"; } else { document.getElementById("p1colorDiv").style.color = "white"; };
+	if (cvalue == "white" || cvalue == "") { document.getElementById("p1colorDiv").style.color = "black"; document.getElementById("p1colorDiv").style.textShadow = "none"; 
+	} else { document.getElementById("p1colorDiv").style.color = "white"; };
+} else {
+	document.getElementById("p1colorDiv").style.color = "black";
+	document.getElementById("p1colorDiv").style.textShadow = "none"; 
 }
 
 if (getStorageItem('p2colorSet') !== null) {
@@ -342,7 +346,12 @@ if (getStorageItem('p2colorSet') !== null) {
     }
 	document.getElementById('p2colorDiv').style.background = getStorageItem('p2colorSet');
 	document.getElementById('p2Name').style.background = `linear-gradient(to left, ${getStorageItem('p2colorSet')}, white)`;
-	if (cvalue == "white" || cvalue == "") { document.getElementById("p2colorDiv").style.color = "black"; } else { document.getElementById("p2colorDiv").style.color = "white"; };
+	if (cvalue == "white" || cvalue == "") { document.getElementById("p2colorDiv").style.color = "black"; document.getElementById("p2colorDiv").style.textShadow = "none"; 
+	} else { document.getElementById("p2colorDiv").style.color = "white"; };
+}
+else {
+	document.getElementById("p2colorDiv").style.color = "black";
+	document.getElementById("p2colorDiv").style.textShadow = "none";
 }
 
 if (getStorageItem('p1ScoreCtrlPanel') > 0 || getStorageItem('p1ScoreCtrlPanel') == "") {

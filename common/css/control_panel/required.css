@@ -92,8 +92,13 @@ div {
 	font-weight: bold;
 	text-align: center;
 	vertical-align: middle;
-	color: black;
+	color: black !important;
 	padding: 0px;
+}
+
+#p1Score::placeholder, #p2Score::placeholder {
+    color: black !important;
+    opacity: 1; /* For Firefox */
 }
 	
 /* Add to one of your CSS files */

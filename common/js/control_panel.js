@@ -332,10 +332,10 @@ function swapColors() {
 		document.getElementsByTagName("select")[1].options[0].value = p1original;
 		c1value = p1original;
 		c2value = p2original;
-		if (c1value == "white") { document.getElementById("p1colorDiv").style.color = "black"; } else { document.getElementById("p1colorDiv").style.color = "white"; };
-		//if (c1value == "cadetblue" || c1value == "steelblue" || c1value == "grey" || c1value == "lightgrey" || c1value == "green" || c1value == "khaki" || c1value == "tomato" || c1value == "red" || c1value == "orangered" || c1value == "white" || c1value == "orange" || c1value == "lightgreen" || c1value == "lightseagreen") { document.getElementById("p2colorDiv").style.color = "#000"; } else { document.getElementById("p2colorDiv").style.color = "lightgrey"; };
-		if (c2value == "white") { document.getElementById("p2colorDiv").style.color = "black"; } else { document.getElementById("p2colorDiv").style.color = "white"; };
-		//if (c2value == "cadetblue" || c2value == "steelblue" || c2value == "grey" || c2value == "lightgrey" || c2value == "green" || cvalue == "orange" || cvalue == "khaki" || cvalue == "tomato" || cvalue == "red" || cvalue == "orangered" || cvalue == "white" || cvalue == "orange" || cvalue == "lightgreen" || cvalue == "lightseagreen") { document.getElementById("p1colorDiv").style.color = "#000"; } else { document.getElementById("p1colorDiv").style.color = "lightgrey"; };
+		if (c1value == "white" || c1value == "") { document.getElementById("p1colorDiv").style.color = "black"; document.getElementById("p1colorDiv").style.textShadow = "none"; 
+		} else { document.getElementById("p1colorDiv").style.color = "white"; };
+		if (c2value == "white" || c2value == "") { document.getElementById("p2colorDiv").style.color = "black"; document.getElementById("p2colorDiv").style.textShadow = "none"; 
+		} else { document.getElementById("p2colorDiv").style.color = "white"; };
 	}, 100);
 }
 
@@ -349,8 +349,8 @@ function playerColorChange(player) {
 		document.getElementById("p1colorDiv").style.background = `${selectedColor}`;
 		document.getElementById("p1Name").style.background = `linear-gradient(to right, ${selectedColor}, white)`;
 
-		//if (cvalue == "cadetblue" || cvalue == "steelblue" || cvalue == "grey" || cvalue == "lightgrey" || cvalue == "green" || cvalue == "khaki" || cvalue == "tomato" || cvalue == "red" || cvalue == "orangered" || cvalue == "white" || cvalue == "orange" || cvalue == "lightgreen" || cvalue == "lightseagreen") { document.getElementById("p1colorDiv").style.color = "#000"; } else { document.getElementById("p1colorDiv").style.color = "lightgrey"; };
-		if (cvalue == "white") { document.getElementById("p1colorDiv").style.color = "black"; } else { document.getElementById("p1colorDiv").style.color = "white"; };
+		if (cvalue == "white" || cvalue == "") { document.getElementById("p1colorDiv").style.color = "black"; document.getElementById("p1colorDiv").style.textShadow = "none"; 
+		} else { document.getElementById("p1colorDiv").style.color = "white"; };
 		setStorageItem("p1colorSet", document.getElementById("p" + player + "colorDiv").value);
 		document.getElementsByTagName("select")[0].options[0].value = cvalue;
 	} else {
@@ -361,8 +361,8 @@ function playerColorChange(player) {
 		document.getElementById("p2colorDiv").style.background = `${selectedColor}`;
 		document.getElementById("p2Name").style.background = `linear-gradient(to left, ${selectedColor}, white)`;
 
-		//if (cvalue == "cadetblue" || cvalue == "steelblue" || cvalue == "grey" || cvalue == "lightgrey" || cvalue == "green" || cvalue == "khaki" || cvalue == "tomato" || cvalue == "red" || cvalue == "orangered" || cvalue == "white" || cvalue == "orange" || cvalue == "lightgreen" || cvalue == "lightseagreen") { document.getElementById("p2colorDiv").style.color = "#000"; } else { document.getElementById("p2colorDiv").style.color = "lightgrey"; };
-		if (cvalue == "white") { document.getElementById("p2colorDiv").style.color = "black"; } else { document.getElementById("p2colorDiv").style.color = "white"; };
+		if (cvalue == "white" || cvalue == "") { document.getElementById("p2colorDiv").style.color = "black"; document.getElementById("p2colorDiv").style.textShadow = "none"; 
+		} else { document.getElementById("p2colorDiv").style.color = "white"; };
 		setStorageItem("p2colorSet", document.getElementById("p" + player + "colorDiv").value);
 		document.getElementsByTagName("select")[1].options[0].value = cvalue;
 	}
