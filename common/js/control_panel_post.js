@@ -130,6 +130,7 @@ window.onload = function() {
 		document.getElementById("ballTrackerCheckbox").checked = true;
 		document.getElementById("ballTracker").classList.remove("noShow");
 		document.getElementById("ballTrackerDirection").classList.remove("noShow");
+		document.getElementById("ballTrackerLabel").classList.remove("noShow");
 		console.log(`Ball tracker enabled`);
 		bc.postMessage({ displayBallTracker: true });
 	} else {
@@ -137,6 +138,7 @@ window.onload = function() {
 		setStorageItem("enableBallTracker", "false");
 		document.getElementById("ballTracker").classList.add("noShow");
 		document.getElementById("ballTrackerDirection").classList.add("noShow");
+		document.getElementById("ballTrackerLabel").classList.add("noShow");		
 		console.log(`Ball tracker disabled`);
 		bc.postMessage({ displayBallTracker: false });
 	}
@@ -324,8 +326,7 @@ if (getStorageItem('p1colorSet') !== null) {
 	document.getElementById('p1colorDiv').style.background = getStorageItem('p1colorSet');
 	document.getElementById('p1Name').style.background = `linear-gradient(to right, ${getStorageItem('p1colorSet')}, white)`;
 	document.getElementsByTagName("select")[0].options[0].value = cvalue;
-	if (cvalue == "white") { document.getElementById("p1colorDiv").style.color = "black"; } else { document.getElementById("p1colorDiv").style.color = "white"; };
-	// if (cvalue == "cadetblue" || cvalue == "steelblue" || cvalue == "grey" ||cvalue == "lightgrey" || cvalue == "green" || cvalue == "khaki" || cvalue == "tomato" || cvalue == "red" || cvalue == "white" || cvalue == "orangered" || cvalue == "orange" || cvalue == "lightgreen" || cvalue == "lightseagreen") { document.getElementById("p1colorDiv").style.color = "#000"; } else { document.getElementById("p1colorDiv").style.color = "lightgrey"; };
+	if (cvalue == "white" || cvalue == "") { document.getElementById("p1colorDiv").style.color = "black"; } else { document.getElementById("p1colorDiv").style.color = "white"; };
 }
 
 if (getStorageItem('p2colorSet') !== null) {
@@ -341,8 +342,7 @@ if (getStorageItem('p2colorSet') !== null) {
     }
 	document.getElementById('p2colorDiv').style.background = getStorageItem('p2colorSet');
 	document.getElementById('p2Name').style.background = `linear-gradient(to left, ${getStorageItem('p2colorSet')}, white)`;
-	if (cvalue == "white") { document.getElementById("p2colorDiv").style.color = "black"; } else { document.getElementById("p2colorDiv").style.color = "white"; };
-	// if (cvalue == "cadetblue" || cvalue == "steelblue" || cvalue == "grey" || cvalue == "lightgrey" || cvalue == "green" || cvalue == "khaki" || cvalue == "tomato" || cvalue == "red" || cvalue == "orangered" || cvalue == "white" || cvalue == "orange" || cvalue == "lightgreen" || cvalue == "lightseagreen") { document.getElementById("p2colorDiv").style.color = "#000"; } else { document.getElementById("p2colorDiv").style.color = "lightgrey"; };
+	if (cvalue == "white" || cvalue == "") { document.getElementById("p2colorDiv").style.color = "black"; } else { document.getElementById("p2colorDiv").style.color = "white"; };
 }
 
 if (getStorageItem('p1ScoreCtrlPanel') > 0 || getStorageItem('p1ScoreCtrlPanel') == "") {

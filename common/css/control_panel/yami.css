@@ -1,35 +1,33 @@
-.blue28 {
+.blue28, .tabcontent, .tab button:hover {
 	background: #3345a3;
 	border:0px;
-	}
-.obs28 {
+}
+
+.obs28, .tabcontent, .tab button.active {
 	background: #3c404b;
 	border:0px;
-	color:lightgrey;
-	}
+	color:white;
+}
 
-#mainDiv {
-	background: #2b2e38;
-	}
+#mainDiv{
+	background: #1f1e1f;
+}
 
 hr {
 	border-bottom:0px;
 	border-top: 1px solid steelblue;
 	border-left: 0px;
 	border-right: 0px;
-	
-	}
+}
 
-/* .hover {
-} */
 .hover:hover {
 	background:#4f535e;
 }
 
-
 .clkd {
 	color: dimgrey;
 }
+
 .themeSizeLabels{
 	color:lightgrey;
 }

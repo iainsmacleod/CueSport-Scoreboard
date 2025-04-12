@@ -30,6 +30,67 @@
 // 	}
 // }
 
+
+function updateTabVisibility() {
+    // Get the state of the player settings
+    const player1Enabled = document.getElementById("usePlayer1Setting").checked;
+    const player2Enabled = document.getElementById("usePlayer2Setting").checked;
+	const clockEnabled = document.getElementById("useClockSetting").checked;
+
+    // Determine if both players are enabled
+    const bothPlayersEnabled = player1Enabled && player2Enabled;
+
+    // Get tab elements
+    const scoringTab = document.getElementById("scoringTab");
+
+    // Show or hide the scoring tab
+    scoringTab.style.display = bothPlayersEnabled ? "inline-block" : "none";
+}
+
+// Call updateTabVisibility on page load to set initial tab visibility
+document.addEventListener("DOMContentLoaded", function() {
+	updateTabVisibility();
+});
+
+function openTab(evt, tabName) {
+    var i, tabcontent, tablinks;
+    tabcontent = document.getElementsByClassName("tabcontent");
+    for (i = 0; i < tabcontent.length; i++) {
+        tabcontent[i].style.display = "none";
+    }
+    tablinks = document.getElementsByClassName("tablinks");
+    for (i = 0; i < tablinks.length; i++) {
+        tablinks[i].className = tablinks[i].className.replace(" active", "");
+    }
+    document.getElementById(tabName).style.display = "block";
+    evt.currentTarget.className += " active";
+    
+    // Save the selected tab to localStorage
+    setStorageItem("lastSelectedTab", tabName);
+	console.log(`Last Stored Tab- ${tabName}`);
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+    // Try to get the last selected tab from localStorage
+    const lastSelectedTab = getStorageItem("lastSelectedTab");
+    
+    if (lastSelectedTab && document.getElementById(lastSelectedTab)) {
+        // Convert first letter to lowercase before adding "Tab"
+        const buttonId = lastSelectedTab.charAt(0).toLowerCase() + lastSelectedTab.slice(1) + "Tab";
+        const tabButton = document.getElementById(buttonId);
+        
+        if (tabButton) {
+            tabButton.click();
+        } else {
+            // Fallback to first tab if button not found
+            document.querySelector(".tablinks").click();
+        }
+    } else {
+        // Otherwise default to the first tab
+        document.querySelector(".tablinks").click();
+    }
+});
+
 function toggleAnimationSetting(){
 	if (!document.getElementById("winAnimation").checked) {
 		setStorageItem("winAnimation", "no");
@@ -74,11 +135,17 @@ function useBallTracker(){
     const bothPlayersEnabled = player1Enabled && player2Enabled;
 	setStorageItem("enableBallTracker", document.getElementById("ballTrackerCheckbox").checked);
 	if (document.getElementById("ballTrackerCheckbox").checked) {
-		document.getElementById("ballTracker").classList.remove("noShow");
+		document.getElementById("ballTrackerDirectionDiv").classList.remove("noShow");
 		document.getElementById("ballTrackerDirection").classList.remove("noShow");
+		document.getElementById("ballTrackerLabel").classList.remove("noShow");
+		document.getElementById("ballTrackerDiv").classList.remove("noShow");
+		document.getElementById("ballTracker").classList.remove("noShow");
 	} else {
-		document.getElementById("ballTracker").classList.add("noShow");
+		document.getElementById("ballTrackerDirectionDiv").classList.add("noShow");
 		document.getElementById("ballTrackerDirection").classList.add("noShow");
+		document.getElementById("ballTrackerLabel").classList.add("noShow");
+		document.getElementById("ballTrackerDiv").classList.add("noShow");
+		document.getElementById("ballTracker").classList.add("noShow");
 	}
 	if (bothPlayersEnabled){
 		bc.postMessage({ displayBallTracker: document.getElementById("ballTrackerCheckbox").checked});
@@ -160,11 +227,13 @@ function toggleSetting() {
 	console.log(`Display active player ${checkbox ? "enabled" : "disabled"}`);
 	if (checkbox) {
 		document.getElementById("playerToggle").classList.remove("noShow");
+		document.getElementById("playerToggleLabel").classList.remove("noShow");
 		setStorageItem("usePlayerToggle", "yes");
 		bc.postMessage({ clockDisplay: 'showActivePlayer', player: activePlayer });
 		console.log(`Player ${activePlayer ? 1 : 2} is active`);
 	} else {
 		document.getElementById("playerToggle").classList.add("noShow");
+		document.getElementById("playerToggleLabel").classList.add("noShow");
 		setStorageItem("usePlayerToggle", "no");
 		bc.postMessage({ clockDisplay: 'hideActivePlayer' });
 	}
@@ -318,9 +387,10 @@ function playerSetting(player) {
     const player2Enabled = getStorageItem("usePlayer2") === "yes";
     const bothPlayersEnabled = player1Enabled && player2Enabled;
 	const bothPlayersDisabled = !player1Enabled && !player2Enabled;
+	const anyPlayerDisabled = !player1Enabled || !player2Enabled;
 
     // Show/hide shared elements based on both players being enabled
-    document.getElementById("scoreInfo").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
+    // document.getElementById("scoreInfo").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
     document.getElementById("swapBtn").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
 	document.getElementById("useClockSetting").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
 	document.getElementById("labelForUseClockSetting").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
@@ -341,14 +411,29 @@ function playerSetting(player) {
     const useClockEnabled = getStorageItem("useClock") === "yes";
     if (bothPlayersEnabled && useClockEnabled) {
         document.getElementById("clockInfo").classList.remove("noShow");
+		document.getElementById("extensionControls").classList.remove("noShow");
+		document.getElementById("clockControlLabel").classList.remove("noShow");
     } else {
         document.getElementById("clockInfo").classList.add("noShow");
+		document.getElementById("extensionControls").classList.add("noShow");
+		document.getElementById("clockControlLabel").classList.add("noShow");
     } 
 
 	// Hide shared elements based on both players being enabled
-	document.getElementById("playerInfo").classList[bothPlayersDisabled ? "add" : "remove"]("noShow");
+	document.getElementById("gameInfo").classList[bothPlayersDisabled ? "add" : "remove"]("noShow");
+	document.getElementById("teamInfo").classList[bothPlayersDisabled ? "add" : "remove"]("noShow");
+	document.getElementById("raceInfo").classList[bothPlayersDisabled ? "add" : "remove"]("noShow");
+	document.getElementById("raceInfoTxt").classList[bothPlayersDisabled ? "add" : "remove"]("noShow");
+	document.getElementById("sendPNames").classList[bothPlayersDisabled ? "add" : "remove"]("noShow");
+	document.getElementById("playerDetailLabel").classList[bothPlayersDisabled ? "add" : "remove"]("noShow");
+
+	// Hide Race info when any player is disabled
+	document.getElementById("raceInfo").classList[anyPlayerDisabled ? "add" : "remove"]("noShow");
+	document.getElementById("raceInfoTxt").classList[anyPlayerDisabled ? "add" : "remove"]("noShow");
 
     bc.postMessage({playerDisplay: usePlayer, playerNumber: player});
+
+	updateTabVisibility();
 }
 
 function clockSetting() {
@@ -356,12 +441,17 @@ function clockSetting() {
 	if (!document.getElementById("useClockSetting").checked) {
 		setStorageItem("useClock", "no");
 		bc.postMessage({ clockDisplay: 'noClock' });
-		clockDiv.classList.add("noShow"); // Hide the clock controls
+		document.getElementById("clockInfo").classList.add("noShow");
+		document.getElementById("extensionControls").classList.add("noShow");
+		document.getElementById("clockControlLabel").classList.add("noShow");
 	} else if (document.getElementById("useClockSetting").checked) {
 		setStorageItem("useClock", "yes");
 		bc.postMessage({ clockDisplay: 'useClock' });
-		clockDiv.classList.remove("noShow"); // Show the clock controls
+		document.getElementById("clockInfo").classList.remove("noShow");
+		document.getElementById("extensionControls").classList.remove("noShow");
+		document.getElementById("clockControlLabel").classList.remove("noShow");
 	}
+	updateTabVisibility();
 }
 
 function clockDisplay(opt3) {
@@ -765,7 +855,7 @@ function obsThemeChange() {
 }
 
 function startThemeCheck() {
-	if (getStorageItem("obsTheme") == null) { setStorageItem("obsTheme", "28"); document.getElementById("obsTheme").value = "28"; };
+	if (getStorageItem("obsTheme") == null) { setStorageItem("obsTheme", "27"); document.getElementById("obsTheme").value = "27"; };
 	if (getStorageItem("obsTheme") == "28") {
 		document.getElementById("obsTheme").value = "28";
 		document.getElementsByTagName("body")[0].style.background = "#2b2e38";
@@ -988,6 +1078,7 @@ function resetInstance() {
         clearInstanceData();
     }
 }
+
 function clearInstanceData() {
     if (confirm('Are you sure you want to clear stored data for this scoreboard instance, and reset to defaults?')) {
 		const INSTANCE_ID = urlParams.get('instance') || '';
@@ -995,6 +1086,7 @@ function clearInstanceData() {
         location.reload(); // Reload the page to start fresh
     }
 }
+
 function removeInstanceData(instanceId) {
     if (instanceId === null || instanceId === undefined) {
         // Remove all localStorage items
@@ -1009,6 +1101,56 @@ function removeInstanceData(instanceId) {
             if (key.startsWith(instanceId)) {
                 localStorage.removeItem(key);
             }
+        }
+    }
+}
+
+function checkForUpdate() {
+    const updateStatus = document.getElementById('updateStatus');
+    updateStatus.textContent = "Checking for updates...";
+    
+    fetch('https://api.github.com/repos/iainsmacleod/CueSport-Scoreboard/releases/latest')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`GitHub API request failed: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            const latestVersion = data.tag_name.replace(/^v/, '');
+            if (compareVersions(latestVersion, versionNum) > 0) {
+                updateStatus.innerHTML = `Update available! Latest version: ${latestVersion}<br>
+                    <a href="${data.html_url}" target="_blank" rel="noopener noreferrer style="color: red;">Download Update</a>`;
+            } else {
+                updateStatus.textContent = "You have the latest version.";
+            }
+        })
+        .catch(error => {
+            updateStatus.textContent = "Error checking for updates. Please try again later.";
+            console.error("Update check failed:", error);
+        });
+}
+
+function compareVersions(v1, v2) {
+    const parts1 = v1.split('.').map(Number);
+    const parts2 = v2.split('.').map(Number);
+    
+    for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+        const part1 = parts1[i] || 0;
+        const part2 = parts2[i] || 0;
+        if (part1 > part2) return 1;
+        if (part1 < part2) return -1;
+    }
+    return 0;
+}
+
+function updateLayout() {
+    // Force layout recalculation
+    const tabContents = document.getElementsByClassName("tabcontent");
+    for (let i = 0; i < tabContents.length; i++) {
+        if (tabContents[i].style.display !== "none") {
+            // Only update visible tabs
+            LayoutRebuilder.ForceRebuildLayoutImmediate(tabContents[i]);
         }
     }
 }

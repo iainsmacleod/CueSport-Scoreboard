@@ -1,36 +1,25 @@
-.blue28 {
+.blue28, .tabcontent, .tab button:hover {
 	background: maroon;
 	border:0px;
-	}
-.obs28 {
+}
+
+.obs28, .tabcontent, .tab button.active {
 	background: #4c4c4c;
 	border:0px;
-	color:lightgrey;
-	}
-/* #swapBtn {
-	cursor:pointer;
-	position:relative;
-	border: 1px solid dimgrey;
-	padding-bottom:2px;
-	width:10%;
-	min-width:30px;
-	min-height:15px;
-	font-size:7pt;
-} */
+	color:white;
+}
+
 #mainDiv {
-	background: #1f1e1f;
-	}
+	background: #2b2e38;
+}
 
 hr {
 	border-bottom:0px;
 	border-top: 1px solid #4c4c4c;
 	border-left: 0px;
 	border-right: 0px;
-	
-	}
+}
 
-/* .hover {
-} */
 .hover:hover {
 	background:#7a797a;
 }
@@ -38,6 +27,7 @@ hr {
 .clkd {
 	color: dimgrey;
 }
+
 .themeSizeLabels{
 	color:lightgrey;
 }

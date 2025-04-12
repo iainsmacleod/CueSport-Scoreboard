@@ -2,15 +2,22 @@ div {
 	color:black !important; /*override white div font color */
 }
 
-.blue28 {
+.blue28, .tabcontent, .tab button:hover {
 	background: #3345a3;
 	border:0px;
-	}
-.obs28 {
+	color: white !important;
+}
+
+.obs28, .tabcontent, .tab button.active {
 	background: #f3f3f3;
 	color: #000;
 	border:0px;
-	}
+}
+
+.tab button {
+	color: black !important;
+}
+
 #swapBtn {
 	cursor:pointer;
 	position:relative;
@@ -21,20 +28,18 @@ div {
 	min-height:15px;
 	font-size:7pt;
 }
+
 #mainDiv {
 	background: #e5e5e5;
-	}
+}
 
 hr {
 	border-bottom:0px;
 	border-top: 1px solid steelblue;
 	border-left: 0px;
 	border-right: 0px;
-	
-	}
+}
 
-/* .hover {
-} */
 .hover:hover {
 	background:#fefeff;
 }

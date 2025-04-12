@@ -1,15 +1,18 @@
 div {
 	color:black !important; /*override white div font color */
 }
-.blue28 {
+
+.blue28, .tabcontent, .tab button:hover {
 	background: #3345a3;
 	border:0px;
-	}
-.obs28 {
+}
+
+.obs28, .tabcontent, .tab button.active {
 	background: #00bbd2;
 	border:0px;
-	color:lightgrey;
-	}
+	color:black;
+}
+
 #swapBtn {
 	cursor:pointer;
 	position:relative;
@@ -20,24 +23,21 @@ div {
 	min-height:15px;
 	font-size:7pt;
 }
+
 #mainDiv {
 	background: #232629;
-	}
+}
 
 hr {
 	border-bottom:0px;
 	border-top: 1px solid steelblue;
 	border-left: 0px;
 	border-right: 0px;
-	
-	}
+}
 
-/* .hover {
-} */
 .hover:hover {
 	background:#914c67;
 }
-
 
 .clkd {
 	color: dimgrey;
@@ -46,13 +46,3 @@ hr {
 .themeSizeLabels{
 	color:lightgrey;
 }
-	
-	
-	
-	
-	
-	
-		
-		
-		
-		

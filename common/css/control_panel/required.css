@@ -74,60 +74,47 @@ div {
 	margin-bottom: 0px;
 	display: flex;
 	flex-direction: column; /* or row, depending on your layout */
-	/* min-height: 95%; */
 	border: 0px solid #000;
 	border-radius: 0px;
-	min-width:50px;
 	justify-content: center;
 	font-size: 10pt;
-	padding:0px;
-	padding-right:60px;
-	padding-left:60px;
-	padding-top:2px;
+	padding: 2px;
 }
 
 #p1Score, #p2Score {
 	cursor: pointer;
-	position: sticky;
-	width:50px;
-	height:26px;
+	width: 50px;
+	height: 28px;
 	border: 0px solid #000;
 	border-radius: 0px;
 	background-color: #ed4e54;
-	font-size: 12pt;
-}
-
-.score-control {
-	display: flex;
-	align-items: center;
-}
-	
-.score-control input {
-	flex: 1;
+	font-size: 14pt;
+	font-weight: bold;
+	text-align: center;
+	vertical-align: middle;
+	color: black;
+	padding: 0px;
 }
 	
-/* .score-control button {
-font-size: 100pt;
-} */
-
 /* Add to one of your CSS files */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
 	-webkit-appearance: none;
 	margin: 0;
 }
-
-/* input[type="number"] {
-	-moz-appearance: textfield;
-} */
 		
 #sendP2Score, #sendP2ScoreSub, #sendP1Score, #sendP1ScoreSub{
 	cursor: pointer;
-	width:40px;
+	width: 40px;
 	height:28px;
 	border: 0px solid #000;
 	border-radius: 0px;
-	font-size: 12pt;
+	font-size: 14pt;
+	font-weight: bold;
+	text-align: center;
+	vertical-align: middle;
+	color: black;
+	padding: 0px;
 }
 
 #usePlayer1Setting, #usePlayer2Setting, #useClockSetting, #customLogo1, #customLogo2, #logoSlideshowChk {
@@ -136,37 +123,50 @@ input[type="number"]::-webkit-outer-spin-button {
 	height: 15px;
 }
 
-#ballTracker {
-	/* width: auto; */
-	scale: 95%;
-	white-space: nowrap;
+#ballTracker img {
+	padding: 1px;
 }
 
 .faded {
 	opacity: 0.2;
 }
 
-#p1colorDiv, #p2colorDiv {
+#p1colorDiv, #p2colorDiv, #p1Name, #p2Name {
 	cursor: pointer;
-	width:120px;
-	font-size: 12pt;
+	width:150px;
+	font-size: 16pt;
 	font-weight: bold;
 	text-shadow: 1px 1px 2px black, 0 0 25px black, 0 0 5px black;
 	text-align: center;
 	vertical-align: middle;
 	color:white;
 	-webkit-text-stroke: 1px black;
+	padding: 0px;
 }
 
-#shotClock30, #shotClock60, #stopClockDiv, #sendPNames, #sendPInfo, #sendPScores, #swapBtn, #shotClockShow, #logoSsImg1, #logoSsImg2, #logoSsImg3, #logoSsImg4, #logoSsImg5, #ballTrackerDirection{
-		cursor: pointer;
-		width: 100px;
-		font-size: 10pt;
-		padding: 0px 0px 0px 0px;
-		border:2px solid black;
-	}
+#shotClock30, #shotClock60, #stopClockDiv, #sendPNames, #sendPInfo, #resetScores, #sendPScores, #swapBtn, #shotClockShow, #logoSsImg1, #logoSsImg2, #logoSsImg3, #logoSsImg4, #logoSsImg5{
+	cursor: pointer;
+	width: 100px;
+	font-size: 10pt;
+	padding: 0px 0px 0px 0px;
+	border:2px solid black;
+}
 
-#resetBtn, #uploadCustomLogo, #uploadCustomLogo2{
+#raceInfoTxt, #gameInfoTxt{
+	font-size:16pt;
+	border-radius: 0px;
+	padding: 0 5px 0 5px;
+}
+
+#ballTrackerDirection{
+	cursor: pointer;
+	width: auto;
+	font-size: 10pt;
+	padding: 0px 5px 0px 5px;
+	border:2px solid black;
+}
+
+#resetBtn, #uploadCustomLogo, #uploadCustomLogo2, #updateCheck{
 	cursor: pointer;
 	width: 150px;
 	font-size: 10pt;
@@ -194,21 +194,10 @@ input[type="number"]::-webkit-outer-spin-button {
 	background: green;
 }
 
-
 .noShow{
 	visibility:hidden;
 	display: none;
 }
-
-/* #footer {
-	width:90%;
-	left:5%;
-	border: none;
-	background: none;
-	position: absolute;
-	bottom: 5px;
-	text-align:center;
-} */
 
 #FileUploadL1, #FileUploadL2, #FileUploadL3, #FileUploadL4, #FileUploadL5 {
 	display: none;
@@ -216,17 +205,14 @@ input[type="number"]::-webkit-outer-spin-button {
 
 #btnFile {
 	font-size: 10pt;
-
 	color: white;
 	border: none;
 	padding:0px;
 	cursor: pointer;
 }
 
-
-#settingsInfo, #logoInfo, #gameInfo, #playerInfo, #scoreInfo, #clockInfo, #resetData{
+#settingsInfo, #resetData{
 	min-width:85px;
-	width:600px;
 	position:relative;
 	top:17px;
 	display:block;
@@ -249,18 +235,6 @@ input[type="number"]::-webkit-outer-spin-button {
 	font-size: 10pt;
 }
 
-	
-/* #settingsBox3 {
-	cursor: arrow;
-	min-width:85px;
-	width:145px;
-	position:static;
-	left:50%;
-	margin-left:150px;
-	margin-bottom:3px;
-	font-size:7pt;
-}	
-	*/
 text {
 	cursor: default;
 }
@@ -270,52 +244,16 @@ input.smallSize {
 	width: 15px;
 	color:red;
 }
-		
-/* #bsStyle{
-	position:relative;
-	font-size: 8pt;
-	cursor: pointer;
-	border-radius:5px;
-	font-family:tahoma;
-	
-	bottom:0px;
-	border:0px;
-	text-align:justify
-	
-} */
-
-/* #obsThemeDiv {
-	position:fixed;
-	font-size: 8pt;
-	cursor: pointer;
-	border-radius:5px;
-	font-family:tahoma;
-	top:10px;
-	border:0px;
-	left:50%;
-	text-align:justify
-}
-
-#obsTheme{
-	font-size: 8pt;
-	cursor: pointer;
-	border-radius:5px;
-	font-family:tahoma;
-	text-align:justify
-}
-
-#obsThemeLabel {
-	position:fixed;
-	font-size: 8pt;
-	right:50%;
-	font-family:tahoma;
-	font-size: 10pt;
-	top:10px;
-} */
 
 input {
 	border-radius:3px;
 	border:0px;
+}
+
+.score-control {
+    display: flex;
+    align-items: center;
+    /* This ensures the controls are grouped together */
 }
 		
 .tooltip .tooltiptext {
@@ -334,23 +272,41 @@ input {
 	visibility: visible;
 }
 
-.two-column-container{
-	/* display: flex; */
-	justify-content: space-between;
-	padding: 10px;
-	clear: both;
-}
-
-.four-column-container{
-	/* display: flex; */
-	justify-content: space-between;
-	padding: 10px;
-	clear: both;
-}
-
 .column {
-	width: 100%;
-	justify-content: space-between;
+	display: flex;
+	justify-content:space-between;
+	padding: 10px 0 10px 0;
+	clear: both;
+	width: 650px;
+	height:fit-content;
+}
+
+.header {
+	display: flex;
+	justify-content:space-between;
+	padding: 6px 12px;
+	clear: both;
+	width: 650px;
+}
+
+.section-header {
+	display: flex;
+	justify-content:space-between;
+	padding: 15px 0 0 0;
+	clear: both;
+	text-decoration: underline;
+	/* text-transform:capitalize; */
+	font-weight: bold;
+	font-size: 16px;
+	font-variant: small-caps;
+}
+
+#ballTracker {
+	display: flex;
+	justify-content:center;
+	padding: 10px 0 10px 0;
+	clear: both;
+	width: 650px;
 }
 
 /* Basic placeholder styling */
@@ -417,11 +373,11 @@ input {
 }
 
 .player1 {
-    right: 10px;
+    left: 8px;
 }
 
 .player2 {
-    left: 10px;
+    left: 30px;
 }
 
 input:checked + .slider_round {
@@ -443,32 +399,49 @@ input:checked + .slider_round:before {
 
 /* Add styles for tabs */
 .tab {
-    overflow: hidden;
-    border-bottom: 1px solid #ccc;
-    background-color: #f1f1f1;
+	/* overflow: hidden; */
+	color: white;
+	display: flex;
+	justify-content:stretch;
+	width: 674px;
 }
 
 .tab button {
-    background-color: inherit;
-    float: left;
-    border: none;
-    outline: none;
-    cursor: pointer;
-    padding: 14px 16px;
-    transition: 0.3s;
-    font-size: 17px;
+	background-color: inherit;
+	float: left;
+	border-bottom-width: 0px;
+	outline: none;
+	cursor: pointer;
+	padding: 14px;
+	transition: 0.3s;
+	font-size: 17px;
+	color: white;
+	border-radius: 10px 10px 0 0;
+	box-sizing: border-box;
 }
 
 .tab button:hover {
-    background-color: #ddd;
+	border-radius: 10px 10px 0 0;
+	border: 2px solid transparent; /* prevent bounce effect from apparent defout border on tab */
+	border-bottom-width: 0px;
 }
 
 .tab button.active {
-    background-color: #ccc;
+	border-radius: 10px 10px 0px 0px;
+	border: 2px solid transparent; /* prevent bounce effect from apparent defout border on tab */
+	border-bottom-width: 0px;
 }
 
 .tabcontent {
-    display: none;
-    padding: 6px 12px;
-    border-top: none;
+	display: flex;
+    flex-direction: column;
+	padding: 0 12px 6px 12px;
+	color: white; /* Match the font color */
+	border-radius: 0 10px 10px 10px;
+}
+
+.tablinks {
+	text-transform: uppercase;
+	font-weight: bold;
+	font-size: 16px;
 }
