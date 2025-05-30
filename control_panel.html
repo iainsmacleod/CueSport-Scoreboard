@@ -39,6 +39,11 @@ for more information about Salotto please visit https://salotto.app
 			<a href="https://github.com/iainsmacleod/CueSport-Scoreboard/wiki" target="_blank" rel="noopener noreferrer">
 				<span style="font-size:10pt; color:red; top: 4px;">CueSport Scoreboard v<span id="verNum"></span></span>
 			</a>
+			<div class="zoom-controls">
+				<button class="zoom-btn" onclick="zoomOut()" title="Zoom Out">-</button>
+				<button class="zoom-btn" onclick="resetZoom()" title="Reset Zoom">RESET</button>
+				<button class="zoom-btn" onclick="zoomIn()" title="Zoom In">+</button>
+			</div>
 			<a href="https://buymeacoffee.com/iainmacleod" target="_blank" rel="noopener noreferrer">
 				<span style="font-size:10pt; color:red; top: 4px;">Support</span>
 			</a>
@@ -250,6 +255,15 @@ for more information about Salotto please visit https://salotto.app
 				<span id="sliderUiScalingValue">100%</span>
 			</div>
 			<div class="column">
+				<div class="zoom-controls">
+					<label>Zoom Level:</label>
+					<div class="hover obs28" onclick="zoomIn()">Zoom In (+)</div>
+					<div class="hover obs28" onclick="zoomOut()">Zoom Out (-)</div>
+					<div class="hover obs28" onclick="resetZoom()">Reset Zoom</div>
+					<span id="zoomLevel">100%</span>
+				</div>
+			</div>
+			<div class="column">
 				Game Type
 				<select class="dropdown" id="gameType" onchange="gameType(this.value)">
 					<option value="game1">None</option>
@@ -347,6 +361,36 @@ for more information about Salotto please visit https://salotto.app
 
 		//////////////////// end of HotKey scripts
 		refreshData();
+
+		// Zoom control functions
+		let currentZoom = 100;
+
+		function zoomIn() {
+			if (currentZoom < 200) {
+				currentZoom += 10;
+				applyZoom();
+			}
+		}
+
+		function zoomOut() {
+			if (currentZoom > 50) {
+				currentZoom -= 10;
+				applyZoom();
+			}
+		}
+
+		function resetZoom() {
+			currentZoom = 100;
+			applyZoom();
+		}
+
+		function applyZoom() {
+			document.body.style.zoom = currentZoom + '%';
+			document.getElementById('zoomLevel').textContent = currentZoom + '%';
+		}
+
+		// Initialize zoom level
+		applyZoom();
 	</script>
 
 </body>
