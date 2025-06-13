@@ -386,54 +386,63 @@ function playerSetting(player) {
     const player1Enabled = getStorageItem("usePlayer1") === "yes";
     const player2Enabled = getStorageItem("usePlayer2") === "yes";
     const bothPlayersEnabled = player1Enabled && player2Enabled;
-	const bothPlayersDisabled = !player1Enabled && !player2Enabled;
-	const anyPlayerDisabled = !player1Enabled || !player2Enabled;
+    const bothPlayersDisabled = !player1Enabled && !player2Enabled;
+    const anyPlayerDisabled = !player1Enabled || !player2Enabled;
+
+    // Handle score display checkbox
+    const scoreDisplayCheckbox = document.getElementById("scoreDisplay");
+    if (anyPlayerDisabled) {
+        scoreDisplayCheckbox.disabled = true;
+        scoreDisplayCheckbox.checked = false;
+        setStorageItem("scoreDisplay", "no");
+    } else {
+        scoreDisplayCheckbox.disabled = false;
+    }
 
     // Show/hide shared elements based on both players being enabled
-    // document.getElementById("scoreInfo").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
     document.getElementById("swapBtn").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
-	document.getElementById("useClockSetting").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
-	document.getElementById("labelForUseClockSetting").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
-	document.getElementById("useToggleSetting").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
-	document.getElementById("labelForUseToggleSetting").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
-	document.getElementById("ballTrackerCheckbox").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
-	document.getElementById("labelForBallTrackerCheckbox").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
-	
-	// Show/hide  elements based on individual players being enabled
-	document.getElementById("logoName").classList[player1Enabled ? "remove" : "add"]("noShow");
-	document.getElementById("customLogo1").classList[player1Enabled ? "remove" : "add"]("noShow");
-	document.getElementById("uploadCustomLogo").classList[player1Enabled ? "remove" : "add"]("noShow");
-	document.getElementById("logoName2").classList[player2Enabled ? "remove" : "add"]("noShow");
-	document.getElementById("customLogo2").classList[player2Enabled ? "remove" : "add"]("noShow");
-	document.getElementById("uploadCustomLogo2").classList[player2Enabled ? "remove" : "add"]("noShow");
+    document.getElementById("useClockSetting").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
+    document.getElementById("labelForUseClockSetting").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
+    document.getElementById("useToggleSetting").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
+    document.getElementById("labelForUseToggleSetting").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
+    document.getElementById("ballTrackerCheckbox").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
+    document.getElementById("labelForBallTrackerCheckbox").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
+    
+    // Show/hide  elements based on individual players being enabled
+    document.getElementById("logoName").classList[player1Enabled ? "remove" : "add"]("noShow");
+    document.getElementById("customLogo1").classList[player1Enabled ? "remove" : "add"]("noShow");
+    document.getElementById("uploadCustomLogo").classList[player1Enabled ? "remove" : "add"]("noShow");
+    document.getElementById("logoName2").classList[player2Enabled ? "remove" : "add"]("noShow");
+    document.getElementById("customLogo2").classList[player2Enabled ? "remove" : "add"]("noShow");
+    document.getElementById("uploadCustomLogo2").classList[player2Enabled ? "remove" : "add"]("noShow");
 
-	// Update clockInfo visibility based on player settings and useClock
+    // Update clockInfo visibility based on player settings and useClock
     const useClockEnabled = getStorageItem("useClock") === "yes";
     if (bothPlayersEnabled && useClockEnabled) {
         document.getElementById("clockInfo").classList.remove("noShow");
-		document.getElementById("extensionControls").classList.remove("noShow");
-		document.getElementById("clockControlLabel").classList.remove("noShow");
+        document.getElementById("extensionControls").classList.remove("noShow");
+        document.getElementById("clockControlLabel").classList.remove("noShow");
     } else {
         document.getElementById("clockInfo").classList.add("noShow");
-		document.getElementById("extensionControls").classList.add("noShow");
-		document.getElementById("clockControlLabel").classList.add("noShow");
+        document.getElementById("extensionControls").classList.add("noShow");
+        document.getElementById("clockControlLabel").classList.add("noShow");
     } 
 
-	// Hide shared elements based on both players being enabled
-	document.getElementById("gameInfo").classList[bothPlayersDisabled ? "add" : "remove"]("noShow");
-	document.getElementById("teamInfo").classList[bothPlayersDisabled ? "add" : "remove"]("noShow");
-	document.getElementById("raceInfo").classList[bothPlayersDisabled ? "add" : "remove"]("noShow");
-	document.getElementById("raceInfoTxt").classList[bothPlayersDisabled ? "add" : "remove"]("noShow");
-	document.getElementById("sendPNames").classList[bothPlayersDisabled ? "add" : "remove"]("noShow");
-	document.getElementById("playerDetailLabel").classList[bothPlayersDisabled ? "add" : "remove"]("noShow");
+    // Hide shared elements based on both players being enabled
+    document.getElementById("gameInfo").classList[bothPlayersDisabled ? "add" : "remove"]("noShow");
+    document.getElementById("teamInfo").classList[bothPlayersDisabled ? "add" : "remove"]("noShow");
+    document.getElementById("raceInfo").classList[bothPlayersDisabled ? "add" : "remove"]("noShow");
+    document.getElementById("raceInfoTxt").classList[bothPlayersDisabled ? "add" : "remove"]("noShow");
+    document.getElementById("sendPNames").classList[bothPlayersDisabled ? "add" : "remove"]("noShow");
+    document.getElementById("playerDetailLabel").classList[bothPlayersDisabled ? "add" : "remove"]("noShow");
 
-	// Hide Race info when any player is disabled
-	document.getElementById("raceInfo").classList[anyPlayerDisabled ? "add" : "remove"]("noShow");
-	document.getElementById("raceInfoTxt").classList[anyPlayerDisabled ? "add" : "remove"]("noShow");
+    // Hide Race info when any player is disabled
+    document.getElementById("raceInfo").classList[anyPlayerDisabled ? "add" : "remove"]("noShow");
+    document.getElementById("raceInfoTxt").classList[anyPlayerDisabled ? "add" : "remove"]("noShow");
 
     bc.postMessage({playerDisplay: usePlayer, playerNumber: player});
 
-	updateTabVisibility();
+    updateTabVisibility();
 }
 
 function scoreDisplaySetting() {
@@ -443,7 +452,9 @@ function scoreDisplaySetting() {
 	} else if (document.getElementById("scoreDisplay").checked) {
 		setStorageItem("scoreDisplay", "yes");
 	}
-	bc.postMessage({ scoreDisplay: scoreDisplay.checked ? "yes" : "no" });
+	if (getStorageItem("usePlayer1") === "yes" && getStorageItem("usePlayer2") === "yes") {
+		bc.postMessage({ scoreDisplay: scoreDisplay.checked ? "yes" : "no" });
+	}
 }
 
 function clockSetting() {

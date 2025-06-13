@@ -81,6 +81,10 @@ window.onload = function() {
 	if (getStorageItem("usePlayer2") === null) {
 		setStorageItem("usePlayer2", "yes");
 	}
+	
+	if (getStorageItem("scoreDisplay") === null) {
+		setStorageItem("scoreDisplay", "yes");
+	}
 
 	if (getStorageItem("usePlayerToggle")==="yes" || getStorageItem("usePlayerToggle") === null) {
 		document.getElementById("useToggleSetting").checked = true;
