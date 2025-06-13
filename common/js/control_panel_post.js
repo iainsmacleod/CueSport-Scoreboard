@@ -102,6 +102,14 @@ window.onload = function() {
 		bc.postMessage({ clockDisplay: 'showActivePlayer', player: activePlayer });
 	}
 
+	if (getStorageItem("scoreDisplay") === "yes") {
+		document.getElementById("scoreDisplay").checked = true;
+		scoreDisplaySetting();
+	} else {
+		document.getElementById("scoreDisplay").checked = false;
+		scoreDisplaySetting();
+	}
+
 	if (getStorageItem("p1Score") === null) {
 		setStorageItem("p1Score", "0");
 	}

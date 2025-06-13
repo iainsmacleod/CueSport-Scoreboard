@@ -436,6 +436,16 @@ function playerSetting(player) {
 	updateTabVisibility();
 }
 
+function scoreDisplaySetting() {
+	const scoreDisplay = document.getElementById("scoreDisplay");
+	if (!document.getElementById("scoreDisplay").checked) {
+		setStorageItem("scoreDisplay", "no");
+	} else if (document.getElementById("scoreDisplay").checked) {
+		setStorageItem("scoreDisplay", "yes");
+	}
+	bc.postMessage({ scoreDisplay: scoreDisplay.checked ? "yes" : "no" });
+}
+
 function clockSetting() {
 	const clockDiv = document.getElementById("clockInfo");
 	if (!document.getElementById("useClockSetting").checked) {

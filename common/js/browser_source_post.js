@@ -78,11 +78,13 @@ const handlers = {
             document.getElementById("customLogo1").classList.remove("customLogoWide1");
             document.getElementById("customLogo2").classList.remove("customLogoWide2");
         } else {
-            document.getElementById("raceInfo").classList.remove("noShow");
-            document.getElementById("raceInfo").classList.add("fadeInElm");
+            // if (getStorageItem("scoreDisplay") === "yes") {
+                document.getElementById("raceInfo").classList.remove("noShow");
+                document.getElementById("raceInfo").classList.add("fadeInElm");
+                document.getElementById("raceInfo").innerHTML = "(" + data.race + ")";
+            // }
             document.getElementById("customLogo1").classList.add("customLogoWide1");
             document.getElementById("customLogo2").classList.add("customLogoWide2");
-            document.getElementById("raceInfo").innerHTML = "(" + data.race + ")";
         }
     },
 
@@ -149,7 +151,7 @@ const handlers = {
             if (player2Enabled && getStorageItem("useCustomLogo2")=="yes") {
                 document.getElementById("customLogo2").classList.replace("fadeOutElm", "fadeInElm");
             }
-            if (bothPlayersEnabled && getStorageItem("raceInfo")) {
+            if (bothPlayersEnabled && getStorageItem("raceInfo") && getStorageItem("scoreDisplay") === "yes") {
                 document.getElementById("raceInfo").classList.replace("fadeOutElm", "fadeInElm");
             }
 
@@ -164,7 +166,7 @@ const handlers = {
                 // Debug logs
                 console.log("Display player 1:", getStorageItem("usePlayer1"));
                 console.log("Display player 2:", getStorageItem("usePlayer2"));
-                if (getStorageItem("usePlayer1") === "yes" && getStorageItem("usePlayer2") === "yes") {
+                if (getStorageItem("usePlayer1") === "yes" && getStorageItem("usePlayer2") === "yes" && getStorageItem("scoreDisplay") === "yes") {
                     console.log("Both players enabled, so scores are enabled");
                     showScores();
                 } else {
@@ -184,6 +186,14 @@ const handlers = {
             document.getElementById("customLogo"+ data.playerNumber).classList.replace("fadeInElm", "fadeOutElm");
 			document.getElementById("ballTracker").classList.add("noShow");
         };
+    },
+
+    scoreDisplay(data) {
+        if (data.scoreDisplay == "yes") {
+            showScores();
+        } else {
+            hideScores();
+        }
     },
 
     clockDisplay(data) {
@@ -445,7 +455,7 @@ if (getStorageItem("gameInfo") != "" && getStorageItem("gameInfo") != null) {
 	document.getElementById("gameInfo").classList.remove("noShow");
 }
 
-if (getStorageItem("raceInfo") != "" && getStorageItem("raceInfo") != null && bothPlayersEnabled) {
+if (getStorageItem("raceInfo") != "" && getStorageItem("raceInfo") != null && bothPlayersEnabled && getStorageItem("scoreDisplay") === "yes") {
 	document.getElementById("raceInfo").classList.remove("noShow");
 	document.getElementById("raceInfo").classList.add("fadeInElm");
 	document.getElementById("customLogo1").classList.add("customLogoWide1");
@@ -503,16 +513,6 @@ if (getStorageItem('p2colorSet') != "") {
 	document.getElementById("player2Name").style.background = "linear-gradient(to right, white, " + getStorageItem('p2colorSet');
 	console.log("p2color: " + getStorageItem('p2colorSet'));
 }
-
-// if (getStorageItem("b_style") != null) {
-// 	styleChange(getStorageItem("b_style"));
-// } else {
-// 	// document.styleSheets[0].disabled = true;
-// 	document.styleSheets[0].disabled = true;
-// 	document.styleSheets[1].disabled = true;
-// 	document.styleSheets[2].disabled = false;
-// 	setStorageItem("b_style", "3");      // Store XL as default
-// }
 
 if (getStorageItem("enableBallTracker") === "false" || getStorageItem("enableBallTracker") === null){
 	document.getElementById("ballTracker").classList.add("noShow");

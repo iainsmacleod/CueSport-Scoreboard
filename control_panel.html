@@ -24,7 +24,7 @@ for more information about Salotto please visit https://salotto.app
 	<link rel="stylesheet" href="./common/css/control_panel/required.css" />
 	<script>
 	//---------------------------------------------------------------------------------------------
-		var versionNum = "2.1.0";
+		var versionNum = "2.2.0";
  	 //---------------------------------------------------------------------------------------------
 	</script>
 	<script src="./common/js/jquery.js"></script>
@@ -60,7 +60,7 @@ for more information about Salotto please visit https://salotto.app
 			<div class="section-header" id="gameDetailLabel">Game Details</div>
 			<div class="column">
 				<text id="raceInfo">Race Info:</text><input style="width: 35px;" type="text" id="raceInfoTxt" placeholder="" maxlength="3">
-				Game/Other Info:<input style="width: 200px;" type="text" id="gameInfoTxt" placeholder="" maxlength="50">
+				Game/Other Info:<input style="width: 200px;" type="text" id="gameInfoTxt" placeholder="" maxlength="60">
 			</div>
 			<div class="column">
 				<span></span>
@@ -286,10 +286,14 @@ for more information about Salotto please visit https://salotto.app
 				<div class="column">
 					<div>Player 1<input type="checkbox" class="smallSize" id="usePlayer1Setting" onchange="playerSetting(1)" checked></div>
 					<div>Player 2<input type="checkbox" class="smallSize" id="usePlayer2Setting" onchange="playerSetting(2)" checked></div>
+					<div>Show Scores<input type="checkbox" class="smallSize" id="scoreDisplay" onchange="scoreDisplaySetting()" checked></div>
 					<div>Animation<input type="checkbox" class="smallSize" id="winAnimation" onchange="toggleAnimationSetting()"></div>
+				</div>
+				<div class="column">
 					<div><label for="useClockSetting" id="labelForUseClockSetting">Clock</label><input type="checkbox" class="smallSize" id="useClockSetting" onchange="clockSetting()"></div>
 					<div><label for="useToggleSetting" id="labelForUseToggleSetting">Player Toggle</label><input type="checkbox" class="smallSize" id="useToggleSetting" onchange="toggleSetting()"></div>
 					<div><label for="ballTrackerCheckbox" id="labelForBallTrackerCheckbox">Ball Tracker</label><input type="checkbox" class="smallSize" id="ballTrackerCheckbox" onchange="useBallTracker()"></div>
+					<div></div>
 				</div>
 				<div class="section-header" id="updateCheckLabel">Version Check</div>
 				<div class="column">
@@ -386,7 +390,6 @@ for more information about Salotto please visit https://salotto.app
 
 		function applyZoom() {
 			document.body.style.zoom = currentZoom + '%';
-			document.getElementById('zoomLevel').textContent = currentZoom + '%';
 		}
 
 		// Initialize zoom level
