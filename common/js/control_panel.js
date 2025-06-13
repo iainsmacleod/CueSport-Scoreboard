@@ -399,14 +399,47 @@ function playerSetting(player) {
         scoreDisplayCheckbox.disabled = false;
     }
 
-    // Show/hide shared elements based on both players being enabled
-    document.getElementById("swapBtn").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
-    document.getElementById("useClockSetting").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
-    document.getElementById("labelForUseClockSetting").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
-    document.getElementById("useToggleSetting").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
-    document.getElementById("labelForUseToggleSetting").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
-    document.getElementById("ballTrackerCheckbox").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
-    document.getElementById("labelForBallTrackerCheckbox").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
+    // Handle clock, player toggle, and ball tracker checkboxes
+    const clockCheckbox = document.getElementById("useClockSetting");
+    const toggleCheckbox = document.getElementById("useToggleSetting");
+    const ballTrackerCheckbox = document.getElementById("ballTrackerCheckbox");
+
+    if (anyPlayerDisabled) {
+        // Disable and uncheck the checkboxes
+        clockCheckbox.disabled = true;
+        clockCheckbox.checked = false;
+        setStorageItem("useClock", "no");
+        
+        toggleCheckbox.disabled = true;
+        toggleCheckbox.checked = false;
+        setStorageItem("usePlayerToggle", "no");
+        
+        ballTrackerCheckbox.disabled = true;
+        ballTrackerCheckbox.checked = false;
+        setStorageItem("enableBallTracker", "no");
+
+        // Hide related elements
+        document.getElementById("clockInfo").classList.add("noShow");
+        document.getElementById("extensionControls").classList.add("noShow");
+        document.getElementById("clockControlLabel").classList.add("noShow");
+        document.getElementById("playerToggle").classList.add("noShow");
+        document.getElementById("playerToggleLabel").classList.add("noShow");
+        document.getElementById("ballTrackerDirectionDiv").classList.add("noShow");
+        document.getElementById("ballTrackerDirection").classList.add("noShow");
+        document.getElementById("ballTrackerLabel").classList.add("noShow");
+        document.getElementById("ballTrackerDiv").classList.add("noShow");
+        document.getElementById("ballTracker").classList.add("noShow");
+
+        // Send messages to hide these features
+        bc.postMessage({ clockDisplay: 'noClock' });
+        bc.postMessage({ clockDisplay: 'hideActivePlayer' });
+        bc.postMessage({ displayBallTracker: false });
+    } else {
+        // Enable the checkboxes
+        clockCheckbox.disabled = false;
+        toggleCheckbox.disabled = false;
+        ballTrackerCheckbox.disabled = false;
+    }
     
     // Show/hide  elements based on individual players being enabled
     document.getElementById("logoName").classList[player1Enabled ? "remove" : "add"]("noShow");
@@ -415,18 +448,6 @@ function playerSetting(player) {
     document.getElementById("logoName2").classList[player2Enabled ? "remove" : "add"]("noShow");
     document.getElementById("customLogo2").classList[player2Enabled ? "remove" : "add"]("noShow");
     document.getElementById("uploadCustomLogo2").classList[player2Enabled ? "remove" : "add"]("noShow");
-
-    // Update clockInfo visibility based on player settings and useClock
-    const useClockEnabled = getStorageItem("useClock") === "yes";
-    if (bothPlayersEnabled && useClockEnabled) {
-        document.getElementById("clockInfo").classList.remove("noShow");
-        document.getElementById("extensionControls").classList.remove("noShow");
-        document.getElementById("clockControlLabel").classList.remove("noShow");
-    } else {
-        document.getElementById("clockInfo").classList.add("noShow");
-        document.getElementById("extensionControls").classList.add("noShow");
-        document.getElementById("clockControlLabel").classList.add("noShow");
-    } 
 
     // Hide shared elements based on both players being enabled
     document.getElementById("gameInfo").classList[bothPlayersDisabled ? "add" : "remove"]("noShow");

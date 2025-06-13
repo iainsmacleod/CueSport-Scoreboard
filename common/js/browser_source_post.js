@@ -22,6 +22,26 @@ const bcr = new BroadcastChannel(`recv_${INSTANCE_ID}`); // browser_source -> co
 const bc = new BroadcastChannel(`main_${INSTANCE_ID}`);
 var playerNumber;
 
+// Set default values immediately
+function initializeDefaults() {
+    const defaults = {
+        "usePlayer1": "yes",
+        "usePlayer2": "yes",
+        "usePlayerToggle": "yes",
+        "activePlayer": "1"
+    };
+
+    Object.entries(defaults).forEach(([key, value]) => {
+        if (getStorageItem(key) === null) {
+            console.log(`Setting default value for ${key}: ${value}`);
+            setStorageItem(key, value);
+        }
+    });
+}
+
+// Call initialization immediately
+initializeDefaults();
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //										broadcast channel events
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////			
@@ -124,14 +144,37 @@ const handlers = {
         // Code to assist with displaying active player image when only two players are enabled, on reload.
         const player1Enabled = getStorageItem("usePlayer1");
         const player2Enabled = getStorageItem("usePlayer2");
-        const bothPlayersEnabled = player1Enabled && player2Enabled;
+        const bothPlayersEnabled = player1Enabled === "yes" && player2Enabled === "yes";
         const playerToggleEnabled = getStorageItem("usePlayerToggle") === "yes";
         const useclockEnabled = getStorageItem("useClock") === "yes";
 
-        console.log(`player1Enabled:${player1Enabled} player2Enabled:${player2Enabled} bothPlayersEnabled:${bothPlayersEnabled} playerToggleEnabled:${player1Enabled} useclockEnabled${useclockEnabled}`)
+        console.log(`Player States in playerDisplay:`, {
+            player1Enabled,
+            player2Enabled,
+            bothPlayersEnabled,
+            playerToggleEnabled,
+            useclockEnabled,
+            rawPlayer1: getStorageItem("usePlayer1"),
+            rawPlayer2: getStorageItem("usePlayer2")
+        });
+
+        // If we don't have valid player states, initialize defaults
+        if (player1Enabled === null || player2Enabled === null) {
+            console.log('Initializing defaults in playerDisplay handler');
+            initializeDefaults();
+            // Recheck values after initialization
+            const newPlayer1Enabled = getStorageItem("usePlayer1") === "yes";
+            const newPlayer2Enabled = getStorageItem("usePlayer2") === "yes";
+            const newBothPlayersEnabled = newPlayer1Enabled && newPlayer2Enabled;
+            console.log('After initialization:', {
+                newPlayer1Enabled,
+                newPlayer2Enabled,
+                newBothPlayersEnabled
+            });
+        }
                 
         if (data.playerDisplay == "showPlayer") {
-            if ( useclockEnabled && bothPlayersEnabled) {
+            if (useclockEnabled && bothPlayersEnabled) {
                 console.log("Use clock evaluating as enabled");
                 document.getElementById("p1ExtIcon").classList.replace("fadeOutElm", "fadeInElm");
                 document.getElementById("p2ExtIcon").classList.replace("fadeOutElm", "fadeInElm");
@@ -373,6 +416,20 @@ $(document).ready(function() {
 
 });
 
+// Setting defaults in storage so functions execute correctly, in the event values are not being retrieved from storage successfully due to initialization or similar
+if (getStorageItem("usePlayer1") === null) {
+    setStorageItem("usePlayer1", "yes");
+}
+if (getStorageItem("usePlayer2") === null) {
+    setStorageItem("usePlayer2", "yes");
+}
+if (getStorageItem("usePlayerToggle") === null) {
+    setStorageItem("usePlayerToggle", "yes");
+}
+if (getStorageItem("activePlayer") === null) {
+    setStorageItem("activePlayer", "1");
+}
+
 setCustomLogo("customLogo1", "useCustomLogo", "usePlayer1");
 setCustomLogo("customLogo2", "useCustomLogo2", "usePlayer2");
 
@@ -422,21 +479,55 @@ if (getStorageItem("p2NameCtrlPanel") == "" || getStorageItem("p2NameCtrlPanel")
 }
 
 // Code to assist with displaying active player image when only two players are enabled, on reload.
-const player1Enabled = getStorageItem("usePlayer1") == "yes";
-const player2Enabled = getStorageItem("usePlayer2") == "yes";
+const player1Enabled = getStorageItem("usePlayer1") === "yes";
+const player2Enabled = getStorageItem("usePlayer2") === "yes";
 const bothPlayersEnabled = player1Enabled && player2Enabled;
-const playerToggleEnabled = getStorageItem("usePlayerToggle") == "yes";
-console.log(`PlayerToggle: ${playerToggleEnabled}. Players both enabled: ${bothPlayersEnabled}`)
+const playerToggleEnabled = getStorageItem("usePlayerToggle") === "yes";
+
+// Add debug logging
+console.log('Player States:', {
+    player1Enabled,
+    player2Enabled,
+    bothPlayersEnabled,
+    playerToggleEnabled,
+    usePlayer1: getStorageItem("usePlayer1"),
+    usePlayer2: getStorageItem("usePlayer2"),
+    usePlayerToggle: getStorageItem("usePlayerToggle"),
+    activePlayer: getStorageItem("activePlayer")
+});
+
+// Ensure we have valid values
+if (player1Enabled === null || player2Enabled === null) {
+    console.warn('Player states not properly initialized, reinitializing defaults');
+    initializeDefaults();
+    // Recheck values after initialization
+    const player1Enabled = getStorageItem("usePlayer1") === "yes";
+    const player2Enabled = getStorageItem("usePlayer2") === "yes";
+    const bothPlayersEnabled = player1Enabled && player2Enabled;
+    const playerToggleEnabled = getStorageItem("usePlayerToggle") === "yes";
+}
 
 if (bothPlayersEnabled && playerToggleEnabled) {
     const activePlayer = getStorageItem("activePlayer");
-	console.log(`Show player image in autostart condition. PlayerToggle: ${playerToggleEnabled}. Players both enabled: ${bothPlayersEnabled}`);
-    document.getElementById("player1Image").classList.replace(activePlayer === "1" ? "fadeOutElm" : "fadeInElm", activePlayer === "1" ? "fadeInElm" : "fadeOutElm");
-    document.getElementById("player2Image").classList.replace(activePlayer === "2" ? "fadeOutElm" : "fadeInElm", activePlayer === "2" ? "fadeInElm" : "fadeOutElm");
+    console.log(`Show player image in autostart condition. PlayerToggle: ${playerToggleEnabled}. Players both enabled: ${bothPlayersEnabled}`);
+    // Show active player image, hide inactive player image
+    if (activePlayer === "1") {
+        document.getElementById("player1Image").classList.remove("fadeOutElm");
+        document.getElementById("player1Image").classList.add("fadeInElm");
+        document.getElementById("player2Image").classList.remove("fadeInElm");
+        document.getElementById("player2Image").classList.add("fadeOutElm");
+    } else {
+        document.getElementById("player1Image").classList.remove("fadeInElm");
+        document.getElementById("player1Image").classList.add("fadeOutElm");
+        document.getElementById("player2Image").classList.remove("fadeOutElm");
+        document.getElementById("player2Image").classList.add("fadeInElm");
+    }
 } else {
     // Hide both players if not enabled
-    document.getElementById("player1Image").classList.replace("fadeInElm", "fadeOutElm");
-    document.getElementById("player2Image").classList.replace("fadeInElm", "fadeOutElm");
+    document.getElementById("player1Image").classList.remove("fadeInElm");
+    document.getElementById("player1Image").classList.add("fadeOutElm");
+    document.getElementById("player2Image").classList.remove("fadeInElm");
+    document.getElementById("player2Image").classList.add("fadeOutElm");
 }
 
 if (getStorageItem("p1ScoreCtrlPanel") != null) {
@@ -478,21 +569,6 @@ if (getStorageItem("useClock") == "yes" && bothPlayersEnabled) {
     console.log("Icons not shown due to conditions not met.");
     updateIconsVisibility(false);
 }
-
-// Setting defaults in storage so functions execute correctly, in the event values are not being retrieved from storage successfully due to initialization or similar
-if (getStorageItem("usePlayer1") === null) {
-    setStorageItem("usePlayer1", "yes");
-}
-if (getStorageItem("usePlayer2") === null) {
-    setStorageItem("usePlayer2", "yes");
-}
-if (getStorageItem("usePlayerToggle") === null) {
-    setStorageItem("usePlayerToggle", "yes");
-}
-if (getStorageItem("activePlayer") === null) {
-    setStorageItem("activePlayer", "1");
-}
-
 
 if (getStorageItem(("usePlayer1")) != "yes") {
 	document.getElementById("player1Name").classList.replace("fadeInElm", "fadeOutElm");
