@@ -464,6 +464,8 @@ function playerSetting(player) {
     bc.postMessage({playerDisplay: usePlayer, playerNumber: player});
 
     updateTabVisibility();
+
+    document.getElementById("swapBtn").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
 }
 
 function scoreDisplaySetting() {
