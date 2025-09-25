@@ -429,6 +429,40 @@ function playWebmAnimation(gameType, containerSelector = '#videoContainer') {
     return video;
 }
 
+function updateBallImages(selection) {
+    console.log(`Updating ball images to: ${selection}`);
+    
+    // Update all ball images
+    for (let i = 1; i <= 15; i++) {
+        const ballElement = document.getElementById(`ball ${i}`);
+        if (ballElement) {
+            const img = ballElement.querySelector('img');
+            if (img) {
+                let imageSrc;
+                
+                if (selection === "international") {
+                    // International ball naming convention
+                    if (i >= 1 && i <= 7) {
+                        imageSrc = `./common/images/yellow-international-small-ball.png`;
+                    } else if (i >= 8 && i <= 14) {
+                        imageSrc = `./common/images/red-international-small-ball.png`;
+                    } else if (i === 15) {
+                        imageSrc = `./common/images/international-8-small-ball.png`;
+                    }
+                } else {
+                    // American ball naming convention (default)
+                    imageSrc = `./common/images/${i}ball_small.png`;
+                }
+                
+                img.src = imageSrc;
+            }
+        }
+    }
+    
+    // Store the selection for future reference
+    setStorageItem("ballSelection", selection);
+}
+
 function setStorageItem(key, value) {
     const prefix = INSTANCE_ID ? `${INSTANCE_ID}_` : '';
     localStorage.setItem(`${prefix}${key}`, value);

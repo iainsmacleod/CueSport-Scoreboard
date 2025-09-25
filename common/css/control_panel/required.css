@@ -163,7 +163,7 @@ input[type="number"]::-webkit-outer-spin-button {
 	padding: 0 5px 0 5px;
 }
 
-#ballTrackerDirection{
+#ballTrackerDirection, #ballSelection{
 	cursor: pointer;
 	width: auto;
 	font-size: 10pt;

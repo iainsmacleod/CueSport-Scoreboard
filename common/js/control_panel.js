@@ -140,12 +140,18 @@ function useBallTracker(){
 		document.getElementById("ballTrackerLabel").classList.remove("noShow");
 		document.getElementById("ballTrackerDiv").classList.remove("noShow");
 		document.getElementById("ballTracker").classList.remove("noShow");
+		// Show ball style toggle when tracker is enabled
+		var bs = document.getElementById("ballSelection");
+		if (bs) { bs.classList.remove("noShow"); }
 	} else {
 		document.getElementById("ballTrackerDirectionDiv").classList.add("noShow");
 		document.getElementById("ballTrackerDirection").classList.add("noShow");
 		document.getElementById("ballTrackerLabel").classList.add("noShow");
 		document.getElementById("ballTrackerDiv").classList.add("noShow");
 		document.getElementById("ballTracker").classList.add("noShow");
+		// Hide ball style toggle when tracker is disabled
+		var bs2 = document.getElementById("ballSelection");
+		if (bs2) { bs2.classList.add("noShow"); }
 	}
 	if (bothPlayersEnabled){
 		bc.postMessage({ displayBallTracker: document.getElementById("ballTrackerCheckbox").checked});
@@ -154,7 +160,7 @@ function useBallTracker(){
 }
 
 function toggleBallTrackerDirection() {
-    // Get current direction from localStorage or default to "horizontal"
+    // Get current direction from localStorage or default to "vertical"
     const currentDirection = getStorageItem("ballTrackerDirection") || "vertical";
     // Toggle direction
     const newDirection = currentDirection === "horizontal" ? "vertical" : "horizontal";
@@ -163,7 +169,58 @@ function toggleBallTrackerDirection() {
     // Update localStorage
     setStorageItem("ballTrackerDirection", newDirection);
     console.log(`Changed ball tracker to ${newDirection} orientation`);
-	document.getElementById("ballTrackerDirection").innerHTML = currentDirection.charAt(0).toUpperCase() + currentDirection.slice(1).toLowerCase() + " Ball Tracker";
+	// Update button label to reflect NEW direction (current state after toggle)
+	document.getElementById("ballTrackerDirection").innerHTML = newDirection.charAt(0).toUpperCase() + newDirection.slice(1).toLowerCase() + " Ball Tracker";
+}
+
+function updateControlPanelBallImages(selection) {
+    console.log(`Updating control panel ball images to: ${selection}`);
+    
+    // Update all ball images in the control panel
+    for (let i = 1; i <= 15; i++) {
+        const ballElement = document.getElementById(`ball ${i}`);
+        if (ballElement) {
+            const img = ballElement.querySelector('img');
+            if (img) {
+                let imageSrc;
+                
+                if (selection === "international") {
+                    // International ball naming convention
+                    if (i >= 1 && i <= 7) {
+                        imageSrc = `./common/images/yellow-international-small-ball.png`;
+                    } else if (i >= 8 && i <= 14) {
+                        imageSrc = `./common/images/red-international-small-ball.png`;
+                    } else if (i === 15) {
+                        imageSrc = `./common/images/international-8-small-ball.png`;
+                    }
+                } else {
+                    // American ball naming convention (default)
+                    imageSrc = `./common/images/${i}ball_small.png`;
+                }
+                
+                img.src = imageSrc;
+            }
+        }
+    }
+}
+
+function toggleBallSelection() {
+    // Get current selection from localStorage or default to "american"
+    const currentSelection = getStorageItem("ballSelection") || "american";
+    // Toggle selection
+    const newSelection = currentSelection === "international" ? "american" : "international";
+    // Send message to browser source
+    bc.postMessage({ ballSelection: newSelection });
+    // Update localStorage
+    setStorageItem("ballSelection", newSelection);
+    console.log(`Changed ball selection to ${newSelection} ball style`);
+	// Update button label to reflect NEW selection (what it will show after toggle)
+	var bs = document.getElementById("ballSelection");
+	if (bs) {
+		bs.innerHTML = (newSelection === "american" ? "American Balls" : "International Balls");
+	}
+	// Update control panel ball images
+	updateControlPanelBallImages(newSelection);
 }
 
 function togglePot(element) {
@@ -417,6 +474,7 @@ function playerSetting(player) {
         ballTrackerCheckbox.disabled = true;
         ballTrackerCheckbox.checked = false;
         setStorageItem("enableBallTracker", "no");
+		setStorageItem("ballSelection", "american");
 
         // Hide related elements
         document.getElementById("clockInfo").classList.add("noShow");
@@ -426,6 +484,7 @@ function playerSetting(player) {
         document.getElementById("playerToggleLabel").classList.add("noShow");
         document.getElementById("ballTrackerDirectionDiv").classList.add("noShow");
         document.getElementById("ballTrackerDirection").classList.add("noShow");
+		//document.getElementById("ballTrackerSelection").classList.add("noShow");
         document.getElementById("ballTrackerLabel").classList.add("noShow");
         document.getElementById("ballTrackerDiv").classList.add("noShow");
         document.getElementById("ballTracker").classList.add("noShow");

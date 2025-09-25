@@ -369,7 +369,7 @@ const handlers = {
         }
     },
 
-	gameType(data) {
+    gameType(data) {
         console.log('Game type value:', data.gameType);
         if (data.gameType === "game3") {
             // 9-ball
@@ -388,6 +388,11 @@ const handlers = {
                 document.getElementById(`ball ${num}`).classList.remove("noShow");
             });
         }
+    },
+
+    ballSelection(data) {
+        console.log('Ball selection value:', data.ballSelection);
+        updateBallImages(data.ballSelection);
     }
 };
 
@@ -625,6 +630,16 @@ if (getStorageItem("ballTrackerDirection") === null) {
 let slideIndex = 0;
 showSlides();
 applySavedBallStates();
+
+// Initialize ball selection on page load
+const initializeBallSelection = () => {
+    const selection = getStorageItem("ballSelection") || "american";
+    updateBallImages(selection);
+    console.log(`Ball selection initialized to: ${selection}`);
+};
+
+// Run ball selection initialization
+initializeBallSelection();
 
 // Functions
 

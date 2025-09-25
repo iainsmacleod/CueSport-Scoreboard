@@ -143,6 +143,9 @@ window.onload = function() {
 		document.getElementById("ballTracker").classList.remove("noShow");
 		document.getElementById("ballTrackerDirection").classList.remove("noShow");
 		document.getElementById("ballTrackerLabel").classList.remove("noShow");
+		// Show ball style toggle button on load when enabled
+		var bs = document.getElementById("ballSelection");
+		if (bs) { bs.classList.remove("noShow"); }
 		console.log(`Ball tracker enabled`);
 		bc.postMessage({ displayBallTracker: true });
 	} else {
@@ -151,6 +154,9 @@ window.onload = function() {
 		document.getElementById("ballTracker").classList.add("noShow");
 		document.getElementById("ballTrackerDirection").classList.add("noShow");
 		document.getElementById("ballTrackerLabel").classList.add("noShow");		
+		// Hide ball style toggle button on load when disabled
+		var bs2 = document.getElementById("ballSelection");
+		if (bs2) { bs2.classList.add("noShow"); }
 		console.log(`Ball tracker disabled`);
 		bc.postMessage({ displayBallTracker: false });
 	}
@@ -158,13 +164,22 @@ window.onload = function() {
 	if (getStorageItem("ballTrackerDirection") === null) {
 		// Initialize with default value if not set
 		setStorageItem("ballTrackerDirection", "vertical");
-		document.getElementById("ballTrackerDirection").innerHTML = "Horizontal Ball Tracker";
+		setStorageItem("ballSelection", "american");
+		document.getElementById("ballTrackerDirection").innerHTML = "Vertical Ball Tracker";
+		var bsTxt = document.getElementById("ballSelection");
+		if (bsTxt) { bsTxt.innerHTML = "American Balls"; }
 		bc.postMessage({ ballTracker: "vertical" });
+		bc.postMessage({ ballSelection: "american" });
 		console.log(`Ball tracker initialized vertical`);
+		console.log(`Ball selection initialized american`);
 	} else {
 		// Use existing stored value
 		const direction = getStorageItem("ballTrackerDirection");
-		document.getElementById("ballTrackerDirection").innerHTML = direction === "vertical" ? "Horizontal Ball Tracker" : "Vertical Ball Tracker";
+		document.getElementById("ballTrackerDirection").innerHTML = direction === "vertical" ? "Vertical Ball Tracker" : "Horizontal Ball Tracker";
+		const selection = getStorageItem("ballSelection");
+		var bsTxt2 = document.getElementById("ballSelection");
+		if (bsTxt2) { bsTxt2.innerHTML = selection === "american" ? "American Balls" : "International Balls"; }
+		bc.postMessage({ ballSelection: selection });
 		bc.postMessage({ ballTracker: direction });
 		console.log(`Ball tracker initialized ${direction}`);
 	}
@@ -173,6 +188,10 @@ window.onload = function() {
     setPlayerVisibility(1);
     setPlayerVisibility(2);
 	applySavedBallStates();
+	
+	// Initialize control panel ball images
+	const ballSelection = getStorageItem("ballSelection") || "american";
+	updateControlPanelBallImages(ballSelection);
 
 	// Initialize the logo and extension status for each logo (players + slideshow logos) and player
 	initializeLogoStatus();
