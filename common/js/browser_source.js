@@ -370,24 +370,25 @@ function applySavedBallStates() {
 // }
 
 function playWebmAnimation(gameType, containerSelector = '#videoContainer') {
-	// Determine which video URL to use based on the gameType value.
+	// Determine which video URL to use based on the gameType value and ball selection.
     let videoUrl;
+    const ballSelection = getStorageItem("ballSelection") || "american";
+    
     switch (gameType) {
         case 'game1':
-            videoUrl = './common/video/defaultanimation.webm';
+            // Use different default animations based on ball style
+            videoUrl = ballSelection === "international" ? './common/video/international8ballwin.webm' : './common/video/defaultanimation.webm';
             break;
-		case 'game2':
-            videoUrl = './common/video/8ballwin.webm';
-            break;
-        case 'game3':
+        case 'game2':
             videoUrl = './common/video/9ballwin.webm';
             break;
-        case 'game4':
+        case 'game3':
             videoUrl = './common/video/10ballwin.webm';
             break;
         // Add more cases as needed
         default:
-            videoUrl = './common/video/defaultanimation.webm';
+            // Use different default animations based on ball style
+            videoUrl = ballSelection === "international" ? './common/video/international8ballwin.webm' : './common/video/defaultanimation.webm';
             break;
     }
 

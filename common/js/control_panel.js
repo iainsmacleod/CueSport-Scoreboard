@@ -103,14 +103,14 @@ function toggleAnimationSetting(){
 
 function gameType(value) {
 	setStorageItem("gameType", value);
-	if (getStorageItem("gameType") === "game3"){
+	if (getStorageItem("gameType") === "game2"){
 		document.getElementById("ball 10").classList.add("noShow");
 		document.getElementById("ball 11").classList.add("noShow");
 		document.getElementById("ball 12").classList.add("noShow");
 		document.getElementById("ball 13").classList.add("noShow");
 		document.getElementById("ball 14").classList.add("noShow");
 		document.getElementById("ball 15").classList.add("noShow");
-	} else if (getStorageItem("gameType") === "game4"){
+	} else if (getStorageItem("gameType") === "game3"){
 		document.getElementById("ball 10").classList.remove("noShow");
 		document.getElementById("ball 11").classList.add("noShow");
 		document.getElementById("ball 12").classList.add("noShow");
@@ -127,6 +127,24 @@ function gameType(value) {
 	}
 	bc.postMessage({ gameType: value });
 	resetBallTracker();
+
+	// Update Ball Style toggle visibility based on selected game
+	var bs = document.getElementById("ballSelection");
+	if (bs) {
+		bs.classList[(value === "game1" && document.getElementById("ballTrackerCheckbox").checked) ? "remove" : "add"]("noShow");
+	}
+
+	// Reset ball style to American when switching away from 8-ball (game1)
+	if (value !== "game1") {
+		setStorageItem("ballSelection", "american");
+		bc.postMessage({ ballSelection: "american" });
+		updateControlPanelBallImages("american");
+		// Update button label
+		if (bs) {
+			bs.innerHTML = "American Balls";
+		}
+		console.log("Ball style reset to American for non-8-ball game");
+	}
 }
 
 function useBallTracker(){
@@ -140,9 +158,10 @@ function useBallTracker(){
 		document.getElementById("ballTrackerLabel").classList.remove("noShow");
 		document.getElementById("ballTrackerDiv").classList.remove("noShow");
 		document.getElementById("ballTracker").classList.remove("noShow");
-		// Show ball style toggle when tracker is enabled
+		// Show ball style toggle only when tracker is enabled AND game type is 8-ball (game1)
 		var bs = document.getElementById("ballSelection");
-		if (bs) { bs.classList.remove("noShow"); }
+		var currentGameType = getStorageItem("gameType") || "game1";
+		if (bs) { bs.classList[currentGameType === "game1" ? "remove" : "add"]("noShow"); }
 	} else {
 		document.getElementById("ballTrackerDirectionDiv").classList.add("noShow");
 		document.getElementById("ballTrackerDirection").classList.add("noShow");
@@ -207,6 +226,12 @@ function updateControlPanelBallImages(selection) {
 function toggleBallSelection() {
     // Get current selection from localStorage or default to "american"
     const currentSelection = getStorageItem("ballSelection") || "american";
+    // Only allow toggling ball style for 8-ball (game1)
+    const currentGame = getStorageItem("gameType") || (document.getElementById("gameType") ? document.getElementById("gameType").value : "game1");
+    if (currentGame !== "game1") {
+        console.log("Ball style toggle is only available for 8-ball (game1)");
+        return;
+    }
     // Toggle selection
     const newSelection = currentSelection === "international" ? "american" : "international";
     // Send message to browser source
