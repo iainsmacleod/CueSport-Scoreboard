@@ -130,6 +130,12 @@ input[type="number"]::-webkit-outer-spin-button {
 
 #ballTracker img {
 	padding: 1px;
+	transition: box-shadow 0.2s;
+}
+
+#ballTracker img:hover {
+	filter: drop-shadow(0 2px 2px rgba(0,0,0,0.35))
+	drop-shadow(0 6px 12px rgba(0,0,0,0.35));
 }
 
 .faded {
@@ -155,6 +161,8 @@ input[type="number"]::-webkit-outer-spin-button {
 	font-size: 10pt;
 	padding: 0px 0px 0px 0px;
 	border:2px solid black;
+	corner-shape: bevel;
+    border-radius: 0px 0px 12px 0px;
 }
 
 #raceInfoTxt, #gameInfoTxt{
@@ -169,6 +177,8 @@ input[type="number"]::-webkit-outer-spin-button {
 	font-size: 10pt;
 	padding: 0px 5px 0px 5px;
 	border:2px solid black;
+	corner-shape: bevel;
+    border-radius: 0px 0px 12px 0px;
 }
 
 #resetBtn, #uploadCustomLogo, #uploadCustomLogo2, #updateCheck{
@@ -177,6 +187,8 @@ input[type="number"]::-webkit-outer-spin-button {
 	font-size: 10pt;
 	padding: 0px 0px 0px 0px;
 	border:2px solid black;
+	corner-shape: bevel;
+    border-radius: 0px 0px 12px 0px;
 }
 
 #resetDataBtn{
@@ -187,6 +199,8 @@ input[type="number"]::-webkit-outer-spin-button {
 	background: red;
 	color: black;
 	border:2px solid black;
+	corner-shape: bevel;
+    border-radius: 0px 0px 12px 0px;
 }
 
 #p1extensionBtn, #p2extensionBtn  {
@@ -197,6 +211,62 @@ input[type="number"]::-webkit-outer-spin-button {
 	border:2px solid black;
 	color:black;
 	background: green;
+	corner-shape: bevel;
+    border-radius: 0px 0px 12px 0px;
+}
+
+#resetDataBtn,
+#ballTrackerDirection,
+#ballSelection,
+#resetBtn,
+#uploadCustomLogo,
+#uploadCustomLogo2,
+#updateCheck,
+#shotClock30,
+#shotClock60,
+#stopClockDiv,
+#sendPNames,
+#sendPInfo,
+#resetScores,
+#sendPScores,
+#swapBtn,
+#shotClockShow,
+#logoSsImg1,
+#logoSsImg2,
+#logoSsImg3,
+#logoSsImg4,
+#logoSsImg5,
+#p1extensionBtn,
+#p2extensionBtn
+	{
+	transition: box-shadow 0.2s;
+}
+
+#resetDataBtn:hover,
+#ballTrackerDirection:hover,
+#ballSelection:hover,
+#resetBtn:hover,
+#uploadCustomLogo:hover,
+#uploadCustomLogo2:hover,
+#updateCheck:hover,
+#shotClock30:hover,
+#shotClock60:hover,
+#stopClockDiv:hover,
+#sendPNames:hover,
+#sendPInfo:hover,
+#resetScores:hover,
+#sendPScores:hover,
+#swapBtn:hover,
+#shotClockShow:hover,
+#logoSsImg1:hover,
+#logoSsImg2:hover,
+#logoSsImg3:hover,
+#logoSsImg4:hover,
+#logoSsImg5:hover,
+#p1extensionBtn:hover,
+#p2extensionBtn:hover
+	{
+	box-shadow: 0 4px 10px rgba(0,0,0,0.35);
 }
 
 .noShow{
