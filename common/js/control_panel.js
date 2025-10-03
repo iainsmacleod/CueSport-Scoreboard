@@ -32,6 +32,7 @@
 
 // declare mqtt client variable
 let client = null;
+const extraDebug = true;
 
 function updateTabVisibility() {
     // Get the state of the player settings
@@ -64,6 +65,7 @@ document.addEventListener("DOMContentLoaded", function() {
 	}
 });
 
+//main function to update scoreboard from PoolStat Live Stream
 function poolstatUpdate(updateJSON) {
 	if (Object.keys(updateJSON).length == 18) {
 		console.log('Update Received');
@@ -97,6 +99,8 @@ function poolstatUpdate(updateJSON) {
 	}	
 }
 
+// OBS WebSocket functions
+// get list of profiles
 async function getOBSProfiles() {
 	const obsWS = new OBSWebSocket();
 	try {
@@ -110,6 +114,7 @@ async function getOBSProfiles() {
 	}
 }
 
+// get list of scenes
 async function getOBSScenes() {
 	const obsWS = new OBSWebSocket();
 	try {
@@ -123,6 +128,7 @@ async function getOBSScenes() {
 	}
 }
 
+// get stream config
 function getOBStreamConfig() {
 	const obsWS = new OBSWebSocket();
 	return obsWS.connect()
@@ -142,6 +148,7 @@ function getOBStreamConfig() {
 }
 
 
+// send OBS config to PoolStat Live Stream
 async function sendOBSConfig(data) {
 	try {
 		const profiles = await getOBSProfiles();
@@ -162,28 +169,30 @@ async function sendOBSConfig(data) {
 	}
 }
 
-
-
+// update stream status
 function updateStreamStatus() {
 	if (getStorageItem("streamStatus") === "true") {
-		document.getElementById("streamStatus").textContent = "Stream On";
+		document.getElementById("streamStatus").textContent = "Streaming";
+        document.getElementById("streamStatus").style.color = "green";
 		if (getStorageItem("streamKey") != null) {
 			setOBSStreamKey(getStorageItem("streamKey"));
 		}
 		startOBSStream();
 	} else {
-		document.getElementById("streamStatus").textContent = "Stream Off";
+		document.getElementById("streamStatus").textContent = "Not Streaming";
+        document.getElementById("streamStatus").style.color = "red";
 		stopOBSStream();
 	}
 }
 
+// set stream key if required
 function setOBSStreamKey(newKey) {
 	const obsWS = new OBSWebSocket();
 
 	obsWS.connect()
 		.then(() => {
-			console.log('Connected to OBS WebSocket');
-			// Example: Get the current scene
+			if (extraDebug) {console.log('Connected to OBS WebSocket');}
+		
 			return obsWS.call('GetStreamServiceSettings');
 		})
 		.then(data => {
@@ -214,7 +223,7 @@ function setOBSStreamKey(newKey) {
 
 	// Event listeners (optional, but useful for real-time updates)
 	obsWS.on('ConnectionClosed', () => {
-		console.log('Disconnected from OBS WebSocket');
+		if (extraDebug) {console.log('Disconnected from OBS WebSocket');}
 	});
 
 	obsWS.on('error', err => {
@@ -229,7 +238,7 @@ function changeOBSProfile(newProfile) {
 
 	obsWS.connect()
 		.then(() => {
-			console.log('Connected to OBS WebSocket Profile');
+			if (extraDebug) {console.log('Connected to OBS WebSocket Profile');}
 			return obsWS.call('GetProfileList');
 		})
 		.then(data => {
@@ -237,7 +246,7 @@ function changeOBSProfile(newProfile) {
 			if (data.currentProfileName !== newProfile) {
 				return obsWS.call('SetCurrentProfile', { profileName: newProfile });
 			} else {
-				console.log('Profile is already set to the desired profile.');
+				if (extraDebug) {console.log('Profile is already set to the desired profile.');}
 				return Promise.resolve(); // Resolve to continue the chain
 			}
 		})
@@ -258,18 +267,17 @@ function changeOBSProfile(newProfile) {
 	return obsWS;
 }
 
-
+// start OBS stream
 function startOBSStream() {
 	const obsWS = new OBSWebSocket();
 
 	obsWS.connect()
 		.then(() => {
-			console.log('Connected to OBS WebSocket');
-			// Example: Get the current scene
+			if (extraDebug) {console.log('Connected to OBS WebSocket startStream');}
 			return obsWS.call('GetStreamStatus');
 		})
 		.then(data => {
-			console.log('Current Stream Status', data);
+			if (extraDebug) {console.log('Current Stream Status', data);}
 			if (data.outputActive === false) {
 				return obsWS.call('StartStream');
 			} else {
@@ -285,7 +293,6 @@ function startOBSStream() {
 			console.error('Error:', err);
 		});
 
-	// Event listeners (optional, but useful for real-time updates)
 	obsWS.on('ConnectionClosed', () => {
 		console.log('Disconnected from OBS WebSocket');
 	});
@@ -297,13 +304,14 @@ function startOBSStream() {
 	return obsWS;
 }
 
+// stop OBS stream
 function stopOBSStream() {
 	const obsWS = new OBSWebSocket();
 
 	obsWS.connect()
 		.then(() => {
 			console.log('Connected to OBS WebSocket');
-			// Example: Get the current scene
+
 			return obsWS.call('GetStreamStatus');
 		})
 		.then(data => {
@@ -311,7 +319,7 @@ function stopOBSStream() {
 			if (data.outputActive === true) {
 				return obsWS.call('StopStream');
 			} else {
-				console.log('Stream service is already running');
+				console.log('Stream service is not running');
 				return Promise.resolve(); // Resolve to continue the chain
 			}
 		})
@@ -323,7 +331,6 @@ function stopOBSStream() {
 			console.error('Error:', err);
 		});
 
-	// Event listeners (optional, but useful for real-time updates)
 	obsWS.on('ConnectionClosed', () => {
 		console.log('Disconnected from OBS WebSocket');
 	});
@@ -335,6 +342,8 @@ function stopOBSStream() {
 	return obsWS;
 }
 
+//main function to connect to PoolStat Live Stream
+//including handling messages
 function connectPSLiveStream() {
 	const psRigId = getStorageItem("PoolStatRigID");
 	console.log(psRigId);
@@ -354,6 +363,7 @@ function connectPSLiveStream() {
         retain: false
       },
     }
+
     console.log('Connecting to PoolStat Live Stream server')
 	psLiveStatus.textContent = 'Connecting to PoolStat Live Stream server';
 
@@ -375,30 +385,31 @@ function connectPSLiveStream() {
     })
 
     client.on('message', function (topic, message) {
-	  switch (topic)	{
-		case 'livestream/matches':
-			if (JSON.parse(message.toString())) {
-				var messageJSON = JSON.parse(message.toString());
-				//check if the message for this Rig
-				if (messageJSON['rigId'] === psRigId) {
-					poolstatUpdate(JSON.parse(message.toString()));
-				} else {
-					//it is not ours so check if it matches our CompetitionID and if it does process it for 
-					//Ticker display
-				}
-			}
-			break;
-		case 'livestream/rigConfig':
-			if (JSON.parse(message.toString())) {
-				var messageJSON = JSON.parse(message.toString());
-				//check if the message for this Rig
-				if (messageJSON['rigId'] === psRigId && messageJSON['request'] === 'rigConfig') {
-					sendOBSConfig({ rigId: messageJSON['rigId'] });
-				}
-			}
-			break;
-	  }
-    })
+        var messageJSON = JSON.parse(message.toString());
+        if (extraDebug) {console.log('Message Received: Topic-', topic, 'Message-', messageJSON);}
+        switch (topic)	{
+            case 'livestream/matches':
+                if (JSON.parse(message.toString())) {
+                    //check if the message for this Rig
+                    if (messageJSON['rigId'] === psRigId) {
+                        poolstatUpdate(JSON.parse(message.toString()));
+                    } else {
+                        //it is not ours so check if it matches our CompetitionID and if it does process it for 
+                        //Ticker display
+                    }
+                }
+                break;
+            case 'livestream/rigConfig':
+                if (JSON.parse(message.toString())) {
+                    //check if the message for this Rig
+                    if (messageJSON['rigId'] === psRigId && messageJSON['request'] === 'rigConfig') {
+                        sendOBSConfig({ rigId: messageJSON['rigId'] });
+                    }
+                }
+                break;
+            }
+        }
+    )
 
     client.on('reconnect', () => {
       console.log('Reconnecting to PoolStat Live Stream');

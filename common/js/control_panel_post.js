@@ -252,6 +252,7 @@ window.onload = function() {
     setPlayerVisibility(1);
     setPlayerVisibility(2);
 	applySavedBallStates();
+	updateStreamStatus();
 
 	// Initialize the logo and extension status for each logo (players + slideshow logos) and player
 	initializeLogoStatus();
