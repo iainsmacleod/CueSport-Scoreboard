@@ -1,0 +1,44 @@
+{
+   "rigId":"string",
+   "profiles":[
+      "Table1",
+      "Table2",
+      "Table3"
+   ],
+   "scenes":[
+      {
+         "sceneIndex":0,
+         "sceneName":"Table 3 - Intermission",
+         "sceneUuid":"07f6cd74-b5c5-47ad-ae33-1b3667d12f24"
+      },
+      {
+         "sceneIndex":1,
+         "sceneName":"Table 2 - Intermission",
+         "sceneUuid":"94fe8cf4-fad4-4b17-9e33-3d92dff3d36a"
+      },
+      {
+         "sceneIndex":2,
+         "sceneName":"Table 1 - Intermission",
+         "sceneUuid":"5b7ce73a-0ed0-47a2-a045-12821c1878cb"
+      },
+      {
+         "sceneIndex":3,
+         "sceneName":"Table 3 - Match",
+         "sceneUuid":"d6be79f8-3e20-4857-94d8-3090a38aa121"
+      },
+      {
+         "sceneIndex":4,
+         "sceneName":"Table 2 - Match",
+         "sceneUuid":"fc2acae9-96be-4e0b-a81c-61e0eb838691"
+      },
+      {
+         "sceneIndex":5,
+         "sceneName":"Table 1 - Match",
+         "sceneUuid":"8c403564-f062-4789-8540-742d4be4c978"
+      }
+   ],
+   "streamConfig":{
+      "streamKey":"FB-10239015953915456-0-Ab223Izm2vZxMxFGAecrzRJh",
+      "service":"Fabebook - Live"
+   }
+}

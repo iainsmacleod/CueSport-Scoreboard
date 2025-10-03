@@ -1,0 +1,20 @@
+{
+    "rigId": "4c08-3a1e-6c39",
+    "compId": 7011,
+    "matchId": 22,
+    "obsProfileName": "Table1",
+    "obsSceneName": "Table 1 - Match",
+    "streamKey": "FB-10239015953915456-0-Ab223Izm2vZxMxFGAecrzRJh",
+    "streamStatus": true,
+    "matchStatus": "In Progress",
+    "eventName": "NRL Grand Final",
+    "matchFormat": "Final",
+    "drawRound": "23-09-2025 - Round 2",
+    "homePlayer": "Brisbane Broncos",
+    "awayPlayer": "Penrith Panthers",
+    "homePlayerLogo": "https://upload.wikimedia.org/wikipedia/en/thumb/a/ad/Brisbane_Broncos_logo.svg/1280px-Brisbane_Broncos_logo.svg.png",
+    "awayPlayerLogo": "https://upload.wikimedia.org/wikipedia/en/thumb/9/9e/Penrith_Panthers_Logo.svg/2560px-Penrith_Panthers_Logo.svg.png",
+    "homePlayerScore": 14,
+    "awayPlayerScore": 10,
+    "breakingPlayer": "hp"
+}

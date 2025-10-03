@@ -1,0 +1,164 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "type": "object",
+  "properties": {
+    "rigId": {
+      "type": "string"
+    },
+    "profiles": {
+      "type": "array",
+      "items": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "string"
+        }
+      ]
+    },
+    "scenes": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "sceneIndex": {
+              "type": "integer"
+            },
+            "sceneName": {
+              "type": "string"
+            },
+            "sceneUuid": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "sceneIndex",
+            "sceneName",
+            "sceneUuid"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "sceneIndex": {
+              "type": "integer"
+            },
+            "sceneName": {
+              "type": "string"
+            },
+            "sceneUuid": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "sceneIndex",
+            "sceneName",
+            "sceneUuid"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "sceneIndex": {
+              "type": "integer"
+            },
+            "sceneName": {
+              "type": "string"
+            },
+            "sceneUuid": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "sceneIndex",
+            "sceneName",
+            "sceneUuid"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "sceneIndex": {
+              "type": "integer"
+            },
+            "sceneName": {
+              "type": "string"
+            },
+            "sceneUuid": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "sceneIndex",
+            "sceneName",
+            "sceneUuid"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "sceneIndex": {
+              "type": "integer"
+            },
+            "sceneName": {
+              "type": "string"
+            },
+            "sceneUuid": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "sceneIndex",
+            "sceneName",
+            "sceneUuid"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "sceneIndex": {
+              "type": "integer"
+            },
+            "sceneName": {
+              "type": "string"
+            },
+            "sceneUuid": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "sceneIndex",
+            "sceneName",
+            "sceneUuid"
+          ]
+        }
+      ]
+    },
+    "streamConfig": {
+      "type": "object",
+      "properties": {
+        "streamKey": {
+          "type": "string"
+        },
+        "service": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "streamKey",
+        "service"
+      ]
+    }
+  },
+  "required": [
+    "rigId",
+    "profiles",
+    "scenes",
+    "streamConfig"
+  ]
+}
+

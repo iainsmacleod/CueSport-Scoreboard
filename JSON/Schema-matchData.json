@@ -1,0 +1,79 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "type": "object",
+  "properties": {
+    "rigId": {
+      "type": "string"
+    },
+    "compId": {
+      "type": "integer"
+    },
+    "matchId": {
+      "type": "integer"
+    },
+    "obsProfileName": {
+      "type": "string"
+    },
+    "obsSceneName": {
+      "type": "string"
+    },
+    "streamKey": {
+      "type": "string"
+    },
+    "streamStatus": {
+      "type": "boolean"
+    },
+    "matchStatus": {
+      "type": "string"
+    },
+    "eventName": {
+      "type": "string"
+    },
+    "matchFormat": {
+      "type": "string"
+    },
+    "drawRound": {
+      "type": "string"
+    },
+    "homePlayer": {
+      "type": "string"
+    },
+    "awayPlayer": {
+      "type": "string"
+    },
+    "homePlayerLogo": {
+      "type": "string"
+    },
+    "awayPlayerLogo": {
+      "type": "string"
+    },
+    "homePlayerScore": {
+      "type": "integer"
+    },
+    "awayPlayerScore": {
+      "type": "integer"
+    },
+    "breakingPlayer": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "rigId",
+    "compId",
+    "matchId",
+    "obsProfileName",
+    "streamKey",
+    "streamStatus",
+    "matchStatus",
+    "eventName",
+    "matchFormat",
+    "drawRound",
+    "homePlayer",
+    "awayPlayer",
+    "homePlayerLogo",
+    "awayPlayerLogo",
+    "homePlayerScore",
+    "awayPlayerScore",
+    "breakingPlayer"
+  ]
+}
