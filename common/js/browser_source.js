@@ -370,25 +370,24 @@ function applySavedBallStates() {
 // }
 
 function playWebmAnimation(gameType, containerSelector = '#videoContainer') {
-	// Determine which video URL to use based on the gameType value and ball selection.
+	// Determine which video URL to use based on the gameType value.
     let videoUrl;
-    const ballSelection = getStorageItem("ballSelection") || "american";
-    
     switch (gameType) {
         case 'game1':
-            // Use different default animations based on ball style
-            videoUrl = ballSelection === "international" ? './common/video/international8ballwin.webm' : './common/video/defaultanimation.webm';
+            videoUrl = './common/video/defaultanimation.webm';
             break;
-        case 'game2':
-            videoUrl = './common/video/9ballwin.webm';
+		case 'game2':
+            videoUrl = './common/video/8ballwin.webm';
             break;
         case 'game3':
+            videoUrl = './common/video/9ballwin.webm';
+            break;
+        case 'game4':
             videoUrl = './common/video/10ballwin.webm';
             break;
         // Add more cases as needed
         default:
-            // Use different default animations based on ball style
-            videoUrl = ballSelection === "international" ? './common/video/international8ballwin.webm' : './common/video/defaultanimation.webm';
+            videoUrl = './common/video/defaultanimation.webm';
             break;
     }
 
@@ -428,40 +427,6 @@ function playWebmAnimation(gameType, containerSelector = '#videoContainer') {
     
     // Return the video element for further manipulation if needed.
     return video;
-}
-
-function updateBallImages(selection) {
-    console.log(`Updating ball images to: ${selection}`);
-    
-    // Update all ball images
-    for (let i = 1; i <= 15; i++) {
-        const ballElement = document.getElementById(`ball ${i}`);
-        if (ballElement) {
-            const img = ballElement.querySelector('img');
-            if (img) {
-                let imageSrc;
-                
-                if (selection === "international") {
-                    // International ball naming convention
-                    if (i >= 1 && i <= 7) {
-                        imageSrc = `./common/images/yellow-international-small-ball.png`;
-                    } else if (i >= 8 && i <= 14) {
-                        imageSrc = `./common/images/red-international-small-ball.png`;
-                    } else if (i === 15) {
-                        imageSrc = `./common/images/international-8-small-ball.png`;
-                    }
-                } else {
-                    // American ball naming convention (default)
-                    imageSrc = `./common/images/${i}ball_small.png`;
-                }
-                
-                img.src = imageSrc;
-            }
-        }
-    }
-    
-    // Store the selection for future reference
-    setStorageItem("ballSelection", selection);
 }
 
 function setStorageItem(key, value) {

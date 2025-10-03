@@ -136,6 +136,7 @@ input[type="number"]::-webkit-outer-spin-button {
 	opacity: 0.2;
 }
 
+
 #p1colorDiv, #p2colorDiv, #p1Name, #p2Name {
 	cursor: pointer;
 	width:150px;
@@ -149,12 +150,20 @@ input[type="number"]::-webkit-outer-spin-button {
 	padding: 0px;
 }
 
-#shotClock30, #shotClock60, #stopClockDiv, #sendPNames, #sendPInfo, #resetScores, #sendPScores, #swapBtn, #shotClockShow, #logoSsImg1, #logoSsImg2, #logoSsImg3, #logoSsImg4, #logoSsImg5{
+#shotClock30, #shotClock60, #stopClockDiv, #sendPNames, #sendPInfo, #getMatchInfo, #stopPSTimerUpdate, #clearButton, #regenPSRigID, #resetScores, #sendPScores, #swapBtn, #shotClockShow, #logoSsImg1, #logoSsImg2, #logoSsImg3, #logoSsImg4, #logoSsImg5{
 	cursor: pointer;
 	width: 100px;
 	font-size: 10pt;
 	padding: 0px 0px 0px 0px;
 	border:2px solid black;
+}
+
+#matchLiveLabel {
+	color: green;
+}
+
+#psRigId {
+	color: green;
 }
 
 #raceInfoTxt, #gameInfoTxt{
@@ -163,7 +172,19 @@ input[type="number"]::-webkit-outer-spin-button {
 	padding: 0 5px 0 5px;
 }
 
-#ballTrackerDirection, #ballSelection{
+#compIDTxt, #matchIDTxt{
+	font-size:16pt;
+	border-radius: 0px;
+	padding: 0 5px 0 5px;
+}
+
+#compIdTxt, #matchIdTxt{
+	font-size:16pt;
+	border-radius: 0px;
+	padding: 0 5px 0 5px;
+}
+
+#ballTrackerDirection{
 	cursor: pointer;
 	width: auto;
 	font-size: 10pt;
@@ -286,6 +307,15 @@ input {
 	height:fit-content;
 }
 
+.column-center {
+	display: flex;
+	justify-content:space-evenly;
+	padding: 10px 0 10px 0;
+	clear: both;
+	width: 650px;
+	height:fit-content;
+}
+
 .header {
 	display: flex;
 	justify-content:space-between;
@@ -307,6 +337,14 @@ input {
 }
 
 #ballTracker {
+	display: flex;
+	justify-content:center;
+	padding: 10px 0 10px 0;
+	clear: both;
+	width: 650px;
+}
+
+#ballSet {
 	display: flex;
 	justify-content:center;
 	padding: 10px 0 10px 0;
@@ -478,4 +516,34 @@ input:checked + .slider_round:before {
 .zoom-controls span {
     min-width: 60px;
     text-align: center;
+}
+
+.hover-container {
+	position: relative; /* Needed for positioning the info-box */
+	display: inline-block; /* Or block, depending on desired layout */
+	cursor: pointer; /* Optional: indicates interactivity */
+	font-size: 14pt;
+}
+
+.info-box {
+  	font-size: 10pt;
+	visibility: hidden; /* Hides the info box by default */
+	opacity: 0; /* Optional: for a fade-in effect */
+	width: 450px; /* Adjust as needed */
+	background-color: #555;
+	color: #fff;
+	text-align: center;
+	border-radius: 6px;
+	padding: 5px 0;
+	position: absolute;
+	z-index: 1; /* Ensures it appears above other content */
+	bottom: 125%; /* Positions above the hover-container */
+	left: 50%;
+	margin-left: -100px; /* Centers the info box */
+	transition: opacity 0.3s; /* Optional: for a smooth fade-in */
+}
+
+.hover-container:hover .info-box {
+	visibility: visible;
+	opacity: 1; /* Reveals the info box on hover */
 }

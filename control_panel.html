@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <!-- 
 CueSport ScoreBoard is a modified version of G4ScoreBoard by Iain MacLeod. The purpose of this modification was to simplify and enhance the UI/UX for users.
 I have removed the Salotto logo, as I myself have not asked for permission to use - but if you choose to use it, it can be uploaded as a custom logo.
@@ -13,389 +13,674 @@ for more information about Salotto please visit https://salotto.app
 -->
 
 <html>
+    <head>
+        <link rel="stylesheet" href="./common/css/control_panel/dark.css" />
+        <link rel="stylesheet" href="./common/css/control_panel/yami.css" />
+        <link rel="stylesheet" href="./common/css/control_panel/acri.css" />
+        <link rel="stylesheet" href="./common/css/control_panel/grey.css" />
+        <link rel="stylesheet" href="./common/css/control_panel/light.css" />
+        <link rel="stylesheet" href="./common/css/control_panel/rachni.css" />
+        <link rel="stylesheet" href="./common/css/control_panel/required.css" />
+        <script>
+            //---------------------------------------------------------------------------------------------
+            var versionNum = "2.2.1";
+            var psVersionNum = "1.0.0";
+            //---------------------------------------------------------------------------------------------
+        </script>
+        <script src="./common/js/jquery.js"></script>
+        <script src="./common/js/control_panel.js"></script>
+        <script src="hotkeys.js"></script>
+        <script src="./common/js/mqtt.min.js"></script>
+        <script src="./common/js/obs-websocket.min.js"></script>
+        <script>
+            // An mqtt variable will be initialized globally
+            console.log(mqtt);
+        </script>
 
-<head>
-	<link rel="stylesheet" href="./common/css/control_panel/dark.css" />
-	<link rel="stylesheet" href="./common/css/control_panel/yami.css" />
-	<link rel="stylesheet" href="./common/css/control_panel/acri.css" />
-	<link rel="stylesheet" href="./common/css/control_panel/grey.css" />
-	<link rel="stylesheet" href="./common/css/control_panel/light.css" />
-	<link rel="stylesheet" href="./common/css/control_panel/rachni.css" />
-	<link rel="stylesheet" href="./common/css/control_panel/required.css" />
-	<script>
-	//---------------------------------------------------------------------------------------------
-		var versionNum = "2.3.0";
- 	 //---------------------------------------------------------------------------------------------
-	</script>
-	<script src="./common/js/jquery.js"></script>
-	<script src="./common/js/control_panel.js"></script>
-	<script src="hotkeys.js"></script>
-	<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-</head>
+        <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+    </head>
 
-<body>
-	<div id="mainDiv">
-		<div class="header">
-			<a href="https://github.com/iainsmacleod/CueSport-Scoreboard/wiki" target="_blank" rel="noopener noreferrer">
-				<span style="font-size:10pt; color:red; top: 4px;">CueSport Scoreboard v<span id="verNum"></span></span>
-			</a>
-			<div class="zoom-controls">
-				<button class="zoom-btn" onclick="zoomOut()" title="Zoom Out">- ZOOM</button>
-				<button class="zoom-btn" onclick="resetZoom()" title="Reset Zoom">RESET</button>
-				<button class="zoom-btn" onclick="zoomIn()" title="Zoom In">+ ZOOM</button>
-			</div>
-			<a href="https://buymeacoffee.com/iainmacleod" target="_blank" rel="noopener noreferrer">
-				<span style="font-size:10pt; color:red; top: 4px;">Support</span>
-			</a>
-		</div>
-		<!-- Tab navigation inside the main division -->
-		<div class="tab">
-			<button id="gameInfoTab" class="tablinks" onclick="openTab(event, 'GameInfo')">Game Information</button>
-			<button id="scoringTab" class="tablinks" onclick="openTab(event, 'Scoring')">Scoring</button>
-			<button id="imagesTab" class="tablinks" onclick="openTab(event, 'Images')">Images</button>
-			<button id="generalSettingsTab" class="tablinks" onclick="openTab(event, 'GeneralSettings')">General Settings</button>
-		</div>
-		<!-- Player/Team/Game Information Tab -->
-		<div id="GameInfo" class="tabcontent">
-			<div class="section-header" id="gameDetailLabel">Game Details</div>
-			<div class="column">
-				<text id="raceInfo">Race Info:</text><input style="width: 35px;" type="text" id="raceInfoTxt" placeholder="" maxlength="3">
-				Game/Other Info:<input style="width: 350px;" type="text" id="gameInfoTxt" placeholder="" maxlength="60">
-			</div>
-			<div class="column">
-				<span></span>
-				<div class="hover obs28" id="sendPInfo" onclick="postInfo()">Update Info</div>
-			</div>
-			<div class="section-header" id="playerDetailLabel">Player/Team Details</div>
-			<div class="column" id="teamInfo" >
-				<label id="p1NameLabel" for="p1Name">Player/Team 1 Name:</label><input type="text" id="p1Name" placeholder="Player 1" maxlength="20">
-				<label id="p2NameLabel" for="p2Name">Player/Team 2 Name:</label><input type="text" id="p2Name" placeholder="Player 2" maxlength="20">
-			</div>
-			<div class="column" id="gameInfo" >
-				<label id="p1ColorLabel" for="p1colorDiv">Player/Team 1 Color:</label>
-				<select name="p1Colors" id="p1colorDiv" onchange="playerColorChange(1)">
-					<option value="" default>--Choose--</option>
-					<option value="grey">Grey</option>
-					<option value="steelblue">Steel Blue</option>
-					<option value="cadetblue">Cadet Blue</option>
-					<option value="blue">Blue</option>
-					<option value="tomato">Tomato</option>
-					<option value="red">Red</option>
-					<option value="orangered">Orange-Red</option>
-					<option value="orange">Orange</option>
-					<option value="khaki">Khaki</option>
-					<option value="green">Green</option>
-					<option value="lightgreen">Light Green</option>
-					<option value="lightseagreen">Sea Green</option>
-					<option value="purple">Purple</option>
-					<option value="white">White</option>
-				</select>
-				<label id="p2ColorLabel" for="p2colorDiv">Player/Team 2 Color:</label>
-				<select name="p2Colors" id="p2colorDiv" onchange="playerColorChange(2)">
-					<option value="" default>--Choose--</option>
-					<option value="grey">Grey</option>
-					<option value="steelblue">Steel Blue</option>
-					<option value="cadetblue">Cadet Blue</option>
-					<option value="blue">Blue</option>
-					<option value="tomato">Tomato</option>
-					<option value="red">Red</option>
-					<option value="orangered">Orange-Red</option>
-					<option value="orange">Orange</option>
-					<option value="khaki">Khaki</option>
-					<option value="green">Green</option>
-					<option value="lightgreen">Light Green</option>
-					<option value="lightseagreen">Sea Green</option>
-					<option value="purple">Purple</option>
-					<option value="white">White</option>
-				</select>
-			</div>
-			<div class="column" id="colorSwap">
-				<div class="hover obs28" id="swapBtn" onclick="swapColors()">Swap Colors</div>
-				<span></span>
-				<div class="hover obs28" id="sendPNames" onclick="postNames()">Update Names</div>
-			</div>
-		</div>
-		<!-- Scoring Tab -->
-		<div id="Scoring" class="tabcontent">
-			<div class="section-header" id="scoreLabel">Score</div>
-			<div class="column" id="scoreInfoP1">
-				<label id="p1ScoreLabel" for="sendP1ScoreSub">Player/Team 1 - Score/Rack(s)/Ball(s)</label>
-				<div class="score-control">
-					<button id="sendP1ScoreSub" onclick="postScore('sub','1')">-</button>
-					<input type="text" pattern="[0-9]" inputmode="numeric" min="0" max="999" maxlength="3" id="p1Score" placeholder="0">
-					<button id="sendP1Score" onclick="postScore('add','1')">+</button>
-				</div>
-			</div>				  
-			<div class="column" id="scoreInfoP2">
-				<label id="p2ScoreLabel" for="sendP2Score">Player/Team 2 - Score/Rack(s)/Ball(s)</label>
-				<div class="score-control">
-					<button id="sendP2ScoreSub" onclick="postScore('sub','2')">-</button>
-					<input type="text" pattern="[0-9]" inputmode="numeric" min="0" max="999" maxlength="3" id="p2Score" placeholder="0">
-					<button id="sendP2Score" onclick="postScore('add','2')">+</button>
-				</div>
-			</div>
-			<div class="column" id="scoreEditing">
-				<div class="hover obs28" id="resetScores" onclick="resetScores()">Reset Scores</div>
-				<div class="hover obs28" id="sendPScores" onclick="pushScores()">Push Scores</div>
-			</div>
-			<div class="section-header" id="playerToggleLabel">Player Toggle</div>
-			<div class="column" id="playerToggle">
-				<div>
-				<label style="padding: 0 10px 0 0">Current or Breaking Player/Team:</label>
-				<label class="switch toggle">
-					<input type="checkbox" id="playerToggleCheckbox" onchange="togglePlayer(this.checked)">
-					<span class="slider_round"></span>
-					<span class="player1 toggle">P1</span>
+    <body>
+        <div id="mainDiv">
+            <div class="header">
+                <a href="https://github.com/iainsmacleod/CueSport-Scoreboard/wiki" target="_blank" rel="noopener noreferrer">
+                    <span style="font-size: 10pt; color: red; top: 4px">CueSport Scoreboard v
+                        <span id="verNum"></span>
+                    </span>
+                </a>
+                <div class="zoom-controls">
+                    <button class="zoom-btn" onclick="zoomOut()" title="Zoom Out">- ZOOM</button>
+                    <button class="zoom-btn" onclick="resetZoom()" title="Reset Zoom">RESET</button>
+                    <button class="zoom-btn" onclick="zoomIn()" title="Zoom In">+ ZOOM</button>
+                </div>
+                <a href="https://buymeacoffee.com/iainmacleod" target="_blank" rel="noopener noreferrer">
+                    <span style="font-size: 10pt; color: red; top: 4px">Support Iain</span>
+                </a>
+                <a href="https://buymeacoffee.com/brentwesley" target="_blank" rel="noopener noreferrer">
+                    <span style="font-size: 10pt; color: red; top: 4px">Support Brent</span>
+                </a>                
+            </div> <!-- Header-->
+            <!-- Tab navigation inside the main division -->
+            <div class="tab">
+                <button id="gameInfoTab" class="tablinks" onclick="openTab(event, 'GameInfo')">Game Information</button>
+                <button id="poolStatTab" class="tablinks" onclick="openTab(event, 'PoolStat')">PoolStat</button>
+                <button id="scoringTab" class="tablinks" onclick="openTab(event, 'Scoring')">Scoring</button>
+                <button id="imagesTab" class="tablinks" onclick="openTab(event, 'Images')">Images</button>
+                <button id="generalSettingsTab" class="tablinks" onclick="openTab(event, 'GeneralSettings')">General Settings</button>
+            </div>
+            <!-- Player/Team/Game Information Tab -->
+            <div id="GameInfo" class="tabcontent">
+                <div class="section-header" id="gameDetailLabel">Game Details</div>
+                <div class="column">
+                    <text id="raceInfo">Race Info:</text>
+                    <input
+                        style="width: 100px"
+                        type="text"
+                        id="raceInfoTxt"
+                        placeholder=""
+                        maxlength="30"
+                    />
+                    <text>Game/Other Info:</text>
+                    <input
+                        style="width: 350px"
+                        type="text"
+                        id="gameInfoTxt"
+                        placeholder=""
+                        maxlength="60"
+                    />
+                </div>
+                <div class="column">
+                    <span></span>
+                    <div class="hover obs28" id="sendPInfo" onclick="postInfo()">
+                        Update Info
+                    </div>
+                </div>
+                <div class="section-header" id="playerDetailLabel">
+                    Player/Team Details
+                </div>
+                <div class="column" id="teamInfo">
+                    <label id="p1NameLabel" for="p1Name">Player/Team 1 Name:</label>
+                    <input type="text" id="p1Name"  placeholder="Player 1" maxlength="20"/>
+                    <label id="p2NameLabel" for="p2Name">Player/Team 2 Name:</label>
+                    <input type="text" id="p2Name" placeholder="Player 2" maxlength="20"/>
+                </div>
+                <div class="column" id="gameInfo">
+                    <label id="p1ColorLabel" for="p1colorDiv">Player/Team 1 Color:</label>
+                    <select name="p1Colors" id="p1colorDiv" onchange="playerColorChange(1)">
+                        <option value="" default>--Choose--</option>
+                        <option value="grey">Grey</option>
+                        <option value="steelblue">Steel Blue</option>
+                        <option value="cadetblue">Cadet Blue</option>
+                        <option value="blue">Blue</option>
+                        <option value="tomato">Tomato</option>
+                        <option value="red">Red</option>
+                        <option value="orangered">Orange-Red</option>
+                        <option value="orange">Orange</option>
+                        <option value="khaki">Khaki</option>
+                        <option value="green">Green</option>
+                        <option value="lightgreen">Light Green</option>
+                        <option value="lightseagreen">Sea Green</option>
+                        <option value="purple">Purple</option>
+                        <option value="white">White</option>
+                    </select>
+                    <label id="p2ColorLabel" for="p2colorDiv">Player/Team 2 Color:</label>
+                    <select name="p2Colors" id="p2colorDiv" onchange="playerColorChange(2)">
+                        <option value="" default>--Choose--</option>
+                        <option value="grey">Grey</option>
+                        <option value="steelblue">Steel Blue</option>
+                        <option value="cadetblue">Cadet Blue</option>
+                        <option value="blue">Blue</option>
+                        <option value="tomato">Tomato</option>
+                        <option value="red">Red</option>
+                        <option value="orangered">Orange-Red</option>
+                        <option value="orange">Orange</option>
+                        <option value="khaki">Khaki</option>
+                        <option value="green">Green</option>
+                        <option value="lightgreen">Light Green</option>
+                        <option value="lightseagreen">Sea Green</option>
+                        <option value="purple">Purple</option>
+                        <option value="white">White</option>
+                  </select>
+                </div>
+                <div class="column" id="colorSwap">
+                    <div class="hover obs28" id="swapBtn" onclick="swapColors()">
+                        Swap Colors
+                    </div>
+                    <div class="hover obs28" id="clearButton" onclick="clearGame()">
+                        Clear Game
+                    </div>
+                    <div class="hover obs28" id="sendPNames" onclick="postNames()">
+                        Update Names
+                    </div>
+                </div>
+            </div> <!-- Game Info Tab-->
+            <!-- PoolStat Tab -->
+            <div id="PoolStat" class="tabcontent">
+                <div class="section-header" id="poolStatLabel">
+                    PoolStat Match Details
+                </div>
+                <div class="column-center">
+                    <text id="poolStatRigIdlabel">PoolStat Unique Rig ID: </text>
+                    <text id="psRigIdTxt"></text>
+                    <div class="hover-container">
+                        ⓘ
+                        <span class="info-box">
+                            <p>
+                                This ID will need to be Applied to your table configuration in
+                                Poolstat live. Not having a matching ID will stop live updates
+                                wortking on this Rig.
+                            </p>
+                        </span>
+                    </div>
+                    <div class="hover obs28" id="regenPSRigID" onclick="regenPSRigId()">
+                        Regenerate
+                    </div>
+                </div>
+                <div class="column-center">
+                    <div>
+                        <text id="psLiveStatusTxt">PoolStat LiveStream Connection Status: </text>&nbsp;
+                        <text id="psLiveStatus"></text>
+                    </div>
+                </div>                      
+                <div class="column-center">
+                    <div>
+                        <text id="streamStatusTxt">Stream Status: </text>&nbsp;
+                        <text id="streamStatus"></text>
+                    </div>                    
+                </div>
+                <div class="section-header" id="poolStatLabel">
+                    PoolStat configuration
+                </div>        
+                <div class="column">
+                    <div>
+                        <label for="poolStatConfigTickerCheckbox" id="labelPoolStatConfigTickerCheckbox">Marquee Ticker</label>
+                        <input type="checkbox" class="smallSize" id="poolStatConfigTickerCheckbox" onchange="poolStatConfigTicker()"/>
+                    </div>
+                    <div>
+                        <label for="poolStatConfigBreakingPlayerCheckbox" id="labelPoolStatConfigBreakingPlayerCheckbox">Show Breaking Player</label>
+                        <input type="checkbox" class="smallSize" id="poolStatConfigBreakingPlayerCheckbox" onchange="poolStatConfigBreakingPlayer()"/>
+                    </div>          
+                </div>
+            </div> <!-- PoolStat Tab-->
+            <!-- Scoring Tab -->
+            <div id="Scoring" class="tabcontent">
+                <!-- Score Control -->
+                <div class="section-header" id="scoreLabel">Score</div>
+                    <div class="column-center" id="scoreInfoP1">
+                        <label id="p1ScoreLabel" for="sendP1ScoreSub">Player/Team 1 - Score/Rack(s)/Ball(s)</label>
+                        <div class="score-control">
+                            <button id="sendP1ScoreSub" onclick="postScore('sub','1')">-</button>
+                            <input type="text" pattern="[0-9]" inputmode="numeric" min="0" max="999" maxlength="3" id="p1Score" placeholder="0"/>
+                            <button id="sendP1Score" onclick="postScore('add','1')">+</button>
+                        </div>
+                    </div>
+                    <div class="column-center" id="scoreInfoP2">
+                        <label id="p2ScoreLabel" for="sendP2Score">Player/Team 2 - Score/Rack(s)/Ball(s)</label>
+                        <div class="score-control">
+                            <button id="sendP2ScoreSub" onclick="postScore('sub','2')">-</button>
+                            <input type="text" pattern="[0-9]" inputmode="numeric" min="0" max="999" maxlength="3" id="p2Score" placeholder="0"/>
+                            <button id="sendP2Score" onclick="postScore('add','2')">+</button>
+                        </div>
+                    </div>
+                    <div class="column-center" id="scoreEditing">
+                        <div class="hover obs28" id="resetScores" onclick="resetScores()">
+                            Reset Scores
+                        </div>
+                        <div class="hover obs28" id="sendPScores" onclick="pushScores()">
+                            Push Scores
+                        </div>
+                    </div>
+                <!-- Player Toggle -->
+                <div class="section-header" id="playerToggleLabel">Player Toggle</div>
+                    <div class="column" id="playerToggle">
+                        <div>
+                            <label style="padding: 0 10px 0 0">Current or Breaking Player/Team:</label>
+                            <label class="switch toggle">
+                                <input type="checkbox" id="playerToggleCheckbox" onchange="togglePlayer(this.checked)"/>
+                                <span class="slider_round"></span>
+                                <span class="player1 toggle">P1</span>
+                                <span class="player2 toggle">P2</span>
+                            </label>
+                        </div>
+                    </div>
+                <!-- Ball Set Toggle -->
+                <div class="section-header" id="ballSetLabel">Ball Color Toggle</div>
+                    <div class="column" id="ballSet">
+                        <div>
+                            <form id="ballSetSelectionForm" onclick="ballSetChange()">
+                                <p>Player 1 Ball Color:
+                                    <input type="radio" id="p1colorRed" name="p1BallSetSelect" value="p1red/smalls" />
+                                    <label for="p1colorRed">Red/Smalls</label>
+                                    <input type="radio" id="p1colorYellow" name="p1BallSetSelect" value="p1yellow/bigs"/>
+                                    <label for="p1colorYellow">Yellow/Bigs</label>
+                                    <input type="radio" id="p1colorOpen" name="p1BallSetSelect" value="p1Open" checked/>
+                                    <label for="p1colorOpen">Open Table</label>
+                                </p>
+                            </form>
+                       </div>
+                    </div>
+                <!-- Ball Tracker -->
+                <div class="section-header" id="ballTrackerLabel">Ball Tracker</div>
+                    <div class="ballTracker" id="ballTrackerDiv">
+                        <div id="worldBallTracker" class="noShow">
+                            <div class="ball" id="ball 1" onclick="togglePot(this)">
+                                <img src="./common/images/1ball_small.png" />
+                            </div>
+                            <div class="ball" id="ball 2" onclick="togglePot(this)">
+                                <img src="./common/images/2ball_small.png" />
+                            </div>
+                            <div class="ball" id="ball 3" onclick="togglePot(this)">
+                                <img src="./common/images/3ball_small.png" />
+                            </div>
+                            <div class="ball" id="ball 4" onclick="togglePot(this)">
+                                <img src="./common/images/4ball_small.png" />
+                            </div>
+                            <div class="ball" id="ball 5" onclick="togglePot(this)">
+                                <img src="./common/images/5ball_small.png" />
+                            </div>
+                            <div class="ball" id="ball 6" onclick="togglePot(this)">
+                                <img src="./common/images/6ball_small.png" />
+                            </div>
+                            <div class="ball" id="ball 7" onclick="togglePot(this)">
+                                <img src="./common/images/7ball_small.png" />
+                            </div>
+                            <div class="ball" id="ball 8" onclick="togglePot(this)">
+                                <img src="./common/images/8ball_small.png" />
+                            </div>
+                            <div class="ball" id="ball 9" onclick="togglePot(this)">
+                                <img src="./common/images/9ball_small.png" />
+                            </div>
+                            <div class="ball" id="ball 10" onclick="togglePot(this)">
+                                <img src="./common/images/10ball_small.png" />
+                            </div>
+                            <div class="ball" id="ball 11" onclick="togglePot(this)">
+                                <img src="./common/images/11ball_small.png" />
+                            </div>
+                            <div class="ball" id="ball 12" onclick="togglePot(this)">
+                                <img src="./common/images/12ball_small.png" />
+                            </div>
+                            <div class="ball" id="ball 13" onclick="togglePot(this)">
+                                <img src="./common/images/13ball_small.png" />
+                            </div>
+                            <div class="ball" id="ball 14" onclick="togglePot(this)">
+                                <img src="./common/images/14ball_small.png" />
+                            </div>
+                            <div class="ball" id="ball 15" onclick="togglePot(this)">
+                                <img src="./common/images/15ball_small.png" />
+                            </div>
+                        </div>
+                        <div id="internationalBallTracker" class="noShow">
+                            <div class="ball" id="i-ball 1" onclick="togglePot(this)">
+                                <img src="./common/images/red-international-small-ball.png" />
+                            </div>
+                            <div class="ball" id="i-ball 2" onclick="togglePot(this)">
+                                <img src="./common/images/red-international-small-ball.png" />
+                            </div>
+                            <div class="ball" id="i-ball 3" onclick="togglePot(this)">
+                                <img src="./common/images/red-international-small-ball.png" />
+                            </div>
+                            <div class="ball" id="i-ball 4" onclick="togglePot(this)">
+                                <img src="./common/images/red-international-small-ball.png" />
+                            </div>
+                            <div class="ball" id="i-ball 5" onclick="togglePot(this)">
+                                <img src="./common/images/red-international-small-ball.png" />
+                            </div>
+                            <div class="ball" id="i-ball 6" onclick="togglePot(this)">
+                                <img src="./common/images/red-international-small-ball.png" />
+                            </div>
+                            <div class="ball" id="i-ball 7" onclick="togglePot(this)">
+                                <img src="./common/images/red-international-small-ball.png" />
+                            </div>
+                            <div class="ball" id="i-ball 8" onclick="togglePot(this)">
+                                <img src="./common/images/international-8-small-ball.png" />
+                            </div>
+                            <div class="ball" id="i-ball 9" onclick="togglePot(this)">
+                                <img src="./common/images/yellow-international-small-ball.png" />
+                            </div>
+                            <div class="ball" id="i-ball 10" onclick="togglePot(this)">
+                                <img src="./common/images/yellow-international-small-ball.png" />
+                            </div>
+                            <div class="ball" id="i-all 11" onclick="togglePot(this)">
+                                <img src="./common/images/yellow-international-small-ball.png" />
+                            </div>
+                            <div class="ball" id="i-ball 12" onclick="togglePot(this)">
+                                <img src="./common/images/yellow-international-small-ball.png" />
+                            </div>
+                            <div class="ball" id="i-ball 13" onclick="togglePot(this)">
+                                <img src="./common/images/yellow-international-small-ball.png" />
+                            </div>
+                            <div class="ball" id="i-ball 14" onclick="togglePot(this)">
+                                <img src="./common/images/yellow-international-small-ball.png" />
+                            </div>
+                            <div class="ball" id="i-ball 15" onclick="togglePot(this)">
+                                <img src="./common/images/yellow-international-small-ball.png" />
+                            </div>
+                        </div>
+                    </div>
+                <div class="column" id="ballTrackerDirectionDiv">
+                    <span></span>
+                    <div class="hover obs28 noShow" id="ballTrackerDirection" onclick="toggleBallTrackerDirection()">
+                        Vertical Ball Tracker
+                    </div>
+                </div>
+                <!-- Shot Clock -->
+                <div class="section-header" id="clockControlLabel">Clock Controls</div>
+                    <div class="column" id="clockInfo">
+                        <!-- <label id="useClockSettingLabel">Clock Controls:&nbsp;</label> -->
+                        <div class="hover obs28" id="shotClock30" onclick="shotClock(30000)">
+                            30s Shot Clock
+                        </div>
+                        <div class="hover obs28" id="shotClock60" onclick="shotClock(60000)">
+                            60s Shot Clock
+                        </div>
+                        <div id="clockLocalDisplay" onclick="" style="display: none"></div>
+                        <div class="hover obs28" id="stopClockDiv" onclick="stopClock()">
+                            Stop Clock
+                        </div>
+                        <div class="hover obs28" id="shotClockShow" onclick="clockDisplay('show')">
+                            Show Clock
+                        </div>
+                    </div>
+                    <div class="column" id="extensionControls">
+                        <label id="extensionSettingsLabel">Extension Controls:&nbsp;</label>
+                        <div class="hover obs28" id="p1extensionBtn" onclick="add30('p1')">
+                            P1's Extension
+                        </div>
+                        <div class="hover obs28" id="p2extensionBtn" onclick="add30('p2')">
+                            P2's Extension
+                        </div>
+                        <div class="hover obs28" id="resetBtn" onclick="resetExtensions()">
+                            Reset Extensions
+                        </div>
+                    </div>
+            </div>
+            <!-- Images Tab -->
+            <div id="Images" class="tabcontent">
+                <div class="column" id="logoInfo">
+                    <label id="logoSettingsLabel">Logo Settings (Max upload size: 2.4MB)</label>
+                    <span></span>
+                    <label id="logoSettingsLabel">Player/Team logos should be square</label>
+                </div>
+                <div class="section-header" id="slideshowImageLabel">
+                    Slideshow Images
+                </div>
+                <div class="column" id="slideshowImages">
+                    <span>
+                        Custom/Sponsor Slideshow
+                        <input class="smallSize" type="checkbox" id="logoSlideshowChk" onchange="logoSlideshow()"/>
+                    </span>
+                    <div class="tooltip obs28 hover" id="logoSsImg3">
+                        <input type="file" id="FileUploadL3" onchange="logoPost(this,3)" accept="image/png, image/jpeg, image/svg+xml, image/bmp"/>
+                        <span id="FileUploadLText3">L1</span>
+                        <span class="tooltiptext">
+                            <img id="l3Img" src="" style="height: 100px; max-width: 300px"/>
+                        </span>
+                    </div>
+                    <div class="tooltip obs28 hover" id="logoSsImg4">
+                        <input type="file" id="FileUploadL4" onchange="logoPost(this,4)" accept="image/png, image/jpeg, image/svg+xml, image/bmp"/>
+                        <span id="FileUploadLText4">L2</span>
+                        <span class="tooltiptext">
+                            <img id="l4Img" src="" style="height: 100px; max-width: 300px"/>
+                        </span>
+                    </div>
+                    <div class="tooltip obs28 hover" id="logoSsImg5">
+                        <input type="file" id="FileUploadL5" onchange="logoPost(this,5)" accept="image/png, image/jpeg, image/svg+xml, image/bmp"/>
+                        <span id="FileUploadLText5">L3</span>
+                        <span class="tooltiptext">
+                            <img id="l5Img" src="" style="height: 100px; max-width: 300px"/>
+                        </span>
+                    </div>
+                </div>
+                <div class="section-header" id="playerImageLabel">Player Images</div>
+                <div class="column" id="playerImages">
+                    <text class="hover" onclick="cLogoNameChange()" id="logoName" style="text-decoration: underline">Player 1 Logo</text>
+                    <input class="smallSize" type="checkbox" id="customLogo1" onchange="customLogoSetting()" disabled/>
+                    <div class="hover obs28 tooltip" id="uploadCustomLogo" style="width: 150px">
+                        <span id="FileUploadLText1">Upload Player 1 Logo</span>
+                        <input type="file" id="FileUploadL1" onchange="logoPost(this,1); toggleCheckbox('customLogo1', this)" accept="image/png, image/jpeg, image/svg+xml, image/bmp"/>
+                        <span class="tooltiptext">
+                            <img id="l1Img" src="" style="height: 100px; max-width: 300px"/>
+                        </span>
+                    </div>
+                    <text class="hover" onclick="cLogoNameChange2()" id="logoName2" style="text-decoration: underline">Player 2 Logo</text>
+                    <input class="smallSize" type="checkbox" id="customLogo2" onchange="customLogoSetting2()" disabled/>
+                    <div class="hover obs28 tooltip" id="uploadCustomLogo2" style="width: 150px">
+                        <span id="FileUploadLText2">Upload Player 2 Logo</span>
+                        <input type="file" id="FileUploadL2" onchange="logoPost(this,2); toggleCheckbox('customLogo2', this)" accept="image/png, image/jpeg, image/svg+xml, image/bmp"/>
+                        <span class="tooltiptext">
+                            <img id="l2Img" src="" style="height: 100px; max-width: 300px"/>
+                        </span>
+                    </div>
+                </div>
+            </div> <!-- Images Tab-->
+            <!-- General Settings Tab -->
+            <div id="GeneralSettings" class="tabcontent">
+                <div class="section-header" id="uiSettingLabel">UI Setting</div>
+                <div class="column">
+                    OBS Theme
+                    <select class="dropdown" id="obsTheme" onchange="obsThemeChange()">
+                        <option value="28">Default</option>
+                        <option value="27" selected>Classic</option>
+                        <option value="acri">Acri</option>
+                        <option value="grey">Grey</option>
+                        <option value="light">Light</option>
+                        <option value="rachni">Rachni</option>
+                    </select>
+                    <span></span>
+                    Overlay Scaling
+                    <span></span>
+                    <input type="range" min="40" max="100" value="100" class="uiScalingSlider" id="uiScaling" onchange="saveScaling()"/>
+                    <span></span>
+                    <span id="sliderUiScalingValue">100%</span>
+                </div>
+                <div class="column">
+                    Game Type
+                    <select class="dropdown" id="gameType" onchange="gameType(this.value)">
+                        <option value="game1">None</option>
+                        <option value="game2">8-Ball</option>
+                        <option value="game3">9-Ball</option>
+                        <option value="game4">10-Ball</option>
+                        <option value="game5">Straight</option>
+                        <option value="game6">Bank</option>
+                        <option value="game7">One Pocket</option>
+                        <option value="game8">Custom</option>
+                    </select>
+                    <span></span>
+                    <label class="slidecontainer" id="opacityLabel" for="scoreOpacity">Overlay Opacity</label>
+                    <span></span>
+                    <input type="range" min="0" max="100" value="100" class="slider" id="scoreOpacity" onchange="saveOpacity()"/>
+                    <span></span>
+                    <span id="sliderValue">100%</span>
+                </div>
+                <div class="column">
+                    <div>
+                        Ball Type
+                        &nbsp;
+                        <select class="dropdown" id="ballType" onchange="ballType(this.value)">
+                            <option value="World">World (Small/Big)</option>
+                            <option value="International">International (Red/Yellow)</option>
+                        </select>
+                    </div>
+                </div>
 
-					<span class="player2 toggle">P2</span>
-				</label>
-			</div>
-			</div>
-			<div class="section-header" id="ballTrackerLabel">Ball Tracker</div>
-			<div class="ballTracker" id="ballTrackerDiv">
-				<div id="ballTracker" class="noShow">
-					<div class="ball" id="ball 1" onclick="togglePot(this)"><img src="./common/images/1ball_small.png"></div>
-					<div class="ball" id="ball 2" onclick="togglePot(this)"><img src="./common/images/2ball_small.png"></div>
-					<div class="ball" id="ball 3" onclick="togglePot(this)"><img src="./common/images/3ball_small.png"></div>
-					<div class="ball" id="ball 4" onclick="togglePot(this)"><img src="./common/images/4ball_small.png"></div>
-					<div class="ball" id="ball 5" onclick="togglePot(this)"><img src="./common/images/5ball_small.png"></div>
-					<div class="ball" id="ball 6" onclick="togglePot(this)"><img src="./common/images/6ball_small.png"></div>
-					<div class="ball" id="ball 7" onclick="togglePot(this)"><img src="./common/images/7ball_small.png"></div>
-					<div class="ball" id="ball 8" onclick="togglePot(this)"><img src="./common/images/8ball_small.png"></div>
-					<div class="ball" id="ball 9" onclick="togglePot(this)"><img src="./common/images/9ball_small.png"></div>
-					<div class="ball" id="ball 10" onclick="togglePot(this)"><img src="./common/images/10ball_small.png"></div>
-					<div class="ball" id="ball 11" onclick="togglePot(this)"><img src="./common/images/11ball_small.png"></div>
-					<div class="ball" id="ball 12" onclick="togglePot(this)"><img src="./common/images/12ball_small.png"></div>
-					<div class="ball" id="ball 13" onclick="togglePot(this)"><img src="./common/images/13ball_small.png"></div>
-					<div class="ball" id="ball 14" onclick="togglePot(this)"><img src="./common/images/14ball_small.png"></div>
-					<div class="ball" id="ball 15" onclick="togglePot(this)"><img src="./common/images/15ball_small.png"></div>
-				</div>
-			</div>
-			<div class="column" id="ballTrackerDirectionDiv">
-				<div class="hover obs28 noShow" id="ballSelection" onclick="toggleBallSelection()">International Balls</div>
-				<span></span>
-				<div class="hover obs28 noShow" id="ballTrackerDirection" onclick="toggleBallTrackerDirection()">Vertical Ball Tracker</div>
-			</div>
-			<!-- Shot Clock Tab -->
-			<div class="section-header" id="clockControlLabel">Clock Controls</div>
-			<div class="column" id="clockInfo">
-				<!-- <label id="useClockSettingLabel">Clock Controls:&nbsp;</label> -->
-				<div class="hover obs28" id="shotClock30" onclick="shotClock(30000)">30s Shot Clock</div>
-				<div class="hover obs28" id="shotClock60" onclick="shotClock(60000)">60s Shot Clock</div>
-				<div id="clockLocalDisplay" onclick="" style="display: none;"></div>
-				<div class="hover obs28" id="stopClockDiv" onclick="stopClock()">Stop Clock</div>
-				<div class="hover obs28" id="shotClockShow" onclick="clockDisplay('show')">Show Clock</div>
-			</div>
-			<div class="column" id="extensionControls">
-				<label id="extensionSettingsLabel">Extension Controls:&nbsp;</label>
-				<div class="hover obs28" id="p1extensionBtn" onclick="add30('p1')">P1's Extension</div>
-				<div class="hover obs28" id="p2extensionBtn" onclick="add30('p2')">P2's Extension</div>
-				<div class="hover obs28" id="resetBtn" onclick="resetExtensions()">Reset Extensions</div>
-			</div>
-		</div>
-		<!-- Images Tab -->
-		<div id="Images" class="tabcontent">
-			<div class="column" id="logoInfo">
-				<label id="logoSettingsLabel">Logo Settings (Max upload size: 2.4MB)</text></label>
-				<span></span>
-				<label id="logoSettingsLabel">Player/Team logos should be square</text></label>
-			</div>
-			<div class="section-header" id="slideshowImageLabel">Slideshow Images</div>
-			<div class="column" id="slideshowImages">
-				Custom/Sponsor Slideshow<input class="smallSize" type="checkbox" id="logoSlideshowChk" onchange="logoSlideshow()"></span>
-				<div class="tooltip obs28 hover" id="logoSsImg3"><input type="file" id="FileUploadL3" onchange="logoPost(this,3)" accept="image/png, image/jpeg, image/svg+xml, image/bmp"/>
-					<span id="FileUploadLText3">L1</span><span class="tooltiptext"><img id="l3Img" src="" style="height:100px; max-width:300px"></span>
-				</div>
-				<div class="tooltip obs28 hover" id="logoSsImg4"><input type="file" id="FileUploadL4" onchange="logoPost(this,4)" accept="image/png, image/jpeg, image/svg+xml, image/bmp">
-					<span id="FileUploadLText4">L2</span><span class="tooltiptext"><img id="l4Img" src="" style="height:100px; max-width:300px"></span>
-				</div>
-				<div class="tooltip obs28 hover" id="logoSsImg5"><input type="file" id="FileUploadL5" onchange="logoPost(this,5)" accept="image/png, image/jpeg, image/svg+xml, image/bmp"/>
-					<span id="FileUploadLText5">L3</span><span class="tooltiptext"><img id="l5Img" src="" style="height:100px; max-width:300px"></span>
-				</div>
-			</div>
-			<div class="section-header" id="playerImageLabel">Player Images</div>
-			<div class="column" id="playerImages">
-				<text class="hover" onclick="cLogoNameChange()" id="logoName" style="text-decoration: underline;">Player 1 Logo</text>
-				<input class="smallSize" type="checkbox" id="customLogo1" onchange="customLogoSetting()" disabled>
-				<div class="hover obs28 tooltip" id="uploadCustomLogo" style="width: 150px">
-					<span id="FileUploadLText1">Upload Player 1 Logo</span>
-					<input type="file" id="FileUploadL1" onchange="logoPost(this,1); toggleCheckbox('customLogo1', this)" accept="image/png, image/jpeg, image/svg+xml, image/bmp"/>
-					<span class="tooltiptext">
-						<img id="l1Img" src="" style="height:100px; max-width:300px">
-					</span>
-				</div>
-				<text class="hover" onclick="cLogoNameChange2()" id="logoName2" style="text-decoration: underline;">Player 2 Logo</text>
-				<input class="smallSize" type="checkbox" id="customLogo2" onchange="customLogoSetting2()" disabled>
-				<div class="hover obs28 tooltip" id="uploadCustomLogo2" style="width: 150px">
-					<span id="FileUploadLText2">Upload Player 2 Logo</span>
-					<input type="file" id="FileUploadL2" onchange="logoPost(this,2); toggleCheckbox('customLogo2', this)" accept="image/png, image/jpeg, image/svg+xml, image/bmp">
-					<span class="tooltiptext">
-						<img id="l2Img" src="" style="height:100px; max-width:300px">
-					</span>
-				</div>
-			</div>
-		</div>
-		<!-- General Settings Tab -->
-		<div id="GeneralSettings" class="tabcontent">
-			<div class="section-header" id="uiSettingLabel">UI Setting</div>
-			<div class="column">
-				OBS Theme
-				<select class="dropdown" id="obsTheme" onchange="obsThemeChange()">
-					<option value="28">Default</option>
-					<option value="27" selected>Classic</option>
-					<option value="acri">Acri</option>
-					<option value="grey">Grey</option>
-					<option value="light">Light</option>
-					<option value="rachni">Rachni</option>
-				</select>
-				<span></span>
-				Overlay Scaling
-				<span></span>
-				<input type="range" min="40" max="100" value="100" class="uiScalingSlider" id="uiScaling" onchange="saveScaling()">
-				<span></span>
-				<span id="sliderUiScalingValue">100%</span>
-			</div>
-			<!-- <div class="column">
-				<div class="zoom-controls">
-					<label>Zoom Level:</label>
-					<div class="hover obs28" onclick="zoomIn()">Zoom In (+)</div>
-					<div class="hover obs28" onclick="zoomOut()">Zoom Out (-)</div>
-					<div class="hover obs28" onclick="resetZoom()">Reset Zoom</div>
-					<span id="zoomLevel">100%</span>
-				</div>
-			</div> -->
-			<div class="column">
-				Game Type
-				<select class="dropdown" id="gameType" onchange="gameType(this.value)">
-					<option value="game1">8-ball</option>
-					<option value="game2">9-Ball</option>
-					<option value="game3">10-Ball</option>
-					<option value="game4">Straight</option>
-					<option value="game5">Bank</option>
-					<option value="game6">One Pocket</option>
-					<option value="game7">Custom</option>
-				</select>
-				<span></span>
-				<label class="slidecontainer" id="opacityLabel" for="scoreOpacity">Overlay Opacity</label>
-				<span></span>
-				<input type="range" min="0" max="100" value="100" class="slider" id="scoreOpacity" onchange="saveOpacity()">
-				<span></span>
-				<span id="sliderValue">100%</span>
-			</div>
-			<div class="section-header" id="feaureSettingLabel">Feature Settings</div>
-				<div class="column">
-					<div>Player 1<input type="checkbox" class="smallSize" id="usePlayer1Setting" onchange="playerSetting(1)" checked></div>
-					<div>Player 2<input type="checkbox" class="smallSize" id="usePlayer2Setting" onchange="playerSetting(2)" checked></div>
-					<div>Show Scores<input type="checkbox" class="smallSize" id="scoreDisplay" onchange="scoreDisplaySetting()" checked></div>
-					<div>Animation<input type="checkbox" class="smallSize" id="winAnimation" onchange="toggleAnimationSetting()"></div>
-				</div>
-				<div class="column">
-					<div><label for="useClockSetting" id="labelForUseClockSetting">Clock</label><input type="checkbox" class="smallSize" id="useClockSetting" onchange="clockSetting()"></div>
-					<div><label for="useToggleSetting" id="labelForUseToggleSetting">Player Toggle</label><input type="checkbox" class="smallSize" id="useToggleSetting" onchange="toggleSetting()"></div>
-					<div><label for="ballTrackerCheckbox" id="labelForBallTrackerCheckbox">Ball Tracker</label><input type="checkbox" class="smallSize" id="ballTrackerCheckbox" onchange="useBallTracker()"></div>
-					<div></div>
-				</div>
-				<div class="section-header" id="updateCheckLabel">Version Check</div>
-				<div class="column">
-					<div class="hover obs28" id="updateCheck" onclick="checkForUpdate()">Check for Update</div>
-					<div id="updateStatus">Press "Check for Update".</div>
-				</div>
-				<div class="section-header" id="localDataSettingLabel">Local Data Settings</div>
-				<div class="column">
-					<div class="hover obs28" onclick="resetInstance()" id="resetDataBtn" style="color:white">
-						Clear Instance Data
-					</div>
-					<div class="hover obs28" onclick="resetAll()" id="resetDataBtn" style="color:white">
-						Clear All Data
-					</div>
-				</div>
-			</div>	
-		</div>
-	</div>
-	<script src="./common/js/control_panel_post.js"></script>
-	<script>
-		//////////////////// HotKey scripts
+                <div class="section-header" id="feaureSettingLabel">
+                    Feature Settings
+                </div>
+                <div class="column">
+                    <div>
+                        Player 1<input type="checkbox" class="smallSize" id="usePlayer1Setting" onchange="playerSetting(1)" checked/>
+                    </div>
+                    <div>
+                        Player 2<input type="checkbox" class="smallSize" id="usePlayer2Setting" onchange="playerSetting(2)" checked/>
+                    </div>
+                    <div>
+                        Show Scores<input type="checkbox" class="smallSize" id="scoreDisplay" onchange="scoreDisplaySetting()" checked/>
+                    </div>
+                    <div>
+                        Animation<input type="checkbox" class="smallSize" id="winAnimation" onchange="toggleAnimationSetting()"/>
+                    </div>
+                </div>
+                <div class="column">
+                    <div>
+                        <label for="useClockSetting" id="labelForUseClockSetting">Clock</label>
+                        <input type="checkbox" class="smallSize" id="useClockSetting" onchange="clockSetting()"/>
+                    </div>
+                    <div>
+                        <label for="useToggleSetting" id="labelForUseToggleSetting">Player Toggle</label>
+                        <input type="checkbox" class="smallSize" id="useToggleSetting" onchange="toggleSetting()"/>
+                    </div>
+                    <div>
+                        <label for="ballTrackerCheckbox" id="labelForBallTrackerCheckbox">Ball Tracker</label>
+                        <input type="checkbox" class="smallSize" id="ballTrackerCheckbox" onchange="useBallTracker()"/>
+                    </div>
+                    <div>
+                        <label for="ballSetCheckbox" id="labelForBallSetCheckbox">Ball Set Toggle</label>
+                        <input type="checkbox" class="smallSize" id="ballSetCheckbox" onchange="useBallSetToggle()"/>
+                    </div>
+                    <div>
+                        <label for="poolStatCheckbox" id="labelForPoolStatCheckbox">PoolStat</label>
+                        <input type="checkbox" class="smallSize" id="poolStatCheckbox" onchange="poolStatSetting()"/>
+                    </div>
+                </div>
+                <div class="section-header" id="updateCheckLabel">Version Check</div>
+                <div class="column">
+                    <div class="hover obs28" id="updateCheck" onclick="checkForUpdate()">
+                        Check for Update
+                    </div>
+                    <div id="updateStatus">Press "Check for Update".</div>
+                </div>
+                <div class="section-header" id="localDataSettingLabel">
+                    Local Data Settings
+                </div>
+                <div class="column">
+                    <div class="hover obs28" onclick="resetInstance()" id="resetDataBtn" style="color: white">
+                        Clear Instance Data
+                    </div>
+                    <div class="hover obs28" onclick="resetAll()" id="resetDataBtn" style="color: white">
+                        Clear All Data
+                    </div>
+                </div>
+            </div> <!-- General Settings Tab-->
+        </div> <!-- End of tab content -->
 
-		//Reload the hotjeys.js file updated by the LUA script
-		function updateHotkeys() {
-			var src;
-			src = 'hotkeys.js';
-			$('script[src="' + src + '"]').remove();
-			var head = document.getElementsByTagName('head')[0];
-			var script = document.createElement('script');
-			script.src = src;
-			head.appendChild(script);
-		}
+        <script src="./common/js/control_panel_post.js"></script>
+        <script>
+            //////////////////// HotKey scripts
 
-		//Toggle the switches if a hotkey is pressed
-		function checkHotkeys() {
-			if (hotkeyP1ScoreUp != hotkeyP1ScoreUpOld) { postScore('add', '1'); hotkeyP1ScoreUpOld = hotkeyP1ScoreUp; }
-			if (hotkeyP2ScoreUp != hotkeyP2ScoreUpOld) { postScore('add', '2'); hotkeyP2ScoreUpOld = hotkeyP2ScoreUp; }
-			if (hotkeyP1ScoreDown != hotkeyP1ScoreDownOld) { postScore('sub', '1'); hotkeyP1ScoreDownOld = hotkeyP1ScoreDown; }
-			if (hotkeyP2ScoreDown != hotkeyP2ScoreDownOld) { postScore('sub', '2'); hotkeyP2ScoreDownOld = hotkeyP2ScoreDown; }
-			if (hotkeyScoreReset != hotkeyScoreResetOld) { resetScores(); hotkeyScoreResetOld = hotkeyScoreReset; }
-			if (hotkeyP1Extension != hotkeyP1ExtensionOld) { add30('p1'); hotkeyP1ExtensionOld = hotkeyP1Extension; }
-			if (hotkeyP2Extension != hotkeyP2ExtensionOld) { add30('p2'); hotkeyP2ExtensionOld = hotkeyP2Extension; }
-			if (hotkey30Clock != hotkey30ClockOld) { shotClock(30000); hotkey30ClockOld = hotkey30Clock; }
-			if (hotkey60Clock != hotkey60ClockOld) { shotClock(60000); hotkey60ClockOld = hotkey60Clock; }
-			if (hotkeyStopClock != hotkeyStopClockOld) { stopClock(); hotkeyStopClockOld = hotkeyStopClock; }
-			if (hotkeySwap != hotkeySwapOld) { swapColors(); hotkeySwapOld = hotkeySwap; }
-			if (hotkeyPlayerToggle != hotkeyPlayerToggleOld && (useToggleSetting.checked==true && usePlayer1Setting.checked==true && usePlayer2Setting.checked==true)) {
-				var toggleState = getStorageItem("toggleState") === "true";
-				var playerToggleCheckbox = document.getElementById("playerToggleCheckbox");
-				console.log(`Toggle state before ${toggleState}`)
-				playerToggleCheckbox.checked = !toggleState;
+            //Reload the hotjeys.js file updated by the LUA script
+            function updateHotkeys() {
+                var src;
+                src = "hotkeys.js";
+                $('script[src="' + src + '"]').remove();
+                var head = document.getElementsByTagName("head")[0];
+                var script = document.createElement("script");
+                script.src = src;
+                head.appendChild(script);
+            }
 
+            //Toggle the switches if a hotkey is pressed
+            function checkHotkeys() {
+                if (hotkeyP1ScoreUp != hotkeyP1ScoreUpOld) {
+                    postScore("add", "1");
+                    hotkeyP1ScoreUpOld = hotkeyP1ScoreUp;
+                }
+                if (hotkeyP2ScoreUp != hotkeyP2ScoreUpOld) {
+                    postScore("add", "2");
+                    hotkeyP2ScoreUpOld = hotkeyP2ScoreUp;
+                }
+                if (hotkeyP1ScoreDown != hotkeyP1ScoreDownOld) {
+                    postScore("sub", "1");
+                    hotkeyP1ScoreDownOld = hotkeyP1ScoreDown;
+                }
+                if (hotkeyP2ScoreDown != hotkeyP2ScoreDownOld) {
+                    postScore("sub", "2");
+                    hotkeyP2ScoreDownOld = hotkeyP2ScoreDown;
+                }
+                if (hotkeyScoreReset != hotkeyScoreResetOld) {
+                    resetScores();
+                    hotkeyScoreResetOld = hotkeyScoreReset;
+                }
+                if (hotkeyP1Extension != hotkeyP1ExtensionOld) {
+                    add30("p1");
+                    hotkeyP1ExtensionOld = hotkeyP1Extension;
+                }
+                if (hotkeyP2Extension != hotkeyP2ExtensionOld) {
+                    add30("p2");
+                    hotkeyP2ExtensionOld = hotkeyP2Extension;
+                }
+                if (hotkey30Clock != hotkey30ClockOld) {
+                    shotClock(30000);
+                    hotkey30ClockOld = hotkey30Clock;
+                }
+                if (hotkey60Clock != hotkey60ClockOld) {
+                    shotClock(60000);
+                    hotkey60ClockOld = hotkey60Clock;
+                }
+                if (hotkeyStopClock != hotkeyStopClockOld) {
+                    stopClock();
+                    hotkeyStopClockOld = hotkeyStopClock;
+                }
+                if (hotkeySwap != hotkeySwapOld) {
+                    swapColors();
+                    hotkeySwapOld = hotkeySwap;
+                }
+                if (
+                    hotkeyPlayerToggle != hotkeyPlayerToggleOld &&
+                    useToggleSetting.checked == true &&
+                    usePlayer1Setting.checked == true &&
+                    usePlayer2Setting.checked == true
+                ) {
+                    var toggleState = getStorageItem("toggleState") === "true";
+                    var playerToggleCheckbox = document.getElementById("playerToggleCheckbox");
+                    console.log(`Toggle state before ${toggleState}`);
+                    playerToggleCheckbox.checked = !toggleState;
 
-				togglePlayer(!toggleState);
-				setStorageItem("toggleState", !toggleState);
-				console.log(`Toggle state after ${toggleState}`)
-				hotkeyPlayerToggleOld = hotkeyPlayerToggle;
-			}
-			
-		}
+                    togglePlayer(!toggleState);
+                    setStorageItem("toggleState", !toggleState);
+                    console.log(`Toggle state after ${toggleState}`);
+                    hotkeyPlayerToggleOld = hotkeyPlayerToggle;
+                }
+            }
 
-		function refreshData() {
-			var x;
-			x = 0.05; // Refresh time multiplier
-			checkHotkeys();
-			updateHotkeys();
-			setTimeout(refreshData, x * 1000);
-		}
+            function refreshData() {
+                var x;
+                x = 0.05; // Refresh time multiplier
+                checkHotkeys();
+                updateHotkeys();
+                setTimeout(refreshData, x * 1000);
+            }
 
-		//////////////////// end of HotKey scripts
-		refreshData();
+            //////////////////// end of HotKey scripts
+            refreshData();
 
-		// Zoom control functions
-		let currentZoom = 100;
+            // Zoom control functions
+            let currentZoom = 100;
 
-		function zoomIn() {
-			if (currentZoom < 200) {
-				currentZoom += 10;
-				applyZoom();
-			}
-		}
+            function zoomIn() {
+                if (currentZoom < 200) {
+                    currentZoom += 10;
+                    applyZoom();
+                }
+            }
 
-		function zoomOut() {
-			if (currentZoom > 50) {
-				currentZoom -= 10;
-				applyZoom();
-			}
-		}
+            function zoomOut() {
+                if (currentZoom > 50) {
+                    currentZoom -= 10;
+                    applyZoom();
+                }
+            }
 
-		function resetZoom() {
-			currentZoom = 100;
-			applyZoom();
-		}
+            function resetZoom() {
+                currentZoom = 100;
+                applyZoom();
+            }
 
-		function applyZoom() {
-			document.body.style.zoom = currentZoom + '%';
-		}
+            function applyZoom() {
+                document.body.style.zoom = currentZoom + "%";
+            }
 
-		// Initialize zoom level
-		applyZoom();
-	</script>
-
-</body>
-
+            // Initialize zoom level
+            applyZoom();
+        </script>
+    </body>
 </html>

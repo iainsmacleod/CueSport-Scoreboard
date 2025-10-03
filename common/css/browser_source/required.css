@@ -1,5 +1,5 @@
 :root {
-    --standard-font-size: 42px;
+    --standard-font-size: 36px;
     --small-font-size: 24pt;
 }
 
@@ -63,34 +63,47 @@ html, body {
 }
 
 #gameInfoWrapper {
-    position: fixed;
-    top: -2px;
-    left: 0;
-    right: 0;
+    position: flex;
     display: flex;
-    justify-content: center;
+    justify-content: space-evenly;
     z-index: 2;
 }
 
 #gameInfo {
-    position: relative;  /* Change from fixed to relative */
-    background-image: linear-gradient(to bottom, lightgrey, white);
+    position: flex;
     text-align: center;
+    background: #3679dd;
     font-size: calc(var(--small-font-size) * var(--ui-scaling));
-    font-weight: bolder;
-    border: 1px solid #000;
-    display: inline-flex;
-    width: fit-content;
-    padding: 5px 20px;
-    overflow: hidden;
-    white-space: nowrap;
+    font-weight: bold;
+    color: white;
+    -webkit-text-stroke: 1px black;
     box-shadow: 0 8px 16px 0 rgba(0,0,0,0.6);
+    padding: 5px 10px;
+    margin: 0 5px 0 5px;
+    border: 2px solid black;
+    max-width: max-content;
 }
 
-#ballTracker {
+#raceInfo {
+    position: flex;
+    text-align: center;
+    background: #3679dd;
+    font-size: calc(var(--small-font-size) * var(--ui-scaling));
+    font-weight: bold;
+    color: white;
+    -webkit-text-stroke: 1px black;
+    box-shadow: 0 8px 16px 0 rgba(0,0,0,0.6);
+    padding: 5px 10px;
+    margin: 0 5px 0 5px;
+    border: 2px solid black;
+    max-width: max-content;
+}
+
+
+#ballTrackerWorld, #ballTrackerInternational {
     position: fixed;
     padding: 4px;
-    top: 1%;
+    top: 15%;
     right: 1%; 
     z-index: 3;
     background-color: rgba(128, 128, 128, 0.7); /* Opaque grey with 70% opacity */
@@ -213,7 +226,6 @@ html, body {
     -webkit-text-stroke: 1px black;
     font-size: calc(var(--standard-font-size) * var(--ui-scaling));
     /* font-size: calc(32px * var(--ui-scaling)); */
-    /* font-size: 32px; */
     color: white;
     box-shadow: 0 8px 16px 0 rgba(0,0,0,0.6);
     font-weight: bold;
@@ -238,6 +250,15 @@ html, body {
 .score-logo-container {
     position: relative;
     display: inline-block;
+
+}
+
+.score-ball-container {
+    position: relative;
+    align-content: center;
+    justify-content: center;
+    display: inline-block;
+    background-color: rgba(128, 128, 128, 1);
 }
 
 /* Scores */
@@ -250,7 +271,6 @@ html, body {
     color: white;
     -webkit-text-stroke: 1px black;
     padding: 5px 10px;
-    min-width: 50px;
     border: solid black;
     z-index: 2;
 }
@@ -288,20 +308,7 @@ html, body {
     left: 100%;
 }
 
-#raceInfo {
-    position: relative;
-    text-align: center;
-    background: #3679dd;
-    font-size: calc(var(--standard-font-size) * var(--ui-scaling));
-    font-weight: bold;
-    color: white;
-    -webkit-text-stroke: 1px black;
-    box-shadow: 0 8px 16px 0 rgba(0,0,0,0.6);
-    padding: 5px 10px;
-    margin: 0 5px 0 5px;
-    border: 2px solid black;
-    z-index: 2;
-}
+
 
 .ext-image-container {
     position: relative;
