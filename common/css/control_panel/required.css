@@ -353,14 +353,6 @@ input {
 	width: 650px;
 }
 
-#ballSet {
-	display: flex;
-	justify-content:center;
-	padding: 10px 0 10px 0;
-	clear: both;
-	width: 650px;
-}
-
 /* Basic placeholder styling */
 ::placeholder { /* Chrome, Firefox, Opera, Safari */
     color: white;

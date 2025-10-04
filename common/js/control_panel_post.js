@@ -105,6 +105,18 @@ window.onload = function() {
 		toggleSetting();
 	}
 
+	if (getStorageItem("useBallSet")==="yes") {
+		document.getElementById("ballSetCheckbox").checked = true;
+		setStorageItem("useBallSet", "yes");
+		document.getElementById("ballSet").style.display = 'flex';
+		document.getElementById("ballSetLabel").classList.remove("noShow");
+	} else {
+		document.getElementById("ballSetCheckbox").checked = false;
+		setStorageItem("useBallSet", "no");
+		document.getElementById("ballSet").style.display = 'none';
+		document.getElementById("ballSetLabel").classList.add("noShow");
+	}
+
 	if (getStorageItem("usePoolStat")==="yes") {
 		document.getElementById("poolStatCheckbox").checked = true;
 		setStorageItem("usePoolStat", "yes");

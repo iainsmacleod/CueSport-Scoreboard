@@ -203,7 +203,7 @@ for more information about Salotto please visit https://salotto.app
             <div id="Scoring" class="tabcontent">
                 <!-- Score Control -->
                 <div class="section-header" id="scoreLabel">Score</div>
-                    <div class="column-center" id="scoreInfoP1">
+                    <div class="column" id="scoreInfoP1">
                         <label id="p1ScoreLabel" for="sendP1ScoreSub">Player/Team 1 - Score/Rack(s)/Ball(s)</label>
                         <div class="score-control">
                             <button id="sendP1ScoreSub" onclick="postScore('sub','1')">-</button>
@@ -211,7 +211,7 @@ for more information about Salotto please visit https://salotto.app
                             <button id="sendP1Score" onclick="postScore('add','1')">+</button>
                         </div>
                     </div>
-                    <div class="column-center" id="scoreInfoP2">
+                    <div class="column" id="scoreInfoP2">
                         <label id="p2ScoreLabel" for="sendP2Score">Player/Team 2 - Score/Rack(s)/Ball(s)</label>
                         <div class="score-control">
                             <button id="sendP2ScoreSub" onclick="postScore('sub','2')">-</button>
@@ -219,7 +219,7 @@ for more information about Salotto please visit https://salotto.app
                             <button id="sendP2Score" onclick="postScore('add','2')">+</button>
                         </div>
                     </div>
-                    <div class="column-center" id="scoreEditing">
+                    <div class="column" id="scoreEditing">
                         <div class="hover obs28" id="resetScores" onclick="resetScores()">
                             Reset Scores
                         </div>
@@ -241,21 +241,26 @@ for more information about Salotto please visit https://salotto.app
                         </div>
                     </div>
                 <!-- Ball Set Toggle -->
-                <div class="section-header" id="ballSetLabel">Ball Color Toggle</div>
-                    <div class="column" id="ballSet">
-                        <div>
-                            <form id="ballSetSelectionForm" onclick="ballSetChange()">
-                                <p>Player 1 Ball Color:
-                                    <input type="radio" id="p1colorRed" name="p1BallSetSelect" value="p1red/smalls" />
-                                    <label for="p1colorRed">Red/Smalls</label>
-                                    <input type="radio" id="p1colorYellow" name="p1BallSetSelect" value="p1yellow/bigs"/>
-                                    <label for="p1colorYellow">Yellow/Bigs</label>
-                                    <input type="radio" id="p1colorOpen" name="p1BallSetSelect" value="p1Open" checked/>
-                                    <label for="p1colorOpen">Open Table</label>
-                                </p>
-                            </form>
-                       </div>
-                    </div>
+                <div class="section-header" id="ballSetLabel">Player Ball Set Toggle</div>
+				<div class="column" id="ballSet">
+					<div>
+						<form class="column" id="ballSetSelectionForm" onclick="ballSetChange()">
+							<div>Player 1 Ball Color:</div>
+							<div>
+								<input type="radio" id="p1colorRed" name="p1BallSetSelect" value="p1red/smalls" />
+								<label for="p1colorRed">Red/Smalls</label>
+							</div>
+							<div>
+								<input type="radio" id="p1colorYellow" name="p1BallSetSelect" value="p1yellow/bigs"/>
+								<label for="p1colorYellow">Yellow/Bigs</label>
+							</div>
+							<div>
+								<input type="radio" id="p1colorOpen" name="p1BallSetSelect" value="p1Open" checked/>
+								<label for="p1colorOpen">Open Table</label>
+							</div>
+						</form>
+					</div>
+				</div>
                 <!-- Ball Tracker -->
                 <div class="section-header" id="ballTrackerLabel">Ball Tracker</div>
                     <div class="ballTracker" id="ballTrackerDiv">
