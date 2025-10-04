@@ -392,12 +392,12 @@ const handlers = {
     
 	gameType(data) {
         console.log('Game type value:', data.gameType);
-        if (data.gameType === "game3") {
+        if (data.gameType === "game2") {
             // 9-ball
             ["10", "11", "12", "13", "14", "15"].forEach(num => {
                 document.getElementById(`ball ${num}`).classList.add("noShow");
             });
-        } else if (data.gameType === "game4") {
+        } else if (data.gameType === "game3") {
             // 10-ball
             document.getElementById("ball 10").classList.remove("noShow");
             ["11", "12", "13", "14", "15"].forEach(num => {
@@ -470,7 +470,8 @@ $(document).ready(function() {
     $("#scoreBoard").draggable();
     $("#gameInfo").draggable();
     $("#logoSlideshowDiv").draggable();
-	$("#ballTracker").draggable();
+	$("#ballTrackerWorld").draggable();
+	$("#ballTrackerInternational").draggable();
 
 });
 
@@ -495,14 +496,14 @@ if (getStorageItem("poolStat") === null) {
 setCustomLogo("customLogo1", "useCustomLogo", "usePlayer1");
 setCustomLogo("customLogo2", "useCustomLogo2", "usePlayer2");
 
-if (getStorageItem("gameType") === "game3"){
+if (getStorageItem("gameType") === "game2"){
 	document.getElementById("ball 10").classList.add("noShow");
 	document.getElementById("ball 11").classList.add("noShow");
 	document.getElementById("ball 12").classList.add("noShow");
 	document.getElementById("ball 13").classList.add("noShow");
 	document.getElementById("ball 14").classList.add("noShow");
 	document.getElementById("ball 15").classList.add("noShow");
-} else if (getStorageItem("gameType") === "game4"){
+} else if (getStorageItem("gameType") === "game3"){
 	document.getElementById("ball 10").classList.remove("noShow");
 	document.getElementById("ball 11").classList.add("noShow");
 	document.getElementById("ball 12").classList.add("noShow");

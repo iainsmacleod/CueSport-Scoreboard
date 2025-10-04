@@ -468,14 +468,14 @@ function toggleAnimationSetting(){
 
 function gameType(value) {
 	setStorageItem("gameType", value);
-	if (getStorageItem("gameType") === "game3"){
+	if (getStorageItem("gameType") === "game2"){
 		document.getElementById("ball 10").classList.add("noShow");
 		document.getElementById("ball 11").classList.add("noShow");
 		document.getElementById("ball 12").classList.add("noShow");
 		document.getElementById("ball 13").classList.add("noShow");
 		document.getElementById("ball 14").classList.add("noShow");
 		document.getElementById("ball 15").classList.add("noShow");
-	} else if (getStorageItem("gameType") === "game4"){
+	} else if (getStorageItem("gameType") === "game3"){
 		document.getElementById("ball 10").classList.remove("noShow");
 		document.getElementById("ball 11").classList.add("noShow");
 		document.getElementById("ball 12").classList.add("noShow");
@@ -537,16 +537,20 @@ function useBallTracker(){
 		document.getElementById("ballTrackerDirection").classList.remove("noShow");
 		document.getElementById("ballTrackerLabel").classList.remove("noShow");
 		document.getElementById("ballTrackerDiv").classList.remove("noShow");
+		document.getElementById("ballTypeDiv").classList.remove("noShow");
+		document.getElementById("ballSetDiv").classList.remove("noShow");
 		if (getStorageItem("ballType") === "World"){
 			document.getElementById("worldBallTracker").classList.remove("noShow");
 		} else {
 			document.getElementById("internationalBallTracker").classList.remove("noShow");
 		}		
 	} else {
+		document.getElementById("ballTypeDiv").classList.add("noShow");
 		document.getElementById("ballTrackerDirectionDiv").classList.add("noShow");
 		document.getElementById("ballTrackerDirection").classList.add("noShow");
 		document.getElementById("ballTrackerLabel").classList.add("noShow");
 		document.getElementById("ballTrackerDiv").classList.add("noShow");
+		document.getElementById("ballSetDiv").classList.add("noShow");
 		if (getStorageItem("ballType") === "World"){
 			document.getElementById("worldBallTracker").classList.add("noShow");
 		} else {

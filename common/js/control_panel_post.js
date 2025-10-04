@@ -223,13 +223,13 @@ window.onload = function() {
 	if (getStorageItem("ballTrackerDirection") === null) {
 		// Initialize with default value if not set
 		setStorageItem("ballTrackerDirection", "vertical");
-		document.getElementById("ballTrackerDirection").innerHTML = "Horizontal Ball Tracker";
+		document.getElementById("ballTrackerDirection").innerHTML = "Vertical Ball Tracker";
 		bc.postMessage({ ballTracker: "vertical" });
 		console.log(`Ball tracker initialized vertical`);
 	} else {
 		// Use existing stored value
 		const direction = getStorageItem("ballTrackerDirection");
-		document.getElementById("ballTrackerDirection").innerHTML = direction === "vertical" ? "Horizontal Ball Tracker" : "Vertical Ball Tracker";
+		document.getElementById("ballTrackerDirection").innerHTML = direction === "vertical" ? "Vertical Ball Tracker" : "Horizontal Ball Tracker";
 		bc.postMessage({ ballTracker: direction });
 		console.log(`Ball tracker initialized ${direction}`);
 	}
@@ -542,14 +542,14 @@ document.getElementById("p1Score").value = getStorageItem("p1ScoreCtrlPanel");
 document.getElementById("p2Name").value = getStorageItem("p2NameCtrlPanel");
 document.getElementById("p2Score").value = getStorageItem("p2ScoreCtrlPanel");
 document.getElementById("gameType").value = getStorageItem("gameType");
-if (getStorageItem("gameType") === "game3"){
+if (getStorageItem("gameType") === "game2"){
 	document.getElementById("ball 10").classList.add("noShow");
 	document.getElementById("ball 11").classList.add("noShow");
 	document.getElementById("ball 12").classList.add("noShow");
 	document.getElementById("ball 13").classList.add("noShow");
 	document.getElementById("ball 14").classList.add("noShow");
 	document.getElementById("ball 15").classList.add("noShow");
-} else if (getStorageItem("gameType") === "game4"){
+} else if (getStorageItem("gameType") === "game3"){
 	document.getElementById("ball 10").classList.remove("noShow");
 	document.getElementById("ball 11").classList.add("noShow");
 	document.getElementById("ball 12").classList.add("noShow");

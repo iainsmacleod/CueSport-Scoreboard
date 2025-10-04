@@ -376,13 +376,10 @@ function playWebmAnimation(gameType, containerSelector = '#videoContainer') {
         case 'game1':
             videoUrl = './common/video/defaultanimation.webm';
             break;
-		case 'game2':
-            videoUrl = './common/video/8ballwin.webm';
-            break;
-        case 'game3':
+        case 'game2':
             videoUrl = './common/video/9ballwin.webm';
             break;
-        case 'game4':
+        case 'game3':
             videoUrl = './common/video/10ballwin.webm';
             break;
         // Add more cases as needed

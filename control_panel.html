@@ -23,7 +23,7 @@ for more information about Salotto please visit https://salotto.app
         <link rel="stylesheet" href="./common/css/control_panel/required.css" />
         <script>
             //---------------------------------------------------------------------------------------------
-            var versionNum = "2.2.1";
+            var versionNum = "3.0.0";
             var psVersionNum = "1.0.0";
             //---------------------------------------------------------------------------------------------
         </script>
@@ -248,11 +248,11 @@ for more information about Salotto please visit https://salotto.app
 							<div>Player 1 Ball Color:</div>
 							<div>
 								<input type="radio" id="p1colorRed" name="p1BallSetSelect" value="p1red/smalls" />
-								<label for="p1colorRed">Red/Smalls</label>
+								<label for="p1colorRed">Red/Smalls/Lows/Solids</label>
 							</div>
 							<div>
 								<input type="radio" id="p1colorYellow" name="p1BallSetSelect" value="p1yellow/bigs"/>
-								<label for="p1colorYellow">Yellow/Bigs</label>
+								<label for="p1colorYellow">Yellow/Bigs/Highs/Stripes</label>
 							</div>
 							<div>
 								<input type="radio" id="p1colorOpen" name="p1BallSetSelect" value="p1Open" checked/>
@@ -478,14 +478,13 @@ for more information about Salotto please visit https://salotto.app
                 <div class="column">
                     Game Type
                     <select class="dropdown" id="gameType" onchange="gameType(this.value)">
-                        <option value="game1">None</option>
-                        <option value="game2">8-Ball</option>
-                        <option value="game3">9-Ball</option>
-                        <option value="game4">10-Ball</option>
-                        <option value="game5">Straight</option>
-                        <option value="game6">Bank</option>
-                        <option value="game7">One Pocket</option>
-                        <option value="game8">Custom</option>
+                        <option value="game1">8-Ball</option>
+                        <option value="game2">9-Ball</option>
+                        <option value="game3">10-Ball</option>
+                        <option value="game4">Straight</option>
+                        <option value="game5">Bank</option>
+                        <option value="game6">One Pocket</option>
+                        <option value="game7">Custom</option>
                     </select>
                     <span></span>
                     <label class="slidecontainer" id="opacityLabel" for="scoreOpacity">Overlay Opacity</label>
@@ -494,17 +493,6 @@ for more information about Salotto please visit https://salotto.app
                     <span></span>
                     <span id="sliderValue">100%</span>
                 </div>
-                <div class="column">
-                    <div>
-                        Ball Type
-                        &nbsp;
-                        <select class="dropdown" id="ballType" onchange="ballType(this.value)">
-                            <option value="World">World (Small/Big)</option>
-                            <option value="International">International (Red/Yellow)</option>
-                        </select>
-                    </div>
-                </div>
-
                 <div class="section-header" id="feaureSettingLabel">
                     Feature Settings
                 </div>
@@ -532,17 +520,31 @@ for more information about Salotto please visit https://salotto.app
                         <input type="checkbox" class="smallSize" id="useToggleSetting" onchange="toggleSetting()"/>
                     </div>
                     <div>
-                        <label for="ballTrackerCheckbox" id="labelForBallTrackerCheckbox">Ball Tracker</label>
-                        <input type="checkbox" class="smallSize" id="ballTrackerCheckbox" onchange="useBallTracker()"/>
-                    </div>
-                    <div>
-                        <label for="ballSetCheckbox" id="labelForBallSetCheckbox">Ball Set Toggle</label>
-                        <input type="checkbox" class="smallSize" id="ballSetCheckbox" onchange="useBallSetToggle()"/>
-                    </div>
-                    <div>
                         <label for="poolStatCheckbox" id="labelForPoolStatCheckbox">PoolStat</label>
                         <input type="checkbox" class="smallSize" id="poolStatCheckbox" onchange="poolStatSetting()"/>
                     </div>
+                </div>
+				<div class="section-header" id="feaureSettingLabel">
+                    Ball Settings
+                </div>
+                <div class="column">
+                    <div>
+                        <label for="ballTrackerCheckbox" id="labelForBallTrackerCheckbox">Ball Tracker</label>
+                        <input type="checkbox" class="smallSize" id="ballTrackerCheckbox" onchange="useBallTracker()"/>
+                    </div>
+                    <div id="ballSetDiv">
+                        <label for="ballSetCheckbox" id="labelForBallSetCheckbox">Ball Set Toggle</label>
+                        <input type="checkbox" class="smallSize" id="ballSetCheckbox" onchange="useBallSetToggle()"/>
+                    </div>
+					<div id="ballTypeDiv">
+						<span>
+						Ball Type
+						<select class="dropdown" id="ballType" onchange="ballType(this.value)">
+							<option value="World">World (Small/Big,Lows/Highs,Solids/Stripes)</option>
+							<option value="International">International (Red/Yellow)</option>
+						</select>
+					</span>
+					</div>
                 </div>
                 <div class="section-header" id="updateCheckLabel">Version Check</div>
                 <div class="column">
