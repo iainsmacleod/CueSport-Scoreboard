@@ -105,7 +105,7 @@ window.onload = function() {
 		toggleSetting();
 	}
 
-	if (getStorageItem("usePoolStat")==="yes" || getStorageItem("usePoolStat") === null) {
+	if (getStorageItem("usePoolStat")==="yes") {
 		document.getElementById("poolStatCheckbox").checked = true;
 		setStorageItem("usePoolStat", "yes");
 		poolStatSetting();
@@ -223,8 +223,8 @@ window.onload = function() {
 	}
 	
 	if (getStorageItem("usePoolStat") === null) {
-		setStorageItem("usePoolStat", "yes");
-		console.log ('PoolStat initalised')
+		setStorageItem("usePoolStat", "no");
+		console.log ('PoolStat not initalised')
 	}
 
 

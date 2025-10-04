@@ -563,7 +563,7 @@ function useBallTracker(){
 }
 
 function toggleBallTrackerDirection() {
-    // Get current direction from localStorage or default to "horizontal"
+    // Get current direction from localStorage or default to "vertical"
     const currentDirection = getStorageItem("ballTrackerDirection") || "vertical";
     // Toggle direction
     const newDirection = currentDirection === "horizontal" ? "vertical" : "horizontal";
@@ -572,7 +572,8 @@ function toggleBallTrackerDirection() {
     // Update localStorage
     setStorageItem("ballTrackerDirection", newDirection);
     console.log(`Changed ball tracker to ${newDirection} orientation`);
-	document.getElementById("ballTrackerDirection").innerHTML = currentDirection.charAt(0).toUpperCase() + currentDirection.slice(1).toLowerCase() + " Ball Tracker";
+	// Update button label to reflect NEW direction (current state after toggle)
+	document.getElementById("ballTrackerDirection").innerHTML = newDirection.charAt(0).toUpperCase() + newDirection.slice(1).toLowerCase() + " Ball Tracker";
 }
 
 function togglePot(element) {
