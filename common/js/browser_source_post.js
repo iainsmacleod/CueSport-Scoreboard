@@ -411,6 +411,18 @@ const handlers = {
         }
     },
 
+    ballType(data) {
+        console.log('Ball type changed to:', data.ballType);
+        setStorageItem("ballType", data.ballType);
+        
+        // Update current ball display if ball set is active
+        const currentBallSet = getStorageItem("playerBallSet");
+        if (currentBallSet && currentBallSet !== "p1Open") {
+            // Re-apply the current ball set with the new ball type
+            this.playerBallSet({ playerBallSet: currentBallSet });
+        }
+    },
+
     playerBallSet(data) {
         console.log('Player ball set value:', data.playerBallSet);
         var ballType= getStorageItem("ballType");
@@ -422,13 +434,17 @@ const handlers = {
             if (ballType === "World"){
                 document.getElementById("currentBallP1").src = "common/images/1ball_small.png";
                 document.getElementById("currentBallP1").classList.remove("noShow");
+                document.getElementById("scoreBallContainerP1").classList.remove("noShow"); // ADD THIS LINE
                 document.getElementById("currentBallP2").src = "common/images/15ball_small.png";
                 document.getElementById("currentBallP2").classList.remove("noShow");
+                document.getElementById("scoreBallContainerP2").classList.remove("noShow"); // ADD THIS LINE
             } else {
                 document.getElementById("currentBallP1").src = "common/images/red-international-small-ball.png";
                 document.getElementById("currentBallP1").classList.remove("noShow");
+                document.getElementById("scoreBallContainerP1").classList.remove("noShow"); // ADD THIS LINE
                 document.getElementById("currentBallP2").src = "common/images/yellow-international-small-ball.png";
                 document.getElementById("currentBallP2").classList.remove("noShow");
+                document.getElementById("scoreBallContainerP2").classList.remove("noShow"); // ADD THIS LINE
             }
         } else if (data.playerBallSet === "p1yellow/bigs") {
             if (ballType === "World"){
@@ -448,6 +464,7 @@ const handlers = {
         }
     }
 };
+
 
 // Main event handler
 bc.onmessage = (event) => {
@@ -601,10 +618,11 @@ if (getStorageItem("p2ScoreCtrlPanel") != null && getStorageItem("usePoolStat") 
     }
 }
 
-if (getStorageItem("gameInfo") != "" ) {
-	document.getElementById("gameInfo").classList.remove("noShow");
+const gameInfo = getStorageItem("gameInfo");
+if (gameInfo && gameInfo.trim() !== "") {
+    document.getElementById("gameInfo").classList.remove("noShow");
     document.getElementById("gameInfo").classList.add("fadeInElm");
-    document.getElementById("gameInfo").innerHTML = getStorageItem("gameInfo");
+    document.getElementById("gameInfo").innerHTML = gameInfo;
 } else {
     document.getElementById("gameInfo").classList.add("noShow");
     document.getElementById("gameInfo").classList.remove("fadeInElm");
@@ -767,5 +785,46 @@ function initializeBrowserSourceExtensionStatus() {
             p2ExtIcon.style.backgroundColor = "";
             p2ExtIcon.style.color = "";
         }
+    }
+
+    // Initialize ball set selection from storage on page load
+    const savedBallSet = getStorageItem("playerBallSet");
+    if (savedBallSet && savedBallSet !== "p1Open") {
+        // Apply the saved ball set selection
+        const ballType = getStorageItem("ballType");
+        
+        if (savedBallSet === "p1red/smalls") {
+            if (ballType === "World"){
+                document.getElementById("currentBallP1").src = "common/images/1ball_small.png";
+                document.getElementById("currentBallP1").classList.remove("noShow");
+                document.getElementById("scoreBallContainerP1").classList.remove("noShow");
+                document.getElementById("currentBallP2").src = "common/images/15ball_small.png";
+                document.getElementById("currentBallP2").classList.remove("noShow");
+                document.getElementById("scoreBallContainerP2").classList.remove("noShow");
+            } else {
+                document.getElementById("currentBallP1").src = "common/images/red-international-small-ball.png";
+                document.getElementById("currentBallP1").classList.remove("noShow");
+                document.getElementById("scoreBallContainerP1").classList.remove("noShow");
+                document.getElementById("currentBallP2").src = "common/images/yellow-international-small-ball.png";
+                document.getElementById("currentBallP2").classList.remove("noShow");
+                document.getElementById("scoreBallContainerP2").classList.remove("noShow");
+            }
+        } else if (savedBallSet === "p1yellow/bigs") {
+            if (ballType === "World"){
+                document.getElementById("currentBallP1").src = "common/images/15ball_small.png";
+                document.getElementById("scoreBallContainerP1").classList.remove("noShow");
+                document.getElementById("currentBallP2").src = "common/images/1ball_small.png";
+                document.getElementById("scoreBallContainerP2").classList.remove("noShow");
+            } else {
+                document.getElementById("currentBallP1").src = "common/images/yellow-international-small-ball.png";
+                document.getElementById("scoreBallContainerP1").classList.remove("noShow");
+                document.getElementById("currentBallP2").src = "common/images/red-international-small-ball.png";
+                document.getElementById("scoreBallContainerP2").classList.remove("noShow");
+            }
+        }
+    } else {
+        // Default to "Open Table" - ensure containers are hidden
+        document.getElementById("scoreBallContainerP1").classList.add("noShow");
+        document.getElementById("scoreBallContainerP2").classList.add("noShow");
     }
 }

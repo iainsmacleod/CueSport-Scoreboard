@@ -244,18 +244,18 @@ for more information about Salotto please visit https://salotto.app
                 <div class="section-header" id="ballSetLabel">Player Ball Set Toggle</div>
 				<div class="column" id="ballSet">
 					<div>
-						<form class="column" id="ballSetSelectionForm" onclick="ballSetChange()">
+						<form class="column" id="ballSetSelectionForm">
 							<div>Player 1 Ball Color:</div>
 							<div>
-								<input type="radio" id="p1colorRed" name="p1BallSetSelect" value="p1red/smalls" />
+								<input type="radio" id="p1colorRed" name="p1BallSetSelect" value="p1red/smalls" onchange="ballSetChange()" />
 								<label for="p1colorRed">Red/Smalls/Lows/Solids</label>
 							</div>
 							<div>
-								<input type="radio" id="p1colorYellow" name="p1BallSetSelect" value="p1yellow/bigs"/>
+								<input type="radio" id="p1colorYellow" name="p1BallSetSelect" value="p1yellow/bigs" onchange="ballSetChange()" />
 								<label for="p1colorYellow">Yellow/Bigs/Highs/Stripes</label>
 							</div>
 							<div>
-								<input type="radio" id="p1colorOpen" name="p1BallSetSelect" value="p1Open" checked/>
+								<input type="radio" id="p1colorOpen" name="p1BallSetSelect" value="p1Open" checked onchange="ballSetChange()" />
 								<label for="p1colorOpen">Open Table</label>
 							</div>
 						</form>

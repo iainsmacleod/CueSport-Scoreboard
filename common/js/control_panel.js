@@ -527,6 +527,9 @@ function ballType(value) {
         }
     }
 
+	// Send ball type change message to browser source
+	bc.postMessage({ ballType: value });
+
 	if (document.getElementById("ballTrackerCheckbox").checked) {
 		bc.postMessage({ displayBallTracker: true, ballTrackerType: getStorageItem("ballType") });
 	}	else {
@@ -553,6 +556,9 @@ function ballSetChange() {
     };
 	
 	var p1Selected = getSelectedP1Set()
+	// Store the selection
+    setStorageItem("playerBallSet", p1Selected);
+
 	bc.postMessage({ playerBallSet: p1Selected});
 
 	console.log(`Player 1 Ball Set Selected ${p1Selected}`)
@@ -965,6 +971,11 @@ function useBallSetToggle() {
 	} else {
 		document.getElementById("ballSet").style.display = 'none';
 		document.getElementById("ballSetLabel").classList.add("noShow");
+
+		// Reset to "Open Table" and hide the ball images
+		document.getElementById('p1colorOpen').checked = true;
+		setStorageItem("playerBallSet", "p1Open");
+		bc.postMessage({ playerBallSet: "p1Open" });
 	}
 
 }
@@ -1028,11 +1039,11 @@ function clearGame() {
 	setStorageItem("p1NameCtrlPanel", "");
 	setStorageItem("p2NameCtrlPanel", "");	
 	setStorageItem("raceInfo", "");
-	setStorageItem("gameInfo", "");	
+	setStorageItem("gameInfo", "");
+	resetBallSet();
 	postNames();
 	pushScores();
 	postInfo();	
-
 }
 
 function postNames() {
@@ -1141,7 +1152,8 @@ function postScore(opt1, player) {
             document.getElementById("p"+player+"Score").value = p2ScoreValue;
         }
     }
-	resetBallTracker()
+	resetBallSet();
+	resetBallTracker();
 }
 
 function shotClock(timex) {
@@ -1530,8 +1542,9 @@ function resetScores() {
 }
 
 function resetBallSet() {
+	setStorageItem("playerBallSet", "p1Open");
 	document.getElementById('p1colorOpen').checked = true;
-	bc.postMessage({ playerBallSet: 'p1Open' });
+	bc.postMessage({ playerBallSet: "p1Open" });
 }	
 
 function resetBallTracker() {

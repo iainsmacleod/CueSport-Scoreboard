@@ -69,7 +69,7 @@ html, body {
     z-index: 2;
 }
 
-#gameInfo {
+/* #gameInfo {
     position: flex;
     text-align: center;
     background: #3679dd;
@@ -82,6 +82,21 @@ html, body {
     margin: 0 5px 0 5px;
     border: 2px solid black;
     max-width: max-content;
+} */
+
+#gameInfo {
+    position: relative;  /* Change from fixed to relative */
+    background-image: linear-gradient(to bottom, lightgrey, white);
+    text-align: center;
+    font-size: calc(var(--small-font-size) * var(--ui-scaling));
+    font-weight: bolder;
+    border: 1px solid #000;
+    display: inline-flex;
+    width: fit-content;
+    padding: 5px 20px;
+    overflow: hidden;
+    white-space: nowrap;
+    box-shadow: 0 8px 16px 0 rgba(0,0,0,0.6);
 }
 
 #raceInfo {

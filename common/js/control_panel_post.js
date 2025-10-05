@@ -600,6 +600,22 @@ if (getStorageItem("gameType") === "game2"){
 document.getElementById("raceInfoTxt").value = getStorageItem("raceInfo");
 document.getElementById("gameInfoTxt").value = getStorageItem("gameInfo");
 document.getElementById("verNum").innerHTML = versionNum;
+
+// Initialize ball set selection from storage
+const savedBallSet = getStorageItem("playerBallSet");
+if (savedBallSet) {
+    const radioButton = document.querySelector(`input[name="p1BallSetSelect"][value="${savedBallSet}"]`);
+    if (radioButton) {
+        radioButton.checked = true;
+        // Trigger the ball set change to update the display
+        ballSetChange();
+    }
+} else {
+    // Default to "Open Table" if no selection is saved
+    document.getElementById('p1colorOpen').checked = true;
+    setStorageItem("playerBallSet", "p1Open");
+    bc.postMessage({ playerBallSet: "p1Open" });
+}
 // document.getElementById("psVerNum").innerHTML = psVersionNum;
 postNames(); postInfo(); startThemeCheck();
 
