@@ -207,10 +207,10 @@ function updateControlPanelBallImages(selection) {
                     // International ball naming convention
                     if (i >= 1 && i <= 7) {
                         imageSrc = `./common/images/yellow-international-small-ball.png`;
-                    } else if (i >= 8 && i <= 14) {
-                        imageSrc = `./common/images/red-international-small-ball.png`;
-                    } else if (i === 15) {
+                    } else if (i === 8) {
                         imageSrc = `./common/images/international-8-small-ball.png`;
+                    } else if (i >= 9 && i <= 15) {
+                        imageSrc = `./common/images/red-international-small-ball.png`;
                     }
                 } else {
                     // American ball naming convention (default)
