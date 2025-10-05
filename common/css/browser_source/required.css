@@ -249,6 +249,7 @@ html, body {
     overflow: hidden;
     text-overflow: ellipsis;
     border: 2px solid black;
+    min-height: calc(42px * var(--ui-scaling)); /* support the fact that names get blanked when using poolstat */
     z-index: 2;
 }
 

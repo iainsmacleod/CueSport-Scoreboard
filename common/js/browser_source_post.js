@@ -505,10 +505,10 @@ if (getStorageItem("usePlayerToggle") === null) {
 if (getStorageItem("activePlayer") === null) {
     setStorageItem("activePlayer", "1");
 }
-
-if (getStorageItem("poolStat") === null) {
-    setStorageItem("poolStat", "yes");
-}
+// Not sure what this was doing
+// if (getStorageItem("poolStat") === null) {
+//     setStorageItem("poolStat", "yes");
+// }
 
 setCustomLogo("customLogo1", "useCustomLogo", "usePlayer1");
 setCustomLogo("customLogo2", "useCustomLogo2", "usePlayer2");

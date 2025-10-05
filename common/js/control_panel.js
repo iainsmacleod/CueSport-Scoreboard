@@ -935,7 +935,11 @@ function poolStatSetting() {
 		document.getElementById("p1Name").value = " ";
 		document.getElementById("p2Name").value = " ";
 		postNames();
-	} 
+	} else {
+		document.getElementById("p1Name").value = "Player 1";
+		document.getElementById("p2Name").value = "Player 2";
+		postNames();
+	}
 	pushScores();
     updateTabVisibility();
 }
