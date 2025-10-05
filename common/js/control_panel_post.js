@@ -185,6 +185,27 @@ window.onload = function() {
 	}
 	console.log("Ball type: " + getStorageItem("ballType"));
 
+	// Update label text based on initial ball type
+	const redLabel = document.querySelector('label[for="p1colorRed"]');
+	if (redLabel) {
+		const currentBallType = getStorageItem("ballType");
+		if (currentBallType === "World") {
+			redLabel.textContent = "Smalls/Lows/Solids";
+		} else {
+			redLabel.textContent = "Red";
+		}
+	}
+
+	const yellowLabel = document.querySelector('label[for="p1colorYellow"]');
+	if (yellowLabel) {
+		const currentBallType = getStorageItem("ballType");
+		if (currentBallType === "World") {
+			yellowLabel.textContent = "Bigs/Highs/Stripes";
+		} else {
+			yellowLabel.textContent = "Yellow";
+		}
+	}
+
 	var savedOpacity = getStorageItem('overlayOpacity');
 	if (savedOpacity) {
 		document.getElementById('scoreOpacity').value = savedOpacity;
@@ -208,6 +229,8 @@ window.onload = function() {
 		}
 		document.getElementById("ballTrackerDirection").classList.remove("noShow");
 		document.getElementById("ballTrackerLabel").classList.remove("noShow");
+		document.getElementById("ballTypeDiv").classList.remove("noShow");
+		document.getElementById("ballSetDiv").classList.remove("noShow");
 		console.log(`Ball tracker enabled`);
 		bc.postMessage({ displayBallTracker: true });
 	} else {
@@ -217,6 +240,8 @@ window.onload = function() {
 		document.getElementById("internationalBallTracker").classList.add("noShow");
 		document.getElementById("ballTrackerDirection").classList.add("noShow");
 		document.getElementById("ballTrackerLabel").classList.add("noShow");		
+		document.getElementById("ballTypeDiv").classList.add("noShow");
+		document.getElementById("ballSetDiv").classList.add("noShow");
 		console.log(`Ball tracker disabled`);
 	}
 
@@ -542,6 +567,14 @@ document.getElementById("p1Score").value = getStorageItem("p1ScoreCtrlPanel");
 document.getElementById("p2Name").value = getStorageItem("p2NameCtrlPanel");
 document.getElementById("p2Score").value = getStorageItem("p2ScoreCtrlPanel");
 document.getElementById("gameType").value = getStorageItem("gameType");
+if (getStorageItem("gameType") === "game2" || getStorageItem("gameType") === "game3") { // 9-Ball or 10-Ball
+    document.getElementById("ballTypeDiv").classList.add("noShow");
+    // Reset to International when hidden
+    setStorageItem("ballType", "World");
+    document.getElementById("ballType").value = "World";
+} else {
+    document.getElementById("ballTypeDiv").classList.remove("noShow");
+}
 if (getStorageItem("gameType") === "game2"){
 	document.getElementById("ball 10").classList.add("noShow");
 	document.getElementById("ball 11").classList.add("noShow");

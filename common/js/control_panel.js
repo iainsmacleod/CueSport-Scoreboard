@@ -468,6 +468,18 @@ function toggleAnimationSetting(){
 
 function gameType(value) {
 	setStorageItem("gameType", value);
+
+	// Show/hide ball type div based on game type (hide for 9-Ball and 10-Ball)
+    if (getStorageItem("gameType") === "game2" || getStorageItem("gameType") === "game3") { // 9-Ball or 10-Ball
+        document.getElementById("ballTypeDiv").classList.add("noShow");
+        // Reset to International when hidden
+        setStorageItem("ballType", "World");
+        document.getElementById("ballType").value = "World";
+        ballType("World"); // Call the ballType function to update the display
+    } else {
+        document.getElementById("ballTypeDiv").classList.remove("noShow");
+    }
+
 	if (getStorageItem("gameType") === "game2"){
 		document.getElementById("ball 10").classList.add("noShow");
 		document.getElementById("ball 11").classList.add("noShow");
@@ -496,6 +508,25 @@ function gameType(value) {
 
 function ballType(value) {
 	setStorageItem("ballType", value);
+
+	// Update the label text based on ball type
+    const redLabel = document.querySelector('label[for="p1colorRed"]');
+	const yellowLabel = document.querySelector('label[for="p1colorYellow"]');
+    if (redLabel) {
+        if (value === "World") {
+            redLabel.textContent = "Smalls/Lows/Solids";
+        } else {
+            redLabel.textContent = "Red";
+        }
+    }
+	if (yellowLabel) {
+        if (value === "World") {
+            yellowLabel.textContent = "Bigs/Highs/Stripes";
+        } else {
+            yellowLabel.textContent = "Yellow";
+        }
+    }
+
 	if (document.getElementById("ballTrackerCheckbox").checked) {
 		bc.postMessage({ displayBallTracker: true, ballTrackerType: getStorageItem("ballType") });
 	}	else {

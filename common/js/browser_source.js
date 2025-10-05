@@ -372,20 +372,28 @@ function applySavedBallStates() {
 function playWebmAnimation(gameType, containerSelector = '#videoContainer') {
 	// Determine which video URL to use based on the gameType value.
     let videoUrl;
-    switch (gameType) {
-        case 'game1':
-            videoUrl = './common/video/defaultanimation.webm';
-            break;
-        case 'game2':
-            videoUrl = './common/video/9ballwin.webm';
-            break;
-        case 'game3':
-            videoUrl = './common/video/10ballwin.webm';
-            break;
-        // Add more cases as needed
-        default:
-            videoUrl = './common/video/defaultanimation.webm';
-            break;
+    const ballType = getStorageItem("ballType");
+
+    // If ball type is International, use international8ballwin.webm regardless of game type
+    if (ballType === "International") {
+        videoUrl = './common/video/international8ballwin.webm';
+    } else {
+        // Use game-specific videos for World ball type
+        switch (gameType) {
+            case 'game1':
+                videoUrl = './common/video/defaultanimation.webm';
+                break;
+            case 'game2':
+                videoUrl = './common/video/9ballwin.webm';
+                break;
+            case 'game3':
+                videoUrl = './common/video/10ballwin.webm';
+                break;
+            // Add more cases as needed
+            default:
+                videoUrl = './common/video/defaultanimation.webm';
+                break;
+        }
     }
 
     // Get the container element where the video will be appended.

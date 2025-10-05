@@ -258,7 +258,28 @@ html, body {
     align-content: center;
     justify-content: center;
     display: inline-block;
-    background-color: rgba(128, 128, 128, 1);
+}
+
+.score-ball-container img {
+    width: calc(41px * var(--ui-scaling));
+    height: calc(41px * var(--ui-scaling));
+}
+
+#scoreBallContainerP1 img {
+    padding: 0px 5px 0px 0px;
+    position: absolute;
+    top: 50%; 
+    left: 15px;
+    transform: translateY(-50%);
+    z-index: 10;
+}
+#scoreBallContainerP2 img {
+    padding: 0px 0px 0px 5px;
+    position: absolute;
+    top: 50%; 
+    right: 15px;
+    transform: translateY(-50%);
+    z-index: 10;
 }
 
 /* Scores */

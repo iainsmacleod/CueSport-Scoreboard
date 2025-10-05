@@ -527,19 +527,10 @@ if (getStorageItem("slideShow") == "yes") {
 	document.getElementById("logoSlideshowDiv").classList.replace("fadeOutElm", "fadeInElm");
 }
 
-if (getStorageItem("p1NameCtrlPanel") != "" || getStorageItem("p1NameCtrlPanel") != null) {
-	document.getElementById("player1Name").innerHTML = getStorageItem("p1NameCtrlPanel");
-}
-if (getStorageItem("p1NameCtrlPanel") == "" || getStorageItem("p1NameCtrlPanel") == null) {
-	document.getElementById("player1Name").innerHTML = " ";
-}
 
-if (getStorageItem("p2NameCtrlPanel") != "" || getStorageItem("p2NameCtrlPanel") != null) {
-	document.getElementById("player2Name").innerHTML = getStorageItem("p2NameCtrlPanel");
-}
-if (getStorageItem("p2NameCtrlPanel") == "" || getStorageItem("p2NameCtrlPanel") == null) {
-	document.getElementById("player2Name").innerHTML = " ";
-}
+// Defaukt Player 1 and Player 2 names
+document.getElementById("player1Name").innerHTML = getStorageItem("p1NameCtrlPanel") || "Player 1";
+document.getElementById("player2Name").innerHTML = getStorageItem("p2NameCtrlPanel") || "Player 2";
 
 // Code to assist with displaying active player image when only two players are enabled, on reload.
 const player1Enabled = getStorageItem("usePlayer1") === "yes";
