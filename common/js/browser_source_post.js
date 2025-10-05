@@ -505,7 +505,7 @@ if (getStorageItem("usePlayerToggle") === null) {
 if (getStorageItem("activePlayer") === null) {
     setStorageItem("activePlayer", "1");
 }
-// Not sure what this was doing
+// Not sure what this was doing?
 // if (getStorageItem("poolStat") === null) {
 //     setStorageItem("poolStat", "yes");
 // }
