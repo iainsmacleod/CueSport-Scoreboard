@@ -155,116 +155,37 @@ input[type="number"]::-webkit-outer-spin-button {
 	padding: 0px;
 }
 
-#shotClock30, #shotClock60, #stopClockDiv, #sendPNames, #sendPInfo, #resetScores, #sendPScores, #swapBtn, #shotClockShow, #logoSsImg1, #logoSsImg2, #logoSsImg3, #logoSsImg4, #logoSsImg5{
-	cursor: pointer;
-	width: 100px;
-	font-size: 10pt;
-	padding: 0px 0px 0px 0px;
-	border:2px solid black;
-	corner-shape: bevel;
-    border-radius: 0px 0px 12px 0px;
-}
-
 #raceInfoTxt, #gameInfoTxt{
 	font-size:16pt;
 	border-radius: 0px;
 	padding: 0 5px 0 5px;
 }
 
-#ballTrackerDirection, #ballSelection{
-	cursor: pointer;
-	width: auto;
-	font-size: 10pt;
-	padding: 0px 5px 0px 5px;
-	border:2px solid black;
-	corner-shape: bevel;
-    border-radius: 0px 0px 12px 0px;
-}
-
-#resetBtn, #uploadCustomLogo, #uploadCustomLogo2, #updateCheck{
-	cursor: pointer;
-	width: 150px;
-	font-size: 10pt;
-	padding: 0px 0px 0px 0px;
-	border:2px solid black;
-	corner-shape: bevel;
-    border-radius: 0px 0px 12px 0px;
-}
-
 #resetDataBtn{
-	cursor: pointer;
-	width: 150px;
-	font-size: 10pt;
-	padding: 0px 0px 0px 0px;
 	background: red;
 	color: black;
-	border:2px solid black;
-	corner-shape: bevel;
-    border-radius: 0px 0px 12px 0px;
 }
 
 #p1extensionBtn, #p2extensionBtn  {
-	cursor: pointer;
-	width:120px;
-	font-size: 10pt;
-	padding: 0px 5px 0px 5px;
-	border:2px solid black;
 	color:black;
 	background: green;
-	corner-shape: bevel;
-    border-radius: 0px 0px 12px 0px;
 }
 
-#resetDataBtn,
-#ballTrackerDirection,
-#ballSelection,
-#resetBtn,
-#uploadCustomLogo,
-#uploadCustomLogo2,
-#updateCheck,
-#shotClock30,
-#shotClock60,
-#stopClockDiv,
-#sendPNames,
-#sendPInfo,
-#resetScores,
-#sendPScores,
-#swapBtn,
-#shotClockShow,
-#logoSsImg1,
-#logoSsImg2,
-#logoSsImg3,
-#logoSsImg4,
-#logoSsImg5,
-#p1extensionBtn,
-#p2extensionBtn
-	{
+/* Button styling */
+
+.button {
+	cursor: pointer;
+	min-width: 100px;
+	width:auto;
+	font-size: 10pt;
+	padding: 0px 10px 0px 10px;
+	border:2px solid black;
+	corner-shape: bevel;
+    border-radius: 0px 0px 10px 0px;
 	transition: box-shadow 0.2s;
 }
 
-#resetDataBtn:hover,
-#ballTrackerDirection:hover,
-#ballSelection:hover,
-#resetBtn:hover,
-#uploadCustomLogo:hover,
-#uploadCustomLogo2:hover,
-#updateCheck:hover,
-#shotClock30:hover,
-#shotClock60:hover,
-#stopClockDiv:hover,
-#sendPNames:hover,
-#sendPInfo:hover,
-#resetScores:hover,
-#sendPScores:hover,
-#swapBtn:hover,
-#shotClockShow:hover,
-#logoSsImg1:hover,
-#logoSsImg2:hover,
-#logoSsImg3:hover,
-#logoSsImg4:hover,
-#logoSsImg5:hover,
-#p1extensionBtn:hover,
-#p2extensionBtn:hover
+.button:hover
 	{
 	box-shadow: 0 4px 10px rgba(0,0,0,0.35);
 }

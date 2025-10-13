@@ -24,7 +24,7 @@ for more information about Salotto please visit https://salotto.app
 	<link rel="stylesheet" href="./common/css/control_panel/required.css" />
 	<script>
 	//---------------------------------------------------------------------------------------------
-		var versionNum = "2.3.1";
+		var versionNum = "2.3.2";
  	 //---------------------------------------------------------------------------------------------
 	</script>
 	<script src="./common/js/jquery.js"></script>
@@ -64,7 +64,7 @@ for more information about Salotto please visit https://salotto.app
 			</div>
 			<div class="column">
 				<span></span>
-				<div class="hover obs28" id="sendPInfo" onclick="postInfo()">Update Info</div>
+				<div class="button hover obs28" id="sendPInfo" onclick="postInfo()">Update Info</div>
 			</div>
 			<div class="section-header" id="playerDetailLabel">Player/Team Details</div>
 			<div class="column" id="teamInfo" >
@@ -110,9 +110,9 @@ for more information about Salotto please visit https://salotto.app
 				</select>
 			</div>
 			<div class="column" id="colorSwap">
-				<div class="hover obs28" id="swapBtn" onclick="swapColors()">Swap Colors</div>
+				<div class="button hover obs28" id="swapBtn" onclick="swapColors()">Swap Colors</div>
 				<span></span>
-				<div class="hover obs28" id="sendPNames" onclick="postNames()">Update Names</div>
+				<div class="button hover obs28" id="sendPNames" onclick="postNames()">Update Names</div>
 			</div>
 		</div>
 		<!-- Scoring Tab -->
@@ -135,22 +135,37 @@ for more information about Salotto please visit https://salotto.app
 				</div>
 			</div>
 			<div class="column" id="scoreEditing">
-				<div class="hover obs28" id="resetScores" onclick="resetScores()">Reset Scores</div>
-				<div class="hover obs28" id="sendPScores" onclick="pushScores()">Push Scores</div>
+				<div class="button hover obs28" id="resetScores" onclick="resetScores()">Reset Scores</div>
+				<div class="button hover obs28" id="sendPScores" onclick="pushScores()">Push Scores</div>
 			</div>
 			<div class="section-header" id="playerToggleLabel">Player Toggle</div>
-			<div class="column" id="playerToggle">
-				<div>
-				<label style="padding: 0 10px 0 0">Current or Breaking Player/Team:</label>
-				<label class="switch toggle">
-					<input type="checkbox" id="playerToggleCheckbox" onchange="togglePlayer(this.checked)">
-					<span class="slider_round"></span>
-					<span class="player1 toggle">P1</span>
-
-					<span class="player2 toggle">P2</span>
-				</label>
-			</div>
-			</div>
+				<div class="column" id="playerToggle">
+					<div>
+						<label style="padding: 0 10px 0 0">Current or Breaking Player/Team:</label>
+						<label class="switch toggle">
+							<input type="checkbox" id="playerToggleCheckbox" onchange="togglePlayer(this.checked)">
+							<span class="slider_round"></span>
+							<span class="player1 toggle">P1</span>
+							<span class="player2 toggle">P2</span>
+						</label>
+						
+					</div>	
+				</div>
+				<form class="column" id="ballSetSelectionForm">
+					<div>Player 1 Ball Color:</div>
+					<div>
+						<input type="radio" id="p1colorRed" name="p1BallSetSelect" value="p1red/smalls" onchange="ballSetChange()" />
+						<label for="p1colorRed">Red/Smalls/Lows/Solids</label>
+					</div>
+					<div>
+						<input type="radio" id="p1colorYellow" name="p1BallSetSelect" value="p1yellow/bigs" onchange="ballSetChange()" />
+						<label for="p1colorYellow">Yellow/Bigs/Highs/Stripes</label>
+					</div>
+					<div>
+						<input type="radio" id="p1colorOpen" name="p1BallSetSelect" value="p1Open" checked onchange="ballSetChange()" />
+						<label for="p1colorOpen">Open Table</label>
+					</div>
+				</form>
 			<div class="section-header" id="ballTrackerLabel">Ball Tracker</div>
 			<div class="ballTracker" id="ballTrackerDiv">
 				<div id="ballTracker" class="noShow">
@@ -172,25 +187,25 @@ for more information about Salotto please visit https://salotto.app
 				</div>
 			</div>
 			<div class="column" id="ballTrackerDirectionDiv">
-				<div class="hover obs28 noShow" id="ballSelection" onclick="toggleBallSelection()">International Balls</div>
+				<div class="button hover obs28 noShow" id="ballSelection" onclick="toggleBallSelection()">International Balls</div>
 				<span></span>
-				<div class="hover obs28 noShow" id="ballTrackerDirection" onclick="toggleBallTrackerDirection()">Vertical Ball Tracker</div>
+				<div class="button hover obs28 noShow" id="ballTrackerDirection" onclick="toggleBallTrackerDirection()">Vertical Ball Tracker</div>
 			</div>
 			<!-- Shot Clock Tab -->
 			<div class="section-header" id="clockControlLabel">Clock Controls</div>
 			<div class="column" id="clockInfo">
 				<!-- <label id="useClockSettingLabel">Clock Controls:&nbsp;</label> -->
-				<div class="hover obs28" id="shotClock30" onclick="shotClock(30000)">30s Shot Clock</div>
-				<div class="hover obs28" id="shotClock60" onclick="shotClock(60000)">60s Shot Clock</div>
+				<div class="button hover obs28" id="shotClock30" onclick="shotClock(30000)">30s Shot Clock</div>
+				<div class="button hover obs28" id="shotClock60" onclick="shotClock(60000)">60s Shot Clock</div>
 				<div id="clockLocalDisplay" onclick="" style="display: none;"></div>
-				<div class="hover obs28" id="stopClockDiv" onclick="stopClock()">Stop Clock</div>
-				<div class="hover obs28" id="shotClockShow" onclick="clockDisplay('show')">Show Clock</div>
+				<div class="button hover obs28" id="stopClockDiv" onclick="stopClock()">Stop Clock</div>
+				<div class="button hover obs28" id="shotClockShow" onclick="clockDisplay('show')">Show Clock</div>
 			</div>
 			<div class="column" id="extensionControls">
 				<label id="extensionSettingsLabel">Extension Controls:&nbsp;</label>
-				<div class="hover obs28" id="p1extensionBtn" onclick="add30('p1')">P1's Extension</div>
-				<div class="hover obs28" id="p2extensionBtn" onclick="add30('p2')">P2's Extension</div>
-				<div class="hover obs28" id="resetBtn" onclick="resetExtensions()">Reset Extensions</div>
+				<div class="button hover obs28" id="p1extensionBtn" onclick="add30('p1')">P1's Extension</div>
+				<div class="button hover obs28" id="p2extensionBtn" onclick="add30('p2')">P2's Extension</div>
+				<div class="button hover obs28" id="resetBtn" onclick="resetExtensions()">Reset Extensions</div>
 			</div>
 		</div>
 		<!-- Images Tab -->
@@ -203,13 +218,13 @@ for more information about Salotto please visit https://salotto.app
 			<div class="section-header" id="slideshowImageLabel">Slideshow Images</div>
 			<div class="column" id="slideshowImages">
 				Custom/Sponsor Slideshow<input class="smallSize" type="checkbox" id="logoSlideshowChk" onchange="logoSlideshow()"></span>
-				<div class="tooltip obs28 hover" id="logoSsImg3"><input type="file" id="FileUploadL3" onchange="logoPost(this,3)" accept="image/png, image/jpeg, image/svg+xml, image/bmp"/>
+				<div class="button tooltip obs28 hover" id="logoSsImg3"><input type="file" id="FileUploadL3" onchange="logoPost(this,3)" accept="image/png, image/jpeg, image/svg+xml, image/bmp"/>
 					<span id="FileUploadLText3">L1</span><span class="tooltiptext"><img id="l3Img" src="" style="height:100px; max-width:300px"></span>
 				</div>
-				<div class="tooltip obs28 hover" id="logoSsImg4"><input type="file" id="FileUploadL4" onchange="logoPost(this,4)" accept="image/png, image/jpeg, image/svg+xml, image/bmp">
+				<div class="button tooltip obs28 hover" id="logoSsImg4"><input type="file" id="FileUploadL4" onchange="logoPost(this,4)" accept="image/png, image/jpeg, image/svg+xml, image/bmp">
 					<span id="FileUploadLText4">L2</span><span class="tooltiptext"><img id="l4Img" src="" style="height:100px; max-width:300px"></span>
 				</div>
-				<div class="tooltip obs28 hover" id="logoSsImg5"><input type="file" id="FileUploadL5" onchange="logoPost(this,5)" accept="image/png, image/jpeg, image/svg+xml, image/bmp"/>
+				<div class="button tooltip obs28 hover" id="logoSsImg5"><input type="file" id="FileUploadL5" onchange="logoPost(this,5)" accept="image/png, image/jpeg, image/svg+xml, image/bmp"/>
 					<span id="FileUploadLText5">L3</span><span class="tooltiptext"><img id="l5Img" src="" style="height:100px; max-width:300px"></span>
 				</div>
 			</div>
@@ -217,7 +232,7 @@ for more information about Salotto please visit https://salotto.app
 			<div class="column" id="playerImages">
 				<text class="hover" onclick="cLogoNameChange()" id="logoName" style="text-decoration: underline;">Player 1 Logo</text>
 				<input class="smallSize" type="checkbox" id="customLogo1" onchange="customLogoSetting()" disabled>
-				<div class="hover obs28 tooltip" id="uploadCustomLogo" style="width: 150px">
+				<div class="button hover obs28 tooltip" id="uploadCustomLogo" style="width: 150px">
 					<span id="FileUploadLText1">Upload Player 1 Logo</span>
 					<input type="file" id="FileUploadL1" onchange="logoPost(this,1); toggleCheckbox('customLogo1', this)" accept="image/png, image/jpeg, image/svg+xml, image/bmp"/>
 					<span class="tooltiptext">
@@ -226,7 +241,7 @@ for more information about Salotto please visit https://salotto.app
 				</div>
 				<text class="hover" onclick="cLogoNameChange2()" id="logoName2" style="text-decoration: underline;">Player 2 Logo</text>
 				<input class="smallSize" type="checkbox" id="customLogo2" onchange="customLogoSetting2()" disabled>
-				<div class="hover obs28 tooltip" id="uploadCustomLogo2" style="width: 150px">
+				<div class="button hover obs28 tooltip" id="uploadCustomLogo2" style="width: 150px">
 					<span id="FileUploadLText2">Upload Player 2 Logo</span>
 					<input type="file" id="FileUploadL2" onchange="logoPost(this,2); toggleCheckbox('customLogo2', this)" accept="image/png, image/jpeg, image/svg+xml, image/bmp">
 					<span class="tooltiptext">
@@ -297,15 +312,15 @@ for more information about Salotto please visit https://salotto.app
 				</div>
 				<div class="section-header" id="updateCheckLabel">Version Check</div>
 				<div class="column">
-					<div class="hover obs28" id="updateCheck" onclick="checkForUpdate()">Check for Update</div>
+					<div class="button hover obs28" id="updateCheck" onclick="checkForUpdate()">Check for Update</div>
 					<div id="updateStatus">Press "Check for Update".</div>
 				</div>
 				<div class="section-header" id="localDataSettingLabel">Local Data Settings</div>
 				<div class="column">
-					<div class="hover obs28" onclick="resetInstance()" id="resetDataBtn" style="color:white">
+					<div class="button hover obs28" onclick="resetInstance()" id="resetDataBtn" style="color:white">
 						Clear Instance Data
 					</div>
-					<div class="hover obs28" onclick="resetAll()" id="resetDataBtn" style="color:white">
+					<div class="button hover obs28" onclick="resetAll()" id="resetDataBtn" style="color:white">
 						Clear All Data
 					</div>
 				</div>
