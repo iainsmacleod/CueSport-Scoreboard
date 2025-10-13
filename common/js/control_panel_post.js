@@ -96,6 +96,18 @@ window.onload = function() {
 		toggleSetting();
 	}
 
+	if (getStorageItem("useBallSet")==="yes") {
+		document.getElementById("ballSetCheckbox").checked = true;
+		setStorageItem("useBallSet", "yes");
+		document.getElementById("ballSet").style.display = 'flex';
+		document.getElementById("ballSetLabel").classList.remove("noShow");
+	} else {
+		document.getElementById("ballSetCheckbox").checked = false;
+		setStorageItem("useBallSet", "no");
+		document.getElementById("ballSet").style.display = 'none';
+		document.getElementById("ballSetLabel").classList.add("noShow");
+	}
+
 	if (getStorageItem("usePlayer1") === "yes" && getStorageItem("usePlayer2") === "yes" && getStorageItem("usePlayerToggle") === "yes"){
 		console.log(`We should be showing active player identifier`);
 		const activePlayer = getStorageItem("activePlayer") === "2" ? "2" : "1";
@@ -140,25 +152,29 @@ window.onload = function() {
 
 	if (getStorageItem("enableBallTracker") === "true"){
 		document.getElementById("ballTrackerCheckbox").checked = true;
-		document.getElementById("ballTracker").classList.remove("noShow");
+		if (getStorageItem("ballType") === "World"){
+			document.getElementById("worldBallTracker").classList.remove("noShow");
+			document.getElementById("internationalBallTracker").classList.add("noShow");
+		} else {
+			document.getElementById("internationalBallTracker").classList.remove("noShow");
+			document.getElementById("worldBallTracker").classList.add("noShow");
+		}
 		document.getElementById("ballTrackerDirection").classList.remove("noShow");
 		document.getElementById("ballTrackerLabel").classList.remove("noShow");
-		// Show ball style toggle button on load when enabled
-		var bs = document.getElementById("ballSelection");
-		if (bs) { bs.classList.remove("noShow"); }
+		document.getElementById("ballTypeDiv").classList.remove("noShow");
+		document.getElementById("ballSetDiv").classList.remove("noShow");
 		console.log(`Ball tracker enabled`);
 		bc.postMessage({ displayBallTracker: true });
 	} else {
 		document.getElementById("ballTrackerCheckbox").checked = false;
 		setStorageItem("enableBallTracker", "false");
-		document.getElementById("ballTracker").classList.add("noShow");
+		document.getElementById("worldBallTracker").classList.add("noShow");
+		document.getElementById("internationalBallTracker").classList.add("noShow");
 		document.getElementById("ballTrackerDirection").classList.add("noShow");
 		document.getElementById("ballTrackerLabel").classList.add("noShow");		
-		// Hide ball style toggle button on load when disabled
-		var bs2 = document.getElementById("ballSelection");
-		if (bs2) { bs2.classList.add("noShow"); }
+		document.getElementById("ballTypeDiv").classList.add("noShow");
+		document.getElementById("ballSetDiv").classList.add("noShow");
 		console.log(`Ball tracker disabled`);
-		bc.postMessage({ displayBallTracker: false });
 	}
 
 	if (getStorageItem("ballTrackerDirection") === null) {
@@ -494,6 +510,23 @@ if (getStorageItem("gameType") === "game3"){
 document.getElementById("raceInfoTxt").value = getStorageItem("raceInfo");
 document.getElementById("gameInfoTxt").value = getStorageItem("gameInfo");
 document.getElementById("verNum").innerHTML = versionNum;
+
+// Initialize ball set selection from storage
+const savedBallSet = getStorageItem("playerBallSet");
+if (savedBallSet) {
+    const radioButton = document.querySelector(`input[name="p1BallSetSelect"][value="${savedBallSet}"]`);
+    if (radioButton) {
+        radioButton.checked = true;
+        // Trigger the ball set change to update the display
+        ballSetChange();
+    }
+} else {
+    // Default to "Open Table" if no selection is saved
+    document.getElementById('p1colorOpen').checked = true;
+    setStorageItem("playerBallSet", "p1Open");
+    bc.postMessage({ playerBallSet: "p1Open" });
+}
+// document.getElementById("psVerNum").innerHTML = psVersionNum;
 postNames(); postInfo(); startThemeCheck();
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

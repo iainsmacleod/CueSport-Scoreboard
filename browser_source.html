@@ -39,7 +39,7 @@ for more information about Salotto please visit https://salotto.app
 
 <body>
 	<div id="videoContainer"></div>
-	<div id="ballTracker" class="noShow">
+	<div id="ballTrackerWorld" class="noShow">
 		<div class="ball" id="ball 1"><img src="./common/images/1ball_small.png"></div>
 		<div class="ball" id="ball 2"><img src="./common/images/2ball_small.png"></div>
 		<div class="ball" id="ball 3"><img src="./common/images/3ball_small.png"></div>
@@ -56,7 +56,26 @@ for more information about Salotto please visit https://salotto.app
 		<div class="ball" id="ball 14"><img src="./common/images/14ball_small.png"></div>
 		<div class="ball" id="ball 15"><img src="./common/images/15ball_small.png"></div>
 	</div>
+	<div id="ballTrackerInternational" class="noShow">
+		<div class="ball" id="i-ball 1"><img src="./common/images/red-international-small-ball.png"></div>
+		<div class="ball" id="i-ball 2"><img src="./common/images/red-international-small-ball.png"></div>
+		<div class="ball" id="i-ball 3"><img src="./common/images/red-international-small-ball.png"></div>
+		<div class="ball" id="i-ball 4"><img src="./common/images/red-international-small-ball.png"></div>
+		<div class="ball" id="i-ball 5"><img src="./common/images/red-international-small-ball.png"></div>
+		<div class="ball" id="i-ball 6"><img src="./common/images/red-international-small-ball.png"></div>
+		<div class="ball" id="i-ball 7"><img src="./common/images/red-international-small-ball.png"></div>
+		<div class="ball" id="i-ball 8"><img src="./common/images/international-8-small-ball.png"></div>
+		<div class="ball" id="i-ball 9"><img src="./common/images/yellow-international-small-ball.png"></div>
+		<div class="ball" id="i-ball 10"><img src="./common/images/yellow-international-small-ball.png"></div>
+		<div class="ball" id="i-ball 11"><img src="./common/images/yellow-international-small-ball.png"></div>
+		<div class="ball" id="i-ball 12"><img src="./common/images/yellow-international-small-ball.png"></div>
+		<div class="ball" id="i-ball 13"><img src="./common/images/yellow-international-small-ball.png"></div>
+		<div class="ball" id="i-ball 14"><img src="./common/images/yellow-international-small-ball.png"></div>
+		<div class="ball" id="i-ball 15"><img src="./common/images/yellow-international-small-ball.png"></div>
+	</div>
+
 	<div id="gameInfoWrapper">
+		<div id="raceInfo" class="noShow fadeInElm"></div>
 		<div class="noShow fadeInElm" id="gameInfo"></div>
 	</div>
 	<div id="logoSlideshowDiv" class="slideshow-container fadeOutElm">
@@ -65,6 +84,9 @@ for more information about Salotto please visit https://salotto.app
 		<div class="mySlides logoSlide fade"><img id="customLogo5" src=""></div>
 	</div>
 	
+	<!-- Race to & Game Info in center -->
+
+
 	<div id="scoreBoardDiv" class="fadeInElm">
 		<!-- Shot clock container -->
 		<div class="shotclock-container">
@@ -80,31 +102,34 @@ for more information about Salotto please visit https://salotto.app
 					<div id="p1ExtIcon" class="fadeInElm">Ex</div>
 					<div id="player1Image" class="fadeInElm"></div>
 				</div>
-			<div id="player1Name" class="fadeInElm">
-				<span>Player 1</span>
-			</div>
-			<div class="score-logo-container">
-				<img class="fadeOutElm customLogo1" id="customLogo1" src="">
-				<div id="player1Score" class="fadeInElm">0</div>
-			</div>
+				<div class="score-ball-container noShow" id="scoreBallContainerP1">
+					<img class="" id="currentBallP1" src="common/images/15ball_small.png">
+				</div>
+				<div id="player1Name" class="fadeInElm">
+					<span>Player 1</span>
+				</div>		
+				<div class="score-logo-container">
+					<img class="fadeOutElm customLogo1" id="customLogo1" src="">
+					<div id="player1Score" class="fadeInElm">0</div>
+				</div>
 		  </div>
-		  
-		  <!-- Race info in center -->
-		  <div id="raceInfo" class="noShow fadeInElm"></div>
 		  
 		  <!-- Player 2 section -->
 		  <div class="player-container right">
-			<div class="score-logo-container">
-				<div id="player2Score" class="fadeInElm">0</div>
-				<img class="fadeOutElm customLogo2" id="customLogo2" src="">
-			</div>
-			<div id="player2Name" class="fadeInElm">
-				<span>Player 2</span>
-			</div>
-			<div class="ext-image-container">
-				<div id="player2Image" class="fadeOutElm"></div>
-				<div id="p2ExtIcon" class="fadeInElm">Ex</div>
-			</div>
+				<div class="score-logo-container">
+					<div id="player2Score" class="fadeInElm">0</div>
+					<img class="fadeOutElm customLogo2" id="customLogo2" src="">
+				</div>
+				<div id="player2Name" class="fadeInElm">
+					<span>Player 2</span>
+				</div>
+				<div class="score-ball-container noShow" id="scoreBallContainerP2">
+					<img class="" id="currentBallP2" src="common/images/1ball_small.png">
+				</div>
+				<div class="ext-image-container">
+					<div id="player2Image" class="fadeOutElm"></div>
+					<div id="p2ExtIcon" class="fadeInElm">Ex</div>
+				</div>
 		  </div>
 		</div>
 	  </div>

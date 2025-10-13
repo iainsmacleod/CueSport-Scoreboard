@@ -51,12 +51,16 @@ const handlers = {
     ballTracker(data) {
         console.log('Ball tracker value:', data.ballTracker);
         if (data.ballTracker === "vertical") {
-            document.getElementById("ballTracker").style.display = "flex";
-            document.getElementById("ballTracker").style.flexDirection = "column";
+            document.getElementById("ballTrackerWorld").style.display = "flex";
+            document.getElementById("ballTrackerWorld").style.flexDirection = "column";
+            document.getElementById("ballTrackerInternational").style.display = "flex";
+            document.getElementById("ballTrackerInternational").style.flexDirection = "column";
             console.log('Changed ball tracker direction to vertical');
         } else if (data.ballTracker === "horizontal") {
-            document.getElementById("ballTracker").style.display = "flex";
-            document.getElementById("ballTracker").style.flexDirection = "row";
+            document.getElementById("ballTrackerWorld").style.display = "flex";
+            document.getElementById("ballTrackerWorld").style.flexDirection = "row";
+            document.getElementById("ballTrackerInternational").style.display = "flex";
+            document.getElementById("ballTrackerInternational").style.flexDirection = "row";            
             console.log('Changed ball tracker direction to horizontal');
         }
     },
@@ -76,7 +80,7 @@ const handlers = {
 
     opacity(data) {
         console.log(`Opacity setting: ${data.opacity}`);
-        const elements = ["scoreBoardDiv", "gameInfo", "ballTracker"];
+        const elements = ["scoreBoardDiv", "gameInfo", "ballTrackerWorld", "ballTrackerInternational" , "raceInfo" ];
         elements.forEach(id => {
             document.getElementById(id).style.opacity = data.opacity;
         });
@@ -98,11 +102,16 @@ const handlers = {
             document.getElementById("customLogo1").classList.remove("customLogoWide1");
             document.getElementById("customLogo2").classList.remove("customLogoWide2");
         } else {
-            // if (getStorageItem("scoreDisplay") === "yes") {
-                document.getElementById("raceInfo").classList.remove("noShow");
-                document.getElementById("raceInfo").classList.add("fadeInElm");
-                document.getElementById("raceInfo").innerHTML = "(" + data.race + ")";
-            // }
+            document.getElementById("raceInfo").classList.remove("noShow");
+            document.getElementById("raceInfo").classList.add("fadeInElm");
+            var raceTxt = getStorageItem("raceInfo");
+            console.log(typeof getStorageItem("raceInfo"));
+            console.log("a " + getStorageItem("raceInfo"));
+            if (!Number.isNaN(raceTxt)) { //It is a number only value
+                document.getElementById("raceInfo").innerHTML = "" + getStorageItem("raceInfo");
+            } else { // It has Alphanumeric Charachers
+                document.getElementById("raceInfo").innerHTML = getStorageItem("raceInfo");
+            }
             document.getElementById("customLogo1").classList.add("customLogoWide1");
             document.getElementById("customLogo2").classList.add("customLogoWide2");
         }
@@ -110,13 +119,13 @@ const handlers = {
 
     game(data) {
         console.log("Game info: " + data.game);
-        if (data.game == "") {
-            document.getElementById("gameInfo").classList.add("noShow");
-            document.getElementById("gameInfo").classList.remove("fadeInElm");
-        } else {
+        if (data.game != "") {
             document.getElementById("gameInfo").classList.remove("noShow");
             document.getElementById("gameInfo").classList.add("fadeInElm");
             document.getElementById("gameInfo").innerHTML = data.game;
+        } else {
+            document.getElementById("gameInfo").classList.add("noShow");
+            document.getElementById("gameInfo").classList.remove("fadeInElm");        
         }
     },
 
@@ -199,7 +208,13 @@ const handlers = {
             }
 
 			if (getStorageItem("enableBallTracker") === "true"){
-				document.getElementById("ballTracker").classList.remove("noShow");
+                if (getStorageItem("ballType") === "World"){
+                    document.getElementById("ballTrackerWorld").classList.remove("noShow");
+                    document.getElementById("ballTrackerInternational").classList.add("noShow");
+                } else {
+                    document.getElementById("ballTrackerInternational").classList.remove("noShow");
+                    document.getElementById("ballTrackerWorld").classList.add("noShow");
+                }
 			}
 
             showPlayer(data.playerNumber);
@@ -227,7 +242,9 @@ const handlers = {
             document.getElementById("player1Image").classList.replace("fadeInElm", "fadeOutElm");
             document.getElementById("player2Image").classList.replace("fadeInElm", "fadeOutElm");
             document.getElementById("customLogo"+ data.playerNumber).classList.replace("fadeInElm", "fadeOutElm");
-			document.getElementById("ballTracker").classList.add("noShow");
+			document.getElementById("ballTrackerWorld").classList.add("noShow");
+            document.getElementById("ballTrackerInternational").classList.add("noShow");
+            
         };
     },
 
@@ -347,29 +364,33 @@ const handlers = {
         if (elementToToggle) {
             // Toggle the 'faded' class on this 
             elementToToggle.classList.remove('faded');
-            console.log('Removed faded class from', elementId, 'on browser_source.html');
+            //console.log('Removed faded class from', elementId, 'on browser_source.html');
         } else {
-            console.log('Element with id', elementId, 'not found on browser_source.html');
+            //console.log('Element with id', elementId, 'not found on browser_source.html');
         }
     },
 
     displayBallTracker(data) {
-        const ballTracker = document.getElementById("ballTracker");
-        if (!ballTracker) {
-            console.warn('Ball tracker element not found in DOM');
-            return;
-        }
-        
+       
+        console.log(data);
         if (data.displayBallTracker === true) {
-            ballTracker.classList.remove("noShow");
-            console.log('Show ball tracker');
-        } else if (data.displayBallTracker === false) {
-            ballTracker.classList.add("noShow");
+            if (data.ballTrackerType === "World"){
+                ballTrackerWorld.classList.remove("noShow");
+                ballTrackerInternational.classList.add("noShow");
+                console.log('Show ball tracker World');
+            } else if (data.ballTrackerType === "International"){
+                ballTrackerInternational.classList.remove("noShow");
+                ballTrackerWorld.classList.add("noShow");
+                console.log('Show ball tracker Internatoinal');
+            }
+        } else {
+            ballTrackerWorld.classList.add("noShow");
+            ballTrackerInternational.classList.add("noShow");
             console.log('Hide ball tracker');
         }
     },
-
-    gameType(data) {
+    
+	gameType(data) {
         console.log('Game type value:', data.gameType);
         if (data.gameType === "game2") {
             // 9-ball
@@ -390,11 +411,60 @@ const handlers = {
         }
     },
 
-    ballSelection(data) {
-        console.log('Ball selection value:', data.ballSelection);
-        updateBallImages(data.ballSelection);
+    ballType(data) {
+        console.log('Ball type changed to:', data.ballType);
+        setStorageItem("ballType", data.ballType);
+        
+        // Update current ball display if ball set is active
+        const currentBallSet = getStorageItem("playerBallSet");
+        if (currentBallSet && currentBallSet !== "p1Open") {
+            // Re-apply the current ball set with the new ball type
+            this.playerBallSet({ playerBallSet: currentBallSet });
+        }
+    },
+
+    playerBallSet(data) {
+        console.log('Player ball set value:', data.playerBallSet);
+        var ballType= getStorageItem("ballType");
+        var p1 = document.getElementById("currentBallP1");
+        var p2 = document.getElementById("currentBallP2");
+        console.log(p1);
+        console.log(p2);
+        if (data.playerBallSet === "p1red/smalls") {
+            if (ballType === "World"){
+                document.getElementById("currentBallP1").src = "common/images/1ball_small.png";
+                document.getElementById("currentBallP1").classList.remove("noShow");
+                document.getElementById("scoreBallContainerP1").classList.remove("noShow"); // ADD THIS LINE
+                document.getElementById("currentBallP2").src = "common/images/15ball_small.png";
+                document.getElementById("currentBallP2").classList.remove("noShow");
+                document.getElementById("scoreBallContainerP2").classList.remove("noShow"); // ADD THIS LINE
+            } else {
+                document.getElementById("currentBallP1").src = "common/images/red-international-small-ball.png";
+                document.getElementById("currentBallP1").classList.remove("noShow");
+                document.getElementById("scoreBallContainerP1").classList.remove("noShow"); // ADD THIS LINE
+                document.getElementById("currentBallP2").src = "common/images/yellow-international-small-ball.png";
+                document.getElementById("currentBallP2").classList.remove("noShow");
+                document.getElementById("scoreBallContainerP2").classList.remove("noShow"); // ADD THIS LINE
+            }
+        } else if (data.playerBallSet === "p1yellow/bigs") {
+            if (ballType === "World"){
+                document.getElementById("currentBallP1").src = "common/images/15ball_small.png";
+                document.getElementById("scoreBallContainerP1").classList.remove("noShow");
+                document.getElementById("currentBallP2").src = "common/images/1ball_small.png";
+                document.getElementById("scoreBallContainerP2").classList.remove("noShow");
+            } else {
+                document.getElementById("currentBallP1").src = "common/images/yellow-international-small-ball.png";
+                document.getElementById("scoreBallContainerP1").classList.remove("noShow");
+                document.getElementById("currentBallP2").src = "common/images/red-international-small-ball.png";
+                document.getElementById("scoreBallContainerP2").classList.remove("noShow");;
+            }
+        } else if (data.playerBallSet === "p1Open") {
+                document.getElementById("scoreBallContainerP1").classList.add("noShow");
+                document.getElementById("scoreBallContainerP2").classList.add("noShow");
+        }
     }
 };
+
 
 // Main event handler
 bc.onmessage = (event) => {
@@ -417,7 +487,8 @@ $(document).ready(function() {
     $("#scoreBoard").draggable();
     $("#gameInfo").draggable();
     $("#logoSlideshowDiv").draggable();
-	$("#ballTracker").draggable();
+	$("#ballTrackerWorld").draggable();
+	$("#ballTrackerInternational").draggable();
 
 });
 
@@ -438,14 +509,14 @@ if (getStorageItem("activePlayer") === null) {
 setCustomLogo("customLogo1", "useCustomLogo", "usePlayer1");
 setCustomLogo("customLogo2", "useCustomLogo2", "usePlayer2");
 
-if (getStorageItem("gameType") === "game3"){
+if (getStorageItem("gameType") === "game2"){
 	document.getElementById("ball 10").classList.add("noShow");
 	document.getElementById("ball 11").classList.add("noShow");
 	document.getElementById("ball 12").classList.add("noShow");
 	document.getElementById("ball 13").classList.add("noShow");
 	document.getElementById("ball 14").classList.add("noShow");
 	document.getElementById("ball 15").classList.add("noShow");
-} else if (getStorageItem("gameType") === "game4"){
+} else if (getStorageItem("gameType") === "game3"){
 	document.getElementById("ball 10").classList.remove("noShow");
 	document.getElementById("ball 11").classList.add("noShow");
 	document.getElementById("ball 12").classList.add("noShow");
@@ -469,19 +540,10 @@ if (getStorageItem("slideShow") == "yes") {
 	document.getElementById("logoSlideshowDiv").classList.replace("fadeOutElm", "fadeInElm");
 }
 
-if (getStorageItem("p1NameCtrlPanel") != "" || getStorageItem("p1NameCtrlPanel") != null) {
-	document.getElementById("player1Name").innerHTML = getStorageItem("p1NameCtrlPanel");
-}
-if (getStorageItem("p1NameCtrlPanel") == "" || getStorageItem("p1NameCtrlPanel") == null) {
-	document.getElementById("player1Name").innerHTML = "Player 1";
-}
 
-if (getStorageItem("p2NameCtrlPanel") != "" || getStorageItem("p2NameCtrlPanel") != null) {
-	document.getElementById("player2Name").innerHTML = getStorageItem("p2NameCtrlPanel");
-}
-if (getStorageItem("p2NameCtrlPanel") == "" || getStorageItem("p2NameCtrlPanel") == null) {
-	document.getElementById("player2Name").innerHTML = "Player 2";
-}
+// Defaukt Player 1 and Player 2 names
+document.getElementById("player1Name").innerHTML = getStorageItem("p1NameCtrlPanel") || "Player 1";
+document.getElementById("player2Name").innerHTML = getStorageItem("p2NameCtrlPanel") || "Player 2";
 
 // Code to assist with displaying active player image when only two players are enabled, on reload.
 const player1Enabled = getStorageItem("usePlayer1") === "yes";
@@ -535,31 +597,34 @@ if (bothPlayersEnabled && playerToggleEnabled) {
     document.getElementById("player2Image").classList.add("fadeOutElm");
 }
 
-if (getStorageItem("p1ScoreCtrlPanel") != null) {
-	document.getElementById("player1Score").innerHTML = getStorageItem("p1ScoreCtrlPanel");
+const gameInfo = getStorageItem("gameInfo");
+if (gameInfo && gameInfo.trim() !== "") {
+    document.getElementById("gameInfo").classList.remove("noShow");
+    document.getElementById("gameInfo").classList.add("fadeInElm");
+    document.getElementById("gameInfo").innerHTML = gameInfo;
 } else {
-	document.getElementById("player1Score").innerHTML = 0;
+    document.getElementById("gameInfo").classList.add("noShow");
+    document.getElementById("gameInfo").classList.remove("fadeInElm");
 }
 
-if (getStorageItem("p2ScoreCtrlPanel") != null) {
-	document.getElementById("player2Score").innerHTML = getStorageItem("p2ScoreCtrlPanel");
-} else {
-	document.getElementById("player2Score").innerHTML = 0;
-}
-
-if (getStorageItem("gameInfo") != "" && getStorageItem("gameInfo") != null) {
-	document.getElementById("gameInfo").classList.remove("noShow");
-}
 
 if (getStorageItem("raceInfo") != "" && getStorageItem("raceInfo") != null && bothPlayersEnabled && getStorageItem("scoreDisplay") === "yes") {
 	document.getElementById("raceInfo").classList.remove("noShow");
 	document.getElementById("raceInfo").classList.add("fadeInElm");
+    var racenNum = parseInt(getStorageItem("raceInfo"));
+    console.log(typeof racenNum);
+    if (typeof racenNum === "number") { //It is a number only value
+        document.getElementById("raceInfo").innerHTML = "" + getStorageItem("raceInfo");
+    } else { // It has Alphanumeric Charachers
+        document.getElementById("raceInfo").innerHTML = getStorageItem("raceInfo");
+    }
+    
 	document.getElementById("customLogo1").classList.add("customLogoWide1");
 	document.getElementById("customLogo2").classList.add("customLogoWide2");
 }
 
-document.getElementById("gameInfo").innerHTML = getStorageItem("gameInfo");
-document.getElementById("raceInfo").innerHTML = "(" + getStorageItem("raceInfo") + ")";
+
+
 
 function updateIconsVisibility(show) {
     const action = show ? "fadeInElm" : "fadeOutElm";
@@ -596,21 +661,37 @@ if (getStorageItem('p2colorSet') != "") {
 }
 
 if (getStorageItem("enableBallTracker") === "false" || getStorageItem("enableBallTracker") === null){
-	document.getElementById("ballTracker").classList.add("noShow");
+    if (getStorageItem("ballType") === "World"){
+        document.getElementById("ballTrackerWorld").classList.add("noShow");
+    } else {
+        document.getElementById("ballTrackerInternational").classList.add("noShow");
+    }
 	console.log(`Ball tracker disabled on overlay`);
 } else {
-	document.getElementById("ballTracker").classList.remove("noShow");
+    if (getStorageItem("ballType") === "World"){
+        document.getElementById("ballTrackerWorld").classList.remove("noShow");
+    } else {
+        document.getElementById("ballTrackerInternational").classList.remove("noShow");
+    }
 	console.log(`Ball tracker enabled on overlay`);
 }
 
 // On browser_source.html load, check stored direction and apply it
 const initializeBallTracker = () => {
     const direction = getStorageItem("ballTrackerDirection") || "vertical";
-    const ballTracker = document.getElementById("ballTracker");
-    
+    const ballType = getStorageItem("ballType");
+    var ballTracker = null;
+    if (ballType === "World"){
+        ballTracker = document.getElementById("ballTrackerWorld");
+    } else {
+        ballTracker = document.getElementById("ballTrackerInternational");
+    }    
+
     if (ballTracker) {
-        ballTracker.style.display = "flex";
-        ballTracker.style.flexDirection = direction === "vertical" ? "column" : "row";
+        ballTrackerWorld.style.display = "flex";
+        ballTrackerWorld.style.flexDirection = direction === "vertical" ? "column" : "row";
+        ballTrackerInternational.style.display = "flex";
+        ballTrackerInternational.style.flexDirection = direction === "vertical" ? "column" : "row";        
         console.log(`Ball tracker initialized from stored value: ${direction}`);
     }
 };
@@ -630,16 +711,6 @@ if (getStorageItem("ballTrackerDirection") === null) {
 let slideIndex = 0;
 showSlides();
 applySavedBallStates();
-
-// Initialize ball selection on page load
-const initializeBallSelection = () => {
-    const selection = getStorageItem("ballSelection") || "american";
-    updateBallImages(selection);
-    console.log(`Ball selection initialized to: ${selection}`);
-};
-
-// Run ball selection initialization
-initializeBallSelection();
 
 // Functions
 
@@ -693,5 +764,46 @@ function initializeBrowserSourceExtensionStatus() {
             p2ExtIcon.style.backgroundColor = "";
             p2ExtIcon.style.color = "";
         }
+    }
+
+    // Initialize ball set selection from storage on page load
+    const savedBallSet = getStorageItem("playerBallSet");
+    if (savedBallSet && savedBallSet !== "p1Open") {
+        // Apply the saved ball set selection
+        const ballType = getStorageItem("ballType");
+        
+        if (savedBallSet === "p1red/smalls") {
+            if (ballType === "World"){
+                document.getElementById("currentBallP1").src = "common/images/1ball_small.png";
+                document.getElementById("currentBallP1").classList.remove("noShow");
+                document.getElementById("scoreBallContainerP1").classList.remove("noShow");
+                document.getElementById("currentBallP2").src = "common/images/15ball_small.png";
+                document.getElementById("currentBallP2").classList.remove("noShow");
+                document.getElementById("scoreBallContainerP2").classList.remove("noShow");
+            } else {
+                document.getElementById("currentBallP1").src = "common/images/red-international-small-ball.png";
+                document.getElementById("currentBallP1").classList.remove("noShow");
+                document.getElementById("scoreBallContainerP1").classList.remove("noShow");
+                document.getElementById("currentBallP2").src = "common/images/yellow-international-small-ball.png";
+                document.getElementById("currentBallP2").classList.remove("noShow");
+                document.getElementById("scoreBallContainerP2").classList.remove("noShow");
+            }
+        } else if (savedBallSet === "p1yellow/bigs") {
+            if (ballType === "World"){
+                document.getElementById("currentBallP1").src = "common/images/15ball_small.png";
+                document.getElementById("scoreBallContainerP1").classList.remove("noShow");
+                document.getElementById("currentBallP2").src = "common/images/1ball_small.png";
+                document.getElementById("scoreBallContainerP2").classList.remove("noShow");
+            } else {
+                document.getElementById("currentBallP1").src = "common/images/yellow-international-small-ball.png";
+                document.getElementById("scoreBallContainerP1").classList.remove("noShow");
+                document.getElementById("currentBallP2").src = "common/images/red-international-small-ball.png";
+                document.getElementById("scoreBallContainerP2").classList.remove("noShow");
+            }
+        }
+    } else {
+        // Default to "Open Table" - ensure containers are hidden
+        document.getElementById("scoreBallContainerP1").classList.add("noShow");
+        document.getElementById("scoreBallContainerP2").classList.add("noShow");
     }
 }

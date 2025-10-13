@@ -370,26 +370,30 @@ function applySavedBallStates() {
 // }
 
 function playWebmAnimation(gameType, containerSelector = '#videoContainer') {
-	// Determine which video URL to use based on the gameType value and ball selection.
+	// Determine which video URL to use based on the gameType value.
     let videoUrl;
-    const ballSelection = getStorageItem("ballSelection") || "american";
-    
-    switch (gameType) {
-        case 'game1':
-            // Use different default animations based on ball style
-            videoUrl = ballSelection === "international" ? './common/video/international8ballwin.webm' : './common/video/defaultanimation.webm';
-            break;
-        case 'game2':
-            videoUrl = './common/video/9ballwin.webm';
-            break;
-        case 'game3':
-            videoUrl = './common/video/10ballwin.webm';
-            break;
-        // Add more cases as needed
-        default:
-            // Use different default animations based on ball style
-            videoUrl = ballSelection === "international" ? './common/video/international8ballwin.webm' : './common/video/defaultanimation.webm';
-            break;
+    const ballType = getStorageItem("ballType");
+
+    // If ball type is International, use international8ballwin.webm regardless of game type
+    if (ballType === "International") {
+        videoUrl = './common/video/international8ballwin.webm';
+    } else {
+        // Use game-specific videos for World ball type
+        switch (gameType) {
+            case 'game1':
+                videoUrl = './common/video/defaultanimation.webm';
+                break;
+            case 'game2':
+                videoUrl = './common/video/9ballwin.webm';
+                break;
+            case 'game3':
+                videoUrl = './common/video/10ballwin.webm';
+                break;
+            // Add more cases as needed
+            default:
+                videoUrl = './common/video/defaultanimation.webm';
+                break;
+        }
     }
 
     // Get the container element where the video will be appended.
@@ -428,40 +432,6 @@ function playWebmAnimation(gameType, containerSelector = '#videoContainer') {
     
     // Return the video element for further manipulation if needed.
     return video;
-}
-
-function updateBallImages(selection) {
-    console.log(`Updating ball images to: ${selection}`);
-    
-    // Update all ball images
-    for (let i = 1; i <= 15; i++) {
-        const ballElement = document.getElementById(`ball ${i}`);
-        if (ballElement) {
-            const img = ballElement.querySelector('img');
-            if (img) {
-                let imageSrc;
-                
-                if (selection === "international") {
-                    // International ball naming convention
-                    if (i >= 1 && i <= 7) {
-                        imageSrc = `./common/images/yellow-international-small-ball.png`;
-                    } else if (i >= 9 && i <= 15) {
-                        imageSrc = `./common/images/red-international-small-ball.png`;
-                    } else if (i === 8) {
-                        imageSrc = `./common/images/international-8-small-ball.png`;
-                    }
-                } else {
-                    // American ball naming convention (default)
-                    imageSrc = `./common/images/${i}ball_small.png`;
-                }
-                
-                img.src = imageSrc;
-            }
-        }
-    }
-    
-    // Store the selection for future reference
-    setStorageItem("ballSelection", selection);
 }
 
 function setStorageItem(key, value) {
