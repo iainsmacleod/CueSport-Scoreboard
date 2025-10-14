@@ -350,6 +350,7 @@ function toggleBallSelection() {
 	// }
 	// Update control panel ball images
 	updateControlPanelBallImages(newSelection);
+    ballType(newSelection);
     ballSetChange();
 }
 

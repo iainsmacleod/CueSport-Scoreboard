@@ -184,10 +184,6 @@ window.onload = function() {
 		document.getElementById("ballTracker").classList.remove("noShow");
 		document.getElementById("ballTrackerDirection").classList.remove("noShow");
 		document.getElementById("ballSelection").classList.remove("noShow");
-		// document.getElementById("ballTrackerLabel").classList.remove("noShow");
-		// Show ball style toggle button on load when enabled
-		// var bs = document.getElementById("ballSelection");
-		// if (bs) { bs.classList.remove("noShow"); }
 		console.log(`Ball tracker enabled`);
 		bc.postMessage({ displayBallTracker: true });
 	} else {
@@ -196,10 +192,6 @@ window.onload = function() {
 		document.getElementById("ballTracker").classList.add("noShow");
 		document.getElementById("ballTrackerDirection").classList.add("noShow");
 		document.getElementById("ballSelection").classList.add("noShow");
-		// document.getElementById("ballTrackerLabel").classList.add("noShow");		
-		// Hide ball style toggle button on load when disabled
-		// var bs2 = document.getElementById("ballSelection");
-		// if (bs2) { bs2.classList.add("noShow"); }
 		console.log(`Ball tracker disabled`);
 		bc.postMessage({ displayBallTracker: false });
 	}
@@ -235,7 +227,6 @@ window.onload = function() {
 	// Initialize the logo and extension status for each logo (players + slideshow logos) and player
 	initializeLogoStatus();
 	initializeExtensionButtonStatus();
-	console.log(`Print: ${INSTANCE_ID}`)
 };
 
 function initializeLogoStatus() {
