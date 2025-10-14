@@ -201,23 +201,23 @@ function ballType(value) {
 
 function useBallSetToggle() {
     var useBallSet = document.getElementById("ballSetCheckbox");
- var isChecked = useBallSet.checked;
- var storageValue = isChecked ? "yes" : "no";
- 
- console.log(`Use Ball Set Toggle ${isChecked}`);
- setStorageItem("useBallSet", storageValue);
- if (isChecked) {
-     document.getElementById("ballSet").style.display = 'flex';
-     document.getElementById("ballSetLabel").classList.remove("noShow");
- } else {
-     document.getElementById("ballSet").style.display = 'none';
-     document.getElementById("ballSetLabel").classList.add("noShow");
+    var isChecked = useBallSet.checked;
+    var storageValue = isChecked ? "yes" : "no";
+    
+    console.log(`Use Ball Set Toggle ${isChecked}`);
+    setStorageItem("useBallSet", storageValue);
+    if (isChecked) {
+        document.getElementById("ballSet").style.display = 'flex';
+        document.getElementById("ballSetLabel").classList.remove("noShow");
+    } else {
+        document.getElementById("ballSet").style.display = 'none';
+        document.getElementById("ballSetLabel").classList.add("noShow");
 
-     // Reset to "Open Table" and hide the ball images
-     document.getElementById('p1colorOpen').checked = true;
-     setStorageItem("playerBallSet", "p1Open");
-     bc.postMessage({ playerBallSet: "p1Open" });
- }
+        // Reset to "Open Table" and hide the ball images
+        document.getElementById('p1colorOpen').checked = true;
+        setStorageItem("playerBallSet", "p1Open");
+        bc.postMessage({ playerBallSet: "p1Open" });
+    }
 
 }
 
@@ -599,7 +599,6 @@ function playerSetting(player) {
         ballTrackerCheckbox.disabled = true;
         ballTrackerCheckbox.checked = false;
         setStorageItem("enableBallTracker", "no");
-		setStorageItem("ballSelection", "american");
 
         // Hide related elements
         document.getElementById("clockInfo").classList.add("noShow");
@@ -609,10 +608,10 @@ function playerSetting(player) {
         document.getElementById("playerToggleLabel").classList.add("noShow");
         document.getElementById("ballTrackerDirectionDiv").classList.add("noShow");
         document.getElementById("ballTrackerDirection").classList.add("noShow");
-		//document.getElementById("ballTrackerSelection").classList.add("noShow");
         document.getElementById("ballTrackerLabel").classList.add("noShow");
         document.getElementById("ballTrackerDiv").classList.add("noShow");
-        document.getElementById("ballTracker").classList.add("noShow");
+		document.getElementById("internationalBallTracker").classList.add("noShow");
+		document.getElementById("worldBallTracker").classList.add("noShow");
 
         // Send messages to hide these features
         bc.postMessage({ clockDisplay: 'noClock' });
@@ -696,6 +695,22 @@ function clockDisplay(opt3) {
 		document.getElementById("shotClockShow").style.background = "none";
 		document.getElementById("shotClockShow").style.color = "lightgrey";
 	}
+}
+
+function clearGame() {
+	console.log('Clearing Match Data');
+	document.getElementById("raceInfoTxt").value = "";
+	document.getElementById("gameInfoTxt").value = "";
+	document.getElementById("p1Name").value = "";
+	document.getElementById("p2Name").value = "";
+	setStorageItem("p1NameCtrlPanel", "");
+	setStorageItem("p2NameCtrlPanel", "");	
+	setStorageItem("raceInfo", "");
+	setStorageItem("gameInfo", "");
+	resetBallSet();
+	postNames();
+	pushScores();
+	postInfo();	
 }
 
 function postNames() {
@@ -800,6 +815,7 @@ function postScore(opt1, player) {
             document.getElementById("p"+player+"Score").value = p2ScoreValue;
         }
     }
+    resetBallSet();
 	resetBallTracker()
 }
 
@@ -1184,8 +1200,15 @@ function resetScores() {
 		resetExt('p1', 'noflash');
 		resetExt('p2', 'noflash');
 		resetBallTracker();
+        resetBallSet();
 	} else { }
 }
+
+function resetBallSet() {
+	setStorageItem("playerBallSet", "p1Open");
+	document.getElementById('p1colorOpen').checked = true;
+	bc.postMessage({ playerBallSet: "p1Open" });
+}	
 
 function resetBallTracker() {
     // Retrieve the saved ball state from localStorage

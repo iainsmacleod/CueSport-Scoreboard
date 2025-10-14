@@ -138,6 +138,35 @@ window.onload = function() {
 		document.getElementById("gameType").value = getStorageItem("gameType");
 	}
 
+	if (getStorageItem("ballType") === null) {
+		setStorageItem("ballType", "World");
+		document.getElementById("ballType").value = getStorageItem("ballType");
+	} else {
+		document.getElementById("ballType").value = getStorageItem("ballType");
+	}
+	console.log("Ball type: " + getStorageItem("ballType"));
+
+	// Update label text based on initial ball type
+	const redLabel = document.querySelector('label[for="p1colorRed"]');
+	if (redLabel) {
+		const currentBallType = getStorageItem("ballType");
+		if (currentBallType === "World") {
+			redLabel.textContent = "Smalls/Lows/Solids";
+		} else {
+			redLabel.textContent = "Red";
+		}
+	}
+
+	const yellowLabel = document.querySelector('label[for="p1colorYellow"]');
+	if (yellowLabel) {
+		const currentBallType = getStorageItem("ballType");
+		if (currentBallType === "World") {
+			yellowLabel.textContent = "Bigs/Highs/Stripes";
+		} else {
+			yellowLabel.textContent = "Yellow";
+		}
+	}
+
 	var savedOpacity = getStorageItem('overlayOpacity');
 	if (savedOpacity) {
 		document.getElementById('scoreOpacity').value = savedOpacity;
