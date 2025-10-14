@@ -138,19 +138,19 @@ window.onload = function() {
 		document.getElementById("gameType").value = getStorageItem("gameType");
 	}
 
-	if (getStorageItem("ballType") === null) {
-		setStorageItem("ballType", "World");
-		document.getElementById("ballType").value = getStorageItem("ballType");
+	if (getStorageItem("ballSelection") === null) {
+		setStorageItem("ballSelection", "american");
+		document.getElementById("ballSelection").value = getStorageItem("ballSelection");
 	} else {
-		document.getElementById("ballType").value = getStorageItem("ballType");
+		document.getElementById("ballSelection").value = getStorageItem("ballSelection");
 	}
-	console.log("Ball type: " + getStorageItem("ballType"));
+	console.log("Ball type: " + getStorageItem("ballSelection"));
 
 	// Update label text based on initial ball type
 	const redLabel = document.querySelector('label[for="p1colorRed"]');
 	if (redLabel) {
-		const currentBallType = getStorageItem("ballType");
-		if (currentBallType === "World") {
+		const currentBallType = getStorageItem("ballSelection");
+		if (currentBallType === "american") {
 			redLabel.textContent = "Smalls/Lows/Solids";
 		} else {
 			redLabel.textContent = "Red";
@@ -159,8 +159,8 @@ window.onload = function() {
 
 	const yellowLabel = document.querySelector('label[for="p1colorYellow"]');
 	if (yellowLabel) {
-		const currentBallType = getStorageItem("ballType");
-		if (currentBallType === "World") {
+		const currentBallType = getStorageItem("ballSelection");
+		if (currentBallType === "american") {
 			yellowLabel.textContent = "Bigs/Highs/Stripes";
 		} else {
 			yellowLabel.textContent = "Yellow";
@@ -181,29 +181,27 @@ window.onload = function() {
 
 	if (getStorageItem("enableBallTracker") === "true"){
 		document.getElementById("ballTrackerCheckbox").checked = true;
-		if (getStorageItem("ballType") === "World"){
-			document.getElementById("worldBallTracker").classList.remove("noShow");
-			document.getElementById("internationalBallTracker").classList.add("noShow");
-		} else {
-			document.getElementById("internationalBallTracker").classList.remove("noShow");
-			document.getElementById("worldBallTracker").classList.add("noShow");
-		}
+		document.getElementById("ballTracker").classList.remove("noShow");
 		document.getElementById("ballTrackerDirection").classList.remove("noShow");
-		document.getElementById("ballTrackerLabel").classList.remove("noShow");
-		document.getElementById("ballTypeDiv").classList.remove("noShow");
-		document.getElementById("ballSetDiv").classList.remove("noShow");
+		document.getElementById("ballSelection").classList.remove("noShow");
+		// document.getElementById("ballTrackerLabel").classList.remove("noShow");
+		// Show ball style toggle button on load when enabled
+		// var bs = document.getElementById("ballSelection");
+		// if (bs) { bs.classList.remove("noShow"); }
 		console.log(`Ball tracker enabled`);
 		bc.postMessage({ displayBallTracker: true });
 	} else {
 		document.getElementById("ballTrackerCheckbox").checked = false;
 		setStorageItem("enableBallTracker", "false");
-		document.getElementById("worldBallTracker").classList.add("noShow");
-		document.getElementById("internationalBallTracker").classList.add("noShow");
+		document.getElementById("ballTracker").classList.add("noShow");
 		document.getElementById("ballTrackerDirection").classList.add("noShow");
-		document.getElementById("ballTrackerLabel").classList.add("noShow");		
-		document.getElementById("ballTypeDiv").classList.add("noShow");
-		document.getElementById("ballSetDiv").classList.add("noShow");
+		document.getElementById("ballSelection").classList.add("noShow");
+		// document.getElementById("ballTrackerLabel").classList.add("noShow");		
+		// Hide ball style toggle button on load when disabled
+		// var bs2 = document.getElementById("ballSelection");
+		// if (bs2) { bs2.classList.add("noShow"); }
 		console.log(`Ball tracker disabled`);
+		bc.postMessage({ displayBallTracker: false });
 	}
 
 	if (getStorageItem("ballTrackerDirection") === null) {
@@ -211,8 +209,6 @@ window.onload = function() {
 		setStorageItem("ballTrackerDirection", "vertical");
 		setStorageItem("ballSelection", "american");
 		document.getElementById("ballTrackerDirection").innerHTML = "Vertical Ball Tracker";
-		var bsTxt = document.getElementById("ballSelection");
-		if (bsTxt) { bsTxt.innerHTML = "American Balls"; }
 		bc.postMessage({ ballTracker: "vertical" });
 		bc.postMessage({ ballSelection: "american" });
 		console.log(`Ball tracker initialized vertical`);
@@ -222,8 +218,6 @@ window.onload = function() {
 		const direction = getStorageItem("ballTrackerDirection");
 		document.getElementById("ballTrackerDirection").innerHTML = direction === "vertical" ? "Vertical Ball Tracker" : "Horizontal Ball Tracker";
 		const selection = getStorageItem("ballSelection");
-		var bsTxt2 = document.getElementById("ballSelection");
-		if (bsTxt2) { bsTxt2.innerHTML = selection === "american" ? "American Balls" : "International Balls"; }
 		bc.postMessage({ ballSelection: selection });
 		bc.postMessage({ ballTracker: direction });
 		console.log(`Ball tracker initialized ${direction}`);

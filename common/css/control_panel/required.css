@@ -171,7 +171,7 @@ input[type="number"]::-webkit-outer-spin-button {
 	padding: 0 5px 0 5px;
 }
 
-#ballTrackerDirection, #ballSelection{
+#ballTrackerDirection {
 	cursor: pointer;
 	width: auto;
 	font-size: 10pt;
@@ -217,7 +217,6 @@ input[type="number"]::-webkit-outer-spin-button {
 
 #resetDataBtn,
 #ballTrackerDirection,
-#ballSelection,
 #resetBtn,
 #uploadCustomLogo,
 #uploadCustomLogo2,
@@ -244,7 +243,6 @@ input[type="number"]::-webkit-outer-spin-button {
 
 #resetDataBtn:hover,
 #ballTrackerDirection:hover,
-#ballSelection:hover,
 #resetBtn:hover,
 #uploadCustomLogo:hover,
 #uploadCustomLogo2:hover,
@@ -295,7 +293,7 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 #obsTheme{
-	width: 86px;
+	width: 89px;
 }
 
 #logoSlideShowDiv { 

@@ -15,22 +15,6 @@
 // functions
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////			
 
-// function bsStyleChange() {
-// 	if (document.getElementById("bsStyle").value == 1) {
-// 		bc.postMessage({ clockDisplay: 'style125' });
-// 		setStorageItem("b_style", 1);
-// 	}
-// 	if (document.getElementById("bsStyle").value == 2) {
-// 		bc.postMessage({ clockDisplay: 'style150' });
-// 		setStorageItem("b_style", 2);
-// 	}
-// 	if (document.getElementById("bsStyle").value == 3) {
-// 		bc.postMessage({ clockDisplay: 'style200' });
-// 		setStorageItem("b_style", 3);
-// 	}
-// }
-
-
 function updateTabVisibility() {
     // Get the state of the player settings
     const player1Enabled = document.getElementById("usePlayer1Setting").checked;
@@ -108,11 +92,36 @@ function gameType(value) {
     if (getStorageItem("gameType") === "game2" || getStorageItem("gameType") === "game3") { // 9-Ball or 10-Ball
         document.getElementById("ballTypeDiv").classList.add("noShow");
         // Reset to International when hidden
-        setStorageItem("ballType", "World");
-        document.getElementById("ballType").value = "World";
-        ballType("World"); // Call the ballType function to update the display
+        setStorageItem("ballSelection", "american");
+        document.getElementById("ballSelection").value = "american";
+        ballType("american"); // Call the ballType function to update the display
     } else {
         document.getElementById("ballTypeDiv").classList.remove("noShow");
+    }
+
+    // Disable and hide ball set toggle for non-8-ball games
+    if (getStorageItem("gameType") !== "game1") { // Not 8-Ball
+        // Disable and hide the ball set toggle checkbox
+        document.getElementById("ballSetCheckbox").disabled = true;
+        document.getElementById("ballSetCheckbox").checked = false;
+        setStorageItem("useBallSet", "no");
+        
+        // Hide ball set controls and reset to "Open Table"
+        document.getElementById("ballSet").style.display = 'none';
+        document.getElementById("ballSetLabel").classList.add("noShow");
+        document.getElementById("ballSetDiv").classList.add("noShow");
+        document.getElementById('p1colorOpen').checked = true;
+        setStorageItem("playerBallSet", "p1Open");
+        bc.postMessage({ playerBallSet: "p1Open" });
+        
+        console.log("Ball set toggle disabled and hidden for non-8-ball game");
+    } else {
+        // Re-enable and show ball set toggle for 8-ball (if ball tracker is also enabled)
+        const ballTrackerEnabled = document.getElementById("ballTrackerCheckbox").checked;
+        if (ballTrackerEnabled) {
+            document.getElementById("ballSetCheckbox").disabled = false;
+            document.getElementById("ballSetDiv").classList.remove("noShow");
+        }
     }
 
 	if (getStorageItem("gameType") === "game2"){
@@ -140,40 +149,30 @@ function gameType(value) {
 	bc.postMessage({ gameType: value });
 	resetBallTracker();
 
-	// Update Ball Style toggle visibility based on selected game
-	var bs = document.getElementById("ballSelection");
-	if (bs) {
-		bs.classList[(value === "game1" && document.getElementById("ballTrackerCheckbox").checked) ? "remove" : "add"]("noShow");
-	}
-
 	// Reset ball style to American when switching away from 8-ball (game1)
-	if (value !== "game1") {
+	if (value  === "game2" || value === "game3") {
 		setStorageItem("ballSelection", "american");
 		bc.postMessage({ ballSelection: "american" });
 		updateControlPanelBallImages("american");
-		// Update button label
-		if (bs) {
-			bs.innerHTML = "American Balls";
-		}
 		console.log("Ball style reset to American for non-8-ball game");
 	}
 }
 
 function ballType(value) {
-	setStorageItem("ballType", value);
+	setStorageItem("ballSelection", value);
 
 	// Update the label text based on ball type
     const redLabel = document.querySelector('label[for="p1colorRed"]');
 	const yellowLabel = document.querySelector('label[for="p1colorYellow"]');
     if (redLabel) {
-        if (value === "World") {
+        if (value === "american") {
             redLabel.textContent = "Smalls/Lows/Solids";
         } else {
             redLabel.textContent = "Red";
         }
     }
 	if (yellowLabel) {
-        if (value === "World") {
+        if (value === "american") {
             yellowLabel.textContent = "Bigs/Highs/Stripes";
         } else {
             yellowLabel.textContent = "Yellow";
@@ -184,22 +183,23 @@ function ballType(value) {
 	bc.postMessage({ ballType: value });
 
 	if (document.getElementById("ballTrackerCheckbox").checked) {
-		bc.postMessage({ displayBallTracker: true, ballTrackerType: getStorageItem("ballType") });
+		bc.postMessage({ displayBallTracker: true, ballTrackerType: getStorageItem("ballSelection") });
 	}	else {
-		bc.postMessage({ displayBallTracker: false, ballTrackerType: getStorageItem("ballType") });
+		bc.postMessage({ displayBallTracker: false, ballTrackerType: getStorageItem("ballSelection") });
 	}
 	console.log(`Ball Type ${value}`)
-	if (getStorageItem("ballType") === "World"){
-		document.getElementById("worldBallTracker").classList.remove("noShow");
-		document.getElementById("internationalBallTracker").classList.add("noShow");
-	} else {
-		document.getElementById("internationalBallTracker").classList.remove("noShow");
-		document.getElementById("worldBallTracker").classList.add("noShow");
-	}
-	resetBallTracker();
 }
 
 function useBallSetToggle() {
+    // Check if ball set toggle should be enabled
+    const ballTrackerEnabled = document.getElementById("ballTrackerCheckbox").checked;
+    const gameTypeIs8Ball = getStorageItem("gameType") === "game1";
+    
+    if (!ballTrackerEnabled || !gameTypeIs8Ball) {
+        console.log("Ball set toggle is disabled - ball tracker disabled or not 8-ball game");
+        return;
+    }
+    
     var useBallSet = document.getElementById("ballSetCheckbox");
     var isChecked = useBallSet.checked;
     var storageValue = isChecked ? "yes" : "no";
@@ -218,7 +218,6 @@ function useBallSetToggle() {
         setStorageItem("playerBallSet", "p1Open");
         bc.postMessage({ playerBallSet: "p1Open" });
     }
-
 }
 
 function ballSetChange() {
@@ -243,39 +242,44 @@ function useBallTracker(){
 	const player1Enabled = getStorageItem("usePlayer1") === "yes";
     const player2Enabled = getStorageItem("usePlayer2") === "yes";
     const bothPlayersEnabled = player1Enabled && player2Enabled;
+    console.log('Both players enabled evaluation:', bothPlayersEnabled)
 	setStorageItem("enableBallTracker", document.getElementById("ballTrackerCheckbox").checked);
 	if (document.getElementById("ballTrackerCheckbox").checked) {
 		document.getElementById("ballTrackerDirectionDiv").classList.remove("noShow");
 		document.getElementById("ballTrackerDirection").classList.remove("noShow");
-		document.getElementById("ballTrackerLabel").classList.remove("noShow");
 		document.getElementById("ballTrackerDiv").classList.remove("noShow");
-		document.getElementById("ballTypeDiv").classList.remove("noShow");
+		document.getElementById("ballTracker").classList.remove("noShow");
+        document.getElementById("ballTypeDiv").classList.remove("noShow");
 		document.getElementById("ballSetDiv").classList.remove("noShow");
-		if (getStorageItem("ballType") === "World"){
-			document.getElementById("worldBallTracker").classList.remove("noShow");
-		} else {
-			document.getElementById("internationalBallTracker").classList.remove("noShow");
-		}		
+		
+		// Re-enable ball set toggle when ball tracker is enabled (only for 8-ball)
+		const gameTypeIs8Ball = getStorageItem("gameType") === "game1";
+		if (gameTypeIs8Ball) {
+			document.getElementById("ballSetCheckbox").disabled = false;
+		}
 	} else {
-		document.getElementById("ballTypeDiv").classList.add("noShow");
 		document.getElementById("ballTrackerDirectionDiv").classList.add("noShow");
 		document.getElementById("ballTrackerDirection").classList.add("noShow");
-		document.getElementById("ballTrackerLabel").classList.add("noShow");
 		document.getElementById("ballTrackerDiv").classList.add("noShow");
+		document.getElementById("ballTracker").classList.add("noShow");
+		document.getElementById("ballTypeDiv").classList.add("noShow");
 		document.getElementById("ballSetDiv").classList.add("noShow");
-		if (getStorageItem("ballType") === "World"){
-			document.getElementById("worldBallTracker").classList.add("noShow");
-		} else {
-			document.getElementById("internationalBallTracker").classList.add("noShow");
-		}		
+		
+		// Also disable and hide ball set toggle when ball tracker is disabled
+		document.getElementById("ballSetCheckbox").disabled = true;
+		document.getElementById("ballSetCheckbox").checked = false;
+		setStorageItem("useBallSet", "no");
+		document.getElementById("ballSet").style.display = 'none';
+		document.getElementById("ballSetLabel").classList.add("noShow");
+		document.getElementById('p1colorOpen').checked = true;
+		setStorageItem("playerBallSet", "p1Open");
+		bc.postMessage({ playerBallSet: "p1Open" });
 	}
 	if (bothPlayersEnabled){
-		if (document.getElementById("ballTrackerCheckbox").checked) {
-			bc.postMessage({ displayBallTracker: true, ballTrackerType: getStorageItem("ballType") });
-		}	else {
-			bc.postMessage({ displayBallTracker: false, ballTrackerType: getStorageItem("ballType") });
-		}
-	}
+		bc.postMessage({ displayBallTracker: document.getElementById("ballTrackerCheckbox").checked});
+	} else {
+	    console.log(`Both players are not enabled so we are not enabling the ball tracker`)
+    }
 }
 
 function toggleBallTrackerDirection() {
@@ -328,8 +332,8 @@ function toggleBallSelection() {
     const currentSelection = getStorageItem("ballSelection") || "american";
     // Only allow toggling ball style for 8-ball (game1)
     const currentGame = getStorageItem("gameType") || (document.getElementById("gameType") ? document.getElementById("gameType").value : "game1");
-    if (currentGame !== "game1") {
-        console.log("Ball style toggle is only available for 8-ball (game1)");
+    if (currentGame === "game2" || currentGame === "game3") {
+        console.log("Ball style toggle is not available for 9- or 10-ball (game2/game3)");
         return;
     }
     // Toggle selection
@@ -340,12 +344,13 @@ function toggleBallSelection() {
     setStorageItem("ballSelection", newSelection);
     console.log(`Changed ball selection to ${newSelection} ball style`);
 	// Update button label to reflect NEW selection (what it will show after toggle)
-	var bs = document.getElementById("ballSelection");
-	if (bs) {
-		bs.innerHTML = (newSelection === "american" ? "American Balls" : "International Balls");
-	}
+	// var bs = document.getElementById("ballSelection");
+	// if (bs) {
+	// 	bs.innerHTML = (newSelection === "american" ? "World (Small/Big,Lows/Highs,Solids/Stripes)" : "International (Red/Yellow)");
+	// }
 	// Update control panel ball images
 	updateControlPanelBallImages(newSelection);
+    ballSetChange();
 }
 
 function togglePot(element) {
@@ -599,6 +604,8 @@ function playerSetting(player) {
         ballTrackerCheckbox.disabled = true;
         ballTrackerCheckbox.checked = false;
         setStorageItem("enableBallTracker", "no");
+        setStorageItem("ballSelection", "american");
+
 
         // Hide related elements
         document.getElementById("clockInfo").classList.add("noShow");
@@ -608,10 +615,8 @@ function playerSetting(player) {
         document.getElementById("playerToggleLabel").classList.add("noShow");
         document.getElementById("ballTrackerDirectionDiv").classList.add("noShow");
         document.getElementById("ballTrackerDirection").classList.add("noShow");
-        document.getElementById("ballTrackerLabel").classList.add("noShow");
         document.getElementById("ballTrackerDiv").classList.add("noShow");
-		document.getElementById("internationalBallTracker").classList.add("noShow");
-		document.getElementById("worldBallTracker").classList.add("noShow");
+        document.getElementById("ballTracker").classList.add("noShow");
 
         // Send messages to hide these features
         bc.postMessage({ clockDisplay: 'noClock' });
@@ -1229,7 +1234,7 @@ function resetBallTracker() {
     // Save the updated state back to localStorage
     setStorageItem('ballState', JSON.stringify(ballState));
 
-    console.log("All balls have been reset to their default condition.");
+    console.log("All balls have been reset in ball tracker.");
 }
 
 function clearLogo(xL) {
