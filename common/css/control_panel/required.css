@@ -155,116 +155,36 @@ input[type="number"]::-webkit-outer-spin-button {
 	padding: 0px;
 }
 
-#shotClock30, #shotClock60, #stopClockDiv, #sendPNames, #sendPInfo, #resetScores, #sendPScores, #swapBtn, #shotClockShow, #logoSsImg1, #logoSsImg2, #logoSsImg3, #logoSsImg4, #logoSsImg5{
-	cursor: pointer;
-	width: 100px;
-	font-size: 10pt;
-	padding: 0px 0px 0px 0px;
-	border:2px solid black;
-	corner-shape: bevel;
-    border-radius: 0px 0px 12px 0px;
-}
-
 #raceInfoTxt, #gameInfoTxt{
 	font-size:16pt;
 	border-radius: 0px;
 	padding: 0 5px 0 5px;
 }
 
-#ballTrackerDirection {
-	cursor: pointer;
-	width: auto;
-	font-size: 10pt;
-	padding: 0px 5px 0px 5px;
-	border:2px solid black;
-	corner-shape: bevel;
-    border-radius: 0px 0px 12px 0px;
-}
-
-#resetBtn, #uploadCustomLogo, #uploadCustomLogo2, #updateCheck{
-	cursor: pointer;
-	width: 150px;
-	font-size: 10pt;
-	padding: 0px 0px 0px 0px;
-	border:2px solid black;
-	corner-shape: bevel;
-    border-radius: 0px 0px 12px 0px;
-}
-
 #resetDataBtn{
-	cursor: pointer;
-	width: 150px;
-	font-size: 10pt;
-	padding: 0px 0px 0px 0px;
 	background: red;
 	color: black;
-	border:2px solid black;
-	corner-shape: bevel;
-    border-radius: 0px 0px 12px 0px;
 }
 
 #p1extensionBtn, #p2extensionBtn  {
-	cursor: pointer;
-	width:120px;
-	font-size: 10pt;
-	padding: 0px 5px 0px 5px;
-	border:2px solid black;
 	color:black;
 	background: green;
-	corner-shape: bevel;
-    border-radius: 0px 0px 12px 0px;
 }
 
-#resetDataBtn,
-#ballTrackerDirection,
-#resetBtn,
-#uploadCustomLogo,
-#uploadCustomLogo2,
-#updateCheck,
-#shotClock30,
-#shotClock60,
-#stopClockDiv,
-#sendPNames,
-#sendPInfo,
-#resetScores,
-#sendPScores,
-#swapBtn,
-#shotClockShow,
-#logoSsImg1,
-#logoSsImg2,
-#logoSsImg3,
-#logoSsImg4,
-#logoSsImg5,
-#p1extensionBtn,
-#p2extensionBtn
-	{
-	transition: box-shadow 0.2s;
-}
-
-#resetDataBtn:hover,
-#ballTrackerDirection:hover,
-#resetBtn:hover,
-#uploadCustomLogo:hover,
-#uploadCustomLogo2:hover,
-#updateCheck:hover,
-#shotClock30:hover,
-#shotClock60:hover,
-#stopClockDiv:hover,
-#sendPNames:hover,
-#sendPInfo:hover,
-#resetScores:hover,
-#sendPScores:hover,
-#swapBtn:hover,
-#shotClockShow:hover,
-#logoSsImg1:hover,
-#logoSsImg2:hover,
-#logoSsImg3:hover,
-#logoSsImg4:hover,
-#logoSsImg5:hover,
-#p1extensionBtn:hover,
-#p2extensionBtn:hover
-	{
+.button:hover {
+	transition: box-shadow 0.3s;
 	box-shadow: 0 4px 10px rgba(0,0,0,0.35);
+}
+
+.button {
+	font-size: 10pt;
+	cursor: pointer;
+	width: auto;
+	min-width: 120px;
+	padding: 0px 5px 0px 5px;
+	corner-shape: bevel;
+	border:2px solid black;
+    border-radius: 0px 0px 10px 0px;
 }
 
 .noShow{
@@ -481,9 +401,9 @@ input:checked + .slider_round:before {
 
 .tab button {
 	background-color: inherit;
-	float: left;
+	/* float: left;
 	border-bottom-width: 0px;
-	outline: none;
+	outline: none; */
 	cursor: pointer;
 	padding: 14px;
 	transition: 0.3s;
@@ -497,6 +417,7 @@ input:checked + .slider_round:before {
 	border-radius: 10px 10px 0 0;
 	border: 2px solid transparent; /* prevent bounce effect from apparent defout border on tab */
 	border-bottom-width: 0px;
+	background-color: inherit;
 }
 
 .tab button.active {
@@ -508,9 +429,13 @@ input:checked + .slider_round:before {
 .tabcontent {
 	display: flex;
     flex-direction: column;
-	padding: 0 12px 6px 12px;
+	padding: 0px 12px 6px 12px;
 	color: white; /* Match the font color */
-	border-radius: 0 10px 10px 10px;
+	transition: box-shadow 0.2s;
+	box-shadow: 0 4px 10px rgba(0,0,0,0.35);
+	border-radius: 0px 0px 10px 0px;
+	corner-shape: bevel;
+	margin-top: -1px; /* Add this to compensate for the transparent border */
 }
 
 .tablinks {

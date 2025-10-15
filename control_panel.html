@@ -226,12 +226,6 @@ for more information about Salotto please visit https://salotto.app
 						<div class="ball" id="ball 15" onclick="togglePot(this)"><img src="./common/images/15ball_small.png"></div>
 					</div>
 				</div>
-                <!-- <div class="column" id="ballTrackerDirectionDiv">
-                    <span></span>
-                    <div class="hover obs28 button noShow" id="ballTrackerDirection" onclick="toggleBallTrackerDirection()">
-                        Vertical Ball Tracker
-                    </div>
-                </div> -->
                 <!-- Shot Clock -->
                 <div class="section-header" id="clockControlLabel">Clock Controls</div>
                     <div class="column" id="clockInfo">
@@ -391,30 +385,30 @@ for more information about Salotto please visit https://salotto.app
                     Ball Settings
                 </div>
                 <div class="column">
+					<!-- Row One -->
                     <div>
                         <label for="ballTrackerCheckbox" id="labelForBallTrackerCheckbox">Ball Tracker</label>
                         <input type="checkbox" class="smallSize" id="ballTrackerCheckbox" onchange="useBallTracker()"/>
                     </div>
+                    <div class="hover obs28 button noShow" id="ballTrackerDirectionDiv" onclick="toggleBallTrackerDirection()">
+                        Vertical Ball Tracker
+                    </div>
+                </div>
+				<!-- Row Two -->
+				<div class="column">
                     <div id="ballSetDiv">
                         <label for="ballSetCheckbox" id="labelForBallSetCheckbox">Ball Set Toggle</label>
                         <input type="checkbox" class="smallSize" id="ballSetCheckbox" onchange="useBallSetToggle()"/>
                     </div>
 					<div id="ballTypeDiv">
 						<span>
-						Ball Type
-						<select class="dropdown" id="ballSelection" onchange="toggleBallSelection()">
-							<option value="american">World (Small/Big,Lows/Highs,Solids/Stripes)</option>
-							<option value="international">International (Red/Yellow)</option>
-						</select>
-					</span>
+							Ball Type
+							<select class="dropdown" id="ballSelection" onchange="toggleBallSelection()">
+								<option value="american">World (Small/Big,Lows/Highs,Solids/Stripes)</option>
+								<option value="international">International (Red/Yellow)</option>
+							</select>
+						</span>
 					</div>
-					
-                </div>
-				<div class="column" id="ballTrackerDirectionDiv">
-                    <span></span>
-                    <div class="hover obs28 button noShow" id="ballTrackerDirection" onclick="toggleBallTrackerDirection()">
-                        Vertical Ball Tracker
-                    </div>
                 </div>
                 <div class="section-header" id="updateCheckLabel">Version Check</div>
                 <div class="column">

@@ -96,7 +96,13 @@ function gameType(value) {
         document.getElementById("ballSelection").value = "american";
         ballType("american"); // Call the ballType function to update the display
     } else {
-        document.getElementById("ballTypeDiv").classList.remove("noShow");
+        // Only show ball type div if ball tracker is enabled
+        const ballTrackerEnabled = document.getElementById("ballTrackerCheckbox").checked;
+        if (ballTrackerEnabled) {
+            document.getElementById("ballTypeDiv").classList.remove("noShow");
+        } else {
+            document.getElementById("ballTypeDiv").classList.add("noShow");
+        }
     }
 
     // Disable and hide ball set toggle for non-8-ball games
@@ -245,23 +251,16 @@ function useBallTracker(){
     console.log('Both players enabled evaluation:', bothPlayersEnabled)
 	setStorageItem("enableBallTracker", document.getElementById("ballTrackerCheckbox").checked);
 	if (document.getElementById("ballTrackerCheckbox").checked) {
-		document.getElementById("ballTrackerDirectionDiv").classList.remove("noShow");
-		document.getElementById("ballTrackerDirection").classList.remove("noShow");
-		document.getElementById("ballTrackerDiv").classList.remove("noShow");
-		document.getElementById("ballTracker").classList.remove("noShow");
-        document.getElementById("ballTypeDiv").classList.remove("noShow");
-		document.getElementById("ballSetDiv").classList.remove("noShow");
-		
+		document.getElementById("ballTrackerDirectionDiv").classList.remove("noShow");		
 		// Re-enable ball set toggle when ball tracker is enabled (only for 8-ball)
 		const gameTypeIs8Ball = getStorageItem("gameType") === "game1";
 		if (gameTypeIs8Ball) {
 			document.getElementById("ballSetCheckbox").disabled = false;
+            document.getElementById("ballTypeDiv").classList.remove("noShow");
+            document.getElementById("ballSetDiv").classList.remove("noShow");
 		}
 	} else {
 		document.getElementById("ballTrackerDirectionDiv").classList.add("noShow");
-		document.getElementById("ballTrackerDirection").classList.add("noShow");
-		document.getElementById("ballTrackerDiv").classList.add("noShow");
-		document.getElementById("ballTracker").classList.add("noShow");
 		document.getElementById("ballTypeDiv").classList.add("noShow");
 		document.getElementById("ballSetDiv").classList.add("noShow");
 		
@@ -270,7 +269,6 @@ function useBallTracker(){
 		document.getElementById("ballSetCheckbox").checked = false;
 		setStorageItem("useBallSet", "no");
 		document.getElementById("ballSet").style.display = 'none';
-		document.getElementById("ballSetLabel").classList.add("noShow");
 		document.getElementById('p1colorOpen').checked = true;
 		setStorageItem("playerBallSet", "p1Open");
 		bc.postMessage({ playerBallSet: "p1Open" });
@@ -293,7 +291,7 @@ function toggleBallTrackerDirection() {
     setStorageItem("ballTrackerDirection", newDirection);
     console.log(`Changed ball tracker to ${newDirection} orientation`);
 	// Update button label to reflect NEW direction (current state after toggle)
-	document.getElementById("ballTrackerDirection").innerHTML = newDirection.charAt(0).toUpperCase() + newDirection.slice(1).toLowerCase() + " Ball Tracker";
+	document.getElementById("ballTrackerDirectionDiv").innerHTML = newDirection.charAt(0).toUpperCase() + newDirection.slice(1).toLowerCase() + " Ball Tracker";
 }
 
 function updateControlPanelBallImages(selection) {
