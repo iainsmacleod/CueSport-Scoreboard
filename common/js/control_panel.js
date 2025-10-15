@@ -251,7 +251,8 @@ function useBallTracker(){
     console.log('Both players enabled evaluation:', bothPlayersEnabled)
 	setStorageItem("enableBallTracker", document.getElementById("ballTrackerCheckbox").checked);
 	if (document.getElementById("ballTrackerCheckbox").checked) {
-		document.getElementById("ballTrackerDirectionDiv").classList.remove("noShow");		
+		document.getElementById("ballTrackerDirectionDiv").classList.remove("noShow");	
+        document.getElementById("ballTracker").classList.remove("noShow");			
 		// Re-enable ball set toggle when ball tracker is enabled (only for 8-ball)
 		const gameTypeIs8Ball = getStorageItem("gameType") === "game1";
 		if (gameTypeIs8Ball) {
@@ -261,6 +262,7 @@ function useBallTracker(){
 		}
 	} else {
 		document.getElementById("ballTrackerDirectionDiv").classList.add("noShow");
+        document.getElementById("ballTracker").classList.add("noShow");
 		document.getElementById("ballTypeDiv").classList.add("noShow");
 		document.getElementById("ballSetDiv").classList.add("noShow");
 		

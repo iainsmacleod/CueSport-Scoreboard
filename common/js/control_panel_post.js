@@ -187,6 +187,7 @@ window.onload = function() {
 	if ((getStorageItem("enableBallTracker") === "true") && (getStorageItem("gameType") === "game1")){
 		document.getElementById("ballTrackerCheckbox").checked = true;
 		document.getElementById("ballTrackerDirectionDiv").classList.remove("noShow");
+		document.getElementById("ballTracker").classList.remove("noShow");
 		// document.getElementById("ballSelection").classList.remove("noShow");
 		document.getElementById("ballTypeDiv").classList.remove("noShow");
 		document.getElementById("ballSetDiv").classList.remove("noShow");
@@ -196,6 +197,7 @@ window.onload = function() {
 		document.getElementById("ballTrackerCheckbox").checked = false;
 		setStorageItem("enableBallTracker", "false");
 		document.getElementById("ballTrackerDirectionDiv").classList.add("noShow");
+		document.getElementById("ballTracker").classList.add("noShow");
 		// document.getElementById("ballSelection").classList.add("noShow");
 		document.getElementById("ballTypeDiv").classList.add("noShow");
 		document.getElementById("ballSetDiv").classList.add("noShow");
