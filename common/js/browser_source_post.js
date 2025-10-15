@@ -531,6 +531,9 @@ if (getStorageItem("slideShow") == "yes") {
 // Defaukt Player 1 and Player 2 names
 document.getElementById("player1Name").innerHTML = getStorageItem("p1NameCtrlPanel") || "Player 1";
 document.getElementById("player2Name").innerHTML = getStorageItem("p2NameCtrlPanel") || "Player 2";
+// Initialize scores from storage on overlay load
+document.getElementById("player1Score").innerHTML = getStorageItem("p1ScoreCtrlPanel") || getStorageItem("p1Score") || 0;
+document.getElementById("player2Score").innerHTML = getStorageItem("p2ScoreCtrlPanel") || getStorageItem("p2Score") || 0;
 
 // Code to assist with displaying active player image when only two players are enabled, on reload.
 const player1Enabled = getStorageItem("usePlayer1") === "yes";
@@ -692,8 +695,8 @@ const initializeBallSelection = () => {
 
 // Run ball selection initialization
 initializeBallSelection();
-
-// Functions
+// Ensure overlay gets current scores after a refresh
+pushScores();
 
 // Functions
 

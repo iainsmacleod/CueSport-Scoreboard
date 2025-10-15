@@ -413,7 +413,7 @@ input:checked + .slider_round:before {
 	box-sizing: border-box;
 }
 
-.tab button:hover {
+.tab button:not(.active):hover {
 	border-radius: 10px 10px 0 0;
 	border: 2px solid transparent; /* prevent bounce effect from apparent defout border on tab */
 	border-bottom-width: 0px;
