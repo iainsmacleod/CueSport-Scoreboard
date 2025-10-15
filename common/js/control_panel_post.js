@@ -198,9 +198,16 @@ window.onload = function() {
 		setStorageItem("enableBallTracker", "false");
 		document.getElementById("ballTrackerDirectionDiv").classList.add("noShow");
 		document.getElementById("ballTracker").classList.add("noShow");
-		// document.getElementById("ballSelection").classList.add("noShow");
-		document.getElementById("ballTypeDiv").classList.add("noShow");
-		document.getElementById("ballSetDiv").classList.add("noShow");
+	
+		// Keep ball type and ball set visible for 8-ball even when tracker is off
+		if (getStorageItem("gameType") === "game1") {
+			document.getElementById("ballTypeDiv").classList.remove("noShow");
+			document.getElementById("ballSetDiv").classList.remove("noShow");
+		} else {
+			document.getElementById("ballTypeDiv").classList.add("noShow");
+			document.getElementById("ballSetDiv").classList.add("noShow");
+		}
+	
 		console.log(`Ball tracker disabled`);
 		bc.postMessage({ displayBallTracker: false });
 	}

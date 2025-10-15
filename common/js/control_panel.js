@@ -122,12 +122,12 @@ function gameType(value) {
         
         console.log("Ball set toggle disabled and hidden for non-8-ball game");
     } else {
-        // Re-enable and show ball set toggle for 8-ball (if ball tracker is also enabled)
-        const ballTrackerEnabled = document.getElementById("ballTrackerCheckbox").checked;
-        if (ballTrackerEnabled) {
-            document.getElementById("ballSetCheckbox").disabled = false;
-            document.getElementById("ballSetDiv").classList.remove("noShow");
-        }
+        // Always allow ball set/ball type for 8-ball regardless of tracker
+        document.getElementById("ballSetCheckbox").disabled = false;
+        document.getElementById("ballSetDiv").classList.remove("noShow");
+
+        // Ball type controls should be visible in 8-ball
+        document.getElementById("ballTypeDiv").classList.remove("noShow");
     }
 
 	if (getStorageItem("gameType") === "game2"){
@@ -197,12 +197,11 @@ function ballType(value) {
 }
 
 function useBallSetToggle() {
-    // Check if ball set toggle should be enabled
-    const ballTrackerEnabled = document.getElementById("ballTrackerCheckbox").checked;
+    // Allow ball set toggle only for 8-ball
     const gameTypeIs8Ball = getStorageItem("gameType") === "game1";
     
-    if (!ballTrackerEnabled || !gameTypeIs8Ball) {
-        console.log("Ball set toggle is disabled - ball tracker disabled or not 8-ball game");
+    if (!gameTypeIs8Ball) {
+        console.log("Ball set toggle is disabled - not 8-ball game");
         return;
     }
     
@@ -253,7 +252,7 @@ function useBallTracker(){
 	if (document.getElementById("ballTrackerCheckbox").checked) {
 		document.getElementById("ballTrackerDirectionDiv").classList.remove("noShow");	
         document.getElementById("ballTracker").classList.remove("noShow");			
-		// Re-enable ball set toggle when ball tracker is enabled (only for 8-ball)
+		// Enable related 8-ball controls
 		const gameTypeIs8Ball = getStorageItem("gameType") === "game1";
 		if (gameTypeIs8Ball) {
 			document.getElementById("ballSetCheckbox").disabled = false;
@@ -261,19 +260,21 @@ function useBallTracker(){
             document.getElementById("ballSetDiv").classList.remove("noShow");
 		}
 	} else {
+		// Hide tracker UI only
 		document.getElementById("ballTrackerDirectionDiv").classList.add("noShow");
         document.getElementById("ballTracker").classList.add("noShow");
-		document.getElementById("ballTypeDiv").classList.add("noShow");
-		document.getElementById("ballSetDiv").classList.add("noShow");
-		
-		// Also disable and hide ball set toggle when ball tracker is disabled
-		document.getElementById("ballSetCheckbox").disabled = true;
-		document.getElementById("ballSetCheckbox").checked = false;
-		setStorageItem("useBallSet", "no");
-		document.getElementById("ballSet").style.display = 'none';
-		document.getElementById('p1colorOpen').checked = true;
-		setStorageItem("playerBallSet", "p1Open");
-		bc.postMessage({ playerBallSet: "p1Open" });
+
+        // Keep ball type and ball set controls available for 8-ball even when tracker is off
+        const gameTypeIs8Ball = getStorageItem("gameType") === "game1";
+        if (gameTypeIs8Ball) {
+            document.getElementById("ballTypeDiv").classList.remove("noShow");
+            document.getElementById("ballSetDiv").classList.remove("noShow");
+            // Do NOT disable/reset the ball set checkbox or selection here
+        } else {
+            // For non-8-ball, still hide ball type/set controls
+            document.getElementById("ballTypeDiv").classList.add("noShow");
+            document.getElementById("ballSetDiv").classList.add("noShow");
+        }
 	}
 	if (bothPlayersEnabled){
 		bc.postMessage({ displayBallTracker: document.getElementById("ballTrackerCheckbox").checked});
