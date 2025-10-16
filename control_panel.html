@@ -23,13 +23,246 @@ for more information about Salotto please visit https://salotto.app
         <link rel="stylesheet" href="./common/css/control_panel/required.css" />
         <script>
             //---------------------------------------------------------------------------------------------
-            var versionNum = "2.4.1";
+            var versionNum = "3.0.0";
             //---------------------------------------------------------------------------------------------
         </script>
+        <script src="./common/js/obs-websocket-js.js"></script>
         <script src="./common/js/jquery.js"></script>
         <script src="./common/js/control_panel.js"></script>
         <script src="hotkeys.js"></script>
-        </script>
+        
+        <!-- Add this script tag in your HTML before your main JS -->
+
+        <script>
+            // Create OBSWebSocket client instance
+            const obs = new OBSWebSocket();
+
+            // Track readiness (post-Identify)
+            let isObsReady = false;
+
+            // Connect to OBS WebSocket server once DOM and library are ready
+            async function connectToObsWebSocket() {
+                try {
+                    // If your OBS WebSocket has a password, pass it as the 2nd arg
+                    // Example: await obs.connect('ws://127.0.0.1:4455', 'your_password');
+                    await obs.connect('ws://127.0.0.1:4455');
+                    // At this point ConnectionOpened has fired, but wait for Identified
+                    console.log('OBS WebSocket: Connection opened, awaiting Identify...');
+                } catch (err) {
+                    console.error('Failed to connect:', err);
+                }
+            }
+
+            // 2) Name of the Media Source that should play the replay
+            const MEDIA_INPUT_NAME = 'Instant Replay'; // exact name of your Media Source
+
+            // 3) When the replay is saved, OBS emits ReplayBufferSaved with the file path
+            obs.on('ReplayBufferSaved', async ({ savedReplayPath }) => {
+                try {
+                    // Update the Media Source to the new clip
+                    await obs.call('SetInputSettings', {
+                        inputName: MEDIA_INPUT_NAME,
+                        inputSettings: { local_file: savedReplayPath },
+                        overlay: false
+                    });
+
+                    // Restart playback to begin from the start
+                    await obs.call('TriggerMediaInputAction', {
+                        inputName: MEDIA_INPUT_NAME,
+                        mediaAction: 'OBS_WEBSOCKET_MEDIA_INPUT_ACTION_RESTART'
+                    });
+
+                    // Optional: ensure the source is visible (if you sometimes hide it)
+                    // await obs.call('SetSceneItemEnabled', {
+                    //   sceneName: 'Your Scene',
+                    //   sceneItemId: await getSceneItemId('Your Scene', MEDIA_INPUT_NAME),
+                    //   sceneItemEnabled: true
+                    // });
+
+                    console.log('Replay loaded and playing:', savedReplayPath);
+                } catch (error) {
+                    console.error('Failed to load/play replay in media source:', error);
+                }
+            });
+
+            // OBS v5 lifecycle events
+            obs.on('ConnectionOpened', () => {
+                console.log('OBS WebSocket: ConnectionOpened');
+            });
+
+            obs.on('Identified', () => {
+                isObsReady = true;
+                console.log('OBS WebSocket: Identified (ready for requests)');
+                setButtonsEnabled(true);
+            });
+
+            obs.on('ConnectionClosed', () => {
+                isObsReady = false;
+                console.warn('OBS WebSocket: ConnectionClosed');
+                setButtonsEnabled(false);
+            });
+
+            // Enable/disable the replay control buttons until ready
+            function setButtonsEnabled(enabled) {
+                const ids = ['btnMonitorGame', 'btnReplayClip', 'btnSaveClip'];
+                ids.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.disabled = !enabled;
+                });
+            }
+            setButtonsEnabled(false);
+
+            // Immediately connect after defining
+            connectToObsWebSocket();
+
+            // UI button click handlers, async and awaiting hotkey dispatch
+            let isMonitoringActive = false;
+            // Track if we have a saved clip ready to replay
+            let hasSavedClip = false;
+
+            // UI helpers
+            function setMonitorButtonText() {
+                const btn = document.getElementById('btnMonitorGame');
+                if (!btn) return;
+                btn.textContent = isMonitoringActive ? 'Stop Monitoring' : 'Resume Monitoring';
+            }
+
+            function setReplayButtonText() {
+                const btn = document.getElementById('btnReplayClip');
+                if (!btn) return;
+                btn.textContent = hasSavedClip ? 'Restart Clip' : 'Replay Clip';
+            }
+
+            // One-time wait for ReplayBufferSaved
+            function waitForReplaySaved(timeoutMs = 7000) {
+                return new Promise((resolve, reject) => {
+                    let settled = false;
+
+                    const handler = ({ savedReplayPath }) => {
+                        if (settled) return;
+                        settled = true;
+                        obs.off('ReplayBufferSaved', handler);
+                        resolve(savedReplayPath);
+                    };
+
+                    const timer = setTimeout(() => {
+                        if (settled) return;
+                        settled = true;
+                        obs.off('ReplayBufferSaved', handler);
+                        reject(new Error('Timed out waiting for ReplayBufferSaved'));
+                    }, timeoutMs);
+
+                    obs.on('ReplayBufferSaved', (evt) => {
+                        clearTimeout(timer);
+                        handler(evt);
+                    });
+                });
+            }
+
+            // Replay/Restart Clip handler
+            async function triggerReplayClip() {
+                if (!isObsReady) return;
+
+                // If we already have a saved clip, just restart it
+                if (hasSavedClip) {
+                    try {
+                        await obs.call('TriggerMediaInputAction', {
+                            inputName: 'Instant Replay',
+                            mediaAction: 'OBS_WEBSOCKET_MEDIA_INPUT_ACTION_RESTART'
+                        });
+                        console.log('Restarting current clip');
+                        return;
+                    } catch (error) {
+                        console.error('Failed to restart clip:', error);
+                        return;
+                    }
+                }
+
+                // First time: need to save a clip first
+                try {
+                    // If monitoring is not active, we can't save a new clip
+                    if (!isMonitoringActive) {
+                        console.warn('Cannot replay: monitoring is not active and no saved clip exists.');
+                        return;
+                    }
+
+                    // Confirm replay buffer is running
+                    const { outputActive } = await obs.call('GetReplayBufferStatus');
+                    if (!outputActive) {
+                        console.warn('Replay buffer is not running; cannot save replay.');
+                        return;
+                    }
+
+                    // 1) Save first to get a clip
+                    const savedPathPromise = waitForReplaySaved(8000);
+                    await obs.call('SaveReplayBuffer');
+                    const savedPath = await savedPathPromise;
+
+                    // 2) Stop monitoring
+                    try {
+                        await obs.call('StopReplayBuffer');
+                        isMonitoringActive = false;
+                        setMonitorButtonText();
+                    } catch (err) {
+                        console.error('Failed to stop replay buffer:', err);
+                    }
+
+                    // 3) Load and play the saved clip
+                    await obs.call('SetInputSettings', {
+                        inputName: 'Instant Replay',
+                        inputSettings: { local_file: savedPath },
+                        overlay: false
+                    });
+
+                    await obs.call('TriggerMediaInputAction', {
+                        inputName: 'Instant Replay',
+                        mediaAction: 'OBS_WEBSOCKET_MEDIA_INPUT_ACTION_RESTART'
+                    });
+
+                    // 4) Mark that we have a saved clip and update button
+                    hasSavedClip = true;
+                    setReplayButtonText();
+
+                    console.log('Replay ready and playing:', savedPath);
+                } catch (error) {
+                    console.error('Replay Clip failed:', error);
+                }
+            }
+
+            // Monitor toggle
+            async function toggleReplayMonitoring() {
+                if (!isObsReady) return;
+                try {
+                    if (!isMonitoringActive) {
+                        // Resume monitoring: stop any active replay first
+                        if (hasSavedClip) {
+                            try {
+                                await obs.call('TriggerMediaInputAction', {
+                                    inputName: 'Instant Replay',
+                                    mediaAction: 'OBS_WEBSOCKET_MEDIA_INPUT_ACTION_STOP'
+                                });
+                                console.log('Stopped active replay before resuming monitoring');
+                            } catch (err) {
+                                console.warn('Failed to stop active replay:', err);
+                                // Continue anyway
+                            }
+                        }
+
+                        await obs.call('StartReplayBuffer');
+                        isMonitoringActive = true;
+                        // When monitoring resumes, reset clip state
+                        hasSavedClip = false;
+                        setReplayButtonText();
+                    } else {
+                        await obs.call('StopReplayBuffer');
+                        isMonitoringActive = false;
+                    }
+                    setMonitorButtonText();
+                } catch (error) {
+                    console.error('Replay buffer toggle failed:', error);
+                }
+            }
+        </script>   
 
         <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
     </head>
@@ -177,7 +410,6 @@ for more information about Salotto please visit https://salotto.app
                     <div class="column replay-controls">
                         <button id="btnMonitorGame" class="hover obs28 button" onclick="toggleReplayMonitoring()">Monitor Game</button>
                         <button id="btnReplayClip" class="hover obs28 button" onclick="triggerReplayClip()">Replay Clip</button>
-                        <button id="btnSaveClip" class="hover obs28 button" onclick="triggerSaveClip()">Save Clip</button>
                     </div>
                 <!-- Player Toggle -->
                 <div class="section-header" id="playerToggleLabel">Player Toggle</div>
@@ -556,6 +788,7 @@ for more information about Salotto please visit https://salotto.app
 
             // Initialize zoom level
             applyZoom();
+
         </script>
     </body>
 </html>

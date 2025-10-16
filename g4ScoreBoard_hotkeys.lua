@@ -32,7 +32,7 @@ local hotkeys = {
 	CLOCK_60 = "CueSport - 60 Second Shot Clock Start",
 	STOP_CLK = "CueSport - Stop Clock",
 	SWAP_CLR = "CueSport - Swap Player Colors",
-	PLY_SWAP = "CueSport - Player Toggle",		
+	PLY_SWAP = "CueSport - Player Toggle",
 }
 
 -- add any custom actions here
