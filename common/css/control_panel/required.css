@@ -1,29 +1,35 @@
-#sliderValue, #sliderUiScalingValue {
-    min-width: 45px;  /* Fixed width for the percentage display */
-    text-align: left; /* Align text to the left */
-    display: inline-block;  /* Ensure the width is respected */
+#sliderValue,
+#sliderUiScalingValue {
+	min-width: 45px;
+	/* Fixed width for the percentage display */
+	text-align: left;
+	/* Align text to the left */
+	display: inline-block;
+	/* Ensure the width is respected */
 }
 
 .slidecontainer {
 	width: auto;
-	position:relative;
+	position: relative;
 	/* bottom:-10px; */
-} 
+}
 
-.slider, .uiScalingSlider{
+.slider,
+.uiScalingSlider {
 	-webkit-appearance: none;
 	appearance: none;
 	width: 25%;
 	height: 5px;
 	border-radius: 5px;
-	background: lightgrey; 
+	background: lightgrey;
 	outline: none;
 	opacity: 1;
 	-webkit-transition: .2s;
 	transition: opacity .2s;
-	}
+}
 
-.slider::-webkit-slider-thumb, .uiScalingSlider::-webkit-slider-thumb {
+.slider::-webkit-slider-thumb,
+.uiScalingSlider::-webkit-slider-thumb {
 	-webkit-appearance: none;
 	appearance: none;
 	width: 20px;
@@ -35,7 +41,8 @@
 	cursor: pointer;
 }
 
-.slider::-moz-range-thumb, .uiScalingSlider::-moz-range-thumb {
+.slider::-moz-range-thumb,
+.uiScalingSlider::-moz-range-thumb {
 	width: 20px;
 	height: 20px;
 	/* border-radius: 50%; */
@@ -44,36 +51,39 @@
 	/* background: #3345a3; */
 	cursor: pointer;
 }
-	
-	
-body{
+
+
+body {
 	font-family: Arial, Helvetica, sans-serif;
 	background: #2b2e38;
-	margin-left:auto;
-	margin-right:auto;
-	margin-bottom:auto;
-	margin-top:0px;
+	margin-left: auto;
+	margin-right: auto;
+	margin-bottom: auto;
+	margin-top: 0px;
 }
-	
+
 
 div {
-	color:white;
+	color: white;
 	min-height: 24px;
 	border: 0px solid #000;
 	border-radius: 5px;
 	display: flex;
-	justify-content: center; /* align horizontal */
-	align-items: center; /* align vertical */
+	justify-content: center;
+	/* align horizontal */
+	align-items: center;
+	/* align vertical */
 	font-size: 10pt;
 }
-	
+
 #mainDiv {
 	margin-top: 0px;
 	margin-right: auto;
 	margin-left: auto;
 	margin-bottom: 0px;
 	display: flex;
-	flex-direction: column; /* or row, depending on your layout */
+	flex-direction: column;
+	/* or row, depending on your layout */
 	border: 0px solid #000;
 	border-radius: 0px;
 	justify-content: center;
@@ -81,7 +91,8 @@ div {
 	padding: 2px;
 }
 
-#p1Score, #p2Score {
+#p1Score,
+#p2Score {
 	cursor: pointer;
 	width: 50px;
 	height: 28px;
@@ -96,22 +107,27 @@ div {
 	padding: 0px;
 }
 
-#p1Score::placeholder, #p2Score::placeholder {
-    color: black !important;
-    opacity: 1; /* For Firefox */
+#p1Score::placeholder,
+#p2Score::placeholder {
+	color: black !important;
+	opacity: 1;
+	/* For Firefox */
 }
-	
+
 /* Add to one of your CSS files */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
 	-webkit-appearance: none;
 	margin: 0;
 }
-		
-#sendP2Score, #sendP2ScoreSub, #sendP1Score, #sendP1ScoreSub{
+
+#sendP2Score,
+#sendP2ScoreSub,
+#sendP1Score,
+#sendP1ScoreSub {
 	cursor: pointer;
 	width: 40px;
-	height:28px;
+	height: 28px;
 	border: 0px solid #000;
 	border-radius: 0px;
 	font-size: 14pt;
@@ -122,7 +138,12 @@ input[type="number"]::-webkit-outer-spin-button {
 	padding: 0px;
 }
 
-#usePlayer1Setting, #usePlayer2Setting, #useClockSetting, #customLogo1, #customLogo2, #logoSlideshowChk {
+#usePlayer1Setting,
+#usePlayer2Setting,
+#useClockSetting,
+#customLogo1,
+#customLogo2,
+#logoSlideshowChk {
 	cursor: pointer;
 	width: 15px;
 	height: 15px;
@@ -134,46 +155,49 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 #ballTracker img:hover {
-	filter: drop-shadow(0 2px 2px rgba(0,0,0,0.35))
-	drop-shadow(0 6px 12px rgba(0,0,0,0.35));
+	filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.35)) drop-shadow(0 6px 12px rgba(0, 0, 0, 0.35));
 }
 
 .faded {
 	opacity: 0.2;
 }
 
-#p1colorDiv, #p2colorDiv, #p1Name, #p2Name {
+#p1colorDiv,
+#p2colorDiv,
+#p1Name,
+#p2Name {
 	cursor: pointer;
-	width:150px;
+	width: 150px;
 	font-size: 16pt;
 	font-weight: bold;
 	text-shadow: 1px 1px 2px black, 0 0 25px black, 0 0 5px black;
 	text-align: center;
 	vertical-align: middle;
-	color:white;
+	color: white;
 	-webkit-text-stroke: 1px black;
 	padding: 0px;
 }
 
-#raceInfoTxt, #gameInfoTxt{
-	font-size:16pt;
-	border-radius: 0px;
+#raceInfoTxt,
+#gameInfoTxt {
+	font-size: 16pt;
 	padding: 0 5px 0 5px;
 }
 
-#resetDataBtn{
+#resetDataBtn {
 	background: red;
 	color: black;
 }
 
-#p1extensionBtn, #p2extensionBtn  {
-	color:black;
+#p1extensionBtn,
+#p2extensionBtn {
+	color: black;
 	background: green;
 }
 
 .button:hover {
 	transition: box-shadow 0.3s;
-	box-shadow: 0 4px 10px rgba(0,0,0,0.35);
+	box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
 }
 
 .button {
@@ -184,16 +208,20 @@ input[type="number"]::-webkit-outer-spin-button {
 	min-height: 28px;
 	padding: 0px 5px 0px 5px;
 	corner-shape: bevel;
-	border:2px solid black;
-    border-radius: 0px 0px 10px 0px;
+	border: 2px solid black;
+	border-radius: 0px 0px 10px 0px;
 }
 
-.noShow{
-	visibility:hidden;
+.noShow {
+	visibility: hidden;
 	display: none;
 }
 
-#FileUploadL1, #FileUploadL2, #FileUploadL3, #FileUploadL4, #FileUploadL5 {
+#FileUploadL1,
+#FileUploadL2,
+#FileUploadL3,
+#FileUploadL4,
+#FileUploadL5 {
 	display: none;
 }
 
@@ -201,31 +229,32 @@ input[type="number"]::-webkit-outer-spin-button {
 	font-size: 10pt;
 	color: white;
 	border: none;
-	padding:0px;
+	padding: 0px;
 	cursor: pointer;
 }
 
-#settingsInfo, #resetData{
-	min-width:85px;
-	position:relative;
-	top:17px;
-	display:block;
-	padding:5px;
+#settingsInfo,
+#resetData {
+	min-width: 85px;
+	position: relative;
+	top: 17px;
+	display: block;
+	padding: 5px;
 }
 
-#obsTheme{
+#obsTheme {
 	width: 89px;
 }
 
-#logoSlideShowDiv { 
-	min-width:85px;
-	width:125px;
-	position:absolute;
-	right:50%;
-	padding-left:10px;
-	padding-right:10px;
-	padding-bottom:2px;
-	margin-right:2px;
+#logoSlideShowDiv {
+	min-width: 85px;
+	width: 125px;
+	position: absolute;
+	right: 50%;
+	padding-left: 10px;
+	padding-right: 10px;
+	padding-bottom: 2px;
+	margin-right: 2px;
 	font-size: 10pt;
 }
 
@@ -236,23 +265,23 @@ text {
 input.smallSize {
 	height: 15px;
 	width: 15px;
-	color:red;
+	color: red;
 }
 
 input {
-	border-radius:3px;
-	border:0px;
+	border-radius: 3px;
+	border: 0px;
 }
 
 .score-control {
-    display: flex;
-    align-items: center;
-    /* This ensures the controls are grouped together */
+	display: flex;
+	align-items: center;
+	/* This ensures the controls are grouped together */
 }
-		
+
 .tooltip .tooltiptext {
 	visibility: hidden;
-	background: rgba(0,0,0,0.6);
+	background: rgba(0, 0, 0, 0.6);
 	border-radius: 6px;
 	padding: 5px;
 	position: absolute;
@@ -268,16 +297,39 @@ input {
 
 .column {
 	display: flex;
-	justify-content:space-between;
+	justify-content: space-between;
 	padding: 10px 0 10px 0;
 	clear: both;
 	width: 650px;
-	height:fit-content;
+	height: fit-content;
 }
 
+.form-rows {
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	gap: 8px;
+}
+
+.form-row {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	column-gap: 50px;
+	width: 100%;
+}
+
+.field {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	justify-content: space-between;
+}
+
+/* each pair takes equal width */
 .header {
 	display: flex;
-	justify-content:space-between;
+	justify-content: space-between;
 	padding: 6px 12px;
 	clear: both;
 	width: 650px;
@@ -285,7 +337,7 @@ input {
 
 .section-header {
 	display: flex;
-	justify-content:space-between;
+	justify-content: space-between;
 	padding: 15px 0 0 0;
 	clear: both;
 	text-decoration: underline;
@@ -297,89 +349,96 @@ input {
 
 #ballTracker {
 	display: flex;
-	justify-content:center;
+	justify-content: center;
 	padding: 10px 0 10px 0;
 	clear: both;
 	width: 650px;
 }
 
 /* Basic placeholder styling */
-::placeholder { /* Chrome, Firefox, Opera, Safari */
-    color: white;
+::placeholder {
+	/* Chrome, Firefox, Opera, Safari */
+	color: white;
 }
 
 /* For older browsers you might also need: */
-::-webkit-input-placeholder { /* Chrome/Safari/Opera */
-    color: white;
+::-webkit-input-placeholder {
+	/* Chrome/Safari/Opera */
+	color: white;
 }
-:-ms-input-placeholder { /* Internet Explorer */
-    color: white;
+
+:-ms-input-placeholder {
+	/* Internet Explorer */
+	color: white;
 }
-::-ms-input-placeholder { /* Microsoft Edge */
-    color: white;
+
+::-ms-input-placeholder {
+	/* Microsoft Edge */
+	color: white;
 }
 
 /* Toggle player css code */
 .toggle {
-    position: relative;
-    display: inline-block;
-    width: 52px;
-    height: 26px;
+	position: relative;
+	display: inline-block;
+	width: 52px;
+	height: 26px;
 }
 
 .toggle input {
-    opacity: 0;
-    width: 0;
-    height: 0;
+	opacity: 0;
+	width: 0;
+	height: 0;
 }
 
 .slider_round {
-    position: absolute;
-    cursor: pointer;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: #cc8181;
-    transition: .4s;
-    border-radius: 26px;
+	position: absolute;
+	cursor: pointer;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background-color: #cc8181;
+	transition: .4s;
+	border-radius: 26px;
 }
 
 .slider_round:before {
-    position: absolute;
-    content: "";
-    height: 22px;
-    width: 22px;
-    left: 2px;
-    bottom: 2px;
-    background-color: white;
-    transition: .4s;
-    border-radius: 50%;
+	position: absolute;
+	content: "";
+	height: 22px;
+	width: 22px;
+	left: 2px;
+	bottom: 2px;
+	background-color: white;
+	transition: .4s;
+	border-radius: 50%;
 }
 
-.player1, .player2 {
-    position: absolute;
-    color: white;
-    font-size: 12px;
-    z-index: 1;
-    top: 72%;
-    transform: translateY(-50%);
+.player1,
+.player2 {
+	position: absolute;
+	color: white;
+	font-size: 12px;
+	z-index: 1;
+	top: 72%;
+	transform: translateY(-50%);
 }
 
 .player1 {
-    left: 8px;
+	left: 8px;
 }
 
 .player2 {
-    left: 30px;
+	left: 30px;
 }
 
-input:checked + .slider_round {
-    background-color: #2196F3;
+input:checked+.slider_round {
+	background-color: #2196F3;
 }
 
-input:checked + .slider_round:before {
-    transform: translateX(26px);
+input:checked+.slider_round:before {
+	transform: translateX(26px);
 }
 
 /* Rounded sliders */
@@ -396,7 +455,7 @@ input:checked + .slider_round:before {
 	/* overflow: hidden; */
 	color: white;
 	display: flex;
-	justify-content:stretch;
+	justify-content: stretch;
 	width: 674px;
 }
 
@@ -416,27 +475,31 @@ input:checked + .slider_round:before {
 
 .tab button:not(.active):hover {
 	border-radius: 10px 10px 0 0;
-	border: 2px solid transparent; /* prevent bounce effect from apparent defout border on tab */
+	border: 2px solid transparent;
+	/* prevent bounce effect from apparent defout border on tab */
 	border-bottom-width: 0px;
 	background-color: inherit;
 }
 
 .tab button.active {
 	border-radius: 10px 10px 0px 0px;
-	border: 2px solid transparent; /* prevent bounce effect from apparent defout border on tab */
+	border: 2px solid transparent;
+	/* prevent bounce effect from apparent defout border on tab */
 	border-bottom-width: 0px;
 }
 
 .tabcontent {
 	display: flex;
-    flex-direction: column;
+	flex-direction: column;
 	padding: 0px 12px 6px 12px;
-	color: white; /* Match the font color */
+	color: white;
+	/* Match the font color */
 	transition: box-shadow 0.2s;
-	box-shadow: 0 4px 10px rgba(0,0,0,0.35);
+	box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
 	border-radius: 0px 0px 10px 0px;
 	corner-shape: bevel;
-	margin-top: -1px; /* Add this to compensate for the transparent border */
+	margin-top: -1px;
+	/* Add this to compensate for the transparent border */
 }
 
 .tablinks {
@@ -446,30 +509,30 @@ input:checked + .slider_round:before {
 }
 
 .zoom-controls {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin: 10px 0;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin: 10px 0;
 }
 
 .zoom-controls .hover {
-    padding: 5px 10px;
-    cursor: pointer;
-    border-radius: 4px;
-    background-color: var(--button-background);
-    color: var(--button-text);
-    transition: background-color 0.2s;
+	padding: 5px 10px;
+	cursor: pointer;
+	border-radius: 4px;
+	background-color: var(--button-background);
+	color: var(--button-text);
+	transition: background-color 0.2s;
 }
 
 .zoom-controls .hover:hover {
-    background-color: var(--button-hover);
+	background-color: var(--button-hover);
 }
 
 .zoom-controls label {
-    margin-right: 10px;
+	margin-right: 10px;
 }
 
 .zoom-controls span {
-    min-width: 60px;
-    text-align: center;
+	min-width: 60px;
+	text-align: center;
 }

@@ -16,9 +16,6 @@
 
 var cLogoName = "Player 1 Logo";  // 13 character limit. it will auto trim to 13 characters.
 var cLogoName2 = "Player 2 Logo";
-// Get instance from URL or use 'default'
-const urlParams = new URLSearchParams(window.location.search);
-const INSTANCE_ID = urlParams.get('instance') || '';
 const bc = new BroadcastChannel(`main_${INSTANCE_ID}`);
 const bcr = new BroadcastChannel(`recv_${INSTANCE_ID}`); // return channel from browser_source 
 var hotkeyP1ScoreUp;
@@ -546,6 +543,10 @@ if (getStorageItem("gameType") === "game3"){
 document.getElementById("raceInfoTxt").value = getStorageItem("raceInfo");
 document.getElementById("gameInfoTxt").value = getStorageItem("gameInfo");
 document.getElementById("verNum").innerHTML = versionNum;
+
+document.getElementById('replaySceneName').value = getStorageItem("replaySceneName");
+document.getElementById('replayVideoSourceName').value = getStorageItem("replayVideoSourceName");
+document.getElementById('replayIndicatorSourceName').value = getStorageItem("replayIndicatorSourceName");
 
 // Initialize ball set selection from storage
 const savedBallSet = getStorageItem("playerBallSet");
