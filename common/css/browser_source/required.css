@@ -3,7 +3,8 @@
     --small-font-size: 24pt;
 }
 
-html, body {
+html,
+body {
     height: 100%;
     margin: 0;
     font-family: Arial, sans-serif;
@@ -34,7 +35,9 @@ html, body {
     text-align: center;
 }
 
-#customLogo3, #customLogo4, #customLogo5 {
+#customLogo3,
+#customLogo4,
+#customLogo5 {
     height: 50vh;
     width: auto;
     max-width: 80vw;
@@ -85,7 +88,8 @@ html, body {
 } */
 
 #gameInfo {
-    position: relative;  /* Change from fixed to relative */
+    position: relative;
+    /* Change from fixed to relative */
     background-image: linear-gradient(to bottom, lightgrey, white);
     text-align: center;
     font-size: calc(var(--small-font-size) * var(--ui-scaling));
@@ -96,7 +100,7 @@ html, body {
     padding: 5px 20px;
     overflow: hidden;
     white-space: nowrap;
-    box-shadow: 0 8px 16px 0 rgba(0,0,0,0.6);
+    box-shadow: 0 8px 16px 0 rgba(0, 0, 0, 0.6);
 }
 
 #raceInfo {
@@ -107,21 +111,21 @@ html, body {
     font-weight: bold;
     color: white;
     -webkit-text-stroke: 1px black;
-    box-shadow: 0 8px 16px 0 rgba(0,0,0,0.6);
+    box-shadow: 0 8px 16px 0 rgba(0, 0, 0, 0.6);
     padding: 5px 10px;
     margin: 0 5px 0 5px;
     border: 2px solid black;
     max-width: max-content;
 }
 
-
 #ballTracker {
     position: fixed;
     padding: 4px;
     top: 15%;
-    right: 1%; 
+    right: 1%;
     z-index: 3;
-    background-color: rgba(128, 128, 128, 0.7); /* Opaque grey with 70% opacity */
+    background-color: rgba(128, 128, 128, 0.7);
+    /* Opaque grey with 70% opacity */
     border: 2px solid black;
     border-radius: 30px;
     min-width: fit-content;
@@ -145,7 +149,8 @@ html, body {
 #scoreBoardDiv {
     position: fixed;
     display: flex;
-    flex-direction: column; /* Stack shotclock-container and scoreBoard vertically */
+    flex-direction: column;
+    /* Stack shotclock-container and scoreBoard vertically */
     align-items: center;
     width: 90%;
     z-index: 2;
@@ -159,23 +164,27 @@ html, body {
 /* Add this new class */
 .shotclock-container {
     display: flex;
-    flex-direction: column; /* Stack shotClock and shotClockVis vertically */
+    flex-direction: column;
+    /* Stack shotClock and shotClockVis vertically */
     align-items: center;
     width: calc(85% * var(--ui-scaling));
-    margin-bottom: calc(5px * var(--ui-scaling));; /* Space between shotclock-container and scoreBoard */
+    margin-bottom: calc(5px * var(--ui-scaling));
+    ;
+    /* Space between shotclock-container and scoreBoard */
 }
 
 /* Update shotClock styling */
 #shotClock {
     display: flex;
     justify-content: center;
-    background: rgba(255,255,255,1);
+    background: rgba(255, 255, 255, 1);
     font-size: calc(var(--small-font-size) * var(--ui-scaling));
     font-weight: bold;
     text-align: center;
     border: 1px solid black;
     padding: 0 10px;
-    margin-bottom: calc(5px * var(--ui-scaling));;
+    margin-bottom: calc(5px * var(--ui-scaling));
+    ;
     align-items: center;
     width: fit-content;
 }
@@ -200,18 +209,20 @@ html, body {
 }
 
 .shotRed {
-    color:white;
+    color: white;
 }
 
 /* Scoreboard layout */
 #scoreBoard {
     position: relative;
     display: flex;
-    flex-direction: row; /* Keep the row layout for player sections */
+    flex-direction: row;
+    /* Keep the row layout for player sections */
     justify-content: flex-start;
     align-items: center;
     width: fit-content;
-    gap: 0; /* No gap between flex items */
+    gap: 0;
+    /* No gap between flex items */
     z-index: 2;
 }
 
@@ -234,22 +245,24 @@ html, body {
 }
 
 /* Player names */
-#player1Name, #player2Name {
+#player1Name,
+#player2Name {
     position: relative;
-    background: rgba(255,255,255,1);
+    background: rgba(255, 255, 255, 1);
     text-shadow: 1px 1px 2px black, 0 0 25px black, 0 0 5px black;
     -webkit-text-stroke: 1px black;
     font-size: calc(var(--standard-font-size) * var(--ui-scaling));
     /* font-size: calc(32px * var(--ui-scaling)); */
     color: white;
-    box-shadow: 0 8px 16px 0 rgba(0,0,0,0.6);
+    box-shadow: 0 8px 16px 0 rgba(0, 0, 0, 0.6);
     font-weight: bold;
     text-align: center;
     width: calc(550px * var(--ui-scaling));
     overflow: hidden;
     text-overflow: ellipsis;
     border: 2px solid black;
-    min-height: calc(42px * var(--ui-scaling)); /* support the fact that names get blanked when using poolstat */
+    min-height: calc(42px * var(--ui-scaling));
+    /* support the fact that names get blanked when using poolstat */
     z-index: 2;
 }
 
@@ -284,22 +297,24 @@ html, body {
 #scoreBallContainerP1 img {
     padding: 0px 5px 0px 0px;
     position: absolute;
-    top: 50%; 
+    top: 50%;
     left: 15px;
     transform: translateY(-50%);
     z-index: 10;
 }
+
 #scoreBallContainerP2 img {
     padding: 0px 0px 0px 5px;
     position: absolute;
-    top: 50%; 
+    top: 50%;
     right: 15px;
     transform: translateY(-50%);
     z-index: 10;
 }
 
 /* Scores */
-#player1Score, #player2Score {
+#player1Score,
+#player2Score {
     position: relative;
     text-align: center;
     background: #ed4e54;
@@ -313,26 +328,31 @@ html, body {
 }
 
 #player1Score {
-    border-width:2px 2px 2px 0; /* No left border */
+    border-width: 2px 2px 2px 0;
+    /* No left border */
     margin: 0 5px 0 0;
-    box-shadow: 0 8px 16px 0 rgba(0,0,0,0.6);
+    box-shadow: 0 8px 16px 0 rgba(0, 0, 0, 0.6);
 }
 
 #player2Score {
-    border-width:2px 0 2px 2px; /* No right border */
+    border-width: 2px 0 2px 2px;
+    /* No right border */
     margin: 0 0 0 5px;
-    box-shadow: 0 8px 16px 0 rgba(0,0,0,0.6);
+    box-shadow: 0 8px 16px 0 rgba(0, 0, 0, 0.6);
 }
 
 /* Custom logos */
-.customLogo1, .customLogo2 {
+.customLogo1,
+.customLogo2 {
     position: absolute;
     top: 0;
     border: 2px solid black;
-    box-sizing: border-box; /* Includes border in the height calculation */
+    box-sizing: border-box;
+    /* Includes border in the height calculation */
     max-width: auto;
     height: 100%;
-    aspect-ratio: 1 / 1; /* For a square aspect ratio */
+    aspect-ratio: 1 / 1;
+    /* For a square aspect ratio */
     object-fit: cover;
     z-index: 3;
 }
@@ -351,8 +371,10 @@ html, body {
     position: relative;
     display: inline-block;
 }
+
 /* Extension icons */
-#p1ExtIcon, #p2ExtIcon {
+#p1ExtIcon,
+#p2ExtIcon {
     background: green;
     border: solid black;
     color: white;
@@ -366,25 +388,29 @@ html, body {
 
 #p1ExtIcon {
     right: 100%;
-    border-width:2px 0 2px 2px; /* No right border */
-    box-shadow: 0 8px 16px 0 rgba(0,0,0,0.6);
+    border-width: 2px 0 2px 2px;
+    /* No right border */
+    box-shadow: 0 8px 16px 0 rgba(0, 0, 0, 0.6);
 
 }
 
 #p2ExtIcon {
     left: 100%;
-    border-width:2px 2px 2px 0; /* No left border */
-    box-shadow: 0 8px 16px 0 rgba(0,0,0,0.6);
+    border-width: 2px 2px 2px 0;
+    /* No left border */
+    box-shadow: 0 8px 16px 0 rgba(0, 0, 0, 0.6);
 
 }
 
 /* Player images */
-#player1Image, #player2Image {
+#player1Image,
+#player2Image {
     position: absolute;
     top: 0;
     background-color: red;
     border: 2px solid black;
-    box-sizing: border-box; /* Includes border in the height calculation */
+    box-sizing: border-box;
+    /* Includes border in the height calculation */
     height: 100%;
     width: 20%;
     z-index: 4;
@@ -419,12 +445,17 @@ html, body {
 }
 
 @keyframes fade {
-    from {opacity: .4} 
-    to {opacity: 1}
+    from {
+        opacity: .4
+    }
+
+    to {
+        opacity: 1
+    }
 }
 
 .logoSlide {
-    display:none;
+    display: none;
 }
 
 .winBlink {
@@ -436,13 +467,23 @@ html, body {
 }
 
 @keyframes blinking {
-    0% { background-color: #ffffff; }
-    100% { background-color: lightgreen; }
+    0% {
+        background-color: #ffffff;
+    }
+
+    100% {
+        background-color: lightgreen;
+    }
 }
 
 @keyframes extblinking {
-    0% { background-color: green; }
-    100% { background-color: red; }
+    0% {
+        background-color: green;
+    }
+
+    100% {
+        background-color: red;
+    }
 }
 
 .noShow {

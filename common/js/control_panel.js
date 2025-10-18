@@ -55,6 +55,9 @@ function updateReplayControlsVisibility() {
 
 // Call updateTabVisibility on page load to set initial tab visibility
 document.addEventListener("DOMContentLoaded", function () {
+    // In your initialization code
+    loadReplaySources();
+    updateReplayControlsVisibility();
     updateTabVisibility();
 });
 
@@ -1486,10 +1489,6 @@ function updateLayout() {
         }
     }
 }
-
-// In your initialization code
-loadReplaySources();
-updateReplayControlsVisibility(); // Add this line
 
 // Create OBSWebSocket client instance
 const obs = new OBSWebSocket();
