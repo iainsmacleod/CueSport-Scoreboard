@@ -695,8 +695,6 @@ const initializeBallSelection = () => {
 
 // Run ball selection initialization
 initializeBallSelection();
-// Ensure overlay gets current scores after a refresh
-pushScores();
 
 // Functions
 
