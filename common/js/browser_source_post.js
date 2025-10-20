@@ -56,7 +56,7 @@ const handlers = {
             console.log('Changed ball tracker direction to vertical');
         } else if (data.ballTracker === "horizontal") {
             document.getElementById("ballTracker").style.display = "flex";
-            document.getElementById("ballTracker").style.flexDirection = "row";       
+            document.getElementById("ballTracker").style.flexDirection = "row";
             console.log('Changed ball tracker direction to horizontal');
         }
     },
@@ -76,7 +76,7 @@ const handlers = {
 
     opacity(data) {
         console.log(`Opacity setting: ${data.opacity}`);
-        const elements = ["scoreBoardDiv", "gameInfo", "ballTracker", "raceInfo" ];
+        const elements = ["scoreBoardDiv", "gameInfo", "ballTracker", "raceInfo"];
         elements.forEach(id => {
             document.getElementById(id).style.opacity = data.opacity;
         });
@@ -121,7 +121,7 @@ const handlers = {
             document.getElementById("gameInfo").innerHTML = data.game;
         } else {
             document.getElementById("gameInfo").classList.add("noShow");
-            document.getElementById("gameInfo").classList.remove("fadeInElm");        
+            document.getElementById("gameInfo").classList.remove("fadeInElm");
         }
     },
 
@@ -177,7 +177,7 @@ const handlers = {
                 newBothPlayersEnabled
             });
         }
-                
+
         if (data.playerDisplay == "showPlayer") {
             if (useclockEnabled && bothPlayersEnabled) {
                 console.log("Use clock evaluating as enabled");
@@ -193,19 +193,19 @@ const handlers = {
                 document.getElementById("player1Image").classList.replace(activePlayer === "1" ? "fadeOutElm" : "fadeInElm", activePlayer === "1" ? "fadeInElm" : "fadeOutElm");
                 document.getElementById("player2Image").classList.replace(activePlayer === "2" ? "fadeOutElm" : "fadeInElm", activePlayer === "2" ? "fadeInElm" : "fadeOutElm");
             }
-            if (player1Enabled && getStorageItem("useCustomLogo")=="yes") {
+            if (player1Enabled && getStorageItem("useCustomLogo") == "yes") {
                 document.getElementById("customLogo1").classList.replace("fadeOutElm", "fadeInElm");
             }
-            if (player2Enabled && getStorageItem("useCustomLogo2")=="yes") {
+            if (player2Enabled && getStorageItem("useCustomLogo2") == "yes") {
                 document.getElementById("customLogo2").classList.replace("fadeOutElm", "fadeInElm");
             }
             if (bothPlayersEnabled && getStorageItem("raceInfo") && getStorageItem("scoreDisplay") === "yes") {
                 document.getElementById("raceInfo").classList.replace("fadeOutElm", "fadeInElm");
             }
 
-			if (getStorageItem("enableBallTracker") === "true"){
-				document.getElementById("ballTracker").classList.remove("noShow");
-			}
+            if (getStorageItem("enableBallTracker") === "true") {
+                document.getElementById("ballTracker").classList.remove("noShow");
+            }
 
             showPlayer(data.playerNumber);
 
@@ -223,16 +223,16 @@ const handlers = {
             }, 50); // Small delay to ensure localStorage is updated
         };
 
-        if (data.playerDisplay == "hidePlayer") { 
-            hidePlayer(data.playerNumber); 
+        if (data.playerDisplay == "hidePlayer") {
+            hidePlayer(data.playerNumber);
             hideScores();
             hideClock();
             document.getElementById("p1ExtIcon").classList.replace("fadeInElm", "fadeOutElm");
             document.getElementById("p2ExtIcon").classList.replace("fadeInElm", "fadeOutElm");
             document.getElementById("player1Image").classList.replace("fadeInElm", "fadeOutElm");
             document.getElementById("player2Image").classList.replace("fadeInElm", "fadeOutElm");
-            document.getElementById("customLogo"+ data.playerNumber).classList.replace("fadeInElm", "fadeOutElm");
-			document.getElementById("ballTracker").classList.add("noShow");            
+            document.getElementById("customLogo" + data.playerNumber).classList.replace("fadeInElm", "fadeOutElm");
+            document.getElementById("ballTracker").classList.add("noShow");
         };
     },
 
@@ -264,17 +264,17 @@ const handlers = {
             if (data.clockDisplay == "p2ExtReset") { extReset('p2'); };
             if (data.clockDisplay == "hidesalotto") { salottoHide(); };
             if (data.clockDisplay == "showsalotto") { salottoShow(); };
-            if (data.clockDisplay == "hidecustomLogo") { 
-                customHide(); 
+            if (data.clockDisplay == "hidecustomLogo") {
+                customHide();
             }
-            if (data.clockDisplay == "showcustomLogo") { 
-                customShow(); 
+            if (data.clockDisplay == "showcustomLogo") {
+                customShow();
             }
-            if (data.clockDisplay == "hidecustomLogo2") { 
-                custom2Hide(); 
+            if (data.clockDisplay == "hidecustomLogo2") {
+                custom2Hide();
             }
-            if (data.clockDisplay == "showcustomLogo2") { 
-                custom2Show(); 
+            if (data.clockDisplay == "showcustomLogo2") {
+                custom2Show();
             }
             if (data.clockDisplay == "postLogo") { postLogo(); };
             if (data.clockDisplay == "logoSlideShow-show") {
@@ -304,12 +304,12 @@ const handlers = {
 
             if (data.clockDisplay === 'toggleActivePlayer') {
                 const playerToggle = data.player; // Get the active player from the message
-                var activePlayer = playerToggle ? "1": "2";
+                var activePlayer = playerToggle ? "1" : "2";
                 console.log(`Toggle to player ${activePlayer}`);
                 changeActivePlayer(playerToggle); // Call the function to update the display
             }
 
-            if (data.clockDisplay === 'showActivePlayer'){
+            if (data.clockDisplay === 'showActivePlayer') {
                 const activePlayer = data.player; // Get the active player from the message
                 const player1Enabled = getStorageItem("usePlayer1") === "yes";
                 const player2Enabled = getStorageItem("usePlayer2") === "yes";
@@ -322,7 +322,7 @@ const handlers = {
                     changeActivePlayer(activePlayer); // Call the function to update the display
                 }
             }
-            if (data.clockDisplay === 'hideActivePlayer'){
+            if (data.clockDisplay === 'hideActivePlayer') {
                 document.getElementById("player1Image").classList.replace("fadeInElm", "fadeOutElm");
                 document.getElementById("player2Image").classList.replace("fadeInElm", "fadeOutElm");
             }
@@ -364,7 +364,7 @@ const handlers = {
             console.warn('Ball tracker element not found in DOM');
             return;
         }
-        
+
         if (data.displayBallTracker === true) {
             ballTracker.classList.remove("noShow");
             console.log('Show ball tracker');
@@ -373,8 +373,8 @@ const handlers = {
             console.log('Hide ball tracker');
         }
     },
-    
-	gameType(data) {
+
+    gameType(data) {
         console.log('Game type value:', data.gameType);
         if (data.gameType === "game2") {
             // 9-ball
@@ -403,7 +403,7 @@ const handlers = {
     ballType(data) {
         console.log('Ball type changed to:', data.ballType);
         setStorageItem("ballSelection", data.ballType);
-        
+
         // Update current ball display if ball set is active
         const currentBallSet = getStorageItem("playerBallSet");
         if (currentBallSet && currentBallSet !== "p1Open") {
@@ -414,13 +414,13 @@ const handlers = {
 
     playerBallSet(data) {
         console.log('Player ball set value:', data.playerBallSet);
-        var ballType= getStorageItem("ballSelection");
+        var ballType = getStorageItem("ballSelection");
         var p1 = document.getElementById("currentBallP1");
         var p2 = document.getElementById("currentBallP2");
         console.log(p1);
         console.log(p2);
         if (data.playerBallSet === "p1red/smalls") {
-            if (ballType === "american"){
+            if (ballType === "american") {
                 document.getElementById("currentBallP1").src = "common/images/1ball_small.png";
                 document.getElementById("currentBallP1").classList.remove("noShow");
                 document.getElementById("scoreBallContainerP1").classList.remove("noShow");
@@ -436,7 +436,7 @@ const handlers = {
                 document.getElementById("scoreBallContainerP2").classList.remove("noShow");
             }
         } else if (data.playerBallSet === "p1yellow/bigs") {
-            if (ballType === "american"){
+            if (ballType === "american") {
                 document.getElementById("currentBallP1").src = "common/images/15ball_small.png";
                 document.getElementById("scoreBallContainerP1").classList.remove("noShow");
                 document.getElementById("currentBallP2").src = "common/images/1ball_small.png";
@@ -448,8 +448,8 @@ const handlers = {
                 document.getElementById("scoreBallContainerP2").classList.remove("noShow");;
             }
         } else if (data.playerBallSet === "p1Open") {
-                document.getElementById("scoreBallContainerP1").classList.add("noShow");
-                document.getElementById("scoreBallContainerP2").classList.add("noShow");
+            document.getElementById("scoreBallContainerP1").classList.add("noShow");
+            document.getElementById("scoreBallContainerP2").classList.add("noShow");
         }
     }
 };
@@ -471,7 +471,7 @@ bc.onmessage = (event) => {
 //							autostart stuff
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-$(document).ready(function() {
+$(document).ready(function () {
     // Initialize draggable elements
     $("#scoreBoard").draggable();
     $("#gameInfo").draggable();
@@ -496,35 +496,35 @@ if (getStorageItem("activePlayer") === null) {
 setCustomLogo("customLogo1", "useCustomLogo", "usePlayer1");
 setCustomLogo("customLogo2", "useCustomLogo2", "usePlayer2");
 
-if (getStorageItem("gameType") === "game2"){
-	document.getElementById("ball 10").classList.add("noShow");
-	document.getElementById("ball 11").classList.add("noShow");
-	document.getElementById("ball 12").classList.add("noShow");
-	document.getElementById("ball 13").classList.add("noShow");
-	document.getElementById("ball 14").classList.add("noShow");
-	document.getElementById("ball 15").classList.add("noShow");
-} else if (getStorageItem("gameType") === "game3"){
-	document.getElementById("ball 10").classList.remove("noShow");
-	document.getElementById("ball 11").classList.add("noShow");
-	document.getElementById("ball 12").classList.add("noShow");
-	document.getElementById("ball 13").classList.add("noShow");
-	document.getElementById("ball 14").classList.add("noShow");
-	document.getElementById("ball 15").classList.add("noShow");
+if (getStorageItem("gameType") === "game2") {
+    document.getElementById("ball 10").classList.add("noShow");
+    document.getElementById("ball 11").classList.add("noShow");
+    document.getElementById("ball 12").classList.add("noShow");
+    document.getElementById("ball 13").classList.add("noShow");
+    document.getElementById("ball 14").classList.add("noShow");
+    document.getElementById("ball 15").classList.add("noShow");
+} else if (getStorageItem("gameType") === "game3") {
+    document.getElementById("ball 10").classList.remove("noShow");
+    document.getElementById("ball 11").classList.add("noShow");
+    document.getElementById("ball 12").classList.add("noShow");
+    document.getElementById("ball 13").classList.add("noShow");
+    document.getElementById("ball 14").classList.add("noShow");
+    document.getElementById("ball 15").classList.add("noShow");
 } else {
-	document.getElementById("ball 10").classList.remove("noShow");
-	document.getElementById("ball 11").classList.remove("noShow");
-	document.getElementById("ball 12").classList.remove("noShow");
-	document.getElementById("ball 13").classList.remove("noShow");
-	document.getElementById("ball 14").classList.remove("noShow");
-	document.getElementById("ball 15").classList.remove("noShow");
+    document.getElementById("ball 10").classList.remove("noShow");
+    document.getElementById("ball 11").classList.remove("noShow");
+    document.getElementById("ball 12").classList.remove("noShow");
+    document.getElementById("ball 13").classList.remove("noShow");
+    document.getElementById("ball 14").classList.remove("noShow");
+    document.getElementById("ball 15").classList.remove("noShow");
 }
 
 if (getStorageItem("customLogo3") != null) { document.getElementById("customLogo3").src = getStorageItem("customLogo3"); } else { document.getElementById("customLogo3").src = "./common/images/placeholder.png"; };
 if (getStorageItem("customLogo4") != null) { document.getElementById("customLogo4").src = getStorageItem("customLogo4"); } else { document.getElementById("customLogo4").src = "./common/images/placeholder.png"; };
 if (getStorageItem("customLogo5") != null) { document.getElementById("customLogo5").src = getStorageItem("customLogo5"); } else { document.getElementById("customLogo5").src = "./common/images/placeholder.png"; };
 if (getStorageItem("slideShow") == "yes") {
-	document.getElementById("logoSlideshowDiv").classList.replace("fadeOutElm", "fadeInElm");
-	document.getElementById("logoSlideshowDiv").classList.replace("fadeOutElm", "fadeInElm");
+    document.getElementById("logoSlideshowDiv").classList.replace("fadeOutElm", "fadeInElm");
+    document.getElementById("logoSlideshowDiv").classList.replace("fadeOutElm", "fadeInElm");
 }
 
 
@@ -599,8 +599,8 @@ if (gameInfo && gameInfo.trim() !== "") {
 
 
 if (getStorageItem("raceInfo") != "" && getStorageItem("raceInfo") != null && bothPlayersEnabled && getStorageItem("scoreDisplay") === "yes") {
-	document.getElementById("raceInfo").classList.remove("noShow");
-	document.getElementById("raceInfo").classList.add("fadeInElm");
+    document.getElementById("raceInfo").classList.remove("noShow");
+    document.getElementById("raceInfo").classList.add("fadeInElm");
     var racenNum = parseInt(getStorageItem("raceInfo"));
     console.log(typeof racenNum);
     if (typeof racenNum === "number") { //It is a number only value
@@ -608,9 +608,9 @@ if (getStorageItem("raceInfo") != "" && getStorageItem("raceInfo") != null && bo
     } else { // It has Alphanumeric Charachers
         document.getElementById("raceInfo").innerHTML = getStorageItem("raceInfo");
     }
-    
-	document.getElementById("customLogo1").classList.add("customLogoWide1");
-	document.getElementById("customLogo2").classList.add("customLogoWide2");
+
+    document.getElementById("customLogo1").classList.add("customLogoWide1");
+    document.getElementById("customLogo2").classList.add("customLogoWide2");
 }
 
 
@@ -631,38 +631,38 @@ if (getStorageItem("useClock") == "yes" && bothPlayersEnabled) {
 }
 
 if (getStorageItem(("usePlayer1")) != "yes") {
-	document.getElementById("player1Name").classList.replace("fadeInElm", "fadeOutElm");
-	document.getElementById("player1Score").classList.replace("fadeInElm", "fadeOutElm");
-	document.getElementById("player2Score").classList.replace("fadeInElm", "fadeOutElm");
+    document.getElementById("player1Name").classList.replace("fadeInElm", "fadeOutElm");
+    document.getElementById("player1Score").classList.replace("fadeInElm", "fadeOutElm");
+    document.getElementById("player2Score").classList.replace("fadeInElm", "fadeOutElm");
 }
 if (getStorageItem(("usePlayer2")) != "yes") {
-	document.getElementById("player2Name").classList.replace("fadeInElm", "fadeOutElm");
-	document.getElementById("player1Score").classList.replace("fadeInElm", "fadeOutElm");
-	document.getElementById("player2Score").classList.replace("fadeInElm", "fadeOutElm");
+    document.getElementById("player2Name").classList.replace("fadeInElm", "fadeOutElm");
+    document.getElementById("player1Score").classList.replace("fadeInElm", "fadeOutElm");
+    document.getElementById("player2Score").classList.replace("fadeInElm", "fadeOutElm");
 }
 
 if (getStorageItem('p1colorSet') != "") {
-	document.getElementById("player1Name").style.background = "linear-gradient(to left, white, " + getStorageItem('p1colorSet');
-	console.log("p1color: " + getStorageItem('p1colorSet'));
+    document.getElementById("player1Name").style.background = "linear-gradient(to left, white, " + getStorageItem('p1colorSet');
+    console.log("p1color: " + getStorageItem('p1colorSet'));
 }
 if (getStorageItem('p2colorSet') != "") {
-	document.getElementById("player2Name").style.background = "linear-gradient(to right, white, " + getStorageItem('p2colorSet');
-	console.log("p2color: " + getStorageItem('p2colorSet'));
+    document.getElementById("player2Name").style.background = "linear-gradient(to right, white, " + getStorageItem('p2colorSet');
+    console.log("p2color: " + getStorageItem('p2colorSet'));
 }
 
-if (getStorageItem("enableBallTracker") === "false" || getStorageItem("enableBallTracker") === null){
-	document.getElementById("ballTracker").classList.add("noShow");
-	console.log(`Ball tracker disabled on overlay`);
+if (getStorageItem("enableBallTracker") === "false" || getStorageItem("enableBallTracker") === null) {
+    document.getElementById("ballTracker").classList.add("noShow");
+    console.log(`Ball tracker disabled on overlay`);
 } else {
-	document.getElementById("ballTracker").classList.remove("noShow");
-	console.log(`Ball tracker enabled on overlay`);
+    document.getElementById("ballTracker").classList.remove("noShow");
+    console.log(`Ball tracker enabled on overlay`);
 }
 
 // On browser_source.html load, check stored direction and apply it
 const initializeBallTracker = () => {
     const direction = getStorageItem("ballTrackerDirection") || "vertical";
     const ballTracker = document.getElementById("ballTracker");
-    
+
     if (ballTracker) {
         ballTracker.style.display = "flex";
         ballTracker.style.flexDirection = direction === "vertical" ? "column" : "row";
@@ -695,8 +695,6 @@ const initializeBallSelection = () => {
 
 // Run ball selection initialization
 initializeBallSelection();
-// Ensure overlay gets current scores after a refresh
-pushScores();
 
 // Functions
 
@@ -738,7 +736,7 @@ function initializeBrowserSourceExtensionStatus() {
             p1ExtIcon.style.color = "";
         }
     }
-    
+
     // Update styling for Player 2's extension element
     if (p2ExtIcon) {
         if (extStatus2 && extStatus2 === "enabled") {
@@ -757,9 +755,9 @@ function initializeBrowserSourceExtensionStatus() {
     if (savedBallSet && savedBallSet !== "p1Open") {
         // Apply the saved ball set selection
         const ballType = getStorageItem("ballSelection");
-        
+
         if (savedBallSet === "p1red/smalls") {
-            if (ballType === "american"){
+            if (ballType === "american") {
                 document.getElementById("currentBallP1").src = "common/images/1ball_small.png";
                 document.getElementById("currentBallP1").classList.remove("noShow");
                 document.getElementById("scoreBallContainerP1").classList.remove("noShow");
@@ -775,7 +773,7 @@ function initializeBrowserSourceExtensionStatus() {
                 document.getElementById("scoreBallContainerP2").classList.remove("noShow");
             }
         } else if (savedBallSet === "p1yellow/bigs") {
-            if (ballType === "american"){
+            if (ballType === "american") {
                 document.getElementById("currentBallP1").src = "common/images/15ball_small.png";
                 document.getElementById("scoreBallContainerP1").classList.remove("noShow");
                 document.getElementById("currentBallP2").src = "common/images/1ball_small.png";
