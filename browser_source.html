@@ -18,19 +18,20 @@ for more information about Salotto please visit https://salotto.app
 	<script>
 		// Apply scaling immediately before page renders
 		const uiScaling = localStorage.getItem('uiScalingValue') || 100;
-		document.documentElement.style.setProperty('--ui-scaling', uiScaling/100);
+		document.documentElement.style.setProperty('--ui-scaling', uiScaling / 100);
 		// Add event listener for when DOM is fully loaded
-        document.addEventListener('DOMContentLoaded', function() {
-            const opacity = localStorage.getItem('overlayOpacity') || 100;
-            const elements = ["scoreBoardDiv", "gameInfo", "ballTracker"];
-            elements.forEach(id => {
-                const element = document.getElementById(id);
-                if (element) {
-                    element.style.opacity = opacity/100;
-                }
-            });
-        });
-	</script><script src="./common/js/jquery.js"></script>
+		document.addEventListener('DOMContentLoaded', function () {
+			const opacity = localStorage.getItem('overlayOpacity') || 100;
+			const elements = ["scoreBoardDiv", "gameInfo", "ballTracker"];
+			elements.forEach(id => {
+				const element = document.getElementById(id);
+				if (element) {
+					element.style.opacity = opacity / 100;
+				}
+			});
+		});
+	</script>
+	<script src="./common/js/jquery.js"></script>
 	<script src="./common/js/browser_source.js"></script>
 	<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
 	<link rel="stylesheet" href="./common/css/browser_source/required.css" />
@@ -65,6 +66,9 @@ for more information about Salotto please visit https://salotto.app
 		<div class="mySlides logoSlide fade"><img id="customLogo4" src=""></div>
 		<div class="mySlides logoSlide fade"><img id="customLogo5" src=""></div>
 	</div>
+	
+	<!-- Race to & Game Info in center -->
+
 
 	<div id="scoreBoardDiv" class="fadeInElm">
 		<!-- Shot clock container -->
@@ -74,8 +78,8 @@ for more information about Salotto please visit https://salotto.app
 		</div>
 		<!-- Main scoreboard container -->
 		<div id="scoreBoard">
-			
-		  <!-- Player 1 section -->
+
+			<!-- Player 1 section -->
 			<div class="player-container left">
 				<div class="ext-image-container">
 					<div id="p1ExtIcon" class="fadeInElm">Ex</div>
@@ -86,15 +90,12 @@ for more information about Salotto please visit https://salotto.app
 				</div>
 				<div id="player1Name" class="fadeInElm">
 					<span>Player 1</span>
-				</div>		
+				</div>
 				<div class="score-logo-container">
 					<img class="fadeOutElm customLogo1" id="customLogo1" src="">
 					<div id="player1Score" class="fadeInElm">0</div>
 				</div>
 		  </div>
-
-		  <!-- Race info in center -->
-		  <div id="raceInfo" class="noShow fadeInElm"></div>
 		  
 		  <!-- Player 2 section -->
 		  <div class="player-container right">
@@ -112,9 +113,9 @@ for more information about Salotto please visit https://salotto.app
 					<div id="player2Image" class="fadeOutElm"></div>
 					<div id="p2ExtIcon" class="fadeInElm">Ex</div>
 				</div>
-		  </div>
+			</div>
 		</div>
-	  </div>
+	</div>
 	<script src="./common/js/browser_source_post.js"></script>
 </body>
 
