@@ -17,6 +17,15 @@
 // Get instance from URL or use 'default'
 const urlParams = new URLSearchParams(window.location.search);
 const INSTANCE_ID = urlParams.get('instance') || '';
+// Create OBSWebSocket client instance
+const obs = new OBSWebSocket();
+// Track readiness (post-Identify)
+let isObsReady = false;
+// UI button click handlers, async and awaiting hotkey dispatch
+let isMonitoringActive = false;
+// Track if we have a saved clip ready to replay
+let hasSavedClip = false;
+let isConnected = false;
 
 function updateTabVisibility() {
     // Get the state of the player settings
@@ -38,10 +47,10 @@ function updateTabVisibility() {
 function updateReplayControlsVisibility() {
     const replaySectionHeader = document.getElementById('replayLabel');
     const replayControlsDiv = document.getElementById('replay-controls');
-    
+
     const sceneName = getStorageItem("replaySceneName") || "";
     const videoSource = getStorageItem("replayVideoSourceName") || "";
-    
+
     if (!sceneName || !videoSource) {
         // Hide replay controls if either required field is empty
         replaySectionHeader.classList.add('noShow');
@@ -1490,22 +1499,89 @@ function updateLayout() {
     }
 }
 
-// Create OBSWebSocket client instance
-const obs = new OBSWebSocket();
+document.addEventListener('DOMContentLoaded', () => {
+    const toggleBtn = document.getElementById('togglePassword');
+    const passwordInput = document.getElementById('obsPassword');
 
-// Track readiness (post-Identify)
-let isObsReady = false;
+    // Only add toggle event listener if password field exists
+    if (toggleBtn && passwordInput) {
+        toggleBtn.style.display = passwordInput.value ? 'flex' : 'none';
 
-// Connect to OBS WebSocket server once DOM and library are ready
+        toggleBtn.addEventListener('click', () => {
+            if (!passwordInput.value) return; // Do nothing if no password
+
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                toggleBtn.textContent = 'Hide';
+            } else {
+                passwordInput.type = 'password';
+                toggleBtn.textContent = 'Show';
+            }
+        });
+
+        // Optionally, listen to input changes to hide/show button dynamically
+        passwordInput.addEventListener('input', () => {
+            toggleBtn.style.display = passwordInput.value ? 'flex' : 'none';
+            // Reset input type and button text when emptied
+            if (!passwordInput.value) {
+                passwordInput.type = 'password';
+                toggleBtn.textContent = 'Show';
+            }
+        });
+    }
+});
+
+function getObsAddress() {
+    const input = document.getElementById('obsAddress');
+    const address = input ? input.value.trim() : '';
+    return address || 'ws://127.0.0.1:4455'; // fallback to default if empty
+}
+
+function getObsPassword() {
+    const input = document.getElementById('obsPassword');
+    const password = input ? input.value.trim() : '';
+    return password || ''; // fallback to default if empty
+}
+
 async function connectToObsWebSocket() {
-    try {
-        // If your OBS WebSocket has a password, pass it as the 2nd arg
-        // Example: await obs.connect('ws://127.0.0.1:4455', 'your_password');
-        await obs.connect('ws://127.0.0.1:4455');
-        // At this point ConnectionOpened has fired, but wait for Identified
-        console.log('OBS WebSocket: Connection opened, awaiting Identify...');
-    } catch (err) {
-        console.error('Failed to connect:', err);
+    if (isConnected) {
+        await toggleReplayMonitoring();
+        // Disconnect
+        try {
+            await obs.disconnect();
+            isConnected = false;
+            updateConnectButton();
+            console.log('Disconnected from OBS WebSocket');
+        } catch (err) {
+            console.error('Failed to disconnect:', err);
+            alert('Failed to disconnect: ' + (err.message || err.toString()));
+        }
+    } else {
+        // Connect
+        const address = getObsAddress();
+        const password = getObsPassword();
+
+        try {
+            await obs.connect(address, password); // Pass both URL and password
+            isConnected = true;
+            updateConnectButton();
+            console.log('OBS WebSocket: Connected and authenticated');
+        } catch (err) {
+            console.error('Failed to connect:', err);
+            alert('Failed to connect.\n\nDetails: ' + (err.message || err.toString()));
+        }
+    }
+}
+
+function updateConnectButton() {
+    const connectBtn = document.getElementById('connectBtn');
+    if (!connectBtn) return;
+    if (isConnected) {
+        connectBtn.textContent = 'Disconnect';
+        connectBtn.style.backgroundColor = 'red';
+    } else {
+        connectBtn.textContent = 'Connect';
+        connectBtn.style.backgroundColor = 'green';
     }
 }
 
@@ -1611,20 +1687,19 @@ function setButtonsEnabled(enabled) {
     });
 }
 setButtonsEnabled(false);
-
-// Immediately connect after defining
-connectToObsWebSocket();
-
-// UI button click handlers, async and awaiting hotkey dispatch
-let isMonitoringActive = false;
-// Track if we have a saved clip ready to replay
-let hasSavedClip = false;
-
 // UI helpers
 function setMonitorButtonText() {
     const btn = document.getElementById('btnMonitorGame');
     if (!btn) return;
-    btn.textContent = isMonitoringActive ? 'Stop Monitoring' : 'Resume Monitoring';
+    if (isMonitoringActive) {
+        btn.textContent = 'Stop Monitoring';
+        btn.style.backgroundColor = 'red';  // red fill for Stop Monitoring
+        btn.style.color = 'white';           // optionally set text color for contrast
+    } else {
+        btn.textContent = 'Resume Monitoring';
+        btn.style.backgroundColor = 'green'; // green fill for Resume Monitoring
+        btn.style.color = 'white';            // optionally set text color
+    }
 }
 
 function setReplayButtonText() {
@@ -1661,7 +1736,10 @@ function waitForReplaySaved(timeoutMs = 7000) {
 
 // Replay/Restart Clip handler
 async function triggerReplayClip() {
-    if (!isObsReady) return;
+    if (!isObsReady) {
+        alert('Failed to control OBS: OBS connection is not ready, most likely the websocket connection has not been setup.');
+        return;
+      }
 
     // If we already have a saved clip, just restart it
     if (hasSavedClip) {
@@ -1756,7 +1834,10 @@ async function triggerReplayClip() {
 
 // Monitor toggle
 async function toggleReplayMonitoring() {
-    if (!isObsReady) return;
+    if (!isObsReady) {
+        alert('Failed to initiate monitoring: OBS connection is not ready, most likely the websocket connection has not been setup.');
+        return;
+      }
     try {
         if (!isMonitoringActive) {
             // Resume monitoring: stop any active replay first

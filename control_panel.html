@@ -55,11 +55,13 @@ for more information about Salotto please visit https://salotto.app
         </div> <!-- Header-->
         <!-- Tab navigation inside the main division -->
         <div class="tab">
-            <button id="gameInfoTab" class="tablinks" onclick="openTab(event, 'GameInfo')">Game Information</button>
+            <button id="gameInfoTab" class="tablinks" onclick="openTab(event, 'GameInfo')">Game Setup</button>
             <button id="scoringTab" class="tablinks" onclick="openTab(event, 'Scoring')">Scoring</button>
-            <button id="imagesTab" class="tablinks" onclick="openTab(event, 'Images')">Images</button>
+            <button id="imagesTab" class="tablinks" onclick="openTab(event, 'Images')">Image &#x2699;</button>
+            <button id="replaySettingsTab" class="tablinks" onclick="openTab(event, 'ReplaySettings')">Replay
+                &#x2699;</button>
             <button id="generalSettingsTab" class="tablinks" onclick="openTab(event, 'GeneralSettings')">General
-                Settings</button>
+                &#x2699;</button>
         </div>
         <!-- Player/Team/Game Information Tab -->
         <div id="GameInfo" class="tabcontent">
@@ -240,7 +242,7 @@ for more information about Salotto please visit https://salotto.app
             <!-- OBS Replay Controls -->
             <div class="section-header noShow" id="replayLabel">Replay Controls</div>
             <div class="column noShow" id="replay-controls">
-                <button id="btnMonitorGame" class="hover obs28 button" onclick="toggleReplayMonitoring()">Monitor
+                <button id="btnMonitorGame" class="hover obs28 button" style="background-color:green;" onclick="toggleReplayMonitoring()">Monitor
                     Game</button>
                 <button id="btnReplayClip" class="hover obs28 button" onclick="triggerReplayClip()">Replay Clip</button>
             </div>
@@ -343,6 +345,57 @@ for more information about Salotto please visit https://salotto.app
                 </div>
             </div>
         </div> <!-- Images Tab-->
+        <!-- Replay Settings Tab -->
+        <div id="ReplaySettings" class="tabcontent">
+            <div class="section-header" id="replaySettingsLabel">WebSocket Settings</div>
+            <div class="column form-rows">
+                <div class="form-row">
+                    <div class="field">
+                        <label for="obsAddress">OBS WebSocket Address:</label>
+                        <input type="text" id="obsAddress" value="ws://127.0.0.1:4455" />
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="field">
+                        <label for="obsPassword">Password:</label>
+                        <div style="display: flex; align-items: center;">
+                            <input type="password" id="obsPassword" placeholder="Enter password" />
+                        </div>
+                    </div>
+                    <div class="field">
+                        <div class="hover obs28 button" id="togglePassword">Show</div>
+                    </div>
+                    <div class="field">
+                        <div class="hover obs28 button" id="connectBtn" style="background-color:green;" onclick="connectToObsWebSocket()">Connect</div>
+                    </div>
+                </div>
+                <div class="section-header" id="replaySettingsLabel">Replay Source Settings</div>
+                <div class="form-row">
+                    <div class="field">
+                        <label>Scene Name: </label>
+                        <input style="width: 150px" type="text" id="replaySceneName" placeholder="" />
+                    </div>
+                    <div class="field">
+                        <label>Video Source Name: </label>
+                        <input style="width: 150px" type="text" id="replayVideoSourceName" placeholder="" />
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="field">
+                        <label>Indictor Source Name (Optional): </label>
+                        <input style="width: 150px" type="text" id="replayIndicatorSourceName" placeholder="" />
+                    </div>
+                </div>
+                <div class="form-row">
+                    <span></span>
+                    <div class="field">
+                        <div class="hover obs28 button" id="sendSourceInfo" onclick="postSources()">
+                            Update Sources
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div> <!-- Replay Settings Tab-->
         <!-- General Settings Tab -->
         <div id="GeneralSettings" class="tabcontent">
             <div class="section-header" id="uiSettingLabel">UI Setting</div>
@@ -410,7 +463,8 @@ for more information about Salotto please visit https://salotto.app
                     <input type="checkbox" class="smallSize" id="useToggleSetting" onchange="toggleSetting()" />
                 </div>
                 <div>
-                    Win Animation<input type="checkbox" class="smallSize" id="winAnimation" onchange="toggleAnimationSetting()" />
+                    Win Animation<input type="checkbox" class="smallSize" id="winAnimation"
+                        onchange="toggleAnimationSetting()" />
                 </div>
             </div>
             <div class="section-header" id="feaureSettingLabel">
@@ -441,28 +495,6 @@ for more information about Salotto please visit https://salotto.app
                             <option value="international">International (Red/Yellow)</option>
                         </select>
                     </span>
-                </div>
-            </div>
-            <div class="section-header" id="replaySettingsLabel">Replay Source Settings</div>
-            <div class="column form-rows">
-                <div class="form-row">
-                    <div class="field">
-                        <label>Scene Name: </label>
-                        <input style="width: 150px" type="text" id="replaySceneName" placeholder="" />
-                    </div>
-                    <div class="field">
-                        <label>Video Source Name: </label>
-                        <input style="width: 150px" type="text" id="replayVideoSourceName" placeholder="" />
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="field">
-                        <label>Indictor Source Name (Optional): </label>
-                        <input style="width: 150px" type="text" id="replayIndicatorSourceName" placeholder="" />
-                    </div>
-                    <div class="hover obs28 button" id="sendSourceInfo" onclick="postSources()">
-                        Update Sources
-                    </div>
                 </div>
             </div>
             <div class="section-header" id="updateCheckLabel">Version Check</div>
