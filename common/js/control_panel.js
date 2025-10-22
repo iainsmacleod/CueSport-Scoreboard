@@ -1603,8 +1603,22 @@ async function showSource(sceneName, sourceName) {
 }
 
 async function hideSource(sceneName, sourceName) {
-    const id = await getSceneItemId(sceneName, sourceName);
-    await obs.call('SetSceneItemEnabled', { sceneName, sceneItemId: id, sceneItemEnabled: false });
+    if (!sourceName || sourceName.trim() === "") {
+        console.warn(`No source name provided for hiding in scene "${sceneName}". Skipping.`);
+        return;
+    }
+
+    try {
+        const id = await getSceneItemId(sceneName, sourceName);
+        if (id === null || id === undefined) {
+            console.warn(`Source "${sourceName}" not found in scene "${sceneName}".`);
+            return;
+        }
+        await obs.call('SetSceneItemEnabled', { sceneName, sceneItemId: id, sceneItemEnabled: false });
+        console.log(`Source "${sourceName}" hidden in scene "${sceneName}".`);
+    } catch (error) {
+        console.error(`Failed to hide source "${sourceName}" in scene "${sceneName}":`, error);
+    }
 }
 
 const settings = getReplaySettings();
@@ -1651,8 +1665,11 @@ obs.on('ReplayBufferSaved', async ({ savedReplayPath }) => {
     try {
         const { sceneName, videoSource, indicatorSource } = getReplaySettings();
 
-        await showSource(sceneName, videoSource); // before replay
-        await showSource(sceneName, indicatorSource); // before replay
+        await showSource(sceneName, videoSource); // always show videoSource
+
+        if (indicatorSource) {
+            await showSource(sceneName, indicatorSource); // only if indicator source is set
+        }
 
         // Restart playback to begin from the start
         await obs.call('TriggerMediaInputAction', {
@@ -1751,8 +1768,10 @@ async function triggerReplayClip() {
     // If we already have a saved clip, just restart it
     if (hasSavedClip) {
         const { sceneName, videoSource, indicatorSource } = getReplaySettings();
-        await showSource(sceneName, videoSource); // before replay
-        await showSource(sceneName, indicatorSource); // before replay
+        await showSource(sceneName, videoSource); // always show videoSource
+        if (indicatorSource) {
+            await showSource(sceneName, indicatorSource); // only if indicator source is set
+        }
 
         try {
             await obs.call('TriggerMediaInputAction', {
@@ -1876,8 +1895,10 @@ async function playPreviousReplay(index) {
 
     const filePath = replayHistory[index];
     const { sceneName, videoSource, indicatorSource } = getReplaySettings();
-    await showSource(sceneName, videoSource);
-    await showSource(sceneName, indicatorSource);
+    await showSource(sceneName, videoSource); // always show videoSource
+    if (indicatorSource) {
+        await showSource(sceneName, indicatorSource); // only if indicator source is set
+    }
 
     try {
         // Preserve full input settings before modification
