@@ -1499,8 +1499,9 @@ function checkForUpdate() {
         .then(data => {
             const latestVersion = data.tag_name.replace(/^v/, '');
             if (compareVersions(latestVersion, versionNum) > 0) {
-                updateStatus.innerHTML = `Update available! Latest version: ${latestVersion}<br>
-                    <a href="${data.html_url}" target="_blank" rel="noopener noreferrer style="color: red;">Download Update</a>`;
+                updateStatus.innerHTML = `Update available! Latest version: ${latestVersion}&nbsp; 
+<a href="${data.html_url}" target="_blank" rel="noopener noreferrer" style="color: red;">Download Update</a>`;
+
             } else {
                 updateStatus.textContent = "You have the latest version.";
             }
