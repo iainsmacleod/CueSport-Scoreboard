@@ -279,6 +279,11 @@ input {
 	/* This ensures the controls are grouped together */
 }
 
+.tooltip {
+	position: relative;
+	display: inline-block;
+}
+
 .tooltip .tooltiptext {
 	visibility: hidden;
 	background: rgba(0, 0, 0, 0.6);
@@ -289,11 +294,19 @@ input {
 	bottom: 100%;
 	left: 50%;
 	margin-left: -80px;
+	color: white;
+	white-space: normal;
+	max-width: 300px;
+	width: max-content;       /* expand to fit content */
+	transition: opacity 1s ease 1s;
+	opacity: 0;
 }
 
 .tooltip:hover .tooltiptext {
+	opacity: 1;
 	visibility: visible;
 }
+
 
 .column {
 	display: flex;
@@ -457,6 +470,7 @@ input:checked+.slider_round:before {
 	display: flex;
 	justify-content: stretch;
 	width: 674px;
+	height: 55px;
 }
 
 .tab button {
@@ -485,7 +499,7 @@ input:checked+.slider_round:before {
 	border-radius: 10px 10px 0px 0px;
 	border: 2px solid transparent;
 	/* prevent bounce effect from apparent defout border on tab */
-	border-bottom-width: 0px;
+	border-bottom-width: -2px;
 }
 
 .tabcontent {

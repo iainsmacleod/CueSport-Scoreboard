@@ -163,8 +163,12 @@ for more information about Salotto please visit https://salotto.app
                 <div class="hover obs28 button" id="resetScores" onclick="resetScores()">
                     Reset Scores
                 </div>
-                <div class="hover obs28 button" id="sendPScores" onclick="pushScores()">
-                    Push Scores
+                <div class="tooltip">
+                    <div class="hover obs28 button" id="sendPScores" onclick="pushScores()">
+                        Push Scores
+                    </div>
+                    <span class="tooltiptext">Manual adjustments to scores can be entered directly in each players score
+                        box, use "Push Scores" to update the overlay.</span>
                 </div>
             </div>
             <!-- Player Toggle -->
@@ -242,9 +246,26 @@ for more information about Salotto please visit https://salotto.app
             <!-- OBS Replay Controls -->
             <div class="section-header noShow" id="replayLabel">Replay Controls</div>
             <div class="column noShow" id="replay-controls">
-                <button id="btnMonitorGame" class="hover obs28 button" style="background-color:green;" onclick="toggleReplayMonitoring()">Monitor
-                    Game</button>
-                <button id="btnReplayClip" class="hover obs28 button" onclick="triggerReplayClip()">Replay Clip</button>
+                <div class="tooltip">
+                    <button id="btnMonitorGame" class="hover obs28 button" style="background-color:green;"
+                        onclick="toggleReplayMonitoring()">
+                        Monitor Game
+                    </button>
+                    <span class="tooltiptext">Start or stop monitoring the game for replay capability.<br><br>Note:
+                        Replay Buffer must be enabled and configured under Edit | Settings | Video in OBS. Additionally, WebSocket must be setup and connected to allow control.</span>
+                </div>
+                <div class="tooltip">
+                    <button id="btnReplayClip" class="btnReplayClip hover obs28 button noShow" onclick="triggerReplayClip()">Instant Replay</button>
+                    <span class="tooltiptext">Save and replay up to last X seconds or restart previously recorded
+                        clip.<br><br>Note: X equals OBS defined Maximum Replay Time.</span>
+                </div>
+            </div>
+            <div class="column">
+                <button id="prvReplayClip1" class="prvReplayClip1 hover obs28 button" onclick="playPreviousReplay(0)">Clip 1</button>
+                <button id="prvReplayClip2" class="prvReplayClip2 hover obs28 button" onclick="playPreviousReplay(1)">Clip 2</button>
+                <button id="prvReplayClip3" class="prvReplayClip3 hover obs28 button" onclick="playPreviousReplay(2)">Clip 3</button>
+                <button id="prvReplayClip4" class="prvReplayClip4 hover obs28 button" onclick="playPreviousReplay(3)">Clip 4</button>
+                <button id="prvReplayClip5" class="prvReplayClip5 hover obs28 button" onclick="playPreviousReplay(4)">Clip 5</button>
             </div>
             <!-- Shot Clock -->
             <div class="section-header" id="clockControlLabel">Clock Controls</div>
@@ -292,29 +313,35 @@ for more information about Salotto please visit https://salotto.app
                     Custom/Sponsor Slideshow
                     <input class="smallSize" type="checkbox" id="logoSlideshowChk" onchange="logoSlideshow()" />
                 </span>
-                <div class="tooltip obs28 button hover" id="logoSsImg3">
-                    <input type="file" id="FileUploadL3" onchange="logoPost(this,3)"
-                        accept="image/png, image/jpeg, image/svg+xml, image/bmp" />
-                    <span id="FileUploadLText3">L1</span>
-                    <span class="tooltiptext">
-                        <img id="l3Img" src="" style="height: 100px; max-width: 300px" />
-                    </span>
+                <div class="tooltip">
+                    <div class="obs28 button hover" id="logoSsImg3">
+                        <input type="file" id="FileUploadL3" onchange="logoPost(this,3)"
+                            accept="image/png, image/jpeg, image/svg+xml, image/bmp" />
+                        <span id="FileUploadLText3">L1</span>
+                        <span class="tooltiptext">
+                            <img id="l3Img" src="" style="height: 100px; max-width: 300px" />
+                        </span>
+                    </div>
                 </div>
-                <div class="tooltip obs28 button hover" id="logoSsImg4">
-                    <input type="file" id="FileUploadL4" onchange="logoPost(this,4)"
-                        accept="image/png, image/jpeg, image/svg+xml, image/bmp" />
-                    <span id="FileUploadLText4">L2</span>
-                    <span class="tooltiptext">
-                        <img id="l4Img" src="" style="height: 100px; max-width: 300px" />
-                    </span>
+                <div class="tooltip">
+                    <div class="obs28 button hover" id="logoSsImg4">
+                        <input type="file" id="FileUploadL4" onchange="logoPost(this,4)"
+                            accept="image/png, image/jpeg, image/svg+xml, image/bmp" />
+                        <span id="FileUploadLText4">L2</span>
+                        <span class="tooltiptext">
+                            <img id="l4Img" src="" style="height: 100px; max-width: 300px" />
+                        </span>
+                    </div>
                 </div>
-                <div class="tooltip obs28 button hover" id="logoSsImg5">
-                    <input type="file" id="FileUploadL5" onchange="logoPost(this,5)"
-                        accept="image/png, image/jpeg, image/svg+xml, image/bmp" />
-                    <span id="FileUploadLText5">L3</span>
-                    <span class="tooltiptext">
-                        <img id="l5Img" src="" style="height: 100px; max-width: 300px" />
-                    </span>
+                <div class="tooltip">
+                    <div class="obs28 button hover" id="logoSsImg5">
+                        <input type="file" id="FileUploadL5" onchange="logoPost(this,5)"
+                            accept="image/png, image/jpeg, image/svg+xml, image/bmp" />
+                        <span id="FileUploadLText5">L3</span>
+                        <span class="tooltiptext">
+                            <img id="l5Img" src="" style="height: 100px; max-width: 300px" />
+                        </span>
+                    </div>
                 </div>
             </div>
             <div class="section-header" id="playerImageLabel">Player Images</div>
@@ -322,26 +349,30 @@ for more information about Salotto please visit https://salotto.app
                 <text class="hover" onclick="cLogoNameChange()" id="logoName" style="text-decoration: underline">Player
                     1 Logo</text>
                 <input class="smallSize" type="checkbox" id="customLogo1" onchange="customLogoSetting()" disabled />
-                <div class="hover obs28 button tooltip" id="uploadCustomLogo" style="width: 150px">
-                    <span id="FileUploadLText1">Upload Player 1 Logo</span>
-                    <input type="file" id="FileUploadL1"
-                        onchange="logoPost(this,1); toggleCheckbox('customLogo1', this)"
-                        accept="image/png, image/jpeg, image/svg+xml, image/bmp" />
-                    <span class="tooltiptext">
-                        <img id="l1Img" src="" style="height: 100px; max-width: 300px" />
-                    </span>
+                <div class="tooltip">
+                    <div class="hover obs28 button" id="uploadCustomLogo" style="width: 150px">
+                        <span id="FileUploadLText1">Upload Player 1 Logo</span>
+                        <input type="file" id="FileUploadL1"
+                            onchange="logoPost(this,1); toggleCheckbox('customLogo1', this)"
+                            accept="image/png, image/jpeg, image/svg+xml, image/bmp" />
+                        <span class="tooltiptext">
+                            <img id="l1Img" src="" style="height: 100px; max-width: 300px" />
+                        </span>
+                    </div>
                 </div>
                 <text class="hover" onclick="cLogoNameChange2()" id="logoName2"
                     style="text-decoration: underline">Player 2 Logo</text>
                 <input class="smallSize" type="checkbox" id="customLogo2" onchange="customLogoSetting2()" disabled />
-                <div class="hover obs28 button tooltip" id="uploadCustomLogo2" style="width: 150px">
-                    <span id="FileUploadLText2">Upload Player 2 Logo</span>
-                    <input type="file" id="FileUploadL2"
-                        onchange="logoPost(this,2); toggleCheckbox('customLogo2', this)"
-                        accept="image/png, image/jpeg, image/svg+xml, image/bmp" />
-                    <span class="tooltiptext">
-                        <img id="l2Img" src="" style="height: 100px; max-width: 300px" />
-                    </span>
+                <div class="tooltip">
+                    <div class="hover obs28 button" id="uploadCustomLogo2" style="width: 150px">
+                        <span id="FileUploadLText2">Upload Player 2 Logo</span>
+                        <input type="file" id="FileUploadL2"
+                            onchange="logoPost(this,2); toggleCheckbox('customLogo2', this)"
+                            accept="image/png, image/jpeg, image/svg+xml, image/bmp" />
+                        <span class="tooltiptext">
+                            <img id="l2Img" src="" style="height: 100px; max-width: 300px" />
+                        </span>
+                    </div>
                 </div>
             </div>
         </div> <!-- Images Tab-->
@@ -366,7 +397,11 @@ for more information about Salotto please visit https://salotto.app
                         <div class="hover obs28 button" id="togglePassword">Show</div>
                     </div>
                     <div class="field">
-                        <div class="hover obs28 button" id="connectBtn" style="background-color:green;" onclick="connectToObsWebSocket()">Connect</div>
+                        <div class="tooltip">
+                            <div class="hover obs28 button" id="connectBtn" style="background-color:green;"
+                                onclick="connectToObsWebSocket()">Connect</div>
+                            <span class="tooltiptext">WebSocket connection must be enabled and configured under OBS tools.</span>
+                        </div>
                     </div>
                 </div>
                 <div class="section-header" id="replaySettingsLabel">Replay Source Settings</div>
