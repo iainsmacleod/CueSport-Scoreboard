@@ -45,6 +45,18 @@ function updateTabVisibility() {
     scoringTab.style.display = bothPlayersEnabled ? "inline-block" : "none";
 }
 
+function updatePlayerBallControlVisibility() {
+    const ballTrackerCheckbox = document.getElementById("ballTrackerCheckbox").checked;
+    const ballSetCheckbox = document.getElementById("ballSetCheckbox").checked;
+    const useToggleSetting = document.getElementById("useToggleSetting").checked;
+
+    if (!ballTrackerCheckbox && !ballSetCheckbox && !useToggleSetting) {
+        document.getElementById("playerToggleLabel").classList.add("noShow");
+    } else {
+        document.getElementById("playerToggleLabel").classList.remove("noShow");
+    }
+}
+
 // Show/hide Replay Controls based on configuration
 function updateReplayControlsVisibility() {
     const replaySectionHeader = document.getElementById('replayLabel');
@@ -71,6 +83,7 @@ document.addEventListener("DOMContentLoaded", function () {
     updateReplayControlsVisibility();
     updateTabVisibility();
     updateReplayButtonsVisibility();
+    updatePlayerBallControlVisibility();
 });
 
 function openTab(evt, tabName) {
@@ -159,12 +172,22 @@ function gameType(value) {
 
         console.log("Ball set toggle disabled and hidden for non-8-ball game");
     } else {
-        // Always allow ball set/ball type for 8-ball regardless of tracker
-        document.getElementById("ballSetCheckbox").disabled = false;
-        document.getElementById("ballSetDiv").classList.remove("noShow");
+        const ballTrackerEnabled = document.getElementById("ballTrackerCheckbox").checked;
+        if (ballTrackerEnabled) {
+            document.getElementById("ballTypeDiv").classList.remove("noShow");
+            document.getElementById("ballSetDiv").classList.remove("noShow");
+            document.getElementById("ballSetCheckbox").disabled = false;
+        } else {
+            document.getElementById("ballTypeDiv").classList.add("noShow");
+            document.getElementById("ballSetDiv").classList.add("noShow");
 
-        // Ball type controls should be visible in 8-ball
-        document.getElementById("ballTypeDiv").classList.remove("noShow");
+        }
+        // Always allow ball set/ball type for 8-ball regardless of tracker
+        // document.getElementById("ballSetCheckbox").disabled = false;
+        // document.getElementById("ballSetDiv").classList.remove("noShow");
+
+        // // Ball type controls should be visible in 8-ball
+        // document.getElementById("ballTypeDiv").classList.remove("noShow");
     }
 
     if (getStorageItem("gameType") === "game2") {
@@ -260,6 +283,7 @@ function useBallSetToggle() {
         setStorageItem("playerBallSet", "p1Open");
         bc.postMessage({ playerBallSet: "p1Open" });
     }
+    updatePlayerBallControlVisibility();
 }
 
 function ballSetChange() {
@@ -288,36 +312,38 @@ function useBallTracker() {
     setStorageItem("enableBallTracker", document.getElementById("ballTrackerCheckbox").checked);
     if (document.getElementById("ballTrackerCheckbox").checked) {
         document.getElementById("ballTrackerDirectionDiv").classList.remove("noShow");
+        document.getElementById("ballTrackerDiv").classList.remove("noShow");
         document.getElementById("ballTracker").classList.remove("noShow");
-        // Enable related 8-ball controls
-        const gameTypeIs8Ball = getStorageItem("gameType") === "game1";
-        if (gameTypeIs8Ball) {
+
+        // Enable related ball controls for aplicable games
+        const gameType = getStorageItem("gameType");
+
+        if (gameType === "game1") {
+            // For game1, -ball
             document.getElementById("ballSetCheckbox").disabled = false;
             document.getElementById("ballTypeDiv").classList.remove("noShow");
             document.getElementById("ballSetDiv").classList.remove("noShow");
+        } else if (gameType !== "game2" && gameType !== "game3") {
+            // For any game other than game2 and game3 (but not game1), therefore 9- and 10-ball
+            document.getElementById("ballSetCheckbox").disabled = false;
+            document.getElementById("ballTypeDiv").classList.remove("noShow");
+            // Note: no line for ballSetDiv here
         }
+
     } else {
         // Hide tracker UI only
         document.getElementById("ballTrackerDirectionDiv").classList.add("noShow");
+        document.getElementById("ballTrackerDiv").classList.add("noShow");
         document.getElementById("ballTracker").classList.add("noShow");
-
-        // Keep ball type and ball set controls available for 8-ball even when tracker is off
-        const gameTypeIs8Ball = getStorageItem("gameType") === "game1";
-        if (gameTypeIs8Ball) {
-            document.getElementById("ballTypeDiv").classList.remove("noShow");
-            document.getElementById("ballSetDiv").classList.remove("noShow");
-            // Do NOT disable/reset the ball set checkbox or selection here
-        } else {
-            // For non-8-ball, still hide ball type/set controls
-            document.getElementById("ballTypeDiv").classList.add("noShow");
-            document.getElementById("ballSetDiv").classList.add("noShow");
-        }
+        document.getElementById("ballTypeDiv").classList.add("noShow");
+        document.getElementById("ballSetDiv").classList.add("noShow");
     }
     if (bothPlayersEnabled) {
         bc.postMessage({ displayBallTracker: document.getElementById("ballTrackerCheckbox").checked });
     } else {
         console.log(`Both players are not enabled so we are not enabling the ball tracker`)
     }
+    updatePlayerBallControlVisibility();
 }
 
 function toggleBallTrackerDirection() {
@@ -453,16 +479,19 @@ function toggleSetting() {
     console.log(`Display active player ${checkbox ? "enabled" : "disabled"}`);
     if (checkbox) {
         document.getElementById("playerToggle").classList.remove("noShow");
-        document.getElementById("playerToggleLabel").classList.remove("noShow");
+        document.getElementById("playerToggleCheckbox").classList.remove("noShow");
+        // document.getElementById("playerToggleLabel").classList.remove("noShow");
         setStorageItem("usePlayerToggle", "yes");
         bc.postMessage({ clockDisplay: 'showActivePlayer', player: activePlayer });
         console.log(`Player ${activePlayer ? 1 : 2} is active`);
     } else {
         document.getElementById("playerToggle").classList.add("noShow");
-        document.getElementById("playerToggleLabel").classList.add("noShow");
+        document.getElementById("playerToggleCheckbox").classList.add("noShow");
+        // document.getElementById("playerToggleLabel").classList.add("noShow");
         setStorageItem("usePlayerToggle", "no");
         bc.postMessage({ clockDisplay: 'hideActivePlayer' });
     }
+    updatePlayerBallControlVisibility();
 }
 
 function logoSlideshow() {
@@ -647,9 +676,12 @@ function playerSetting(player) {
         ballTrackerCheckbox.disabled = true;
         ballTrackerCheckbox.checked = false;
         setStorageItem("enableBallTracker", "no");
-        setStorageItem("ballSelection", "american");
 
-
+        ballSetCheckbox.disabled = true;
+        ballSetCheckbox.checked = false;
+        setStorageItem("useBallSet", "no");
+        resetBallSet()
+        
         // Hide related elements
         document.getElementById("clockInfo").classList.add("noShow");
         document.getElementById("extensionControls").classList.add("noShow");
@@ -657,9 +689,10 @@ function playerSetting(player) {
         document.getElementById("playerToggle").classList.add("noShow");
         document.getElementById("playerToggleLabel").classList.add("noShow");
         document.getElementById("ballTrackerDirectionDiv").classList.add("noShow");
-        document.getElementById("ballTrackerDirection").classList.add("noShow");
         document.getElementById("ballTrackerDiv").classList.add("noShow");
         document.getElementById("ballTracker").classList.add("noShow");
+        document.getElementById("ballTypeDiv").classList.add("noShow");
+
 
         // Send messages to hide these features
         bc.postMessage({ clockDisplay: 'noClock' });

@@ -309,12 +309,12 @@ input {
 
 
 .column {
-	display: flex;
+	/* display: flex; */ /* removed to help real-estate management */
 	justify-content: space-between;
 	padding: 7px 0 7px 0;
 	clear: both;
 	width: 650px;
-	height: fit-content;
+	/* height: fit-content; */
 }
 
 .form-rows {
@@ -349,12 +349,11 @@ input {
 }
 
 .section-header {
-	display: flex;
+	/* display: flex; */ /*removed to assist with real estate management */
 	justify-content: space-between;
 	padding: 15px 0 0 0;
 	clear: both;
 	text-decoration: underline;
-	/* text-transform:capitalize; */
 	font-weight: bold;
 	font-size: 16px;
 	font-variant: small-caps;

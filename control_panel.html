@@ -24,7 +24,7 @@ for more information about Salotto please visit https://salotto.app
     <link rel="stylesheet" href="./common/css/control_panel/required.css" />
     <script>
         //---------------------------------------------------------------------------------------------
-        var versionNum = "3.0.0";
+        var versionNum = "3.1.0";
         //---------------------------------------------------------------------------------------------
     </script>
     <script src="./common/js/obs-websocket-js.js"></script>
@@ -173,8 +173,8 @@ for more information about Salotto please visit https://salotto.app
             </div>
             <!-- Player Toggle -->
             <div class="section-header" id="playerToggleLabel">Player and Ball Controls</div>
-            <div class="column" id="playerToggle" style="display: flex; align-items: center; gap: 50px;">
-                <div>
+            <div class="column" id="playerToggle">
+                <div class="column">
                     <label style="padding: 0 10px 0 0">Breaking Player:</label>
                     <label class="switch toggle">
                         <input type="checkbox" id="playerToggleCheckbox" onchange="togglePlayer(this.checked)" />
@@ -182,24 +182,24 @@ for more information about Salotto please visit https://salotto.app
                         <span class="player1 toggle">P1</span>
                         <span class="player2 toggle">P2</span>
                     </label>
-                    </div>
-                    <div id="ballSet" style="display: flex; flex:1; justify-content:space-between;">
-                        <div>
-                            <div style="gap: 20px">P1 Balls:</div>
-                            <input type="radio" id="p1colorRed" name="p1BallSetSelect" value="p1red/smalls"
-                                onchange="ballSetChange()" />
-                            <label for="p1colorRed">Red/Lows/Solids</label>
-                        </div>
-                        <div>
-                            <input type="radio" id="p1colorYellow" name="p1BallSetSelect" value="p1yellow/bigs"
-                                onchange="ballSetChange()" />
-                            <label for="p1colorYellow">Yellow/Highs/Stripes</label>
-                        </div>
-                        <div>
-                            <input type="radio" id="p1colorOpen" name="p1BallSetSelect" value="p1Open" checked
-                                onchange="ballSetChange()" />
-                            <label for="p1colorOpen">Open Table</label>
-                        </div>
+                </div>
+            </div>
+            <div class="column" id="ballSet">
+                <div style="gap: 20px">Player 1 Chosen Ball:</div>
+                <div>
+                    <input type="radio" id="p1colorRed" name="p1BallSetSelect" value="p1red/smalls"
+                        onchange="ballSetChange()" />
+                    <label for="p1colorRed">Red/Lows/Solids</label>
+                </div>
+                <div>
+                    <input type="radio" id="p1colorYellow" name="p1BallSetSelect" value="p1yellow/bigs"
+                        onchange="ballSetChange()" />
+                    <label for="p1colorYellow">Yellow/Highs/Stripes</label>
+                </div>
+                <div>
+                    <input type="radio" id="p1colorOpen" name="p1BallSetSelect" value="p1Open" checked
+                        onchange="ballSetChange()" />
+                    <label for="p1colorOpen">Open Table</label>
                 </div>
             </div>
             <!-- Ball Tracker -->
@@ -246,20 +246,27 @@ for more information about Salotto please visit https://salotto.app
                         Monitor Game
                     </button>
                     <span class="tooltiptext">Start or stop monitoring the game for replay capability.<br><br>Note:
-                        Replay Buffer must be enabled and configured under Edit | Settings | Video in OBS. Additionally, WebSocket must be setup and connected to allow control.</span>
+                        Replay Buffer must be enabled and configured under Edit | Settings | Video in OBS. Additionally,
+                        WebSocket must be setup and connected to allow control.</span>
                 </div>
                 <div class="tooltip">
-                    <button id="btnReplayClip" class="btnReplayClip hover obs28 button noShow" onclick="triggerReplayClip()">Instant Replay</button>
+                    <button id="btnReplayClip" class="btnReplayClip hover obs28 button noShow"
+                        onclick="triggerReplayClip()">Instant Replay</button>
                     <span class="tooltiptext">Save and replay up to last X seconds or restart previously recorded
                         clip.<br><br>Note: X equals OBS defined Maximum Replay Time.</span>
                 </div>
             </div>
             <div class="column" style="display: flex; justify-content: flex-start; align-items: center; gap: 12.8px;">
-                <button id="prvReplayClip1" class="prvReplayClip1 hover obs28 button" onclick="playPreviousReplay(0)">Clip 1</button>
-                <button id="prvReplayClip2" class="prvReplayClip2 hover obs28 button" onclick="playPreviousReplay(1)">Clip 2</button>
-                <button id="prvReplayClip3" class="prvReplayClip3 hover obs28 button" onclick="playPreviousReplay(2)">Clip 3</button>
-                <button id="prvReplayClip4" class="prvReplayClip4 hover obs28 button" onclick="playPreviousReplay(3)">Clip 4</button>
-                <button id="prvReplayClip5" class="prvReplayClip5 hover obs28 button" onclick="playPreviousReplay(4)">Clip 5</button>
+                <button id="prvReplayClip1" class="prvReplayClip1 hover obs28 button"
+                    onclick="playPreviousReplay(0)">Clip 1</button>
+                <button id="prvReplayClip2" class="prvReplayClip2 hover obs28 button"
+                    onclick="playPreviousReplay(1)">Clip 2</button>
+                <button id="prvReplayClip3" class="prvReplayClip3 hover obs28 button"
+                    onclick="playPreviousReplay(2)">Clip 3</button>
+                <button id="prvReplayClip4" class="prvReplayClip4 hover obs28 button"
+                    onclick="playPreviousReplay(3)">Clip 4</button>
+                <button id="prvReplayClip5" class="prvReplayClip5 hover obs28 button"
+                    onclick="playPreviousReplay(4)">Clip 5</button>
             </div>
             <!-- Shot Clock -->
             <div class="section-header" id="clockControlLabel">Clock Controls</div>
@@ -394,7 +401,8 @@ for more information about Salotto please visit https://salotto.app
                         <div class="tooltip">
                             <div class="hover obs28 button" id="connectBtn" style="background-color:green;"
                                 onclick="connectToObsWebSocket()">Connect</div>
-                            <span class="tooltiptext">WebSocket connection must be enabled and configured under OBS tools.</span>
+                            <span class="tooltiptext">WebSocket connection must be enabled and configured under OBS
+                                tools.</span>
                         </div>
                     </div>
                 </div>
@@ -511,12 +519,12 @@ for more information about Salotto please visit https://salotto.app
                 </div>
             </div>
             <!-- Row Two -->
-            <div class="column">
+            <div class="column" id="ballTypeDiv">
                 <div id="ballSetDiv">
                     <label for="ballSetCheckbox" id="labelForBallSetCheckbox">Ball Set Toggle</label>
                     <input type="checkbox" class="smallSize" id="ballSetCheckbox" onchange="useBallSetToggle()" />
                 </div>
-                <div id="ballTypeDiv">
+                <div>
                     <span>
                         Ball Type
                         <select class="dropdown" id="ballSelection" onchange="toggleBallSelection()">
