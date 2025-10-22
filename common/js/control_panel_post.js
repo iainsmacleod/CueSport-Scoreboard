@@ -97,12 +97,12 @@ window.onload = function() {
 		document.getElementById("ballSetCheckbox").checked = true;
 		setStorageItem("useBallSet", "yes");
 		document.getElementById("ballSet").style.display = 'flex';
-		document.getElementById("ballSetLabel").classList.remove("noShow");
+		// document.getElementById("ballSetLabel").classList.remove("noShow");
 	} else {
 		document.getElementById("ballSetCheckbox").checked = false;
 		setStorageItem("useBallSet", "no");
 		document.getElementById("ballSet").style.display = 'none';
-		document.getElementById("ballSetLabel").classList.add("noShow");
+		// document.getElementById("ballSetLabel").classList.add("noShow");
 	}
 
 	if (getStorageItem("usePlayer1") === "yes" && getStorageItem("usePlayer2") === "yes" && getStorageItem("usePlayerToggle") === "yes"){

@@ -172,40 +172,34 @@ for more information about Salotto please visit https://salotto.app
                 </div>
             </div>
             <!-- Player Toggle -->
-            <div class="section-header" id="playerToggleLabel">Player Toggle</div>
-            <div class="column" id="playerToggle">
+            <div class="section-header" id="playerToggleLabel">Player and Ball Controls</div>
+            <div class="column" id="playerToggle" style="display: flex; align-items: center; gap: 50px;">
                 <div>
-                    <label style="padding: 0 10px 0 0">Breaking Player/Team:</label>
+                    <label style="padding: 0 10px 0 0">Breaking Player:</label>
                     <label class="switch toggle">
                         <input type="checkbox" id="playerToggleCheckbox" onchange="togglePlayer(this.checked)" />
                         <span class="slider_round"></span>
                         <span class="player1 toggle">P1</span>
                         <span class="player2 toggle">P2</span>
                     </label>
-                </div>
-            </div>
-            <!-- Ball Set Toggle -->
-            <div class="section-header" id="ballSetLabel">Player Ball Set Toggle</div>
-            <div class="column" id="ballSet">
-                <div>
-                    <form class="column" id="ballSetSelectionForm">
-                        <div>Player 1 Ball Color:</div>
+                    </div>
+                    <div id="ballSet" style="display: flex; flex:1; justify-content:space-between;">
                         <div>
+                            <div style="gap: 20px">P1 Balls:</div>
                             <input type="radio" id="p1colorRed" name="p1BallSetSelect" value="p1red/smalls"
                                 onchange="ballSetChange()" />
-                            <label for="p1colorRed">Red/Smalls/Lows/Solids</label>
+                            <label for="p1colorRed">Red/Lows/Solids</label>
                         </div>
                         <div>
                             <input type="radio" id="p1colorYellow" name="p1BallSetSelect" value="p1yellow/bigs"
                                 onchange="ballSetChange()" />
-                            <label for="p1colorYellow">Yellow/Bigs/Highs/Stripes</label>
+                            <label for="p1colorYellow">Yellow/Highs/Stripes</label>
                         </div>
                         <div>
                             <input type="radio" id="p1colorOpen" name="p1BallSetSelect" value="p1Open" checked
                                 onchange="ballSetChange()" />
                             <label for="p1colorOpen">Open Table</label>
                         </div>
-                    </form>
                 </div>
             </div>
             <!-- Ball Tracker -->
@@ -260,7 +254,7 @@ for more information about Salotto please visit https://salotto.app
                         clip.<br><br>Note: X equals OBS defined Maximum Replay Time.</span>
                 </div>
             </div>
-            <div class="column">
+            <div class="column" style="display: flex; justify-content: flex-start; align-items: center; gap: 12.8px;">
                 <button id="prvReplayClip1" class="prvReplayClip1 hover obs28 button" onclick="playPreviousReplay(0)">Clip 1</button>
                 <button id="prvReplayClip2" class="prvReplayClip2 hover obs28 button" onclick="playPreviousReplay(1)">Clip 2</button>
                 <button id="prvReplayClip3" class="prvReplayClip3 hover obs28 button" onclick="playPreviousReplay(2)">Clip 3</button>

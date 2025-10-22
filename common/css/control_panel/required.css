@@ -311,7 +311,7 @@ input {
 .column {
 	display: flex;
 	justify-content: space-between;
-	padding: 10px 0 10px 0;
+	padding: 7px 0 7px 0;
 	clear: both;
 	width: 650px;
 	height: fit-content;

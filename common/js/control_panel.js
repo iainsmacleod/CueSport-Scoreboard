@@ -151,7 +151,7 @@ function gameType(value) {
 
         // Hide ball set controls and reset to "Open Table"
         document.getElementById("ballSet").style.display = 'none';
-        document.getElementById("ballSetLabel").classList.add("noShow");
+        // document.getElementById("ballSetLabel").classList.add("noShow");
         document.getElementById("ballSetDiv").classList.add("noShow");
         document.getElementById('p1colorOpen').checked = true;
         setStorageItem("playerBallSet", "p1Open");
@@ -250,10 +250,10 @@ function useBallSetToggle() {
     setStorageItem("useBallSet", storageValue);
     if (isChecked) {
         document.getElementById("ballSet").style.display = 'flex';
-        document.getElementById("ballSetLabel").classList.remove("noShow");
+        // document.getElementById("ballSetLabel").classList.remove("noShow");
     } else {
         document.getElementById("ballSet").style.display = 'none';
-        document.getElementById("ballSetLabel").classList.add("noShow");
+        // document.getElementById("ballSetLabel").classList.add("noShow");
 
         // Reset to "Open Table" and hide the ball images
         document.getElementById('p1colorOpen').checked = true;
