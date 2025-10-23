@@ -29,21 +29,19 @@ let isConnected = false;
 let replayHistory = [];
 
 
-function updateTabVisibility() {
-    // Get the state of the player settings
-    const player1Enabled = document.getElementById("usePlayer1Setting").checked;
-    const player2Enabled = document.getElementById("usePlayer2Setting").checked;
-    const clockEnabled = document.getElementById("useClockSetting").checked;
+// function updateTabVisibility() {
+//     // Get the state of the player settings
+//     const player1Enabled = document.getElementById("usePlayer1Setting").checked;
+//     const player2Enabled = document.getElementById("usePlayer2Setting").checked;
+//     // Determine if both players are enabled
+//     const bothPlayersEnabled = player1Enabled && player2Enabled;
 
-    // Determine if both players are enabled
-    const bothPlayersEnabled = player1Enabled && player2Enabled;
+//     // Get tab elements
+//     const scoringTab = document.getElementById("scoringTab");
 
-    // Get tab elements
-    const scoringTab = document.getElementById("scoringTab");
-
-    // Show or hide the scoring tab
-    scoringTab.style.display = bothPlayersEnabled ? "inline-block" : "none";
-}
+//     // Show or hide the scoring tab
+//     // scoringTab.style.display = bothPlayersEnabled ? "inline-block" : "none";
+// }
 
 function updatePlayerBallControlVisibility() {
     const ballTrackerCheckbox = document.getElementById("ballTrackerCheckbox").checked;
@@ -81,7 +79,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // In your initialization code
     loadReplaySources();
     updateReplayControlsVisibility();
-    updateTabVisibility();
+    // updateTabVisibility();
     updateReplayButtonsVisibility();
     updatePlayerBallControlVisibility();
 });
@@ -681,7 +679,7 @@ function playerSetting(player) {
         ballSetCheckbox.checked = false;
         setStorageItem("useBallSet", "no");
         resetBallSet()
-        
+
         // Hide related elements
         document.getElementById("clockInfo").classList.add("noShow");
         document.getElementById("extensionControls").classList.add("noShow");
@@ -727,7 +725,7 @@ function playerSetting(player) {
 
     bc.postMessage({ playerDisplay: usePlayer, playerNumber: player });
 
-    updateTabVisibility();
+    // updateTabVisibility();
 
     document.getElementById("swapBtn").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
 }
@@ -759,7 +757,7 @@ function clockSetting() {
         document.getElementById("extensionControls").classList.remove("noShow");
         document.getElementById("clockControlLabel").classList.remove("noShow");
     }
-    updateTabVisibility();
+    // updateTabVisibility();
 }
 
 function clockDisplay(opt3) {
@@ -1580,6 +1578,17 @@ function getObsPassword() {
     return password || ''; // fallback to default if empty
 }
 
+function autoResumeReplayBuffer() {
+    const autoResumeReplayBuffer = document.getElementById("autoResumeReplayBuffer").checked;
+    if (autoResumeReplayBuffer) {
+        // document.getElementById("autoResumeReplayBuffer").checked = true;
+        setStorageItem("autoResumeReplayBuffer", "yes");
+    } else {
+        // document.getElementById("autoResumeReplayBuffer").checked = false;
+        setStorageItem("autoResumeReplayBuffer", "no");
+    }
+}
+
 async function connectToObsWebSocket() {
     if (isConnected) {
         if (isMonitoringActive) {
@@ -1674,6 +1683,9 @@ obs.on('MediaInputPlaybackEnded', async ({ inputName }) => {
             console.error('Error hiding replay source on playback end:', error);
         }
     }
+    if (document.getElementById("autoResumeReplayBuffer").checked){
+        toggleReplayMonitoring();
+    } return;
 });
 
 async function showReplayIndicator(sceneName) {

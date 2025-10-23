@@ -105,6 +105,12 @@ window.onload = function() {
 		// document.getElementById("ballSetLabel").classList.add("noShow");
 	}
 
+	if (getStorageItem("autoResumeReplayBuffer")==="yes") {
+		document.getElementById("autoResumeReplayBuffer").checked = true;
+	} else {
+		document.getElementById("autoResumeReplayBuffer").checked = false;
+	}
+
 	if (getStorageItem("usePlayer1") === "yes" && getStorageItem("usePlayer2") === "yes" && getStorageItem("usePlayerToggle") === "yes"){
 		console.log(`We should be showing active player identifier`);
 		const activePlayer = getStorageItem("activePlayer") === "2" ? "2" : "1";
