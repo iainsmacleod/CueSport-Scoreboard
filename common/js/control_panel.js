@@ -263,7 +263,7 @@ function useBallSetToggle() {
         document.getElementById("ballSet").classList.remove("noShow");
     } else {
         document.getElementById("ballSet").classList.add("noShow");
-        
+
         // Reset to "Open Table" and hide the ball images
         document.getElementById('p1colorOpen').checked = true;
         setStorageItem("playerBallSet", "p1Open");
@@ -779,6 +779,7 @@ function clearGame() {
     setStorageItem("p2NameCtrlPanel", "");
     setStorageItem("raceInfo", "");
     setStorageItem("gameInfo", "");
+    resetBallTracker();
     resetBallSet();
     postNames();
     pushScores();
