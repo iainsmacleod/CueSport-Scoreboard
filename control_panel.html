@@ -24,7 +24,7 @@ for more information about Salotto please visit https://salotto.app
     <link rel="stylesheet" href="./common/css/control_panel/required.css" />
     <script>
         //---------------------------------------------------------------------------------------------
-        var versionNum = "3.1.1";
+        var versionNum = "3.2.0";
         //---------------------------------------------------------------------------------------------
     </script>
     <script src="./common/js/obs-websocket-js.js"></script>
@@ -56,7 +56,7 @@ for more information about Salotto please visit https://salotto.app
         <!-- Tab navigation inside the main division -->
         <div class="tab">
             <button id="gameInfoTab" class="tablinks" onclick="openTab(event, 'GameInfo')">Game Setup</button>
-            <button id="scoringTab" class="tablinks" onclick="openTab(event, 'Scoring')">Scoring</button>
+            <button id="scoringTab" class="tablinks" onclick="openTab(event, 'Scoring')">Controls</button>
             <button id="imagesTab" class="tablinks" onclick="openTab(event, 'Images')">Image &#x2699;</button>
             <button id="replaySettingsTab" class="tablinks" onclick="openTab(event, 'ReplaySettings')">Replay
                 &#x2699;</button>
@@ -68,7 +68,7 @@ for more information about Salotto please visit https://salotto.app
             <div class="section-header" id="gameDetailLabel">Game Details</div>
             <div class="column">
                 <text id="raceInfo">Race Info:</text>
-                <input style="width: 100px" type="text" id="raceInfoTxt" placeholder="" maxlength="30" />
+                <input style="width: 100px" type="text" id="raceInfoTxt" maxlength="4" pattern="\d*" inputmode="numeric" />
                 <text>Game/Other Info:</text>
                 <input style="width: 350px" type="text" id="gameInfoTxt" placeholder="" maxlength="60" />
             </div>
@@ -140,7 +140,7 @@ for more information about Salotto please visit https://salotto.app
         <!-- Scoring Tab -->
         <div id="Scoring" class="tabcontent">
             <!-- Score Control -->
-            <div class="section-header" id="scoreLabel">Score</div>
+            <div class="section-header" id="scoreLabel">Score Controls</div>
             <div class="column" id="scoreInfoP1">
                 <label id="p1ScoreLabel" for="sendP1ScoreSub">Player/Team 1 - Score/Rack(s)/Ball(s)</label>
                 <div class="score-control">
@@ -256,7 +256,7 @@ for more information about Salotto please visit https://salotto.app
                         clip.<br><br>Note: X equals OBS defined Maximum Replay Time.</span>
                 </div>
             </div>
-            <div class="column" style="display: flex; justify-content: flex-start; align-items: center; gap: 12.8px;">
+            <div class="column" id="replayClips" style=" justify-content: flex-start; align-items: center; gap: 12.8px;">
                 <button id="prvReplayClip1" class="prvReplayClip1 hover obs28 button"
                     onclick="playPreviousReplay(0)">Clip 1</button>
                 <button id="prvReplayClip2" class="prvReplayClip2 hover obs28 button"
@@ -506,7 +506,7 @@ for more information about Salotto please visit https://salotto.app
                         onchange="toggleAnimationSetting()" />
                 </div>
             </div>
-            <div class="section-header" id="feaureSettingLabel">
+            <div class="section-header" id="ballSettingLabel">
                 Ball Settings
             </div>
             <div class="column">

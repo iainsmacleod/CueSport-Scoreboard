@@ -95,14 +95,12 @@ window.onload = function() {
 
 	if (getStorageItem("useBallSet")==="yes") {
 		document.getElementById("ballSetCheckbox").checked = true;
-		setStorageItem("useBallSet", "yes");
-		document.getElementById("ballSet").style.display = 'flex';
-		// document.getElementById("ballSetLabel").classList.remove("noShow");
+		document.getElementById("ballSet").classList.remove("noShow");
+		// setStorageItem("useBallSet", "yes");
 	} else {
 		document.getElementById("ballSetCheckbox").checked = false;
 		setStorageItem("useBallSet", "no");
-		document.getElementById("ballSet").style.display = 'none';
-		// document.getElementById("ballSetLabel").classList.add("noShow");
+		document.getElementById("ballSet").classList.add("noShow");
 	}
 
 	if (getStorageItem("autoResumeReplayBuffer")==="yes") {
@@ -185,9 +183,18 @@ window.onload = function() {
 	if (getStorageItem("enableBallTracker") === null) {
 		setStorageItem("enableBallTracker", "no");
 		document.getElementById("ballTrackerCheckbox").checked = false;
+		document.getElementById("ballTracker").classList.add("noShow");
+	} else if ((getStorageItem("enableBallTracker") === "yes")) {
+		setStorageItem("enableBallTracker", "yes");
+		document.getElementById("ballTrackerCheckbox").checked = true;
+		document.getElementById("ballTracker").classList.remove("noShow");
+	} else {
+		setStorageItem("enableBallTracker", "no");
+		document.getElementById("ballTrackerCheckbox").checked = false;
+		document.getElementById("ballTracker").classList.add("noShow");
 	}
 
-	if ((getStorageItem("enableBallTracker") === "true") && (getStorageItem("gameType") === "game1")){
+	if ((getStorageItem("enableBallTracker") === "yes") && (getStorageItem("gameType") === "game1")){
 		document.getElementById("ballTrackerCheckbox").checked = true;
 		document.getElementById("ballTrackerDirectionDiv").classList.remove("noShow");
 		document.getElementById("ballTracker").classList.remove("noShow");
@@ -198,16 +205,16 @@ window.onload = function() {
 		bc.postMessage({ displayBallTracker: true });
 	} else {
 		document.getElementById("ballTrackerCheckbox").checked = false;
-		setStorageItem("enableBallTracker", "false");
+		setStorageItem("enableBallTracker", "no");
 		document.getElementById("ballTrackerDirectionDiv").classList.add("noShow");
 		document.getElementById("ballTracker").classList.add("noShow");
 	
 		// Keep ball type and ball set visible for 8-ball even when tracker is off
-		if (getStorageItem("gameType") === "game1") {
+		if (getStorageItem("gameType") !== "game2" && getStorageItem("gameType") !== "game3") {
 			document.getElementById("ballTypeDiv").classList.remove("noShow");
 			document.getElementById("ballSetDiv").classList.remove("noShow");
 		} else {
-			document.getElementById("ballTypeDiv").classList.add("noShow");
+			// document.getElementById("ballTypeDiv").classList.add("noShow");
 			document.getElementById("ballSetDiv").classList.add("noShow");
 		}
 	
@@ -252,6 +259,7 @@ window.onload = function() {
 	// Initialize the logo and extension status for each logo (players + slideshow logos) and player
 	initializeLogoStatus();
 	initializeExtensionButtonStatus();
+	toggleReplayClipsVisibility();
 };
 
 function initializeLogoStatus() {

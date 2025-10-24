@@ -88,28 +88,18 @@ const handlers = {
     },
 
     race(data) {
-        console.log("Race info: " + data.race);
         const player1Enabled = getStorageItem("usePlayer1");
         const player2Enabled = getStorageItem("usePlayer2");
         const bothPlayersEnabled = player1Enabled && player2Enabled;
+        var raceTxt = data.race;
+
         if (data.race == "" || !bothPlayersEnabled) {
             document.getElementById("raceInfo").classList.add("noShow");
             document.getElementById("raceInfo").classList.remove("fadeInElm");
-            document.getElementById("customLogo1").classList.remove("customLogoWide1");
-            document.getElementById("customLogo2").classList.remove("customLogoWide2");
         } else {
+            document.getElementById("raceInfo").innerHTML = data.race;
             document.getElementById("raceInfo").classList.remove("noShow");
             document.getElementById("raceInfo").classList.add("fadeInElm");
-            var raceTxt = getStorageItem("raceInfo");
-            console.log(typeof getStorageItem("raceInfo"));
-            console.log("a " + getStorageItem("raceInfo"));
-            if (!Number.isNaN(raceTxt)) { //It is a number only value
-                document.getElementById("raceInfo").innerHTML = "" + getStorageItem("raceInfo");
-            } else { // It has Alphanumeric Charachers
-                document.getElementById("raceInfo").innerHTML = getStorageItem("raceInfo");
-            }
-            document.getElementById("customLogo1").classList.add("customLogoWide1");
-            document.getElementById("customLogo2").classList.add("customLogoWide2");
         }
     },
 
@@ -203,7 +193,7 @@ const handlers = {
                 document.getElementById("raceInfo").classList.replace("fadeOutElm", "fadeInElm");
             }
 
-            if (getStorageItem("enableBallTracker") === "true") {
+            if (getStorageItem("enableBallTracker") === "yes") {
                 document.getElementById("ballTracker").classList.remove("noShow");
             }
 
@@ -650,7 +640,7 @@ if (getStorageItem('p2colorSet') != "") {
     console.log("p2color: " + getStorageItem('p2colorSet'));
 }
 
-if (getStorageItem("enableBallTracker") === "false" || getStorageItem("enableBallTracker") === null) {
+if (getStorageItem("enableBallTracker") === "no" || getStorageItem("enableBallTracker") === null) {
     document.getElementById("ballTracker").classList.add("noShow");
     console.log(`Ball tracker disabled on overlay`);
 } else {

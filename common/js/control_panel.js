@@ -43,6 +43,20 @@ let replayHistory = [];
 //     // scoringTab.style.display = bothPlayersEnabled ? "inline-block" : "none";
 // }
 
+function toggleReplayClipsVisibility() {
+    const replayClips = document.getElementById("replayClips");
+    const buttons = replayClips.querySelectorAll("button");
+
+    // Check if there is any visible button
+    const hasVisibleClip = Array.from(buttons).some(btn => btn.style.display !== "none");
+
+    if (hasVisibleClip) {
+        replayClips.classList.remove("noShow");
+    } else {
+        replayClips.classList.add("noShow");
+    }
+}
+
 function updatePlayerBallControlVisibility() {
     const ballTrackerCheckbox = document.getElementById("ballTrackerCheckbox").checked;
     const ballSetCheckbox = document.getElementById("ballSetCheckbox").checked;
@@ -136,57 +150,39 @@ function toggleAnimationSetting() {
 function gameType(value) {
     setStorageItem("gameType", value);
 
-    // Show/hide ball type div based on game type (hide for 9-Ball and 10-Ball)
-    if (getStorageItem("gameType") === "game2" || getStorageItem("gameType") === "game3") { // 9-Ball or 10-Ball
-        document.getElementById("ballTypeDiv").classList.add("noShow");
-        // Reset to International when hidden
-        setStorageItem("ballSelection", "american");
-        document.getElementById("ballSelection").value = "american";
-        ballType("american"); // Call the ballType function to update the display
-    } else {
-        // Only show ball type div if ball tracker is enabled
-        const ballTrackerEnabled = document.getElementById("ballTrackerCheckbox").checked;
-        if (ballTrackerEnabled) {
-            document.getElementById("ballTypeDiv").classList.remove("noShow");
-        } else {
-            document.getElementById("ballTypeDiv").classList.add("noShow");
-        }
-    }
+    const gameType = getStorageItem("gameType");
 
-    // Disable and hide ball set toggle for non-8-ball games
-    if (getStorageItem("gameType") !== "game1") { // Not 8-Ball
-        // Disable and hide the ball set toggle checkbox
-        document.getElementById("ballSetCheckbox").disabled = true;
+    // 9-Ball or 10-Ball -> hide both
+    if (["game2", "game3"].includes(gameType)) {
+        document.getElementById("ballSetDiv").classList.add("noShow");
+        document.getElementById("ballTypeDiv").classList.add("noShow");
         document.getElementById("ballSetCheckbox").checked = false;
         setStorageItem("useBallSet", "no");
+        setStorageItem("ballSelection", "american");
+        document.getElementById("ballSelection").value = "american";
+        ballType("american");
 
-        // Hide ball set controls and reset to "Open Table"
-        document.getElementById("ballSet").style.display = 'none';
-        // document.getElementById("ballSetLabel").classList.add("noShow");
-        document.getElementById("ballSetDiv").classList.add("noShow");
+        // 8-Ball or Game7 -> show both
+    } else if (["game1", "game7"].includes(gameType)) {
+        document.getElementById("ballSetDiv").classList.remove("noShow");
+        document.getElementById("ballTypeDiv").classList.remove("noShow");
+        document.getElementById("ballSetCheckbox").disabled = false;
         document.getElementById('p1colorOpen').checked = true;
         setStorageItem("playerBallSet", "p1Open");
         bc.postMessage({ playerBallSet: "p1Open" });
+        console.log("Ball set toggle enabled and reset to Open Table");
 
-        console.log("Ball set toggle disabled and hidden for non-8-ball game");
+        // All other game types -> hide ball set, show ball type
     } else {
-        const ballTrackerEnabled = document.getElementById("ballTrackerCheckbox").checked;
-        if (ballTrackerEnabled) {
-            document.getElementById("ballTypeDiv").classList.remove("noShow");
-            document.getElementById("ballSetDiv").classList.remove("noShow");
-            document.getElementById("ballSetCheckbox").disabled = false;
-        } else {
-            document.getElementById("ballTypeDiv").classList.add("noShow");
-            document.getElementById("ballSetDiv").classList.add("noShow");
-
-        }
-        // Always allow ball set/ball type for 8-ball regardless of tracker
-        // document.getElementById("ballSetCheckbox").disabled = false;
-        // document.getElementById("ballSetDiv").classList.remove("noShow");
-
-        // // Ball type controls should be visible in 8-ball
-        // document.getElementById("ballTypeDiv").classList.remove("noShow");
+        document.getElementById("ballSetDiv").classList.add("noShow");
+        document.getElementById("ballTypeDiv").classList.remove("noShow");
+        document.getElementById("ballSetCheckbox").checked = false;
+        setStorageItem("useBallSet", "no");
+        setStorageItem("ballSelection", "american");
+        document.getElementById("ballSelection").value = "american";
+        ballType("american");
     }
+
 
     if (getStorageItem("gameType") === "game2") {
         document.getElementById("ball 10").classList.add("noShow");
@@ -220,6 +216,7 @@ function gameType(value) {
         updateControlPanelBallImages("american");
         console.log("Ball style reset to American for non-8-ball game");
     }
+    useBallSetToggle()
 }
 
 function ballType(value) {
@@ -256,13 +253,6 @@ function ballType(value) {
 
 function useBallSetToggle() {
     // Allow ball set toggle only for 8-ball
-    const gameTypeIs8Ball = getStorageItem("gameType") === "game1";
-
-    if (!gameTypeIs8Ball) {
-        console.log("Ball set toggle is disabled - not 8-ball game");
-        return;
-    }
-
     var useBallSet = document.getElementById("ballSetCheckbox");
     var isChecked = useBallSet.checked;
     var storageValue = isChecked ? "yes" : "no";
@@ -270,12 +260,10 @@ function useBallSetToggle() {
     console.log(`Use Ball Set Toggle ${isChecked}`);
     setStorageItem("useBallSet", storageValue);
     if (isChecked) {
-        document.getElementById("ballSet").style.display = 'flex';
-        // document.getElementById("ballSetLabel").classList.remove("noShow");
+        document.getElementById("ballSet").classList.remove("noShow");
     } else {
-        document.getElementById("ballSet").style.display = 'none';
-        // document.getElementById("ballSetLabel").classList.add("noShow");
-
+        document.getElementById("ballSet").classList.add("noShow");
+        
         // Reset to "Open Table" and hide the ball images
         document.getElementById('p1colorOpen').checked = true;
         setStorageItem("playerBallSet", "p1Open");
@@ -306,8 +294,9 @@ function useBallTracker() {
     const player1Enabled = getStorageItem("usePlayer1") === "yes";
     const player2Enabled = getStorageItem("usePlayer2") === "yes";
     const bothPlayersEnabled = player1Enabled && player2Enabled;
+    const checked = document.getElementById("ballTrackerCheckbox").checked;
     console.log('Both players enabled evaluation:', bothPlayersEnabled)
-    setStorageItem("enableBallTracker", document.getElementById("ballTrackerCheckbox").checked);
+    setStorageItem("enableBallTracker", checked ? "yes" : "no");
     if (document.getElementById("ballTrackerCheckbox").checked) {
         document.getElementById("ballTrackerDirectionDiv").classList.remove("noShow");
         document.getElementById("ballTrackerDiv").classList.remove("noShow");
@@ -333,8 +322,6 @@ function useBallTracker() {
         document.getElementById("ballTrackerDirectionDiv").classList.add("noShow");
         document.getElementById("ballTrackerDiv").classList.add("noShow");
         document.getElementById("ballTracker").classList.add("noShow");
-        document.getElementById("ballTypeDiv").classList.add("noShow");
-        document.getElementById("ballSetDiv").classList.add("noShow");
     }
     if (bothPlayersEnabled) {
         bc.postMessage({ displayBallTracker: document.getElementById("ballTrackerCheckbox").checked });
@@ -382,7 +369,6 @@ function updateControlPanelBallImages(selection) {
                     // American ball naming convention (default)
                     imageSrc = `./common/images/${i}ball_small.png`;
                 }
-
                 img.src = imageSrc;
             }
         }
@@ -405,11 +391,7 @@ function toggleBallSelection() {
     // Update localStorage
     setStorageItem("ballSelection", newSelection);
     console.log(`Changed ball selection to ${newSelection} ball style`);
-    // Update button label to reflect NEW selection (what it will show after toggle)
-    // var bs = document.getElementById("ballSelection");
-    // if (bs) {
-    // 	bs.innerHTML = (newSelection === "american" ? "World (Small/Big,Lows/Highs,Solids/Stripes)" : "International (Red/Yellow)");
-    // }
+
     // Update control panel ball images
     updateControlPanelBallImages(newSelection);
     ballType(newSelection);
@@ -652,6 +634,7 @@ function playerSetting(player) {
         scoreDisplayCheckbox.disabled = true;
         scoreDisplayCheckbox.checked = false;
         setStorageItem("scoreDisplay", "no");
+        resetBallSet()
     } else {
         scoreDisplayCheckbox.disabled = false;
     }
@@ -677,7 +660,11 @@ function playerSetting(player) {
 
         ballSetCheckbox.disabled = true;
         ballSetCheckbox.checked = false;
+        document.getElementById("ballSet").classList[anyPlayerDisabled ? "add" : "remove"]("noShow");
         setStorageItem("useBallSet", "no");
+
+        document.getElementById("ballSelection").disabled = true;
+
         resetBallSet()
 
         // Hide related elements
@@ -689,8 +676,6 @@ function playerSetting(player) {
         document.getElementById("ballTrackerDirectionDiv").classList.add("noShow");
         document.getElementById("ballTrackerDiv").classList.add("noShow");
         document.getElementById("ballTracker").classList.add("noShow");
-        document.getElementById("ballTypeDiv").classList.add("noShow");
-
 
         // Send messages to hide these features
         bc.postMessage({ clockDisplay: 'noClock' });
@@ -701,6 +686,8 @@ function playerSetting(player) {
         clockCheckbox.disabled = false;
         toggleCheckbox.disabled = false;
         ballTrackerCheckbox.disabled = false;
+        ballSetCheckbox.disabled = false;
+        document.getElementById("ballSelection").disabled = false;
     }
 
     // Show/hide  elements based on individual players being enabled
@@ -726,8 +713,14 @@ function playerSetting(player) {
     bc.postMessage({ playerDisplay: usePlayer, playerNumber: player });
 
     // updateTabVisibility();
-
+    //Hide/Show based on both players enabled
     document.getElementById("swapBtn").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
+    document.getElementById("scoreLabel").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
+    document.getElementById("scoreInfoP1").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
+    document.getElementById("scoreInfoP2").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
+    document.getElementById("scoreEditing").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
+    // document.getElementById("ballTypeDiv").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
+    // document.getElementById("ballSet").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
 }
 
 function scoreDisplaySetting() {
@@ -1666,12 +1659,6 @@ async function hideSource(sceneName, sourceName) {
 
 const settings = getReplaySettings();
 
-// // Usage with your single scene name, for example:
-// const SCENE_NAME = document.getElementById("replaySceneName").value;
-// const REPLAY_VIDEO_SOURCE_NAME = document.getElementById("replayVideoSourceName").value;  // Name of the Media Source that should play the replay
-// const REPLAY_INDICATOR_SOURCE_NAME = document.getElementById("replayIndicatorSourceName").value;  // Name of your Text Source in OBS
-
-
 obs.on('MediaInputPlaybackEnded', async ({ inputName }) => {
     const { sceneName, videoSource, indicatorSource } = getReplaySettings();
     if (inputName === videoSource) {
@@ -1683,7 +1670,7 @@ obs.on('MediaInputPlaybackEnded', async ({ inputName }) => {
             console.error('Error hiding replay source on playback end:', error);
         }
     }
-    if (document.getElementById("autoResumeReplayBuffer").checked){
+    if (document.getElementById("autoResumeReplayBuffer").checked) {
         toggleReplayMonitoring();
     } return;
 });
@@ -1745,16 +1732,6 @@ obs.on('ConnectionClosed', () => {
     console.warn('OBS WebSocket: ConnectionClosed');
     // setButtonsEnabled(false);
 });
-
-// Enable/disable the replay control buttons until ready
-// function setButtonsEnabled(enabled) {
-//     const ids = ['btnMonitorGame', 'btnReplayClip'];
-//     ids.forEach(id => {
-//         const el = document.getElementById(id);
-//         if (el) el.disabled = !enabled;
-//     });
-// }
-// setButtonsEnabled(false);
 
 // UI helpers
 function setMonitorButtonText() {
@@ -1916,7 +1893,8 @@ async function triggerReplayClip() {
     } catch (error) {
         console.error('Replay Clip failed:', error);
     }
-    updateReplayButtonsVisibility()
+    updateReplayButtonsVisibility();
+    toggleReplayClipsVisibility();
 }
 
 async function playPreviousReplay(index) {
