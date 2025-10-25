@@ -1889,6 +1889,9 @@ async function triggerReplayClip() {
             replayHistory.shift(); // removes the oldest (first) entry
         }
 
+        // Save replayHistory to localStorage
+        localStorage.setItem('replayHistory', JSON.stringify(replayHistory));
+
         console.log('Updated Replay History:', replayHistory);
 
     } catch (error) {
@@ -1899,19 +1902,8 @@ async function triggerReplayClip() {
 }
 
 async function playPreviousReplay(index) {
-    try {
-        const { outputActive } = await obs.call('GetReplayBufferStatus');
-        if (outputActive) {
-            await obs.call('StopReplayBuffer');
-            isMonitoringActive = false;
-            setMonitorButtonText();
-            console.log('Replay buffer stopped.');
-        } else {
-            console.log('Replay buffer already inactive, skipping stop.');
-        }
-    } catch (err) {
-        console.error('Failed to stop replay buffer:', err);
-    }
+    // Always rehydrate the array from localStorage
+    const replayHistory = JSON.parse(localStorage.getItem('replayHistory')) || [];
 
     if (index < 0 || index >= replayHistory.length) {
         console.warn('Invalid replay index');
@@ -1919,31 +1911,40 @@ async function playPreviousReplay(index) {
     }
 
     const filePath = replayHistory[index];
-    const { sceneName, videoSource, indicatorSource } = getReplaySettings();
-    await showSource(sceneName, videoSource); // always show videoSource
-    if (indicatorSource) {
-        await showSource(sceneName, indicatorSource); // only if indicator source is set
+    if (!filePath) {
+        console.warn('No replay file found at this index.');
+        return;
     }
 
     try {
-        // Preserve full input settings before modification
+        const { outputActive } = await obs.call('GetReplayBufferStatus');
+        if (outputActive) {
+            await obs.call('StopReplayBuffer');
+            isMonitoringActive = false;
+            setMonitorButtonText();
+        }
+    } catch (err) {
+        console.error('Failed to stop replay buffer:', err);
+    }
+
+    const { sceneName, videoSource, indicatorSource } = getReplaySettings();
+    await showSource(sceneName, videoSource);
+    if (indicatorSource) await showSource(sceneName, indicatorSource);
+
+    try {
         const { inputSettings } = await obs.call('GetInputSettings', {
-            inputName: videoSource,
+            inputName: videoSource
         });
 
-        // Apply old settings with new file path
         await obs.call('SetInputSettings', {
             inputName: videoSource,
-            inputSettings: {
-                ...inputSettings,
-                local_file: filePath,
-            },
-            overlay: false,
+            inputSettings: { ...inputSettings, local_file: filePath },
+            overlay: false
         });
 
         await obs.call('TriggerMediaInputAction', {
             inputName: videoSource,
-            mediaAction: 'OBS_WEBSOCKET_MEDIA_INPUT_ACTION_RESTART',
+            mediaAction: 'OBS_WEBSOCKET_MEDIA_INPUT_ACTION_RESTART'
         });
 
         console.log('Replaying historic clip:', filePath);
@@ -1953,7 +1954,10 @@ async function playPreviousReplay(index) {
 }
 
 
+
 function updateReplayButtonsVisibility() {
+    const replayHistory = JSON.parse(localStorage.getItem('replayHistory')) || [];
+
     for (let i = 0; i < 5; i++) {
         const buttonId = `prvReplayClip${i + 1}`;
         const button = document.getElementById(buttonId);
