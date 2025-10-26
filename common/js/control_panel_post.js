@@ -70,7 +70,7 @@ var pColormsg;
 // onload stuff
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-window.onload = function() {
+window.onload = function () {
 	// Set local storage values if not previously configured
 	if (getStorageItem("usePlayer1") === null) {
 		setStorageItem("usePlayer1", "yes");
@@ -78,12 +78,12 @@ window.onload = function() {
 	if (getStorageItem("usePlayer2") === null) {
 		setStorageItem("usePlayer2", "yes");
 	}
-	
+
 	if (getStorageItem("scoreDisplay") === null) {
 		setStorageItem("scoreDisplay", "yes");
 	}
 
-	if (getStorageItem("usePlayerToggle")==="yes" || getStorageItem("usePlayerToggle") === null) {
+	if (getStorageItem("usePlayerToggle") === "yes" || getStorageItem("usePlayerToggle") === null) {
 		document.getElementById("useToggleSetting").checked = true;
 		setStorageItem("usePlayerToggle", "yes");
 		toggleSetting();
@@ -93,7 +93,7 @@ window.onload = function() {
 		toggleSetting();
 	}
 
-	if (getStorageItem("useBallSet")==="yes") {
+	if (getStorageItem("useBallSet") === "yes") {
 		document.getElementById("ballSetCheckbox").checked = true;
 		document.getElementById("ballSet").classList.remove("noShow");
 		// setStorageItem("useBallSet", "yes");
@@ -103,13 +103,13 @@ window.onload = function() {
 		document.getElementById("ballSet").classList.add("noShow");
 	}
 
-	if (getStorageItem("autoResumeReplayBuffer")==="yes") {
+	if (getStorageItem("autoResumeReplayBuffer") === "yes") {
 		document.getElementById("autoResumeReplayBuffer").checked = true;
 	} else {
 		document.getElementById("autoResumeReplayBuffer").checked = false;
 	}
 
-	if (getStorageItem("usePlayer1") === "yes" && getStorageItem("usePlayer2") === "yes" && getStorageItem("usePlayerToggle") === "yes"){
+	if (getStorageItem("usePlayer1") === "yes" && getStorageItem("usePlayer2") === "yes" && getStorageItem("usePlayerToggle") === "yes") {
 		console.log(`We should be showing active player identifier`);
 		const activePlayer = getStorageItem("activePlayer") === "2" ? "2" : "1";
 		setStorageItem("activePlayer", activePlayer);
@@ -194,7 +194,7 @@ window.onload = function() {
 		document.getElementById("ballTracker").classList.add("noShow");
 	}
 
-	if ((getStorageItem("enableBallTracker") === "yes") && (getStorageItem("gameType") === "game1")){
+	if ((getStorageItem("enableBallTracker") === "yes") && (getStorageItem("gameType") === "game1")) {
 		document.getElementById("ballTrackerCheckbox").checked = true;
 		document.getElementById("ballTrackerDirectionDiv").classList.remove("noShow");
 		document.getElementById("ballTracker").classList.remove("noShow");
@@ -208,7 +208,7 @@ window.onload = function() {
 		setStorageItem("enableBallTracker", "no");
 		document.getElementById("ballTrackerDirectionDiv").classList.add("noShow");
 		document.getElementById("ballTracker").classList.add("noShow");
-	
+
 		// Keep ball type and ball set visible for 8-ball even when tracker is off
 		if (getStorageItem("gameType") !== "game2" && getStorageItem("gameType") !== "game3") {
 			document.getElementById("ballTypeDiv").classList.remove("noShow");
@@ -217,7 +217,7 @@ window.onload = function() {
 			// document.getElementById("ballTypeDiv").classList.add("noShow");
 			document.getElementById("ballSetDiv").classList.add("noShow");
 		}
-	
+
 		console.log(`Ball tracker disabled`);
 		bc.postMessage({ displayBallTracker: false });
 	}
@@ -241,11 +241,22 @@ window.onload = function() {
 		console.log(`Ball tracker initialized ${direction}`);
 	}
 
+	if (getStorageItem("isConnected") === "true") {
+		obsReConnect();
+		console.log(`Reconnecting on statup, due to isConnected being true`);
+		if ((getStorageItem("isMonitoringActive") === "true")) {
+			obsReMonitor();
+		}
+		setMonitorButtonText();
+	}
+
+
+
 	// Call the visibility functions based on the checkbox states
-    setPlayerVisibility(1);
-    setPlayerVisibility(2);
+	setPlayerVisibility(1);
+	setPlayerVisibility(2);
 	applySavedBallStates();
-	
+
 	// Initialize control panel ball images
 	const ballSelection = getStorageItem("ballSelection") || "american";
 	updateControlPanelBallImages(ballSelection);
@@ -262,6 +273,29 @@ window.onload = function() {
 	toggleReplayClipsVisibility();
 };
 
+async function obsReConnect() {
+	const address = getObsAddress();
+	const password = getObsPassword();
+
+	try {
+		await obs.connect(address, password);
+		isConnected = true;
+		localStorage.setItem('isConnected', JSON.stringify(isConnected));
+		updateConnectButton();
+		console.log('OBS WebSocket: Connected and authenticated');
+	} catch (err) {
+		console.error('Failed to connect:', err);
+		alert('Failed to connect.\n\nDetails: ' + (err.message || err.toString()));
+	}
+}
+
+async function obsReMonitor() {
+	console.log('Monitoring is marked as active after reconnection, changing states');
+	hasSavedClip = false;
+	btnReplayClip.classList.remove('noShow');
+}
+
+
 function initializeLogoStatus() {
 	// Loop through the logos (in this example logos 1 through 5)
 	for (let xL = 1; xL <= 5; xL++) {
@@ -276,7 +310,7 @@ function initializeLogoStatus() {
 		}
 		let container = document.getElementById(containerId);
 		let fileInput = document.getElementById("FileUploadL" + xL);
-		let label  = document.getElementById("FileUploadLText" + xL);
+		let label = document.getElementById("FileUploadLText" + xL);
 		let imgElem = document.getElementById("l" + xL + "Img");
 
 		if (savedLogo) {
@@ -291,7 +325,7 @@ function initializeLogoStatus() {
 			}
 			// Bind the container's click to call clearLogo.
 			if (container && fileInput) {
-				container.onclick = function(e) {
+				container.onclick = function (e) {
 					e.preventDefault();
 					clearLogo(xL);
 				};
@@ -306,10 +340,10 @@ function initializeLogoStatus() {
 			}
 			if (label) {
 				label.textContent = (xL === 1) ? "Upload Player 1 Logo" :
-									(xL === 2) ? "Upload Player 2 Logo" : "L" + (xL-2);
+					(xL === 2) ? "Upload Player 2 Logo" : "L" + (xL - 2);
 			}
 			if (container && fileInput) {
-				container.onclick = function(e) {
+				container.onclick = function (e) {
 					// e.preventDefault();
 					fileInput.click();
 				};
@@ -322,46 +356,46 @@ function initializeLogoStatus() {
 }
 
 function initializeExtensionButtonStatus() {
-    // Player 1 Extension Button
-    let extBtn1 = document.getElementById("p1extensionBtn");
-    // Use a key to store if the extension is enabled. Here "enabled" means it is active.
-    // If the key is not present, then consider it not enabled.
-    let extStatus1 = getStorageItem("p1Extension"); // e.g., "enabled" or "disabled"
-    if (extBtn1) {
-        if (extStatus1 && extStatus1 === "enabled") {
-            // When enabled, show Reset
-            //extBtn1.textContent = "Reset";
+	// Player 1 Extension Button
+	let extBtn1 = document.getElementById("p1extensionBtn");
+	// Use a key to store if the extension is enabled. Here "enabled" means it is active.
+	// If the key is not present, then consider it not enabled.
+	let extStatus1 = getStorageItem("p1Extension"); // e.g., "enabled" or "disabled"
+	if (extBtn1) {
+		if (extStatus1 && extStatus1 === "enabled") {
+			// When enabled, show Reset
+			//extBtn1.textContent = "Reset";
 			document.getElementById("p1extensionBtn").setAttribute("onclick", "resetExt('p1')");
 			document.getElementById("p1extensionBtn").classList.add("clkd");
 			var playerName = document.getElementById("p1Name").value.split(" ")[0] || "P1";
 			document.getElementById("p1extensionBtn").innerHTML = "Reset " + playerName.substring(0, 9) + "'s Ext";
-            extBtn1.style.backgroundColor = "red";
-            extBtn1.style.color = "black";
-        } else {
-            //extBtn1.textContent = "Extend";
-            extBtn1.style.backgroundColor = "";
-            extBtn1.style.color = "";
-        }
-    }
+			extBtn1.style.backgroundColor = "red";
+			extBtn1.style.color = "black";
+		} else {
+			//extBtn1.textContent = "Extend";
+			extBtn1.style.backgroundColor = "";
+			extBtn1.style.color = "";
+		}
+	}
 
-    // Player 2 Extension Button
-    let extBtn2 = document.getElementById("p2extensionBtn");
-    let extStatus2 = getStorageItem("p2Extension");
-    if (extBtn2) {
-        if (extStatus2 && extStatus2 === "enabled") {
-            //extBtn2.textContent = "Reset";
+	// Player 2 Extension Button
+	let extBtn2 = document.getElementById("p2extensionBtn");
+	let extStatus2 = getStorageItem("p2Extension");
+	if (extBtn2) {
+		if (extStatus2 && extStatus2 === "enabled") {
+			//extBtn2.textContent = "Reset";
 			document.getElementById("p2extensionBtn").setAttribute("onclick", "resetExt('p2')");
 			document.getElementById("p2extensionBtn").classList.add("clkd");
 			var playerName = document.getElementById("p2Name").value.split(" ")[0] || "P1";
 			document.getElementById("p2extensionBtn").innerHTML = "Reset " + playerName.substring(0, 9) + "'s Ext";
-            extBtn2.style.backgroundColor = "red";
-            extBtn2.style.color = "black";
-        } else {
-            //extBtn2.textContent = "Extend";
-            extBtn2.style.backgroundColor = "";
-            extBtn2.style.color = "";
-        }
-    }
+			extBtn2.style.backgroundColor = "red";
+			extBtn2.style.color = "black";
+		} else {
+			//extBtn2.textContent = "Extend";
+			extBtn2.style.backgroundColor = "";
+			extBtn2.style.color = "";
+		}
+	}
 }
 
 slider.oninput = function () {
@@ -409,38 +443,40 @@ document.getElementById('logoSsImg5').onclick = function () {
 if (getStorageItem('p1colorSet') !== null) {
 	var cvalue = getStorageItem('p1colorSet');
 	var selectElement = document.getElementById('p1colorDiv');
-    
-    // Set the selected option
-    for (var i = 0; i < selectElement.options.length; i++) {
-        if (selectElement.options[i].value === cvalue) {
-            selectElement.selectedIndex = i;
-            break;
-        }
-    }
+
+	// Set the selected option
+	for (var i = 0; i < selectElement.options.length; i++) {
+		if (selectElement.options[i].value === cvalue) {
+			selectElement.selectedIndex = i;
+			break;
+		}
+	}
 	document.getElementById('p1colorDiv').style.background = getStorageItem('p1colorSet');
 	document.getElementById('p1Name').style.background = `linear-gradient(to right, ${getStorageItem('p1colorSet')}, white)`;
 	document.getElementsByTagName("select")[0].options[0].value = cvalue;
-	if (cvalue == "white" || cvalue == "") { document.getElementById("p1colorDiv").style.color = "black"; document.getElementById("p1colorDiv").style.textShadow = "none"; 
+	if (cvalue == "white" || cvalue == "") {
+		document.getElementById("p1colorDiv").style.color = "black"; document.getElementById("p1colorDiv").style.textShadow = "none";
 	} else { document.getElementById("p1colorDiv").style.color = "white"; };
 } else {
 	document.getElementById("p1colorDiv").style.color = "black";
-	document.getElementById("p1colorDiv").style.textShadow = "none"; 
+	document.getElementById("p1colorDiv").style.textShadow = "none";
 }
 
 if (getStorageItem('p2colorSet') !== null) {
 	var cvalue = getStorageItem('p2colorSet');
 	var selectElement = document.getElementById('p2colorDiv');
-    
-    // Set the selected option
-    for (var i = 0; i < selectElement.options.length; i++) {
-        if (selectElement.options[i].value === cvalue) {
-            selectElement.selectedIndex = i;
-            break;
-        }
-    }
+
+	// Set the selected option
+	for (var i = 0; i < selectElement.options.length; i++) {
+		if (selectElement.options[i].value === cvalue) {
+			selectElement.selectedIndex = i;
+			break;
+		}
+	}
 	document.getElementById('p2colorDiv').style.background = getStorageItem('p2colorSet');
 	document.getElementById('p2Name').style.background = `linear-gradient(to left, ${getStorageItem('p2colorSet')}, white)`;
-	if (cvalue == "white" || cvalue == "") { document.getElementById("p2colorDiv").style.color = "black"; document.getElementById("p2colorDiv").style.textShadow = "none"; 
+	if (cvalue == "white" || cvalue == "") {
+		document.getElementById("p2colorDiv").style.color = "black"; document.getElementById("p2colorDiv").style.textShadow = "none";
 	} else { document.getElementById("p2colorDiv").style.color = "white"; };
 }
 else {
@@ -478,7 +514,7 @@ if (getStorageItem("useCustomLogo") == "yes") {
 
 if (getStorageItem("useCustomLogo2") == "yes") {
 	console.log("customLogo2 = TRUE");
-	document.getElementById("customLogo2").checked = true;	
+	document.getElementById("customLogo2").checked = true;
 	customLogoSetting2();
 } else {
 	customLogoSetting2()
@@ -532,14 +568,14 @@ document.getElementById("p1Score").value = getStorageItem("p1ScoreCtrlPanel");
 document.getElementById("p2Name").value = getStorageItem("p2NameCtrlPanel");
 document.getElementById("p2Score").value = getStorageItem("p2ScoreCtrlPanel");
 document.getElementById("gameType").value = getStorageItem("gameType");
-if (getStorageItem("gameType") === "game3"){
+if (getStorageItem("gameType") === "game3") {
 	document.getElementById("ball 10").classList.add("noShow");
 	document.getElementById("ball 11").classList.add("noShow");
 	document.getElementById("ball 12").classList.add("noShow");
 	document.getElementById("ball 13").classList.add("noShow");
 	document.getElementById("ball 14").classList.add("noShow");
 	document.getElementById("ball 15").classList.add("noShow");
-} else if (getStorageItem("gameType") === "game4"){
+} else if (getStorageItem("gameType") === "game4") {
 	document.getElementById("ball 10").classList.remove("noShow");
 	document.getElementById("ball 11").classList.add("noShow");
 	document.getElementById("ball 12").classList.add("noShow");
@@ -565,17 +601,17 @@ document.getElementById('replayIndicatorSourceName').value = getStorageItem("rep
 // Initialize ball set selection from storage
 const savedBallSet = getStorageItem("playerBallSet");
 if (savedBallSet) {
-    const radioButton = document.querySelector(`input[name="p1BallSetSelect"][value="${savedBallSet}"]`);
-    if (radioButton) {
-        radioButton.checked = true;
-        // Trigger the ball set change to update the display
-        ballSetChange();
-    }
+	const radioButton = document.querySelector(`input[name="p1BallSetSelect"][value="${savedBallSet}"]`);
+	if (radioButton) {
+		radioButton.checked = true;
+		// Trigger the ball set change to update the display
+		ballSetChange();
+	}
 } else {
-    // Default to "Open Table" if no selection is saved
-    document.getElementById('p1colorOpen').checked = true;
-    setStorageItem("playerBallSet", "p1Open");
-    bc.postMessage({ playerBallSet: "p1Open" });
+	// Default to "Open Table" if no selection is saved
+	document.getElementById('p1colorOpen').checked = true;
+	setStorageItem("playerBallSet", "p1Open");
+	bc.postMessage({ playerBallSet: "p1Open" });
 }
 // document.getElementById("psVerNum").innerHTML = psVersionNum;
 postNames(); postInfo(); startThemeCheck();
@@ -586,9 +622,9 @@ postNames(); postInfo(); startThemeCheck();
 
 bcr.onmessage = (event) => {
 	const clockDisplay = document.getElementById("clockLocalDisplay");
-    clockDisplay.style.background = "green";
+	clockDisplay.style.background = "green";
 	clockDisplay.style.border = "2px solid black";
-    clockDisplay.innerHTML = event.data + "s";
+	clockDisplay.innerHTML = event.data + "s";
 	tev = event.data;
 	console.log(tev);
 	if (tev > 20) { document.getElementById("clockLocalDisplay").style.color = "white"; };
