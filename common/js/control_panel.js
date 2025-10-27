@@ -23,7 +23,6 @@ const obs = new OBSWebSocket();
 let isObsReady = false;
 // UI button click handlers, async and awaiting hotkey dispatch
 let isMonitoringActive = JSON.parse(localStorage.getItem('isMonitoringActive')) || false;
-let hasSavedClip = JSON.parse(localStorage.getItem('hasSavedClip')) || false;
 let isConnected = JSON.parse(localStorage.getItem('isConnected')) || false;
 let replayHistory = JSON.parse(localStorage.getItem('replayHistory')) || [];
 
@@ -1641,13 +1640,23 @@ async function getSceneItemId(sceneName, sourceName) {
 }
 
 async function showSource(sceneName, sourceName) {
-    const id = await getSceneItemId(sceneName, sourceName);
-    await obs.call('SetSceneItemEnabled', { sceneName, sceneItemId: id, sceneItemEnabled: true });
+    try {
+        const id = await getSceneItemId(sceneName, sourceName);
+        if (id === null || id === undefined) {
+            alert(`Error: Source "${sourceName}" not found in scene "${sceneName}". Please check the names.`);
+            return;
+        }
+        await obs.call('SetSceneItemEnabled', { sceneName, sceneItemId: id, sceneItemEnabled: true });
+    } catch (error) {
+        console.error(`Failed to show source "${sourceName}" in scene "${sceneName}":`, error);
+        alert(`OBS Error: Could not show source "${sourceName}" in scene "${sceneName}". Please verify your inputs.`);
+    }
 }
 
 async function hideSource(sceneName, sourceName) {
     if (!sourceName || sourceName.trim() === "") {
         console.warn(`No source name provided for hiding in scene "${sceneName}". Skipping.`);
+        alert(`Error: No source name provided for hiding in scene "${sceneName}".`);
         return;
     }
 
@@ -1655,14 +1664,17 @@ async function hideSource(sceneName, sourceName) {
         const id = await getSceneItemId(sceneName, sourceName);
         if (id === null || id === undefined) {
             console.warn(`Source "${sourceName}" not found in scene "${sceneName}".`);
+            alert(`Error: Source "${sourceName}" not found in scene "${sceneName}". Please check the names.`);
             return;
         }
         await obs.call('SetSceneItemEnabled', { sceneName, sceneItemId: id, sceneItemEnabled: false });
         console.log(`Source "${sourceName}" hidden in scene "${sceneName}".`);
     } catch (error) {
         console.error(`Failed to hide source "${sourceName}" in scene "${sceneName}":`, error);
+        alert(`OBS Error: Could not hide source "${sourceName}" in scene "${sceneName}". Please verify your inputs and OBS connection.`);
     }
 }
+
 
 const settings = getReplaySettings();
 
@@ -1758,10 +1770,8 @@ function setMonitorButtonText() {
 function setReplayButtonText() {
     const btn = document.getElementById('btnReplayClip');
     if (!btn) return;
-    if ((getStorageItem("autoResumeReplayBuffer") === "yes") && (getStorageItem("isMonitoringActive") === "false")) {
+    if ((getStorageItem("isMonitoringActive") === "false")) {
         btnReplayClip.classList.add('noShow');
-    } else {
-        btn.textContent = (getStorageItem("hasSavedClip") === "true") ? 'Restart Clip' : 'Instant Replay';
     }
 }
 
@@ -1792,38 +1802,17 @@ function waitForReplaySaved(timeoutMs = 7000) {
 }
 
 // Replay/Restart Clip handler
-async function triggerReplayClip() {
+async function triggerInstantReplay() {
     if (!isObsReady) {
         console.log('Failed to control OBS: OBS connection is not ready, most likely the websocket connection has not been setup.');
         alert('Failed to control OBS: OBS connection is not ready, most likely the websocket connection has not been setup.');
         return;
     }
 
-    // If we already have a saved clip, just restart it
-    if (getStorageItem("hasSavedClip" === "true")) {
-        const { sceneName, videoSource, indicatorSource } = getReplaySettings();
-        await showSource(sceneName, videoSource); // always show videoSource
-        if (indicatorSource) {
-            await showSource(sceneName, indicatorSource); // only if indicator source is set
-        }
-
-        try {
-            await obs.call('TriggerMediaInputAction', {
-                inputName: videoSource,
-                mediaAction: 'OBS_WEBSOCKET_MEDIA_INPUT_ACTION_RESTART'
-            });
-            console.log('Restarting current clip');
-            return;
-        } catch (error) {
-            console.error('Failed to restart clip:', error);
-            return;
-        }
-    }
-
     // First time: need to save a clip first
     try {
         // If monitoring is not active, we can't save a new clip
-        if (getStorageItem("isMonitoringActive") === "false" || getStorageItem("isMonitoringActive") === null) {
+        if ((getStorageItem("isMonitoringActive") === "false" || getStorageItem("isMonitoringActive") === null)) {
             console.warn('Cannot replay: monitoring is not active and no saved clip exists.');
             alert('Cannot replay: monitoring is not active and no saved clip exists.');
             return;
@@ -1863,11 +1852,18 @@ async function triggerReplayClip() {
 
         // Stop monitoring
         try {
-            await obs.call('StopReplayBuffer');
-            isMonitoringActive = false;
-            localStorage.setItem('isMonitoringActive', JSON.stringify(isMonitoringActive));
-
-            setMonitorButtonText();
+            const { outputActive } = await obs.call('GetReplayBufferStatus');
+            if (outputActive) {
+                try {
+                    await obs.call('StopReplayBuffer');
+                    isMonitoringActive = false;
+                    localStorage.setItem('isMonitoringActive', JSON.stringify(isMonitoringActive));
+                    setMonitorButtonText();
+                    await new Promise(r => setTimeout(r, 150)); // small delay
+                } catch (err) {
+                    console.error('Failed to stop replay buffer:', err);
+                }
+            }
         } catch (err) {
             console.error('Failed to stop replay buffer:', err);
         }
@@ -1887,9 +1883,7 @@ async function triggerReplayClip() {
             mediaAction: 'OBS_WEBSOCKET_MEDIA_INPUT_ACTION_RESTART'
         });
 
-        // Mark that we have a saved clip and update button
-        hasSavedClip = true;
-        localStorage.setItem('hasSavedClip', JSON.stringify(hasSavedClip));
+        // Update instant replay button
         setReplayButtonText();
 
         console.log('Replay ready and playing:', savedPath);
@@ -1904,7 +1898,6 @@ async function triggerReplayClip() {
 
         // Save replayHistory to localStorage
         localStorage.setItem('replayHistory', JSON.stringify(replayHistory));
-
         console.log('Updated Replay History:', replayHistory);
 
     } catch (error) {
@@ -1942,7 +1935,6 @@ async function playPreviousReplay(index) {
                 console.error('Failed to stop replay buffer:', err);
             }
         }
-
     } catch (err) {
         console.error('Failed to stop replay buffer:', err);
     }
@@ -1981,9 +1973,17 @@ function updateReplayButtonsVisibility() {
 
     if (getStorageItem("isConnected") === "false") {
         document.getElementById("replayClips").classList.add("noShow");
+        document.getElementById("savedPathNote").classList.add("noShow");
     } else {
         document.getElementById("replayClips").classList.remove("noShow");
+        document.getElementById("savedPathNote").classList.remove("noShow");
 
+    }
+
+    if (!replayHistory || replayHistory.length === 0) {
+        // replayHistory is null, undefined, or empty
+        document.getElementById("replayClips").classList.add("noShow");
+        document.getElementById("savedPathNote").classList.add("noShow");
     }
 
     for (let i = 0; i < 5; i++) {
@@ -2005,40 +2005,56 @@ function updateReplayButtonsVisibility() {
 
 // Monitor toggle
 async function toggleReplayMonitoring() {
+    //Reconnect to OBS is not connected
+    if(!isConnected){
+        await obsReConnect();
+        toggleReplayClipsVisibility();
+        updateReplayButtonsVisibility();
+    }
+    const { videoSource } = getReplaySettings();
+    try {
+        const { mediaState } = await obs.call('GetMediaInputStatus', { inputName: videoSource });
+        // your existing logic with mediaState check
+        if (mediaState === 'playing') {
+            await obs.call('TriggerMediaInputAction', { inputName: videoSource, mediaAction: 'OBS_WEBSOCKET_MEDIA_INPUT_ACTION_STOP' });
+            await new Promise(r => setTimeout(r, 150));
+        }
+    } catch (error) {
+        console.error('Failed to get media input status:', error);
+        alert(`Error: Media source "${videoSource}" not found or inaccessible. Please check your source name.`);
+        return;  // Stop execution since the source is not valid
+    }
+        
     if (!isObsReady) {
         alert('Failed to initiate monitoring: OBS connection is not ready, most likely the websocket connection has not been setup.');
         return;
     }
+
     try {
         if (getStorageItem("isMonitoringActive") === "false" || getStorageItem("isMonitoringActive") === null) {
             console.log('Monitoring is not active, starting replay buffer...');
-            const { videoSource } = getReplaySettings();
-            if (getStorageItem("hasSavedClip") === "true") {
-                try {
-                    console.log('Stopping active replay...');
-                    await obs.call('TriggerMediaInputAction', { inputName: videoSource, mediaAction: 'OBS_WEBSOCKET_MEDIA_INPUT_ACTION_STOP' });
-                    console.log('Stopped active replay successfully');
-                } catch (innerErr) {
-                    console.warn('Failed to stop active replay:', innerErr);
-                }
-            }
-            console.log('Starting replay buffer...');
             await obs.call('StartReplayBuffer').catch(err => {
                 console.error('StartReplayBuffer failed:', err);
                 throw err; // rethrow to catch below
             });
             isMonitoringActive = true;
             localStorage.setItem('isMonitoringActive', JSON.stringify(isMonitoringActive));
-            hasSavedClip = false;
-            localStorage.setItem('hasSavedClip', JSON.stringify(hasSavedClip));
             btnReplayClip.classList.remove('noShow');
             setReplayButtonText();
         } else {
             console.log('Monitoring is active, stopping replay buffer...');
-            await obs.call('StopReplayBuffer').catch(err => {
-                console.error('StopReplayBuffer failed:', err);
-                throw err; // rethrow to catch below
-            });
+            const { outputActive } = await obs.call('GetReplayBufferStatus');
+            if (outputActive) {
+                try {
+                    await obs.call('StopReplayBuffer');
+                    isMonitoringActive = false;
+                    localStorage.setItem('isMonitoringActive', JSON.stringify(isMonitoringActive));
+                    // setMonitorButtonText();
+                    await new Promise(r => setTimeout(r, 150)); // small delay
+                } catch (err) {
+                    console.error('Failed to stop replay buffer:', err);
+                }
+            }
             isMonitoringActive = false;
             localStorage.setItem('isMonitoringActive', JSON.stringify(isMonitoringActive));
             btnReplayClip.classList.add('noShow');

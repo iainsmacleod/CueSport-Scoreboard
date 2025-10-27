@@ -292,7 +292,6 @@ async function obsReConnect() {
 
 async function obsReMonitor() {
 	console.log('Monitoring is marked as active after reconnection, changing states');
-	hasSavedClip = false;
 	btnReplayClip.classList.remove('noShow');
 }
 

@@ -251,7 +251,7 @@ for more information about Salotto please visit https://salotto.app
                 </div>
                 <div class="tooltip">
                     <button id="btnReplayClip" class="btnReplayClip hover obs28 button noShow"
-                        onclick="triggerReplayClip()">Instant Replay</button>
+                        onclick="triggerInstantReplay()">Instant Replay</button>
                     <span class="tooltiptext">Save and replay up to last X seconds or restart previously recorded
                         clip.<br><br>Note: X equals OBS defined Maximum Replay Time.</span>
                 </div>
@@ -269,7 +269,7 @@ for more information about Salotto please visit https://salotto.app
                     onclick="playPreviousReplay(4)">Clip 5</button>
             </div>
             <div class="column" id="savedPathNote">
-                *NOTE: Remember to cleanup video clip storage periodically.
+                *NOTE: Remember to cleanup Replay video clip storage periodically.
             </div>
             
             <!-- Shot Clock -->
@@ -387,7 +387,7 @@ for more information about Salotto please visit https://salotto.app
             <div class="column form-rows">
                 <div class="form-row">
                     <div class="field">
-                        <label for="obsAddress">OBS WebSocket Address:</label>
+                        <label for="obsAddress">OBS WebSocket Address *:</label>
                         <input type="text" id="obsAddress" value="ws://127.0.0.1:4455" />
                     </div>
                 </div>
@@ -413,24 +413,26 @@ for more information about Salotto please visit https://salotto.app
                 <div class="section-header" id="replaySettingsLabel">Replay Source Settings</div>
                 <div class="form-row">
                     <div class="field">
-                        <label>Scene Name: </label>
+                        <label>Scene Name *: </label>
                         <input style="width: 150px" type="text" id="replaySceneName" placeholder="" />
                     </div>
                     <div class="field">
-                        <label>Video Source Name: </label>
+                        <label>Media Source Name *: </label>
                         <input style="width: 150px" type="text" id="replayVideoSourceName" placeholder="" />
                     </div>
                 </div>
                 <div class="form-row">
                     <div class="field">
-                        <label>Indicator Source Name (Optional): </label>
+                        <label>Indicator Source Name: </label>
                         <input style="width: 150px" type="text" id="replayIndicatorSourceName" placeholder="" />
                     </div>
                     <label>Auto-resume Monitoring: </label>
                     <input class="smallSize" type="checkbox" id="autoResumeReplayBuffer" onchange="autoResumeReplayBuffer()"/>
                 </div>
                 <div class="form-row">
-                    <span></span>
+                    <div class="field">
+                        *Required Fields
+                    </div>
                     <div class="field">
                         <div class="hover obs28 button" id="sendSourceInfo" onclick="postSources()">
                             Update Sources
