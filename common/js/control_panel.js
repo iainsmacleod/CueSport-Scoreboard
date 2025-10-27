@@ -23,10 +23,9 @@ const obs = new OBSWebSocket();
 let isObsReady = false;
 // UI button click handlers, async and awaiting hotkey dispatch
 let isMonitoringActive = JSON.parse(localStorage.getItem('isMonitoringActive')) || false;
-// Track if we have a saved clip ready to replay
 let hasSavedClip = JSON.parse(localStorage.getItem('hasSavedClip')) || false;
 let isConnected = JSON.parse(localStorage.getItem('isConnected')) || false;
-let replayHistory = [];
+let replayHistory = JSON.parse(localStorage.getItem('replayHistory')) || [];
 
 // function updateTabVisibility() {
 //     // Get the state of the player settings
