@@ -271,6 +271,7 @@ window.onload = function () {
 	initializeLogoStatus();
 	initializeExtensionButtonStatus();
 	toggleReplayClipsVisibility();
+	updateReplayButtonsVisibility();
 };
 
 async function obsReConnect() {

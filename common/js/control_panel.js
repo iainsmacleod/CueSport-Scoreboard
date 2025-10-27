@@ -24,7 +24,7 @@ let isObsReady = false;
 // UI button click handlers, async and awaiting hotkey dispatch
 let isMonitoringActive = JSON.parse(localStorage.getItem('isMonitoringActive')) || false;
 // Track if we have a saved clip ready to replay
-let hasSavedClip = false;
+let hasSavedClip = JSON.parse(localStorage.getItem('hasSavedClip')) || false;
 let isConnected = JSON.parse(localStorage.getItem('isConnected')) || false;
 let replayHistory = [];
 
@@ -1585,7 +1585,7 @@ function autoResumeReplayBuffer() {
 async function connectToObsWebSocket() {
     // Get isConnected from localStorage (default to false if not set)
     if (isConnected) {
-        if (getStorageItem("isMonitoringActive")==="true") {
+        if (getStorageItem("isMonitoringActive") === "true") {
             await toggleReplayMonitoring();
         }
         // Disconnect
@@ -1594,6 +1594,7 @@ async function connectToObsWebSocket() {
             isConnected = false;
             localStorage.setItem('isConnected', JSON.stringify(isConnected));
             updateConnectButton();
+            updateReplayButtonsVisibility();
             console.log('Disconnected from OBS WebSocket');
         } catch (err) {
             console.error('Failed to disconnect:', err);
@@ -1609,6 +1610,7 @@ async function connectToObsWebSocket() {
             isConnected = true;
             localStorage.setItem('isConnected', JSON.stringify(isConnected));
             updateConnectButton();
+            updateReplayButtonsVisibility();
             console.log('OBS WebSocket: Connected and authenticated');
         } catch (err) {
             console.error('Failed to connect:', err);
@@ -1743,7 +1745,7 @@ obs.on('ConnectionClosed', () => {
 function setMonitorButtonText() {
     const btn = document.getElementById('btnMonitorGame');
     if (!btn) return;
-    if (getStorageItem("isMonitoringActive")==="true") {
+    if (getStorageItem("isMonitoringActive") === "true") {
         btn.textContent = 'Stop Monitoring';
         btn.style.backgroundColor = 'red';  // red fill for Stop Monitoring
         btn.style.color = 'white';           // optionally set text color for contrast
@@ -1757,7 +1759,11 @@ function setMonitorButtonText() {
 function setReplayButtonText() {
     const btn = document.getElementById('btnReplayClip');
     if (!btn) return;
-    btn.textContent = hasSavedClip ? 'Restart Clip' : 'Instant Replay';
+    if ((getStorageItem("autoResumeReplayBuffer") === "yes") && (getStorageItem("isMonitoringActive") === "false")) {
+        btnReplayClip.classList.add('noShow');
+    } else {
+        btn.textContent = (getStorageItem("hasSavedClip") === "true") ? 'Restart Clip' : 'Instant Replay';
+    }
 }
 
 // One-time wait for ReplayBufferSaved
@@ -1795,7 +1801,7 @@ async function triggerReplayClip() {
     }
 
     // If we already have a saved clip, just restart it
-    if (hasSavedClip) {
+    if (getStorageItem("hasSavedClip" === "true")) {
         const { sceneName, videoSource, indicatorSource } = getReplaySettings();
         await showSource(sceneName, videoSource); // always show videoSource
         if (indicatorSource) {
@@ -1818,7 +1824,7 @@ async function triggerReplayClip() {
     // First time: need to save a clip first
     try {
         // If monitoring is not active, we can't save a new clip
-        if (!getStorageItem("isMonitoringActive")==="true") {
+        if (getStorageItem("isMonitoringActive") === "false" || getStorageItem("isMonitoringActive") === null) {
             console.warn('Cannot replay: monitoring is not active and no saved clip exists.');
             alert('Cannot replay: monitoring is not active and no saved clip exists.');
             return;
@@ -1884,6 +1890,7 @@ async function triggerReplayClip() {
 
         // Mark that we have a saved clip and update button
         hasSavedClip = true;
+        localStorage.setItem('hasSavedClip', JSON.stringify(hasSavedClip));
         setReplayButtonText();
 
         console.log('Replay ready and playing:', savedPath);
@@ -1926,11 +1933,17 @@ async function playPreviousReplay(index) {
     try {
         const { outputActive } = await obs.call('GetReplayBufferStatus');
         if (outputActive) {
-            await obs.call('StopReplayBuffer');
-            isMonitoringActive = false;
-            localStorage.setItem('isMonitoringActive', JSON.stringify(isMonitoringActive));
-            setMonitorButtonText();
+            try {
+                await obs.call('StopReplayBuffer');
+                isMonitoringActive = false;
+                localStorage.setItem('isMonitoringActive', JSON.stringify(isMonitoringActive));
+                setMonitorButtonText();
+                await new Promise(r => setTimeout(r, 150)); // small delay
+            } catch (err) {
+                console.error('Failed to stop replay buffer:', err);
+            }
         }
+
     } catch (err) {
         console.error('Failed to stop replay buffer:', err);
     }
@@ -1959,12 +1972,20 @@ async function playPreviousReplay(index) {
     } catch (err) {
         console.error('Failed to play previous replay:', err);
     }
+    setReplayButtonText();
 }
 
 
 
 function updateReplayButtonsVisibility() {
     const replayHistory = JSON.parse(localStorage.getItem('replayHistory')) || [];
+
+    if (getStorageItem("isConnected") === "false") {
+        document.getElementById("replayClips").classList.add("noShow");
+    } else {
+        document.getElementById("replayClips").classList.remove("noShow");
+
+    }
 
     for (let i = 0; i < 5; i++) {
         const buttonId = `prvReplayClip${i + 1}`;
@@ -1990,10 +2011,10 @@ async function toggleReplayMonitoring() {
         return;
     }
     try {
-        if (getStorageItem("isMonitoringActive")==="false") {
+        if (getStorageItem("isMonitoringActive") === "false" || getStorageItem("isMonitoringActive") === null) {
             console.log('Monitoring is not active, starting replay buffer...');
             const { videoSource } = getReplaySettings();
-            if (hasSavedClip) {
+            if (getStorageItem("hasSavedClip") === "true") {
                 try {
                     console.log('Stopping active replay...');
                     await obs.call('TriggerMediaInputAction', { inputName: videoSource, mediaAction: 'OBS_WEBSOCKET_MEDIA_INPUT_ACTION_STOP' });
@@ -2010,6 +2031,7 @@ async function toggleReplayMonitoring() {
             isMonitoringActive = true;
             localStorage.setItem('isMonitoringActive', JSON.stringify(isMonitoringActive));
             hasSavedClip = false;
+            localStorage.setItem('hasSavedClip', JSON.stringify(hasSavedClip));
             btnReplayClip.classList.remove('noShow');
             setReplayButtonText();
         } else {
@@ -2026,5 +2048,4 @@ async function toggleReplayMonitoring() {
     } catch (error) {
         console.error('Replay buffer toggle failed:', error);
     }
-    
 }
