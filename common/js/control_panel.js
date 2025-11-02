@@ -22,8 +22,9 @@ const obs = new OBSWebSocket();
 // Track readiness (post-Identify)
 let isObsReady = false;
 // UI button click handlers, async and awaiting hotkey dispatch
-let isMonitoringActive = JSON.parse(localStorage.getItem('isMonitoringActive')) || false;
-let isConnected = JSON.parse(localStorage.getItem('isConnected')) || false;
+// Initialize from localStorage - use getStorageItem for consistency with prefix handling
+let isMonitoringActive = getStorageItem('isMonitoringActive') === 'true' || false;
+let isConnected = getStorageItem('isConnected') === 'true' || false;
 let replayHistory = JSON.parse(localStorage.getItem('replayHistory')) || [];
 
 // function updateTabVisibility() {
@@ -1590,7 +1591,7 @@ async function connectToObsWebSocket() {
         try {
             await obs.disconnect();
             isConnected = false;
-            localStorage.setItem('isConnected', JSON.stringify(isConnected));
+            setStorageItem('isConnected', 'false');
             updateConnectButton();
             updateReplayButtonsVisibility();
             console.log('Disconnected from OBS WebSocket');
@@ -1606,7 +1607,7 @@ async function connectToObsWebSocket() {
         try {
             await obs.connect(address, password);
             isConnected = true;
-            localStorage.setItem('isConnected', JSON.stringify(isConnected));
+            setStorageItem('isConnected', 'true');
             updateConnectButton();
             updateReplayButtonsVisibility();
             console.log('OBS WebSocket: Connected and authenticated');
@@ -1620,7 +1621,7 @@ async function connectToObsWebSocket() {
 
 function updateConnectButton() {
     const connectBtn = document.getElementById('connectBtn');
-    isConnected = JSON.parse(localStorage.getItem('isConnected'));
+    isConnected = getStorageItem('isConnected') === 'true';
 
     if (!connectBtn) return;
     if (isConnected) {

@@ -281,7 +281,7 @@ async function obsReConnect() {
 	try {
 		await obs.connect(address, password);
 		isConnected = true;
-		localStorage.setItem('isConnected', JSON.stringify(isConnected));
+		setStorageItem('isConnected', 'true');
 		updateConnectButton();
 		console.log('OBS WebSocket: Connected and authenticated');
 	} catch (err) {
