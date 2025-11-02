@@ -549,3 +549,57 @@ input:checked+.slider_round:before {
 	min-width: 60px;
 	text-align: center;
 }
+
+/* Clip replay button wrapper and delete functionality */
+.clip-button-wrapper {
+	position: relative;
+	display: inline-block;
+}
+
+.clip-button {
+	position: relative;
+	padding-right: 0;
+	transition: padding-right 0.2s ease;
+}
+
+.clip-button-wrapper:hover .clip-button {
+	padding-right: 28px;
+}
+
+.clip-delete-btn {
+	position: absolute;
+	right: 0;
+	top: 0;
+	width: 28px;
+	height: 28px;
+	background-color: #dc3545;
+	border: 2px solid black;
+	border-left: none;
+	border-radius: 0px 0px 10px 0px;
+	cursor: pointer;
+	display: none;
+	align-items: center;
+	justify-content: center;
+	padding: 0;
+	z-index: 10;
+}
+
+.clip-button-wrapper:hover .clip-delete-btn {
+	display: flex;
+}
+
+.clip-delete-btn:hover {
+	background-color: #c82333;
+}
+
+.delete-x {
+	color: white;
+	font-size: 20px;
+	font-weight: bold;
+	line-height: 1;
+	user-select: none;
+}
+
+.clip-label {
+	display: inline-block;
+}

@@ -257,16 +257,51 @@ for more information about Salotto please visit https://salotto.app
                 </div>
             </div>
             <div class="column" id="replayClips" style=" justify-content: flex-start; align-items: center; gap: 12.8px;">
-                <button id="prvReplayClip1" class="prvReplayClip1 hover obs28 button"
-                    onclick="playPreviousReplay(0)">Clip 1</button>
-                <button id="prvReplayClip2" class="prvReplayClip2 hover obs28 button"
-                    onclick="playPreviousReplay(1)">Clip 2</button>
-                <button id="prvReplayClip3" class="prvReplayClip3 hover obs28 button"
-                    onclick="playPreviousReplay(2)">Clip 3</button>
-                <button id="prvReplayClip4" class="prvReplayClip4 hover obs28 button"
-                    onclick="playPreviousReplay(3)">Clip 4</button>
-                <button id="prvReplayClip5" class="prvReplayClip5 hover obs28 button"
-                    onclick="playPreviousReplay(4)">Clip 5</button>
+                <div class="clip-button-wrapper" id="clipWrapper1">
+                    <button id="prvReplayClip1" class="prvReplayClip1 hover obs28 button clip-button"
+                        onclick="playPreviousReplay(0)">
+                        <span class="clip-label">Clip 1</span>
+                    </button>
+                    <button class="clip-delete-btn" onclick="deleteClip(0, event)" title="Delete clip">
+                        <span class="delete-x">×</span>
+                    </button>
+                </div>
+                <div class="clip-button-wrapper" id="clipWrapper2">
+                    <button id="prvReplayClip2" class="prvReplayClip2 hover obs28 button clip-button"
+                        onclick="playPreviousReplay(1)">
+                        <span class="clip-label">Clip 2</span>
+                    </button>
+                    <button class="clip-delete-btn" onclick="deleteClip(1, event)" title="Delete clip">
+                        <span class="delete-x">×</span>
+                    </button>
+                </div>
+                <div class="clip-button-wrapper" id="clipWrapper3">
+                    <button id="prvReplayClip3" class="prvReplayClip3 hover obs28 button clip-button"
+                        onclick="playPreviousReplay(2)">
+                        <span class="clip-label">Clip 3</span>
+                    </button>
+                    <button class="clip-delete-btn" onclick="deleteClip(2, event)" title="Delete clip">
+                        <span class="delete-x">×</span>
+                    </button>
+                </div>
+                <div class="clip-button-wrapper" id="clipWrapper4">
+                    <button id="prvReplayClip4" class="prvReplayClip4 hover obs28 button clip-button"
+                        onclick="playPreviousReplay(3)">
+                        <span class="clip-label">Clip 4</span>
+                    </button>
+                    <button class="clip-delete-btn" onclick="deleteClip(3, event)" title="Delete clip">
+                        <span class="delete-x">×</span>
+                    </button>
+                </div>
+                <div class="clip-button-wrapper" id="clipWrapper5">
+                    <button id="prvReplayClip5" class="prvReplayClip5 hover obs28 button clip-button"
+                        onclick="playPreviousReplay(4)">
+                        <span class="clip-label">Clip 5</span>
+                    </button>
+                    <button class="clip-delete-btn" onclick="deleteClip(4, event)" title="Delete clip">
+                        <span class="delete-x">×</span>
+                    </button>
+                </div>
             </div>
             <div class="column" id="savedPathNote">
                 *NOTE: Remember to cleanup Replay video clip storage periodically.

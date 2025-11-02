@@ -1968,6 +1968,46 @@ async function playPreviousReplay(index) {
 
 
 
+function deleteClip(index, event) {
+    // Prevent the event from bubbling up to the play button
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
+
+    // Get current replay history
+    let replayHistory = JSON.parse(localStorage.getItem('replayHistory')) || [];
+
+    // Validate index
+    if (index < 0 || index >= replayHistory.length) {
+        console.warn('Invalid clip index for deletion');
+        return;
+    }
+
+    // Show confirmation dialog
+    const clipNumber = index + 1;
+    const confirmed = confirm(`Are you sure you want to delete Clip ${clipNumber}?`);
+    
+    if (!confirmed) {
+        return;
+    }
+
+    // Remove the clip from the array
+    replayHistory.splice(index, 1);
+
+    // Save updated history to localStorage
+    localStorage.setItem('replayHistory', JSON.stringify(replayHistory));
+    
+    // Update the global variable
+    replayHistory = JSON.parse(localStorage.getItem('replayHistory')) || [];
+
+    console.log('Clip deleted. Updated Replay History:', replayHistory);
+
+    // Update button visibility and labels
+    updateReplayButtonsVisibility();
+    toggleReplayClipsVisibility();
+}
+
 function updateReplayButtonsVisibility() {
     const replayHistory = JSON.parse(localStorage.getItem('replayHistory')) || [];
 
@@ -1989,15 +2029,37 @@ function updateReplayButtonsVisibility() {
     for (let i = 0; i < 5; i++) {
         const buttonId = `prvReplayClip${i + 1}`;
         const button = document.getElementById(buttonId);
-        if (!button) continue;
+        const wrapperId = `clipWrapper${i + 1}`;
+        const wrapper = document.getElementById(wrapperId);
+        const clipLabel = button ? button.querySelector('.clip-label') : null;
+        const deleteBtn = wrapper ? wrapper.querySelector('.clip-delete-btn') : null;
+        
+        if (!button || !wrapper) continue;
 
         // Show button only if replayHistory has a clip at index i
         if (replayHistory[i]) {
-            button.style.display = 'inline-block';  // or 'block' based on your layout
-            button.disabled = false;                 // enable the button
+            button.style.display = 'inline-block';
+            wrapper.style.display = 'inline-block';
+            button.disabled = false;
+            
+            // Update button label
+            if (clipLabel) {
+                clipLabel.textContent = `Clip ${i + 1}`;
+            } else {
+                button.innerHTML = `<span class="clip-label">Clip ${i + 1}</span>`;
+            }
+            
+            // Update onclick to use correct index
+            button.setAttribute('onclick', `playPreviousReplay(${i})`);
+            
+            // Update delete button onclick
+            if (deleteBtn) {
+                deleteBtn.setAttribute('onclick', `deleteClip(${i}, event)`);
+            }
         } else {
-            button.style.display = 'none';          // hide the button
-            button.disabled = true;                  // disable the button for safety
+            button.style.display = 'none';
+            wrapper.style.display = 'none';
+            button.disabled = true;
         }
     }
 }
