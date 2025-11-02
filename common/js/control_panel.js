@@ -206,6 +206,11 @@ function gameType(value) {
     }
     bc.postMessage({ gameType: value });
     resetBallTracker();
+    
+    // Send update to stream sharing if enabled
+    if (window.streamSharing) {
+        window.streamSharing.sendUpdate();
+    }
 
     // Reset ball style to American when switching away from 8-ball (game1)
     if (value === "game2" || value === "game3") {
@@ -782,6 +787,7 @@ function clearGame() {
     postNames();
     pushScores();
     postInfo();
+    // Note: postNames, pushScores, and postInfo already send updates
 }
 
 function postNames() {
@@ -797,6 +803,10 @@ function postNames() {
     if (!p2Name.value == "") { document.getElementById("p2ScoreLabel").innerHTML = p2namemsg + " - Score/Rack(s)/Ball(s)"; } else { document.getElementById("p2ScoreLabel").innerHTML = "Player/Team 2 - Score/Rack(s)/Ball(s)"; }
     setStorageItem("p1NameCtrlPanel", p1Name.value);
     setStorageItem("p2NameCtrlPanel", p2Name.value);
+    // Send update to stream sharing if enabled
+    if (window.streamSharing) {
+        window.streamSharing.sendUpdate();
+    }
 }
 
 function postInfo() {
@@ -812,6 +822,10 @@ function postInfo() {
     bc.postMessage({ game: gamemsg });
     setStorageItem("raceInfo", raceInfoTxt.value);
     setStorageItem("gameInfo", gameInfoTxt.value);
+    // Send update to stream sharing if enabled
+    if (window.streamSharing) {
+        window.streamSharing.sendUpdate();
+    }
 }
 
 function postSources() {
@@ -879,6 +893,11 @@ function pushScores() {
     setStorageItem("p1Score", p1ScoreValue);
     setStorageItem("p2ScoreCtrlPanel", p2ScoreValue);
     setStorageItem("p2Score", p2ScoreValue);
+    
+    // Send update to stream sharing if enabled
+    if (window.streamSharing) {
+        window.streamSharing.sendUpdate();
+    }
 }
 
 function postScore(opt1, player) {
@@ -935,7 +954,12 @@ function postScore(opt1, player) {
         }
     }
     resetBallSet();
-    resetBallTracker()
+    resetBallTracker();
+    
+    // Send update to stream sharing if enabled
+    if (window.streamSharing) {
+        window.streamSharing.sendUpdate();
+    }
 }
 
 function shotClock(timex) {
@@ -1320,6 +1344,11 @@ function resetScores() {
         resetExt('p2', 'noflash');
         resetBallTracker();
         resetBallSet();
+        
+        // Send update to stream sharing if enabled
+        if (window.streamSharing) {
+            window.streamSharing.sendUpdate();
+        }
     } else { }
 }
 

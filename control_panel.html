@@ -29,6 +29,7 @@ for more information about Salotto please visit https://salotto.app
     </script>
     <script src="./common/js/obs-websocket-js.js"></script>
     <script src="./common/js/jquery.js"></script>
+    <script src="./common/js/stream_sharing.js"></script>
     <script src="./common/js/control_panel.js"></script>
     <script src="hotkeys.js"></script>
 
@@ -545,6 +546,37 @@ for more information about Salotto please visit https://salotto.app
                 <div>
                     Win Animation<input type="checkbox" class="smallSize" id="winAnimation"
                         onchange="toggleAnimationSetting()" />
+                </div>
+            </div>
+            <div class="section-header" id="streamSharingLabel">
+                Stream Sharing
+            </div>
+            <div class="column">
+                <div>
+                    <label for="shareStreamSetting">Share Stream:</label>
+                    <input type="checkbox" class="smallSize" id="shareStreamSetting" onchange="toggleShareStream()" />
+                </div>
+                <div style="margin-top: 10px;">
+                    <label>Server:</label>
+                    <span style="margin-left: 10px; color: #999;">https://cuesports.macleod.systems</span>
+                </div>
+                <div style="margin-top: 10px;">
+                    <label for="streamApiKey">API Key:</label>
+                    <input type="text" id="streamApiKey" readonly style="width: 250px; background-color: #f0f0f0;" />
+                    <button class="hover obs28 button" onclick="copyApiKey()" style="margin-left: 5px;">Copy</button>
+                </div>
+            </div>
+            <div class="column">
+                <div style="margin-top: 25px;">
+                    <label>Connection Status:</label>
+                    <span id="streamConnectionStatus" style="margin-left: 10px; padding: 5px 10px; border-radius: 3px; background-color: #666; color: white;">
+                        Disconnected
+                    </span>
+                </div>
+                <div style="margin-top: 10px;">
+                    <div class="hover obs28 button" onclick="generateApiKey()" style="width: 150px;">
+                        Generate New API Key
+                    </div>
                 </div>
             </div>
             <div class="section-header" id="ballSettingLabel">
