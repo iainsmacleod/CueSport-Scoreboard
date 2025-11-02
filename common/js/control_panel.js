@@ -2096,63 +2096,14 @@ async function toggleReplayMonitoring() {
     try {
         if (getStorageItem("isMonitoringActive") === "false" || getStorageItem("isMonitoringActive") === null) {
             console.log('Monitoring is not active, starting replay buffer...');
-            
-            // Check if replay buffer is already running before starting
-            try {
-                const { outputActive } = await obs.call('GetReplayBufferStatus');
-                if (outputActive) {
-                    console.log('Replay buffer is already running');
-                    // Update state to match reality
-                    isMonitoringActive = true;
-                    localStorage.setItem('isMonitoringActive', JSON.stringify(isMonitoringActive));
-                    btnReplayClip.classList.remove('noShow');
-                    setReplayButtonText();
-                    setMonitorButtonText();
-                    return;
-                }
-            } catch (statusError) {
-                console.warn('Could not check replay buffer status:', statusError);
-                // Continue to try starting it anyway
-            }
-            
-            // Try to start the replay buffer
-            try {
-                await obs.call('StartReplayBuffer');
-                isMonitoringActive = true;
-                localStorage.setItem('isMonitoringActive', JSON.stringify(isMonitoringActive));
-                btnReplayClip.classList.remove('noShow');
-                setReplayButtonText();
-                setMonitorButtonText();
-                console.log('Replay buffer started successfully');
-            } catch (startError) {
-                // Provide more detailed error information
-                const errorMessage = startError?.message || startError?.code || startError?.toString() || 'Unknown error';
-                console.error('StartReplayBuffer failed:', errorMessage, startError);
-                
-                // Check if it's because the buffer is already running
-                if (errorMessage.includes('already') || errorMessage === 'k') {
-                    // Try to verify the actual state
-                    try {
-                        const { outputActive } = await obs.call('GetReplayBufferStatus');
-                        if (outputActive) {
-                            console.log('Replay buffer was already running, updating state');
-                            isMonitoringActive = true;
-                            localStorage.setItem('isMonitoringActive', JSON.stringify(isMonitoringActive));
-                            btnReplayClip.classList.remove('noShow');
-                            setReplayButtonText();
-                            setMonitorButtonText();
-                            return;
-                        }
-                    } catch (verifyError) {
-                        console.error('Could not verify replay buffer status:', verifyError);
-                    }
-                }
-                
-                // Show user-friendly error message
-                alert(`Failed to start replay buffer.\n\nError: ${errorMessage}\n\nPlease ensure:\n- Replay Buffer is enabled in OBS Settings > Output\n- Replay Buffer is configured with a format and encoder\n- You have sufficient disk space\n- No other process is using the replay buffer`);
-                setMonitorButtonText(); // Update button to reflect failed state
-                return;
-            }
+            await obs.call('StartReplayBuffer').catch(err => {
+                console.error('StartReplayBuffer failed:', err);
+                throw err; // rethrow to catch below
+            });
+            isMonitoringActive = true;
+            localStorage.setItem('isMonitoringActive', JSON.stringify(isMonitoringActive));
+            btnReplayClip.classList.remove('noShow');
+            setReplayButtonText();
         } else {
             console.log('Monitoring is active, stopping replay buffer...');
             const { outputActive } = await obs.call('GetReplayBufferStatus');
@@ -2161,22 +2112,18 @@ async function toggleReplayMonitoring() {
                     await obs.call('StopReplayBuffer');
                     isMonitoringActive = false;
                     localStorage.setItem('isMonitoringActive', JSON.stringify(isMonitoringActive));
+                    // setMonitorButtonText();
                     await new Promise(r => setTimeout(r, 150)); // small delay
                 } catch (err) {
                     console.error('Failed to stop replay buffer:', err);
-                    const errorMessage = err?.message || err?.code || err?.toString() || 'Unknown error';
-                    alert(`Failed to stop replay buffer: ${errorMessage}`);
                 }
             }
             isMonitoringActive = false;
             localStorage.setItem('isMonitoringActive', JSON.stringify(isMonitoringActive));
             btnReplayClip.classList.add('noShow');
-            setMonitorButtonText();
         }
+        setMonitorButtonText();
     } catch (error) {
-        const errorMessage = error?.message || error?.code || error?.toString() || 'Unknown error';
-        console.error('Replay buffer toggle failed:', errorMessage, error);
-        alert(`Replay buffer operation failed: ${errorMessage}`);
-        setMonitorButtonText(); // Update button state even on error
+        console.error('Replay buffer toggle failed:', error);
     }
 }
