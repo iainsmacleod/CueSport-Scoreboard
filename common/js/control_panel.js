@@ -2096,34 +2096,100 @@ async function toggleReplayMonitoring() {
     try {
         if (getStorageItem("isMonitoringActive") === "false" || getStorageItem("isMonitoringActive") === null) {
             console.log('Monitoring is not active, starting replay buffer...');
-            await obs.call('StartReplayBuffer').catch(err => {
-                console.error('StartReplayBuffer failed:', err);
-                throw err; // rethrow to catch below
-            });
-            isMonitoringActive = true;
-            localStorage.setItem('isMonitoringActive', JSON.stringify(isMonitoringActive));
-            btnReplayClip.classList.remove('noShow');
-            setReplayButtonText();
-        } else {
-            console.log('Monitoring is active, stopping replay buffer...');
-            const { outputActive } = await obs.call('GetReplayBufferStatus');
+            
+            // Check actual OBS state first
+            let outputActive = false;
+            try {
+                const statusResult = await obs.call('GetReplayBufferStatus');
+                outputActive = statusResult.outputActive;
+            } catch (statusError) {
+                console.warn('Could not check replay buffer status:', statusError);
+            }
+            
             if (outputActive) {
+                console.log('Replay buffer is already running, syncing state...');
+                isMonitoringActive = true;
+                localStorage.setItem('isMonitoringActive', JSON.stringify(isMonitoringActive));
+                btnReplayClip.classList.remove('noShow');
+                setReplayButtonText();
+                setMonitorButtonText();
+                return;
+            }
+            
+            // Try to start the replay buffer
+            try {
+                await obs.call('StartReplayBuffer');
+                isMonitoringActive = true;
+                localStorage.setItem('isMonitoringActive', JSON.stringify(isMonitoringActive));
+                btnReplayClip.classList.remove('noShow');
+                setReplayButtonText();
+                setMonitorButtonText();
+                console.log('Replay buffer started successfully');
+            } catch (startError) {
+                // Handle the "k" error - likely means already running
+                const errorMessage = startError?.message || startError?.code || startError?.toString() || 'Unknown error';
+                console.error('StartReplayBuffer failed:', errorMessage, startError);
+                
+                // If it's the "k" error or "already" error, verify actual state
+                if (errorMessage === 'k' || errorMessage.includes('already')) {
+                    try {
+                        const { outputActive: verifyActive } = await obs.call('GetReplayBufferStatus');
+                        if (verifyActive) {
+                            console.log('Replay buffer was already running despite error, syncing state');
+                            isMonitoringActive = true;
+                            localStorage.setItem('isMonitoringActive', JSON.stringify(isMonitoringActive));
+                            btnReplayClip.classList.remove('noShow');
+                            setReplayButtonText();
+                            setMonitorButtonText();
+                            return; // Success - buffer is running
+                        }
+                    } catch (verifyError) {
+                        console.error('Could not verify replay buffer status:', verifyError);
+                    }
+                }
+                
+                // If we get here, it's a real error
+                alert(`Failed to start replay buffer.\n\nError: ${errorMessage}\n\nPossible causes:\n- Replay Buffer not enabled in OBS Settings > Output\n- Replay Buffer encoder not configured\n- Insufficient disk space\n- Output encoder is busy`);
+                setMonitorButtonText();
+                return;
+            }
+        } else {
+            // Check actual OBS state before assuming it's active
+            let outputActive = false;
+            try {
+                const statusResult = await obs.call('GetReplayBufferStatus');
+                outputActive = statusResult.outputActive;
+            } catch (statusError) {
+                console.warn('Could not check replay buffer status:', statusError);
+            }
+            
+            if (outputActive) {
+                console.log('Monitoring is active, stopping replay buffer...');
                 try {
                     await obs.call('StopReplayBuffer');
                     isMonitoringActive = false;
                     localStorage.setItem('isMonitoringActive', JSON.stringify(isMonitoringActive));
-                    // setMonitorButtonText();
                     await new Promise(r => setTimeout(r, 150)); // small delay
+                    console.log('Replay buffer stopped successfully');
                 } catch (err) {
                     console.error('Failed to stop replay buffer:', err);
+                    const errorMessage = err?.message || err?.code || err?.toString() || 'Unknown error';
+                    alert(`Failed to stop replay buffer: ${errorMessage}`);
                 }
+            } else {
+                console.log('Stored state says monitoring is active, but replay buffer is not running. Syncing state...');
             }
+            
+            // Always update local state regardless of OBS state
             isMonitoringActive = false;
             localStorage.setItem('isMonitoringActive', JSON.stringify(isMonitoringActive));
             btnReplayClip.classList.add('noShow');
+            setMonitorButtonText();
         }
-        setMonitorButtonText();
     } catch (error) {
-        console.error('Replay buffer toggle failed:', error);
+        const errorMessage = error?.message || error?.code || error?.toString() || 'Unknown error';
+        console.error('Replay buffer toggle failed:', errorMessage, error);
+        alert(`Replay buffer operation failed: ${errorMessage}`);
+        setMonitorButtonText();
     }
 }
