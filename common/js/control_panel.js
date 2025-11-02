@@ -1861,7 +1861,7 @@ async function triggerInstantReplay() {
                 try {
                     await obs.call('StopReplayBuffer');
                     isMonitoringActive = false;
-                    localStorage.setItem('isMonitoringActive', JSON.stringify(isMonitoringActive));
+                    setStorageItem('isMonitoringActive', 'false');
                     setMonitorButtonText();
                     await new Promise(r => setTimeout(r, 150)); // small delay
                 } catch (err) {
@@ -2109,7 +2109,7 @@ async function toggleReplayMonitoring() {
             if (outputActive) {
                 console.log('Replay buffer is already running, syncing state...');
                 isMonitoringActive = true;
-                localStorage.setItem('isMonitoringActive', JSON.stringify(isMonitoringActive));
+                setStorageItem('isMonitoringActive', 'true');
                 btnReplayClip.classList.remove('noShow');
                 setReplayButtonText();
                 setMonitorButtonText();
@@ -2120,7 +2120,7 @@ async function toggleReplayMonitoring() {
             try {
                 await obs.call('StartReplayBuffer');
                 isMonitoringActive = true;
-                localStorage.setItem('isMonitoringActive', JSON.stringify(isMonitoringActive));
+                setStorageItem('isMonitoringActive', 'true');
                 btnReplayClip.classList.remove('noShow');
                 setReplayButtonText();
                 setMonitorButtonText();
@@ -2137,7 +2137,7 @@ async function toggleReplayMonitoring() {
                         if (verifyActive) {
                             console.log('Replay buffer was already running despite error, syncing state');
                             isMonitoringActive = true;
-                            localStorage.setItem('isMonitoringActive', JSON.stringify(isMonitoringActive));
+                            setStorageItem('isMonitoringActive', 'true');
                             btnReplayClip.classList.remove('noShow');
                             setReplayButtonText();
                             setMonitorButtonText();
@@ -2168,7 +2168,7 @@ async function toggleReplayMonitoring() {
                 try {
                     await obs.call('StopReplayBuffer');
                     isMonitoringActive = false;
-                    localStorage.setItem('isMonitoringActive', JSON.stringify(isMonitoringActive));
+                    setStorageItem('isMonitoringActive', 'false');
                     await new Promise(r => setTimeout(r, 150)); // small delay
                     console.log('Replay buffer stopped successfully');
                 } catch (err) {
@@ -2182,7 +2182,7 @@ async function toggleReplayMonitoring() {
             
             // Always update local state regardless of OBS state
             isMonitoringActive = false;
-            localStorage.setItem('isMonitoringActive', JSON.stringify(isMonitoringActive));
+            setStorageItem('isMonitoringActive', 'false');
             btnReplayClip.classList.add('noShow');
             setMonitorButtonText();
         }
