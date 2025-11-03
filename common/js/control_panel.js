@@ -2021,16 +2021,21 @@ async function triggerInstantReplay() {
             if (outputActive) {
                 try {
                     await obs.call('StopReplayBuffer');
-                    isMonitoringActive = false;
-                    setStorageItem('isMonitoringActive', 'false');
-                    setMonitorButtonText();
                     await new Promise(r => setTimeout(r, 150)); // small delay
                 } catch (err) {
                     console.error('Failed to stop replay buffer:', err);
                 }
             }
+            // Always update state and button text when playing a replay, regardless of buffer state
+            isMonitoringActive = false;
+            setStorageItem('isMonitoringActive', 'false');
+            setMonitorButtonText();
         } catch (err) {
             console.error('Failed to stop replay buffer:', err);
+            // Still update state even if check failed
+            isMonitoringActive = false;
+            setStorageItem('isMonitoringActive', 'false');
+            setMonitorButtonText();
         }
 
         // Restore original settings and set the new file
@@ -2092,16 +2097,21 @@ async function playPreviousReplay(index) {
         if (outputActive) {
             try {
                 await obs.call('StopReplayBuffer');
-                isMonitoringActive = false;
-                localStorage.setItem('isMonitoringActive', JSON.stringify(isMonitoringActive));
-                setMonitorButtonText();
                 await new Promise(r => setTimeout(r, 150)); // small delay
             } catch (err) {
                 console.error('Failed to stop replay buffer:', err);
             }
         }
+        // Always update state and button text when playing a replay, regardless of buffer state
+        isMonitoringActive = false;
+        setStorageItem('isMonitoringActive', 'false');
+        setMonitorButtonText();
     } catch (err) {
         console.error('Failed to stop replay buffer:', err);
+        // Still update state even if check failed
+        isMonitoringActive = false;
+        setStorageItem('isMonitoringActive', 'false');
+        setMonitorButtonText();
     }
 
     const { sceneName, videoSource, indicatorSource } = getReplaySettings();
