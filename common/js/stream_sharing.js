@@ -18,6 +18,8 @@
     let isEnabled = false;
     let isConnected = false;
     let isAuthenticated = false;
+    let isObsStreaming = false;
+    let streamingCheckInterval = null;
     
     // Helper function to get storage item (compatible with existing codebase pattern)
     function getStorageItem(key) {
@@ -66,32 +68,169 @@
         return 'https://cuesports.macleod.systems';
     }
     
-    // Update connection status display
-    function updateConnectionStatus(status, message) {
-        const statusEl = document.getElementById('streamConnectionStatus');
-        if (!statusEl) return;
+    
+    // Validate stream URL format
+    function isValidStreamUrl(urlString) {
+        if (!urlString || typeof urlString !== 'string') {
+            return false;
+        }
         
-        statusEl.textContent = message || status;
+        const trimmed = urlString.trim();
+        if (!trimmed || trimmed.length === 0) {
+            return false;
+        }
         
-        // Update color based on status
-        switch(status) {
-            case 'connected':
-                statusEl.style.backgroundColor = '#4CAF50'; // Green
-                break;
-            case 'connecting':
-                statusEl.style.backgroundColor = '#FF9800'; // Orange
-                break;
-            case 'disconnected':
-            case 'error':
-                statusEl.style.backgroundColor = '#f44336'; // Red
-                break;
-            default:
-                statusEl.style.backgroundColor = '#666'; // Gray
+        // Must have a minimum length
+        if (trimmed.length < 10) {
+            return false;
+        }
+        
+        // Must start with http:// or https://
+        if (!trimmed.match(/^https?:\/\//i)) {
+            return false;
+        }
+        
+        try {
+            const url = new URL(trimmed);
+            
+            // Must be http or https protocol
+            if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+                return false;
+            }
+            
+            // Must have a valid hostname (not empty)
+            if (!url.hostname || url.hostname.length === 0) {
+                return false;
+            }
+            
+            // Hostname should contain at least one dot (for domain) or be localhost
+            if (!url.hostname.match(/^localhost(:\d+)?$|^\[?[\da-fA-F:]+\)?$/) && !url.hostname.includes('.')) {
+                return false;
+            }
+            
+            // Hostname should not contain spaces or invalid characters
+            if (url.hostname.match(/[\s<>"{}|\\^`\[\]]/)) {
+                return false;
+            }
+            
+            // Basic validation: should have a reasonable structure
+            // Check that it's not just "http://" or "https://"
+            if (url.href === url.protocol + '//' || url.href === url.protocol + '///') {
+                return false;
+            }
+            
+            return true;
+        } catch (e) {
+            // URL constructor throws error for invalid URLs
+            return false;
+        }
+    }
+    
+    // Get manual stream URL synchronously (for button state checks)
+    function getManualStreamUrl() {
+        const manualUrlField = document.getElementById('manualStreamUrl');
+        if (manualUrlField && manualUrlField.value) {
+            const manualUrl = String(manualUrlField.value).trim();
+            if (manualUrl && isValidStreamUrl(manualUrl)) {
+                return manualUrl;
+            }
+        }
+        return '';
+    }
+    
+    // Get stream URL from OBS or manual input
+    async function getStreamUrl() {
+        // First check for manual input
+        const manualUrl = getManualStreamUrl();
+        if (manualUrl) {
+            console.log('Using manual stream URL:', manualUrl);
+            return manualUrl;
+        }
+        
+        // Try to auto-detect from OBS
+        try {
+            // Check if OBS is ready
+            if (typeof obs === 'undefined' || !obs || typeof isObsReady === 'undefined' || !isObsReady) {
+                return '';
+            }
+            
+            try {
+                // Get stream service settings
+                const serviceSettings = await obs.call('GetStreamServiceSettings');
+                console.log('Stream service settings:', serviceSettings);
+                
+                const serviceType = serviceSettings.streamServiceType || '';
+                const settings = serviceSettings.streamServiceSettings || {};
+                
+                // Build stream URL based on service type
+                let streamUrl = '';
+                
+                // For Twitch
+                if (serviceType.toLowerCase().includes('twitch')) {
+                    // Twitch settings can have 'channel' field or 'server' + 'key'
+                    const channel = settings.channel || settings.key || '';
+                    // Remove leading @ if present
+                    const cleanChannel = channel.replace(/^@/, '');
+                    if (cleanChannel) {
+                        streamUrl = `https://www.twitch.tv/${cleanChannel}`;
+                        console.log('Detected Twitch channel:', cleanChannel);
+                    }
+                } 
+                // For YouTube
+                else if (serviceType.toLowerCase().includes('youtube')) {
+                    // YouTube uses stream keys in format, but we can't always construct watch URL
+                    // Try to get channel from settings if available
+                    const streamKey = settings.key || settings.stream_key || '';
+                    // YouTube Live streams use different URLs, but we can try
+                    if (streamKey) {
+                        // For now, just provide a generic YouTube Live link
+                        streamUrl = 'https://www.youtube.com/live';
+                        console.log('Detected YouTube streaming');
+                    }
+                } 
+                // For Facebook
+                else if (serviceType.toLowerCase().includes('facebook')) {
+                    streamUrl = 'https://www.facebook.com/live';
+                    console.log('Detected Facebook Live');
+                }
+                // For RTMP (custom or common)
+                else if (serviceType.includes('rtmp')) {
+                    // For RTMP services, try to extract readable info
+                    // Check if server contains twitch/youtube domain
+                    const server = settings.server || '';
+                    if (server.includes('twitch.tv')) {
+                        const channel = settings.key || '';
+                        if (channel) {
+                            const cleanChannel = channel.replace(/^@/, '');
+                            streamUrl = `https://www.twitch.tv/${cleanChannel}`;
+                            console.log('Detected Twitch via RTMP:', cleanChannel);
+                        }
+                    } else if (server.includes('youtube.com') || server.includes('googlevideo.com')) {
+                        streamUrl = 'https://www.youtube.com/live';
+                        console.log('Detected YouTube via RTMP');
+                    }
+                }
+                
+                if (streamUrl && isValidStreamUrl(streamUrl)) {
+                    console.log('Auto-detected stream URL:', streamUrl);
+                    return streamUrl;
+                } else if (streamUrl) {
+                    console.warn('Auto-detected stream URL failed validation:', streamUrl);
+                }
+                
+                return '';
+            } catch (error) {
+                console.warn('Could not get stream service settings:', error);
+                return '';
+            }
+        } catch (error) {
+            console.warn('Error getting stream URL:', error);
+            return '';
         }
     }
     
     // Collect current game state
-    function collectGameState() {
+    async function collectGameState() {
         // Helper to safely get value
         const getValue = (id, defaultValue = '') => {
             const el = document.getElementById(id);
@@ -111,6 +250,10 @@
         const instanceId = new URLSearchParams(window.location.search).get('instance') || '';
         const storagePrefix = instanceId ? `${instanceId}_` : '';
         
+        // Get stream URL from OBS (validate it)
+        const streamUrl = await getStreamUrl();
+        const validatedUrl = isValidStreamUrl(streamUrl) ? streamUrl : '';
+        
         return {
             player1Name: getValue('p1Name', '') || getStorage(`${storagePrefix}p1NameCtrlPanel`, ''),
             player2Name: getValue('p2Name', '') || getStorage(`${storagePrefix}p2NameCtrlPanel`, ''),
@@ -119,18 +262,19 @@
             gameType: getStorage(`${storagePrefix}gameType`, 'game1'),
             raceInfo: getValue('raceInfoTxt', '') || getStorage(`${storagePrefix}raceInfo`, ''),
             gameInfo: getValue('gameInfoTxt', '') || getStorage(`${storagePrefix}gameInfo`, ''),
+            streamUrl: validatedUrl,
             timestamp: new Date().toISOString()
         };
     }
     
     // Send game state update to server
-    function sendGameState() {
+    async function sendGameState() {
         if (!ws || ws.readyState !== WebSocket.OPEN || !isAuthenticated) {
             return false;
         }
         
         try {
-            const state = collectGameState();
+            const state = await collectGameState();
             const message = {
                 type: 'update',
                 api_key: getApiKey(),
@@ -153,7 +297,7 @@
         
         const serverUrl = getServerUrl();
         if (!serverUrl) {
-            updateConnectionStatus('error', 'No server URL');
+            console.error('No server URL');
             return;
         }
         
@@ -173,7 +317,7 @@
             wsUrl = wsUrl.replace(/\/$/, '') + '/ws';
         }
         
-        updateConnectionStatus('connecting', 'Connecting...');
+        console.log('Connecting to stream sharing server...');
         console.log('Connecting to:', wsUrl);
         
         try {
@@ -183,7 +327,7 @@
                 console.log('WebSocket connected');
                 reconnectAttempts = 0;
                 isConnected = true;
-                updateConnectionStatus('connecting', 'Authenticating...');
+                            console.log('Authenticating...');
                 
                 // Send authentication
                 const authMessage = {
@@ -200,13 +344,18 @@
                     if (data.type === 'auth') {
                         if (data.status === 'success') {
                             isAuthenticated = true;
-                            updateConnectionStatus('connected', 'Connected');
+                            console.log('Stream sharing connected');
+                            updateConnectButton();
                             console.log('Authenticated successfully');
                             // Send initial state
                             sendGameState();
+                        } else if (data.status === 'pending') {
+                            // Server is waiting for authentication - ignore, we already sent it
+                            // Do nothing, wait for success response
                         } else {
                             isAuthenticated = false;
-                            updateConnectionStatus('error', 'Auth failed: ' + (data.message || 'Unknown error'));
+                            console.error('Auth failed: ' + (data.message || 'Unknown error'));
+                            updateConnectButton();
                             console.error('Authentication failed:', data.message);
                             ws.close();
                         }
@@ -224,7 +373,7 @@
             
             ws.onerror = function(error) {
                 console.error('WebSocket error:', error);
-                updateConnectionStatus('error', 'Connection error');
+                console.error('Connection error');
                 isConnected = false;
                 isAuthenticated = false;
             };
@@ -241,23 +390,23 @@
                         MAX_RECONNECT_DELAY
                     );
                     reconnectAttempts++;
-                    updateConnectionStatus('disconnected', `Reconnecting... (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+                    console.log(`Reconnecting... (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
                     
                     reconnectTimer = setTimeout(() => {
                         connect();
                     }, delay);
                 } else {
-                    updateConnectionStatus('disconnected', 'Disconnected');
+                    console.log('Disconnected');
                     if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
                         console.error('Max reconnection attempts reached');
-                        updateConnectionStatus('error', 'Connection failed');
+                        console.error('Connection failed');
                     }
                 }
             };
             
         } catch (error) {
             console.error('Error creating WebSocket:', error);
-            updateConnectionStatus('error', 'Connection error');
+            console.error('Connection error');
             isConnected = false;
         }
     }
@@ -277,21 +426,168 @@
         isConnected = false;
         isAuthenticated = false;
         reconnectAttempts = 0;
-        updateConnectionStatus('disconnected', 'Disconnected');
+        console.log('Disconnected');
+    }
+    
+    // Update connect/disconnect button text and visibility
+    function updateConnectButton() {
+        const btn = document.getElementById('streamConnectBtn');
+        if (!btn) return;
+        
+        // Disable button if not streaming
+        if (!isObsStreaming) {
+            btn.textContent = 'Connect (Not Streaming)';
+            btn.style.backgroundColor = '#999'; // Gray
+            btn.disabled = true;
+            btn.style.cursor = 'not-allowed';
+            return;
+        }
+        
+        // Disable button if stream URL is missing
+        const streamUrl = getManualStreamUrl();
+        if (!streamUrl || streamUrl === '') {
+            btn.textContent = 'Connect (URL Required)';
+            btn.style.backgroundColor = '#999'; // Gray
+            btn.disabled = true;
+            btn.style.cursor = 'not-allowed';
+            return;
+        }
+        
+        btn.disabled = false;
+        btn.style.cursor = 'pointer';
+        
+        if (isEnabled && isConnected && isAuthenticated) {
+            btn.textContent = 'Disconnect';
+            btn.style.backgroundColor = 'red'; // Red - matches WebSocket button
+        } else if (isEnabled && isConnected) {
+            btn.textContent = 'Connecting...';
+            btn.style.backgroundColor = '#FF9800'; // Orange
+        } else {
+            btn.textContent = 'Connect';
+            btn.style.backgroundColor = 'green'; // Green - matches WebSocket button
+        }
+    }
+    
+    // Update stream sharing UI visibility based on streaming state
+    function updateStreamSharingVisibility() {
+        const section = document.getElementById('streamSharingLabel');
+        if (!section) return;
+        
+        const parent = section.parentElement;
+        if (!parent) return;
+        
+        // Find the stream sharing section and related elements
+        let currentElement = section.nextElementSibling;
+        const streamSection = section.closest('.tabcontent') || parent;
+        
+        // Walk through siblings to find stream sharing controls
+        const streamElements = [];
+        streamElements.push(section);
+        
+        // Find elements by their IDs
+        const apiKeyField = document.getElementById('streamApiKey');
+        const connectBtn = document.getElementById('streamConnectBtn');
+        const statusEl = document.getElementById('streamConnectionStatus');
+        const manualUrlField = document.getElementById('manualStreamUrl');
+        
+        if (apiKeyField) streamElements.push(apiKeyField.parentElement);
+        if (connectBtn) streamElements.push(connectBtn.parentElement);
+        if (statusEl) streamElements.push(statusEl.parentElement);
+        if (manualUrlField) streamElements.push(manualUrlField.parentElement);
+        
+        // Apply styling based on streaming state
+        streamElements.forEach(el => {
+            if (el) {
+                if (!isObsStreaming) {
+                    el.style.opacity = '0.6';
+                } else {
+                    el.style.opacity = '1';
+                }
+            }
+        });
+    }
+    
+    // Check OBS streaming status
+    async function checkObsStreamingStatus() {
+        try {
+            // Access the global obs object
+            if (typeof obs === 'undefined' || !obs) {
+                isObsStreaming = false;
+                updateConnectButton();
+                updateStreamSharingVisibility();
+                return;
+            }
+            
+            // Check if OBS is ready
+            if (typeof isObsReady === 'undefined' || !isObsReady) {
+                isObsStreaming = false;
+                updateConnectButton();
+                updateStreamSharingVisibility();
+                return;
+            }
+            
+            try {
+                const status = await obs.call('GetStreamStatus');
+                const wasStreaming = isObsStreaming;
+                // GetStreamStatus returns { outputActive: boolean, outputTimecode: string, outputDuration: number, etc. }
+                isObsStreaming = status.outputActive === true;
+                
+                // If streaming stopped and we were connected, disconnect
+                if (wasStreaming && !isObsStreaming && isConnected) {
+                    console.log('OBS stopped streaming, disconnecting stream sharing');
+                    disconnect();
+                    isEnabled = false;
+                    setStorageItem('enabled', 'false');
+                }
+                
+                updateConnectButton();
+                updateStreamSharingVisibility();
+            } catch (error) {
+                // If we can't check status, assume not streaming
+                console.warn('Could not check OBS streaming status:', error);
+                isObsStreaming = false;
+                updateConnectButton();
+                updateStreamSharingVisibility();
+            }
+        } catch (error) {
+            console.warn('Error checking OBS streaming status:', error);
+            isObsStreaming = false;
+            updateConnectButton();
+            updateStreamSharingVisibility();
+        }
     }
     
     // Toggle stream sharing on/off
     function toggleShareStream() {
-        const checkbox = document.getElementById('shareStreamSetting');
-        if (!checkbox) return;
+        // Don't allow connection if not streaming
+        if (!isObsStreaming) {
+            alert('OBS must be streaming to share your game data.');
+            return;
+        }
         
-        isEnabled = checkbox.checked;
-        setStorageItem('enabled', isEnabled ? 'true' : 'false');
+        // Require stream URL before connecting
+        const streamUrl = getManualStreamUrl();
+        if (!streamUrl || streamUrl === '') {
+            alert('Stream URL is required. Please enter your stream URL before connecting.');
+            const manualUrlField = document.getElementById('manualStreamUrl');
+            if (manualUrlField) {
+                manualUrlField.focus();
+            }
+            return;
+        }
         
-        if (isEnabled) {
-            connect();
-        } else {
+        if (isEnabled && isConnected) {
+            // Disconnect
+            isEnabled = false;
+            setStorageItem('enabled', 'false');
             disconnect();
+            updateConnectButton();
+        } else {
+            // Connect
+            isEnabled = true;
+            setStorageItem('enabled', 'true');
+            updateConnectButton();
+            connect();
         }
     }
     
@@ -349,25 +645,104 @@
     function init() {
         // Load saved settings
         const savedEnabled = getStorageItem('enabled') === 'true';
+        isEnabled = savedEnabled;
         
-        // Set UI elements
-        const checkbox = document.getElementById('shareStreamSetting');
-        if (checkbox) {
-            checkbox.checked = savedEnabled;
-            isEnabled = savedEnabled;
+        // Load saved manual stream URL
+        const savedStreamUrl = getStorageItem('manualStreamUrl');
+        const manualUrlField = document.getElementById('manualStreamUrl');
+        if (manualUrlField && savedStreamUrl) {
+            manualUrlField.value = savedStreamUrl;
+        }
+        
+        // Save manual URL when changed and update button state
+        if (manualUrlField) {
+            // Add visual feedback for URL validation
+            const updateUrlValidation = () => {
+                const urlValue = manualUrlField.value.trim();
+                if (urlValue && !isValidStreamUrl(urlValue)) {
+                    manualUrlField.style.borderColor = '#f44336'; // Red border for invalid
+                    manualUrlField.style.backgroundColor = '#ffebee'; // Light red background
+                } else {
+                    manualUrlField.style.borderColor = '';
+                    manualUrlField.style.backgroundColor = '';
+                }
+            };
+            
+            manualUrlField.addEventListener('blur', function() {
+                const trimmed = this.value.trim();
+                updateUrlValidation();
+                
+                // Only save if valid URL
+                if (trimmed && isValidStreamUrl(trimmed)) {
+                    setStorageItem('manualStreamUrl', trimmed);
+                } else if (trimmed) {
+                    // Show alert for invalid URL
+                    alert('Please enter a valid URL starting with http:// or https://');
+                    this.focus();
+                    return;
+                } else {
+                    setStorageItem('manualStreamUrl', '');
+                }
+                
+                updateConnectButton();
+                if (isEnabled && isConnected && isAuthenticated) {
+                    sendGameState();
+                }
+            });
+            manualUrlField.addEventListener('input', function() {
+                updateUrlValidation();
+                updateConnectButton();
+            });
+            manualUrlField.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    this.blur();
+                }
+            });
+            
+            // Initial validation check
+            updateUrlValidation();
         }
         
         // Update API key display
         updateApiKeyDisplay();
         
-        // Update connection status
-        updateConnectionStatus('disconnected', 'Disconnected');
+        // Start checking OBS streaming status
+        checkObsStreamingStatus();
         
-        // Connect if enabled
-        if (isEnabled) {
+        // Check streaming status every 2 seconds
+        if (streamingCheckInterval) {
+            clearInterval(streamingCheckInterval);
+        }
+        streamingCheckInterval = setInterval(checkObsStreamingStatus, 2000);
+        
+        // Also check when OBS becomes ready
+        if (typeof window !== 'undefined') {
+            // Listen for OBS ready state changes
+            let lastObsReady = false;
+            const obsReadyCheck = setInterval(() => {
+                if (typeof isObsReady !== 'undefined' && isObsReady !== lastObsReady) {
+                    lastObsReady = isObsReady;
+                    if (isObsReady) {
+                        checkObsStreamingStatus();
+                    }
+                }
+            }, 500);
+            
+            // Clean up on page unload
+            window.addEventListener('beforeunload', () => {
+                if (streamingCheckInterval) clearInterval(streamingCheckInterval);
+                clearInterval(obsReadyCheck);
+            });
+        }
+        
+        // Don't auto-connect on page load - user must manually connect
+        // But if they were connected and OBS is streaming, we can reconnect
+        if (isEnabled && isObsStreaming) {
             // Delay connection slightly to ensure DOM is ready
             setTimeout(() => {
-                connect();
+                if (isObsStreaming) {
+                    connect();
+                }
             }, 500);
         }
     }
@@ -389,6 +764,16 @@
         // Check if connected
         isConnected: function() {
             return isConnected && isAuthenticated;
+        },
+        
+        // Disconnect stream sharing (called when WebSocket disconnects)
+        disconnect: function() {
+            if (isEnabled && (isConnected || isAuthenticated)) {
+                isEnabled = false;
+                setStorageItem('enabled', 'false');
+                disconnect();
+                updateConnectButton();
+            }
         },
         
         // Toggle function (called from HTML)

@@ -93,6 +93,7 @@ document.addEventListener("DOMContentLoaded", function () {
     updateReplayControlsVisibility();
     // updateTabVisibility();
     updateReplayButtonsVisibility();
+    updateReplaySourceSettingsVisibility();
     updatePlayerBallControlVisibility();
 });
 
@@ -829,6 +830,13 @@ function postInfo() {
 }
 
 function postSources() {
+    // Check if WebSocket is connected
+    const isConnected = getStorageItem('isConnected') === 'true';
+    if (!isConnected) {
+        alert('A WebSocket connection is required for replay functionality. Please connect to OBS WebSocket first.');
+        return;
+    }
+    
     const sceneNameEl = document.getElementById('replaySceneName');
     const videoSourceEl = document.getElementById('replayVideoSourceName');
     const indicatorSourceEl = document.getElementById('replayIndicatorSourceName');
@@ -1623,6 +1631,13 @@ async function connectToObsWebSocket() {
             setStorageItem('isConnected', 'false');
             updateConnectButton();
             updateReplayButtonsVisibility();
+            updateReplaySourceSettingsVisibility();
+            
+            // Disconnect stream promotion since it requires WebSocket to check OBS streaming status
+            if (window.streamSharing && typeof window.streamSharing.disconnect === 'function') {
+                window.streamSharing.disconnect();
+            }
+            
             console.log('Disconnected from OBS WebSocket');
         } catch (err) {
             console.error('Failed to disconnect:', err);
@@ -1639,6 +1654,7 @@ async function connectToObsWebSocket() {
             setStorageItem('isConnected', 'true');
             updateConnectButton();
             updateReplayButtonsVisibility();
+            updateReplaySourceSettingsVisibility();
             console.log('OBS WebSocket: Connected and authenticated');
         } catch (err) {
             console.error('Failed to connect:', err);
@@ -1659,6 +1675,111 @@ function updateConnectButton() {
     } else {
         connectBtn.textContent = 'Connect';
         connectBtn.style.backgroundColor = 'green';
+    }
+    
+    // Update replay source settings visibility based on WebSocket connection
+    updateReplaySourceSettingsVisibility();
+}
+
+// Update replay source settings visibility based on WebSocket connection
+function updateReplaySourceSettingsVisibility() {
+    // Find the "Replay Source Settings" section header specifically (not WebSocket Settings)
+    // We'll find it by looking for the section header that contains this text
+    const allSectionHeaders = document.querySelectorAll('.section-header');
+    let replaySourceHeader = null;
+    
+    for (let header of allSectionHeaders) {
+        if (header.textContent && header.textContent.trim() === 'Replay Source Settings') {
+            replaySourceHeader = header;
+            break;
+        }
+    }
+    
+    if (!replaySourceHeader) return;
+    
+    // Find all replay source settings elements
+    const replayElements = [];
+    replayElements.push(replaySourceHeader);
+    
+    // Find form rows - get all form-row elements after the section header
+    let currentElement = replaySourceHeader.nextElementSibling;
+    while (currentElement) {
+        if (currentElement.classList && currentElement.classList.contains('form-row')) {
+            replayElements.push(currentElement);
+        } else if (currentElement.classList && currentElement.classList.contains('section-header')) {
+            // Stop if we hit another section header
+            break;
+        }
+        currentElement = currentElement.nextElementSibling;
+    }
+    
+    // Find inputs and button
+    const sceneNameInput = document.getElementById('replaySceneName');
+    const videoSourceInput = document.getElementById('replayVideoSourceName');
+    const indicatorSourceInput = document.getElementById('replayIndicatorSourceName');
+    const autoResumeCheckbox = document.getElementById('autoResumeReplayBuffer');
+    const sendSourceBtn = document.getElementById('sendSourceInfo');
+    
+    // Apply styling based on WebSocket connection state
+    const isConnected = getStorageItem('isConnected') === 'true';
+    
+    // Apply opacity to section header and form rows
+    replayElements.forEach(el => {
+        if (el) {
+            if (!isConnected) {
+                el.style.setProperty('opacity', '0.6', 'important');
+            } else {
+                el.style.setProperty('opacity', '1', 'important');
+            }
+        }
+    });
+    
+    // Also directly target labels with !important to ensure they get dimmed
+    // Find all form-rows after the section header and get their labels
+    let currentRow = replaySourceHeader.nextElementSibling;
+    while (currentRow) {
+        if (currentRow.classList && currentRow.classList.contains('form-row')) {
+            const labels = currentRow.querySelectorAll('label');
+            labels.forEach(label => {
+                if (!isConnected) {
+                    label.style.setProperty('opacity', '0.6', 'important');
+                } else {
+                    label.style.setProperty('opacity', '1', 'important');
+                }
+            });
+            
+            // Also dim the "*Required Fields" text if it exists in this row
+            const requiredFieldsText = currentRow.querySelector('.field');
+            if (requiredFieldsText && requiredFieldsText.textContent && requiredFieldsText.textContent.includes('*Required Fields')) {
+                if (!isConnected) {
+                    requiredFieldsText.style.setProperty('opacity', '0.6', 'important');
+                } else {
+                    requiredFieldsText.style.setProperty('opacity', '1', 'important');
+                }
+            }
+        } else if (currentRow.classList && currentRow.classList.contains('section-header')) {
+            // Stop if we hit another section header
+            break;
+        }
+        currentRow = currentRow.nextElementSibling;
+    }
+    
+    // Disable/enable inputs and button
+    if (sceneNameInput) {
+        sceneNameInput.disabled = !isConnected;
+    }
+    if (videoSourceInput) {
+        videoSourceInput.disabled = !isConnected;
+    }
+    if (indicatorSourceInput) {
+        indicatorSourceInput.disabled = !isConnected;
+    }
+    if (autoResumeCheckbox) {
+        autoResumeCheckbox.disabled = !isConnected;
+    }
+    if (sendSourceBtn) {
+        sendSourceBtn.disabled = !isConnected;
+        sendSourceBtn.style.cursor = isConnected ? 'pointer' : 'not-allowed';
     }
 }
 
@@ -1782,7 +1903,17 @@ obs.on('Identified', () => {
 
 obs.on('ConnectionClosed', () => {
     isObsReady = false;
+    isConnected = false;
+    setStorageItem('isConnected', 'false');
+    updateConnectButton();
+    updateReplaySourceSettingsVisibility();
     console.warn('OBS WebSocket: ConnectionClosed');
+    
+    // Disconnect stream promotion since it requires WebSocket to check OBS streaming status
+    if (window.streamSharing && typeof window.streamSharing.disconnect === 'function') {
+        window.streamSharing.disconnect();
+    }
+    
     // setButtonsEnabled(false);
 });
 

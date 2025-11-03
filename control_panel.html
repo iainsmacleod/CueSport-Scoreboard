@@ -24,7 +24,7 @@ for more information about Salotto please visit https://salotto.app
     <link rel="stylesheet" href="./common/css/control_panel/required.css" />
     <script>
         //---------------------------------------------------------------------------------------------
-        var versionNum = "3.4.0";
+        var versionNum = "4.0.0";
         //---------------------------------------------------------------------------------------------
     </script>
     <script src="./common/js/obs-websocket-js.js"></script>
@@ -59,7 +59,7 @@ for more information about Salotto please visit https://salotto.app
             <button id="gameInfoTab" class="tablinks" onclick="openTab(event, 'GameInfo')">Game Setup</button>
             <button id="controlsTab" class="tablinks" onclick="openTab(event, 'Controls')">Controls</button>
             <button id="imagesTab" class="tablinks" onclick="openTab(event, 'Images')">Image &#x2699;</button>
-            <button id="replaySettingsTab" class="tablinks" onclick="openTab(event, 'ReplaySettings')">Replay
+            <button id="replaySettingsTab" class="tablinks" onclick="openTab(event, 'ReplaySettings')">Replay/Share
                 &#x2699;</button>
             <button id="generalSettingsTab" class="tablinks" onclick="openTab(event, 'GeneralSettings')">General
                 &#x2699;</button>
@@ -446,6 +446,40 @@ for more information about Salotto please visit https://salotto.app
                         </div>
                     </div>
                 </div>
+                <div class="section-header" id="streamSharingLabel">
+                    Stream Promotion (<a href="https://cuesports.macleod.systems" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: underline;">https://cuesports.macleod.systems</a>)
+                </div>
+                <div class="column">
+                    <div style="margin-top: 10px;">
+                        <label for="streamApiKey">API Key: </label>
+                        <input type="text" id="streamApiKey" readonly style="width: 250px; background-color: #f0f0f0;" />
+                        <button class="hover obs28 button" onclick="copyApiKey()" style="margin-left: 5px;">Copy</button>
+                    </div>
+                    <div style="margin-top: 10px;">
+                        <div class="hover obs28 button" onclick="generateApiKey()" style="width: 180px;">
+                            Generate New API Key
+                        </div>
+                    </div>
+                </div>
+                <div class="column">
+                    <div style="margin-top: 10px;">
+                        <label for="manualStreamUrl">Stream URL:</label>
+                        <input type="text" id="manualStreamUrl" placeholder="Example: https://www.twitch.tv/yourchannel" style="width: 350px;" />
+                        <style>
+                            #manualStreamUrl::placeholder {
+                                color: #666;
+                                opacity: 1;
+                            }
+                        </style>
+                    </div>
+                </div>
+                <div class="column">
+                    <div style="margin-top: 10px;">
+                        <div class="hover obs28 button" id="streamConnectBtn" onclick="toggleShareStream()" style="background-color: green;">
+                            Connect
+                        </div>
+                    </div>
+                </div>
                 <div class="section-header" id="replaySettingsLabel">Replay Source Settings</div>
                 <div class="form-row">
                     <div class="field">
@@ -546,37 +580,6 @@ for more information about Salotto please visit https://salotto.app
                 <div>
                     Win Animation<input type="checkbox" class="smallSize" id="winAnimation"
                         onchange="toggleAnimationSetting()" />
-                </div>
-            </div>
-            <div class="section-header" id="streamSharingLabel">
-                Stream Sharing
-            </div>
-            <div class="column">
-                <div>
-                    <label for="shareStreamSetting">Share Stream:</label>
-                    <input type="checkbox" class="smallSize" id="shareStreamSetting" onchange="toggleShareStream()" />
-                </div>
-                <div style="margin-top: 10px;">
-                    <label>Server:</label>
-                    <span style="margin-left: 10px; color: #999;">https://cuesports.macleod.systems</span>
-                </div>
-                <div style="margin-top: 10px;">
-                    <label for="streamApiKey">API Key:</label>
-                    <input type="text" id="streamApiKey" readonly style="width: 250px; background-color: #f0f0f0;" />
-                    <button class="hover obs28 button" onclick="copyApiKey()" style="margin-left: 5px;">Copy</button>
-                </div>
-            </div>
-            <div class="column">
-                <div style="margin-top: 25px;">
-                    <label>Connection Status:</label>
-                    <span id="streamConnectionStatus" style="margin-left: 10px; padding: 5px 10px; border-radius: 3px; background-color: #666; color: white;">
-                        Disconnected
-                    </span>
-                </div>
-                <div style="margin-top: 10px;">
-                    <div class="hover obs28 button" onclick="generateApiKey()" style="width: 150px;">
-                        Generate New API Key
-                    </div>
                 </div>
             </div>
             <div class="section-header" id="ballSettingLabel">

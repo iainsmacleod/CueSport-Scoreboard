@@ -350,7 +350,7 @@ input {
 
 .section-header {
 	/* display: flex; */ /*removed to assist with real estate management */
-	justify-content: space-between;
+	justify-content: start;
 	padding: 15px 0 0 0;
 	clear: both;
 	text-decoration: underline;
@@ -480,7 +480,7 @@ input:checked+.slider_round:before {
 	cursor: pointer;
 	padding: 14px;
 	transition: 0.3s;
-	font-size: 17px;
+	font-size: 16px;
 	color: white;
 	border-radius: 10px 10px 0 0;
 	box-sizing: border-box;
