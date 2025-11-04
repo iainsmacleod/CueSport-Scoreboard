@@ -333,6 +333,10 @@ function useBallTracker() {
         console.log(`Both players are not enabled so we are not enabling the ball tracker`)
     }
     updatePlayerBallControlVisibility();
+
+    if (window.streamSharing && typeof window.streamSharing.sendUpdate === "function") {
+        window.streamSharing.sendUpdate();
+    }
 }
 
 function toggleBallTrackerDirection() {
@@ -725,6 +729,10 @@ function playerSetting(player) {
     document.getElementById("scoreEditing").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
     // document.getElementById("ballTypeDiv").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
     // document.getElementById("ballSet").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
+
+    if (window.streamSharing && typeof window.streamSharing.sendUpdate === "function") {
+        window.streamSharing.sendUpdate();
+    }
 }
 
 function scoreDisplaySetting() {
@@ -736,6 +744,10 @@ function scoreDisplaySetting() {
     }
     if (getStorageItem("usePlayer1") === "yes" && getStorageItem("usePlayer2") === "yes") {
         bc.postMessage({ scoreDisplay: scoreDisplay.checked ? "yes" : "no" });
+    }
+
+    if (window.streamSharing && typeof window.streamSharing.sendUpdate === "function") {
+        window.streamSharing.sendUpdate();
     }
 }
 
@@ -755,6 +767,10 @@ function clockSetting() {
         document.getElementById("clockControlLabel").classList.remove("noShow");
     }
     // updateTabVisibility();
+
+    if (window.streamSharing && typeof window.streamSharing.sendUpdate === "function") {
+        window.streamSharing.sendUpdate();
+    }
 }
 
 function clockDisplay(opt3) {

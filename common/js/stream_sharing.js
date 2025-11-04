@@ -253,6 +253,19 @@
         // Get stream URL from OBS (validate it)
         const streamUrl = await getStreamUrl();
         const validatedUrl = isValidStreamUrl(streamUrl) ? streamUrl : '';
+
+        const player1Setting = String(getStorage(`${storagePrefix}usePlayer1`, getStorage('usePlayer1', 'yes')) || 'yes').toLowerCase();
+        const player2Setting = String(getStorage(`${storagePrefix}usePlayer2`, getStorage('usePlayer2', 'yes')) || 'yes').toLowerCase();
+        const player1Enabled = !(player1Setting === 'no' || player1Setting === 'false' || player1Setting === '0');
+        const player2Enabled = !(player2Setting === 'no' || player2Setting === 'false' || player2Setting === '0');
+
+        const scoreDisplaySetting = String(getStorage(`${storagePrefix}scoreDisplay`, getStorage('scoreDisplay', 'yes')) || 'yes').toLowerCase();
+        const scoreDisplay = !(scoreDisplaySetting === 'no' || scoreDisplaySetting === 'false' || scoreDisplaySetting === '0');
+
+        const ballTrackerSetting = String(getStorage(`${storagePrefix}enableBallTracker`, getStorage('enableBallTracker', 'no')) || 'no').toLowerCase();
+        const shotClockSetting = String(getStorage(`${storagePrefix}useClock`, getStorage('useClock', 'no')) || 'no').toLowerCase();
+        const ballTrackerEnabled = ballTrackerSetting === 'yes' || ballTrackerSetting === 'true' || ballTrackerSetting === '1';
+        const shotClockEnabled = shotClockSetting === 'yes' || shotClockSetting === 'true' || shotClockSetting === '1';
         
         return {
             player1Name: getValue('p1Name', '') || getStorage(`${storagePrefix}p1NameCtrlPanel`, ''),
@@ -263,6 +276,11 @@
             raceInfo: getValue('raceInfoTxt', '') || getStorage(`${storagePrefix}raceInfo`, ''),
             gameInfo: getValue('gameInfoTxt', '') || getStorage(`${storagePrefix}gameInfo`, ''),
             streamUrl: validatedUrl,
+            player1Enabled,
+            player2Enabled,
+            scoreDisplay,
+            ballTrackerEnabled,
+            shotClockEnabled,
             timestamp: new Date().toISOString()
         };
     }
