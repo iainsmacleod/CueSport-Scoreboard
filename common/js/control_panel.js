@@ -826,6 +826,82 @@ function postNames() {
     }
 }
 
+function getRaceTarget() {
+    const raceInput = document.getElementById("raceInfoTxt");
+    let raceString = '';
+
+    if (raceInput && raceInput.value && raceInput.value.trim().length > 0) {
+        raceString = raceInput.value.trim();
+    } else {
+        raceString = (getStorageItem("raceInfo") || '').toString().trim();
+    }
+
+    if (!raceString) {
+        return null;
+    }
+
+    const matches = raceString.match(/\d+/g);
+    if (!matches || matches.length === 0) {
+        return null;
+    }
+
+    const target = parseInt(matches[matches.length - 1], 10);
+    return Number.isFinite(target) && target > 0 ? target : null;
+}
+
+function updateScoreControlAvailability() {
+    const raceTarget = getRaceTarget();
+    const p1Input = document.getElementById("p1Score");
+    const p2Input = document.getElementById("p2Score");
+    const p1Value = p1Input ? parseInt(p1Input.value, 10) || 0 : 0;
+    const p2Value = p2Input ? parseInt(p2Input.value, 10) || 0 : 0;
+    const winnerExists = raceTarget !== null && (p1Value >= raceTarget || p2Value >= raceTarget);
+    const winnerIsP1 = winnerExists && raceTarget !== null && p1Value >= raceTarget && p1Value >= p2Value;
+    const winnerIsP2 = winnerExists && raceTarget !== null && p2Value >= raceTarget && p2Value >= p1Value;
+
+    const controls = [
+        document.getElementById("sendP1Score"),
+        document.getElementById("sendP1ScoreSub"),
+        document.getElementById("sendP2Score"),
+        document.getElementById("sendP2ScoreSub")
+    ];
+
+    controls.forEach(control => {
+        if (control) {
+            control.disabled = winnerExists;
+            control.classList.toggle('disabled', winnerExists);
+        }
+    });
+
+    [p1Input, p2Input].forEach(input => {
+        if (input) {
+            input.readOnly = winnerExists;
+            input.classList.toggle('read-only', winnerExists);
+        }
+    });
+
+    const winnerDecrementButton = winnerIsP1 ? document.getElementById("sendP1ScoreSub") : winnerIsP2 ? document.getElementById("sendP2ScoreSub") : null;
+    const winnerInput = winnerIsP1 ? p1Input : winnerIsP2 ? p2Input : null;
+
+    if (winnerExists && winnerDecrementButton && winnerInput) {
+        winnerDecrementButton.disabled = false;
+        winnerDecrementButton.classList.remove('disabled');
+        winnerInput.readOnly = false;
+        winnerInput.classList.remove('read-only');
+    }
+
+    const resetBtn = document.getElementById("resetScores");
+    if (resetBtn) {
+        if (winnerExists) {
+            resetBtn.style.backgroundColor = '#008000';
+            resetBtn.style.color = '#ffffff';
+        } else {
+            resetBtn.style.backgroundColor = '';
+            resetBtn.style.color = '';
+        }
+    }
+}
+
 function postInfo() {
     if (raceInfoTxt.value == " ") {
         raceInfoTxt.value = null;
@@ -902,35 +978,74 @@ function getReplaySettings() {
 }
 
 function pushScores() {
-    // Send current scores
-    const p1Score = document.getElementById("p1Score").value || 0;
-    const p2Score = document.getElementById("p2Score").value || 0;
-    bc.postMessage({ player: '1', score: p1Score });
-    bc.postMessage({ player: '2', score: p2Score });
+    const p1Input = document.getElementById("p1Score");
+    const p2Input = document.getElementById("p2Score");
+    let enteredP1 = p1Input ? parseInt(p1Input.value, 10) || 0 : 0;
+    let enteredP2 = p2Input ? parseInt(p2Input.value, 10) || 0 : 0;
+    const raceTarget = getRaceTarget();
 
-    // Update global score variables
-    p1ScoreValue = parseInt(p1Score) || 0;
-    p2ScoreValue = parseInt(p2Score) || 0;
+    if (raceTarget !== null) {
+        enteredP1 = Math.min(Math.max(enteredP1, 0), raceTarget);
+        enteredP2 = Math.min(Math.max(enteredP2, 0), raceTarget);
 
-    // Store scores in localStorage
+        if (enteredP1 >= raceTarget) {
+            enteredP2 = Math.min(enteredP2, raceTarget);
+        }
+
+        if (enteredP2 >= raceTarget) {
+            enteredP1 = Math.min(enteredP1, raceTarget);
+        }
+    }
+
+    if (p1Input) {
+        p1Input.value = enteredP1;
+    }
+    if (p2Input) {
+        p2Input.value = enteredP2;
+    }
+
+    bc.postMessage({ player: '1', score: enteredP1 });
+    bc.postMessage({ player: '2', score: enteredP2 });
+
+    p1ScoreValue = enteredP1;
+    p2ScoreValue = enteredP2;
+
     setStorageItem("p1ScoreCtrlPanel", p1ScoreValue);
     setStorageItem("p1Score", p1ScoreValue);
     setStorageItem("p2ScoreCtrlPanel", p2ScoreValue);
     setStorageItem("p2Score", p2ScoreValue);
-    
-    // Send update to stream sharing if enabled
+
     if (window.streamSharing) {
         window.streamSharing.sendUpdate();
     }
+
+    updateScoreControlAvailability();
 }
 
 function postScore(opt1, player) {
     // Parse stored scores as integers
     let p1ScoreValue = parseInt(getStorageItem("p1ScoreCtrlPanel")) || 0;
     let p2ScoreValue = parseInt(getStorageItem("p2ScoreCtrlPanel")) || 0;
+    const raceTarget = getRaceTarget();
+    const raceLocked = raceTarget !== null && (p1ScoreValue >= raceTarget || p2ScoreValue >= raceTarget);
+    const winnerIsP1 = raceLocked && raceTarget !== null && p1ScoreValue >= raceTarget && p1ScoreValue >= p2ScoreValue;
+    const winnerIsP2 = raceLocked && raceTarget !== null && p2ScoreValue >= raceTarget && p2ScoreValue >= p1ScoreValue;
+    const isWinner = player === '1' ? winnerIsP1 : player === '2' ? winnerIsP2 : false;
+
+    if (raceLocked && !isWinner) {
+        updateScoreControlAvailability();
+        return;
+    }
 
     if (player == "1") {
         if (opt1 == "add") {
+            if (raceTarget !== null && p1ScoreValue + 1 > raceTarget) {
+                p1ScoreValue = raceTarget;
+                document.getElementById("p" + player + "Score").value = p1ScoreValue;
+                updateScoreControlAvailability();
+                return;
+            }
+
             if (p1ScoreValue < 999) {
                 p1ScoreValue = p1ScoreValue + 1;
                 msg = { player: player, score: p1ScoreValue };
@@ -938,7 +1053,6 @@ function postScore(opt1, player) {
                 setStorageItem("p" + player + "ScoreCtrlPanel", p1ScoreValue);
                 setStorageItem("p" + player + "Score", p1ScoreValue);
                 stopClock();
-                //document.getElementById("sendP" + player + "Score").style.border = "2px solid lightgreen";
                 document.getElementById("p" + player + "Score").value = p1ScoreValue;
                 resetExt('p1', 'noflash');
                 resetExt('p2', 'noflash');
@@ -949,12 +1063,18 @@ function postScore(opt1, player) {
             bc.postMessage(msg);
             setStorageItem("p" + player + "ScoreCtrlPanel", p1ScoreValue);
             setStorageItem("p" + player + "Score", p1ScoreValue);
-            //document.getElementById("sendP" + player + "ScoreSub").style.border = "2px solid tomato";
             document.getElementById("p" + player + "Score").value = p1ScoreValue;
         }
     }
     if (player == "2") {
         if (opt1 == "add") {
+            if (raceTarget !== null && p2ScoreValue + 1 > raceTarget) {
+                p2ScoreValue = raceTarget;
+                document.getElementById("p" + player + "Score").value = p2ScoreValue;
+                updateScoreControlAvailability();
+                return;
+            }
+
             if (p2ScoreValue < 999) {
                 p2ScoreValue = p2ScoreValue + 1;
                 msg2 = { player: player, score: p2ScoreValue };
@@ -962,7 +1082,6 @@ function postScore(opt1, player) {
                 setStorageItem("p" + player + "ScoreCtrlPanel", p2ScoreValue);
                 setStorageItem("p" + player + "Score", p2ScoreValue);
                 stopClock();
-                //document.getElementById("sendP" + player + "Score").style.border = "2px solid lightgreen";
                 document.getElementById("p" + player + "Score").value = p2ScoreValue;
                 resetExt('p1', 'noflash');
                 resetExt('p2', 'noflash');
@@ -973,17 +1092,16 @@ function postScore(opt1, player) {
             bc.postMessage(msg2);
             setStorageItem("p" + player + "ScoreCtrlPanel", p2ScoreValue);
             setStorageItem("p" + player + "Score", p2ScoreValue);
-            //document.getElementById("sendP" + player + "ScoreSub").style.border = "2px solid tomato";
             document.getElementById("p" + player + "Score").value = p2ScoreValue;
         }
     }
-    resetBallSet();
-    resetBallTracker();
-    
+
     // Send update to stream sharing if enabled
     if (window.streamSharing) {
         window.streamSharing.sendUpdate();
     }
+
+    updateScoreControlAvailability();
 }
 
 function shotClock(timex) {
@@ -1373,6 +1491,8 @@ function resetScores() {
         if (window.streamSharing) {
             window.streamSharing.sendUpdate();
         }
+
+        updateScoreControlAvailability();
     } else { }
 }
 

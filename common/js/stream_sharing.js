@@ -557,6 +557,12 @@
                     isEnabled = false;
                     setStorageItem('enabled', 'false');
                 }
+
+                // If streaming has started and sharing is enabled, ensure connection
+                if (!wasStreaming && isObsStreaming && isEnabled && (!isConnected || !isAuthenticated)) {
+                    console.log('OBS streaming detected, reconnecting stream sharing');
+                    connect();
+                }
                 
                 updateConnectButton();
                 updateStreamSharingVisibility();
@@ -758,7 +764,7 @@
         if (isEnabled && isObsStreaming) {
             // Delay connection slightly to ensure DOM is ready
             setTimeout(() => {
-                if (isObsStreaming) {
+                if (isEnabled && isObsStreaming) {
                     connect();
                 }
             }, 500);

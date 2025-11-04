@@ -603,3 +603,12 @@ input:checked+.slider_round:before {
 .clip-label {
 	display: inline-block;
 }
+
+#btnMonitorGame,
+#btnReplayClip {
+    height: 32px;
+}
+
+#btnMonitorGame {
+    min-width: 134px;
+}

@@ -598,6 +598,10 @@ document.getElementById('replaySceneName').value = getStorageItem("replaySceneNa
 document.getElementById('replayVideoSourceName').value = getStorageItem("replayVideoSourceName");
 document.getElementById('replayIndicatorSourceName').value = getStorageItem("replayIndicatorSourceName");
 
+if (typeof updateScoreControlAvailability === 'function') {
+    updateScoreControlAvailability();
+}
+
 // Initialize ball set selection from storage
 const savedBallSet = getStorageItem("playerBallSet");
 if (savedBallSet) {
