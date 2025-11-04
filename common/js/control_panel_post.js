@@ -284,9 +284,13 @@ async function obsReConnect() {
 		setStorageItem('isConnected', 'true');
 		updateConnectButton();
 		console.log('OBS WebSocket: Connected and authenticated');
-	} catch (err) {
-		console.error('Failed to connect:', err);
-		alert('Failed to connect.\n\nDetails: ' + (err.message || err.toString()));
+        return true;
+    } catch (err) {
+        console.error('Failed to connect:', err);
+        const hint = `Unable to reach OBS WebSocket at ${address}.\n\n` +
+            'Please confirm OBS is running, the WebSocket server is enabled, and the address/password are correct.';
+        alert('Failed to connect.\n\nDetails: ' + (err?.message || err?.code || err?.toString() || 'Unknown error') + '\n\n' + hint);
+        return false;
 	}
 }
 

@@ -71,19 +71,9 @@ function updatePlayerBallControlVisibility() {
 function updateReplayControlsVisibility() {
     const replaySectionHeader = document.getElementById('replayLabel');
     const replayControlsDiv = document.getElementById('replay-controls');
-
-    const sceneName = getStorageItem("replaySceneName") || "";
-    const videoSource = getStorageItem("replayVideoSourceName") || "";
-
-    if (!sceneName || !videoSource) {
-        // Hide replay controls if either required field is empty
-        replaySectionHeader.classList.add('noShow');
-        replayControlsDiv.classList.add('noShow');
-    } else {
-        // Show replay controls if both fields are configured
-        replaySectionHeader.classList.remove('noShow');
-        replayControlsDiv.classList.remove('noShow');
-    }
+    // Always show replay controls; configuration alerts fire when buttons are used
+    replaySectionHeader.classList.remove('noShow');
+    replayControlsDiv.classList.remove('noShow');
 }
 
 // Call updateTabVisibility on page load to set initial tab visibility
@@ -2375,13 +2365,22 @@ function updateReplayButtonsVisibility() {
 
 // Monitor toggle
 async function toggleReplayMonitoring() {
-    //Reconnect to OBS is not connected
+    //Reconnect to OBS if not connected
     if(!isConnected){
-        await obsReConnect();
+        const reconnected = await obsReConnect();
+        if (!reconnected) {
+            alert('Replay monitoring requires an active OBS WebSocket connection. Please configure a webscket connection in OBS under Tools, as well as connection settings on Replay/Share tab before toggling monitoring.');
+            return;
+        }
         toggleReplayClipsVisibility();
         updateReplayButtonsVisibility();
     }
     const { videoSource } = getReplaySettings();
+
+    if (!videoSource) {
+        alert('Replay monitoring requires a configured OBS media source and scene. Please set the Replay Video Source and Scene on Replay/Share tab before toggling monitoring.');
+        return;
+    }
     try {
         const { mediaState } = await obs.call('GetMediaInputStatus', { inputName: videoSource });
         // your existing logic with mediaState check
