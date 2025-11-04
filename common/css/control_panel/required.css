@@ -609,6 +609,6 @@ input:checked+.slider_round:before {
     height: 32px;
 }
 
-#btnMonitorGame {
+#btnMonitorGame{
     min-width: 134px;
 }
