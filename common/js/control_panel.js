@@ -1790,7 +1790,7 @@ async function connectToObsWebSocket() {
             console.log('OBS WebSocket: Connected and authenticated');
         } catch (err) {
             console.error('Failed to connect:', err);
-            alert('Failed to connect.\n\nDetails: ' + (err.message || err.toString()));
+            alert('Failed to connect. Is OBS running and WebSocket enabled? Check your OBS settings.\n\nDetails: ' + (err.message || err.toString()));
         }
     }
 }
