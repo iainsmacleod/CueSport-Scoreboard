@@ -253,7 +253,7 @@
         // Get stream URL from OBS (validate it)
         const streamUrl = await getStreamUrl();
         const validatedUrl = isValidStreamUrl(streamUrl) ? streamUrl : '';
-
+        
         const player1Setting = String(getStorage(`${storagePrefix}usePlayer1`, getStorage('usePlayer1', 'yes')) || 'yes').toLowerCase();
         const player2Setting = String(getStorage(`${storagePrefix}usePlayer2`, getStorage('usePlayer2', 'yes')) || 'yes').toLowerCase();
         const player1Enabled = !(player1Setting === 'no' || player1Setting === 'false' || player1Setting === '0');
