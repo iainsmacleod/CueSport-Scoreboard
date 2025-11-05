@@ -27,6 +27,70 @@ let isMonitoringActive = getStorageItem('isMonitoringActive') === 'true' || fals
 let isConnected = getStorageItem('isConnected') === 'true' || false;
 let replayHistory = JSON.parse(localStorage.getItem('replayHistory')) || [];
 
+const replayPlaybackState = {
+    path: null,
+    ready: false,
+    started: false,
+};
+
+function setReplayPlaybackPath(path) {
+    if (!path) {
+        return;
+    }
+    if (replayPlaybackState.path !== path) {
+        replayPlaybackState.path = path;
+        replayPlaybackState.ready = false;
+        replayPlaybackState.started = false;
+    }
+}
+
+function markReplayMediaReady(path) {
+    if (!path) {
+        return;
+    }
+    setReplayPlaybackPath(path);
+    replayPlaybackState.ready = true;
+    attemptReplayPlayback();
+}
+
+function queueReplayPlayback(path) {
+    if (!path) {
+        return;
+    }
+    setReplayPlaybackPath(path);
+    attemptReplayPlayback();
+}
+
+async function attemptReplayPlayback() {
+    if (!replayPlaybackState.path || replayPlaybackState.started || !replayPlaybackState.ready) {
+        return;
+    }
+
+    try {
+        const { videoSource, indicatorSource } = getReplaySettings();
+        const sceneName = await getActiveSceneName();
+
+        await showSource(sceneName, videoSource);
+        if (indicatorSource) {
+            await showSource(sceneName, indicatorSource);
+        }
+
+        await obs.call('TriggerMediaInputAction', {
+            inputName: videoSource,
+            mediaAction: 'OBS_WEBSOCKET_MEDIA_INPUT_ACTION_RESTART'
+        });
+
+        replayPlaybackState.started = true;
+        console.log('Replay playback started for:', replayPlaybackState.path);
+    } catch (error) {
+        console.error('Failed to start replay playback:', error);
+        const message = error?.message || error?.toString() || '';
+        if (message.includes('Unable to determine active OBS scene')) {
+            alert('Replay monitoring could not determine the active OBS scene. Please ensure OBS is connected and a program scene is active.');
+        }
+    }
+}
+
 // function updateTabVisibility() {
 //     // Get the state of the player settings
 //     const player1Enabled = document.getElementById("usePlayer1Setting").checked;
@@ -2023,30 +2087,9 @@ async function hideReplayIndicator(sceneName) {
 }
 
 // When the replay is saved, OBS emits ReplayBufferSaved with the file path
-obs.on('ReplayBufferSaved', async ({ savedReplayPath }) => {
-	try {
-		const { videoSource, indicatorSource } = getReplaySettings();
-		const sceneName = await getActiveSceneName();
-
-		await showSource(sceneName, videoSource);
-
-		if (indicatorSource) {
-			await showSource(sceneName, indicatorSource);
-		}
-
-		await obs.call('TriggerMediaInputAction', {
-			inputName: videoSource,
-			mediaAction: 'OBS_WEBSOCKET_MEDIA_INPUT_ACTION_RESTART'
-		});
-
-		console.log('Replay loaded and playing:', savedReplayPath);
-	} catch (error) {
-		console.error('Failed to load/play replay in media source:', error);
-		const message = error?.message || error?.toString() || '';
-		if (message.includes('Unable to determine active OBS scene')) {
-			alert('Replay monitoring could not determine the active OBS scene. Please ensure OBS is connected and a program scene is active.');
-		}
-	}
+obs.on('ReplayBufferSaved', ({ savedReplayPath }) => {
+	console.log('ReplayBufferSaved event received:', savedReplayPath);
+	queueReplayPlayback(savedReplayPath);
 });
 
 // OBS v5 lifecycle events
@@ -2173,6 +2216,7 @@ async function triggerInstantReplay() {
         const savedPathPromise = waitForReplaySaved(8000);
         await obs.call('SaveReplayBuffer');
         const savedPath = await savedPathPromise;
+        setReplayPlaybackPath(savedPath);
 
         // Stop monitoring
         try {
@@ -2207,15 +2251,12 @@ async function triggerInstantReplay() {
             overlay: false
         });
 
-        await obs.call('TriggerMediaInputAction', {
-            inputName: videoSource,
-            mediaAction: 'OBS_WEBSOCKET_MEDIA_INPUT_ACTION_RESTART'
-        });
+        markReplayMediaReady(savedPath);
 
         // Update instant replay button
-        setReplayButtonText();
+		setReplayButtonText();
 
-        console.log('Replay ready and playing:', savedPath);
+		console.log('Replay ready. Waiting for playback to start via OBS event:', savedPath);
 
         // Save new replay path to history
         replayHistory.push(savedPath);
@@ -2428,7 +2469,7 @@ async function toggleReplayMonitoring() {
     }
     try {
         const { mediaState } = await obs.call('GetMediaInputStatus', { inputName: videoSource });
-        // your existing logic with mediaState check
+        // Stop playback if the media source is already running
         if (mediaState === 'playing') {
             await obs.call('TriggerMediaInputAction', { inputName: videoSource, mediaAction: 'OBS_WEBSOCKET_MEDIA_INPUT_ACTION_STOP' });
             await new Promise(r => setTimeout(r, 150));
