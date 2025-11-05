@@ -484,13 +484,17 @@ input:checked+.slider_round:before {
 	color: white;
 	border-radius: 10px 10px 0 0;
 	box-sizing: border-box;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	height: 100%;
+	line-height: 1;
 }
 
 .tab button:not(.active):hover {
 	border-radius: 10px 10px 0 0;
 	border: 2px solid transparent;
-	/* prevent bounce effect from apparent defout border on tab */
-	border-bottom-width: 0px;
 	background-color: inherit;
 }
 
@@ -498,7 +502,7 @@ input:checked+.slider_round:before {
 	border-radius: 10px 10px 0px 0px;
 	border: 2px solid transparent;
 	/* prevent bounce effect from apparent defout border on tab */
-	border-bottom-width: -2px;
+	border-bottom-width: 6px;
 }
 
 .tabcontent {
