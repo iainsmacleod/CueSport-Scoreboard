@@ -598,7 +598,10 @@ document.getElementById("raceInfoTxt").value = getStorageItem("raceInfo");
 document.getElementById("gameInfoTxt").value = getStorageItem("gameInfo");
 document.getElementById("verNum").innerHTML = versionNum;
 
-document.getElementById('replaySceneName').value = getStorageItem("replaySceneName");
+const replaySceneNameInput = document.getElementById('replaySceneName');
+if (replaySceneNameInput) {
+    replaySceneNameInput.value = getStorageItem("replaySceneName");
+}
 document.getElementById('replayVideoSourceName').value = getStorageItem("replayVideoSourceName");
 document.getElementById('replayIndicatorSourceName').value = getStorageItem("replayIndicatorSourceName");
 

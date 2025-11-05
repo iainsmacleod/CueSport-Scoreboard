@@ -780,6 +780,11 @@ function clockDisplay(opt3) {
 }
 
 function clearGame() {
+    const confirmed = confirm('Are you sure you wish to clear player, score, and game information?');
+    if (!confirmed) {
+        return;
+    }
+
     console.log('Clearing Match Data');
     document.getElementById("raceInfoTxt").value = "";
     document.getElementById("gameInfoTxt").value = "";
@@ -919,49 +924,50 @@ function postSources() {
         return;
     }
     
-    const sceneNameEl = document.getElementById('replaySceneName');
     const videoSourceEl = document.getElementById('replayVideoSourceName');
     const indicatorSourceEl = document.getElementById('replayIndicatorSourceName');
 
     // Clean up empty strings
-    if (sceneNameEl.value.trim() === "") {
-        sceneNameEl.value = "";
-    }
-    if (videoSourceEl.value.trim() === "") {
+    if (videoSourceEl && videoSourceEl.value.trim() === "") {
         videoSourceEl.value = "";
     }
-    if (indicatorSourceEl.value.trim() === "") {
+    if (indicatorSourceEl && indicatorSourceEl.value.trim() === "") {
         indicatorSourceEl.value = "";
     }
 
-    // Save the values (using replaySceneName as the storage key)
-    setStorageItem("replaySceneName", sceneNameEl.value);
-    setStorageItem("replayVideoSourceName", videoSourceEl.value);
-    setStorageItem("replayIndicatorSourceName", indicatorSourceEl.value);
+    if (videoSourceEl) {
+        setStorageItem("replayVideoSourceName", videoSourceEl.value);
+    }
+    if (indicatorSourceEl) {
+        setStorageItem("replayIndicatorSourceName", indicatorSourceEl.value);
+    }
 
     // Update visibility after saving
     updateReplayControlsVisibility();
 
     console.log('Replay source settings saved:', {
-        sceneName: sceneNameEl.value,
-        videoSource: videoSourceEl.value,
-        indicatorSource: indicatorSourceEl.value
+        videoSource: videoSourceEl ? videoSourceEl.value : '',
+        indicatorSource: indicatorSourceEl ? indicatorSourceEl.value : ''
     });
 }
 
 function loadReplaySources() {
-    const sceneName = getStorageItem("replaySceneName") || "";
     const videoSource = getStorageItem("replayVideoSourceName") || "";
     const indicatorSource = getStorageItem("replayIndicatorSourceName") || "";
 
-    document.getElementById('replaySceneName').value = sceneName;
-    document.getElementById('replayVideoSourceName').value = videoSource;
-    document.getElementById('replayIndicatorSourceName').value = indicatorSource;
+    const videoSourceInput = document.getElementById('replayVideoSourceName');
+    const indicatorInput = document.getElementById('replayIndicatorSourceName');
+
+    if (videoSourceInput) {
+        videoSourceInput.value = videoSource;
+    }
+    if (indicatorInput) {
+        indicatorInput.value = indicatorSource;
+    }
 }
 
 function getReplaySettings() {
     return {
-        sceneName: getStorageItem("replaySceneName") || "",
         videoSource: getStorageItem("replayVideoSourceName") || "",
         indicatorSource: getStorageItem("replayIndicatorSourceName") || ""
     };
@@ -1702,10 +1708,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (passwordInput.type === 'password') {
                 passwordInput.type = 'text';
-                toggleBtn.textContent = 'Hide';
+                toggleBtn.textContent = 'Hide Password';
             } else {
                 passwordInput.type = 'password';
-                toggleBtn.textContent = 'Show';
+                toggleBtn.textContent = 'Show Password';
             }
         });
 
@@ -1840,7 +1846,6 @@ function updateReplaySourceSettingsVisibility() {
     }
     
     // Find inputs and button
-    const sceneNameInput = document.getElementById('replaySceneName');
     const videoSourceInput = document.getElementById('replayVideoSourceName');
     const indicatorSourceInput = document.getElementById('replayIndicatorSourceName');
     const autoResumeCheckbox = document.getElementById('autoResumeReplayBuffer');
@@ -1891,9 +1896,6 @@ function updateReplaySourceSettingsVisibility() {
     }
     
     // Disable/enable inputs and button
-    if (sceneNameInput) {
-        sceneNameInput.disabled = !isConnected;
-    }
     if (videoSourceInput) {
         videoSourceInput.disabled = !isConnected;
     }
@@ -1907,6 +1909,29 @@ function updateReplaySourceSettingsVisibility() {
         sendSourceBtn.disabled = !isConnected;
         sendSourceBtn.style.cursor = isConnected ? 'pointer' : 'not-allowed';
     }
+}
+
+async function getActiveSceneName() {
+    try {
+        const { currentProgramSceneName } = await obs.call('GetCurrentProgramScene');
+        if (currentProgramSceneName) {
+            return currentProgramSceneName;
+        }
+    } catch (err) {
+        console.warn('GetCurrentProgramScene failed, falling back to GetCurrentScene', err);
+    }
+
+    try {
+        const { name } = await obs.call('GetCurrentScene');
+        if (name) {
+            return name;
+        }
+    } catch (fallbackError) {
+        console.error('Unable to determine active scene from OBS', fallbackError);
+        throw new Error('Unable to determine active OBS scene');
+    }
+
+    throw new Error('Active scene name unavailable');
 }
 
 async function getSceneItemId(sceneName, sourceName) {
@@ -1955,24 +1980,28 @@ async function hideSource(sceneName, sourceName) {
         alert(`OBS Error: Could not hide source "${sourceName}" in scene "${sceneName}". Please verify your inputs and OBS connection.`);
     }
 }
-
-
-const settings = getReplaySettings();
-
 obs.on('MediaInputPlaybackEnded', async ({ inputName }) => {
-    const { sceneName, videoSource, indicatorSource } = getReplaySettings();
-    if (inputName === videoSource) {
-        try {
-            await hideSource(sceneName, indicatorSource);
-            await hideSource(sceneName, videoSource); // before replay
-            console.log(`MediaInputPlaybackEnded event received for ${inputName}, source hidden.`);
-        } catch (error) {
-            console.error('Error hiding replay source on playback end:', error);
-        }
-    }
-    if (document.getElementById("autoResumeReplayBuffer").checked) {
-        toggleReplayMonitoring();
-    } return;
+	const { videoSource, indicatorSource } = getReplaySettings();
+	let sceneName = null;
+	try {
+		sceneName = await getActiveSceneName();
+	} catch (err) {
+		console.warn('Could not resolve active scene on playback end:', err);
+	}
+
+	if (inputName === videoSource && sceneName) {
+		try {
+			await hideSource(sceneName, indicatorSource);
+			await hideSource(sceneName, videoSource);
+			console.log(`MediaInputPlaybackEnded event received for ${inputName}, source hidden.`);
+		} catch (error) {
+			console.error('Error hiding replay source on playback end:', error);
+		}
+	}
+	if (document.getElementById("autoResumeReplayBuffer").checked) {
+		toggleReplayMonitoring();
+	}
+	return;
 });
 
 async function showReplayIndicator(sceneName) {
@@ -1995,25 +2024,29 @@ async function hideReplayIndicator(sceneName) {
 
 // When the replay is saved, OBS emits ReplayBufferSaved with the file path
 obs.on('ReplayBufferSaved', async ({ savedReplayPath }) => {
-    try {
-        const { sceneName, videoSource, indicatorSource } = getReplaySettings();
+	try {
+		const { videoSource, indicatorSource } = getReplaySettings();
+		const sceneName = await getActiveSceneName();
 
-        await showSource(sceneName, videoSource); // always show videoSource
+		await showSource(sceneName, videoSource);
 
-        if (indicatorSource) {
-            await showSource(sceneName, indicatorSource); // only if indicator source is set
-        }
+		if (indicatorSource) {
+			await showSource(sceneName, indicatorSource);
+		}
 
-        // Restart playback to begin from the start
-        await obs.call('TriggerMediaInputAction', {
-            inputName: videoSource,
-            mediaAction: 'OBS_WEBSOCKET_MEDIA_INPUT_ACTION_RESTART'
-        });
+		await obs.call('TriggerMediaInputAction', {
+			inputName: videoSource,
+			mediaAction: 'OBS_WEBSOCKET_MEDIA_INPUT_ACTION_RESTART'
+		});
 
-        console.log('Replay loaded and playing:', savedReplayPath);
-    } catch (error) {
-        console.error('Failed to load/play replay in media source:', error);
-    }
+		console.log('Replay loaded and playing:', savedReplayPath);
+	} catch (error) {
+		console.error('Failed to load/play replay in media source:', error);
+		const message = error?.message || error?.toString() || '';
+		if (message.includes('Unable to determine active OBS scene')) {
+			alert('Replay monitoring could not determine the active OBS scene. Please ensure OBS is connected and a program scene is active.');
+		}
+	}
 });
 
 // OBS v5 lifecycle events
@@ -2240,9 +2273,17 @@ async function playPreviousReplay(index) {
         setMonitorButtonText();
     }
 
-    const { sceneName, videoSource, indicatorSource } = getReplaySettings();
-    await showSource(sceneName, videoSource);
-    if (indicatorSource) await showSource(sceneName, indicatorSource);
+	const { videoSource, indicatorSource } = getReplaySettings();
+	let sceneName;
+	try {
+		sceneName = await getActiveSceneName();
+	} catch (err) {
+		console.error('Unable to determine active scene for replay playback:', err);
+		alert('Unable to determine the active OBS scene. Please ensure OBS is connected and streaming.');
+		return;
+	}
+	await showSource(sceneName, videoSource);
+	if (indicatorSource) await showSource(sceneName, indicatorSource);
 
     try {
         const { inputSettings } = await obs.call('GetInputSettings', {
@@ -2262,7 +2303,11 @@ async function playPreviousReplay(index) {
 
         console.log('Replaying historic clip:', filePath);
     } catch (err) {
-        console.error('Failed to play previous replay:', err);
+		console.error('Failed to play previous replay:', err);
+		const message = err?.message || err?.toString() || '';
+		if (message.includes('Unable to determine active OBS scene')) {
+			alert('Unable to determine the active OBS scene when playing a replay. Please ensure OBS is connected and a program scene is active.');
+		}
     }
     setReplayButtonText();
 }
@@ -2369,7 +2414,7 @@ async function toggleReplayMonitoring() {
     if(!isConnected){
         const reconnected = await obsReConnect();
         if (!reconnected) {
-            alert('Replay monitoring requires an active OBS WebSocket connection. Please configure a webscket connection in OBS under Tools, as well as connection settings on Replay/Share tab before toggling monitoring.');
+			alert('Replay monitoring requires an active OBS WebSocket connection. Please configure a websocket connection in OBS under Tools, as well as connection settings on the Replay/Share tab before toggling monitoring.');
             return;
         }
         toggleReplayClipsVisibility();
@@ -2377,8 +2422,8 @@ async function toggleReplayMonitoring() {
     }
     const { videoSource } = getReplaySettings();
 
-    if (!videoSource) {
-        alert('Replay monitoring requires a configured OBS media source and scene. Please set the Replay Video Source and Scene on Replay/Share tab before toggling monitoring.');
+	if (!videoSource) {
+		alert('Replay monitoring requires a configured OBS media source. Please set the Replay Video Source on the Replay/Share tab before toggling monitoring.');
         return;
     }
     try {
