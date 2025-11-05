@@ -76,7 +76,7 @@ const handlers = {
 
     opacity(data) {
         console.log(`Opacity setting: ${data.opacity}`);
-        const elements = ["scoreBoardDiv", "gameInfo", "ballTracker", "raceInfo"];
+        const elements = ["scoreBoardDiv", "gameInfo", "ballTracker", "videoContainer"];
         elements.forEach(id => {
             document.getElementById(id).style.opacity = data.opacity;
         });
@@ -85,6 +85,12 @@ const handlers = {
     scaling(data) {
         console.log(`Scaling setting: ${data.scaling}`);
         document.documentElement.style.setProperty('--ui-scaling', data.scaling);
+        const container = document.getElementById('videoContainer');
+        if (container) {
+            container.style.transform = `scale(${data.scaling})`;
+            container.style.transformOrigin = 'center center';
+        }
+    
     },
 
     race(data) {
@@ -467,6 +473,7 @@ $(document).ready(function () {
     $("#gameInfo").draggable();
     $("#logoSlideshowDiv").draggable();
     $("#ballTracker").draggable();
+    $("#videoContainer").draggable();
 });
 
 // Setting defaults in storage so functions execute correctly, in the event values are not being retrieved from storage successfully due to initialization or similar

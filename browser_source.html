@@ -22,7 +22,7 @@ for more information about Salotto please visit https://salotto.app
 		// Add event listener for when DOM is fully loaded
 		document.addEventListener('DOMContentLoaded', function () {
 			const opacity = localStorage.getItem('overlayOpacity') || 100;
-			const elements = ["scoreBoardDiv", "gameInfo", "ballTracker"];
+			const elements = ["scoreBoardDiv", "gameInfo", "ballTracker", "videoContainer"];
 			elements.forEach(id => {
 				const element = document.getElementById(id);
 				if (element) {

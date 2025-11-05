@@ -420,10 +420,10 @@ function playWebmAnimation(gameType, containerSelector = '#videoContainer') {
         container.removeChild(video);
     });
     
-    // (Optional) Allow early removal on click.
-    video.addEventListener('click', () => {
-        container.removeChild(video);
-    });
+    // // (Optional) Allow early removal on click.
+    // video.addEventListener('click', () => {
+    //     container.removeChild(video);
+    // });
     
     // Return the video element for further manipulation if needed.
     return video;
