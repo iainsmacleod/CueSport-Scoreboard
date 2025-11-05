@@ -463,7 +463,7 @@ bc.onmessage = (event) => {
 
 $(document).ready(function () {
     // Initialize draggable elements
-    $("#scoreBoard").draggable();
+    $("#scoreBoardDiv").draggable();
     $("#gameInfo").draggable();
     $("#logoSlideshowDiv").draggable();
     $("#ballTracker").draggable();
