@@ -22,6 +22,8 @@
     let streamingCheckInterval = null;
     let autoResumeEnabled = false;
     let autoResumePending = false;
+    let isBlockedByServer = false;
+    let blockedReason = null;
     
     // Helper function to get storage item (compatible with existing codebase pattern)
     function getStorageItem(key) {
@@ -268,6 +270,12 @@
         const shotClockSetting = String(getStorage(`${storagePrefix}useClock`, getStorage('useClock', 'no')) || 'no').toLowerCase();
         const ballTrackerEnabled = ballTrackerSetting === 'yes' || ballTrackerSetting === 'true' || ballTrackerSetting === '1';
         const shotClockEnabled = shotClockSetting === 'yes' || shotClockSetting === 'true' || shotClockSetting === '1';
+
+        const breakingPlayerSetting = String(getStorage(`${storagePrefix}usePlayerToggle`, getStorage('usePlayerToggle', 'no')) || 'no').toLowerCase();
+        const breakingPlayerEnabled = breakingPlayerSetting === 'yes' || breakingPlayerSetting === 'true' || breakingPlayerSetting === '1';
+        
+        const ballSelection = String(getStorage(`${storagePrefix}ballSelection`, getStorage('ballSelection', 'american')) || 'american').toLowerCase();
+        const ballType = ballSelection === 'international' ? 'International' : 'World';
         
         return {
             player1Name: getValue('p1Name', '') || getStorage(`${storagePrefix}p1NameCtrlPanel`, ''),
@@ -283,6 +291,8 @@
             scoreDisplay,
             ballTrackerEnabled,
             shotClockEnabled,
+            breakingPlayerEnabled,
+            ballType,
             timestamp: new Date().toISOString()
         };
     }
@@ -313,6 +323,12 @@
     function connect() {
         if (ws && (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN)) {
             return; // Already connecting or connected
+        }
+
+        if (isBlockedByServer) {
+            const reason = blockedReason || 'API key is blocked by administrator';
+            alert(`Stream sharing is blocked:\n${reason}`);
+            return;
         }
         
         const serverUrl = getServerUrl();
@@ -372,6 +388,18 @@
                         } else if (data.status === 'pending') {
                             // Server is waiting for authentication - ignore, we already sent it
                             // Do nothing, wait for success response
+                        } else if (data.status === 'blocked') {
+                            blockedReason = typeof data.message === 'string' && data.message.trim() ? data.message.trim() : 'API key is blocked by administrator';
+                            isBlockedByServer = true;
+                            isAuthenticated = false;
+                            isEnabled = false;
+                            autoResumePending = false;
+                            setStorageItem('enabled', 'false');
+                            setStorageItem('autoResumePending', 'false');
+                            updateConnectButton();
+                            updateStreamSharingVisibility();
+                            alert(`Stream sharing blocked:\n${blockedReason}`);
+                            ws.close(4003, 'API key blocked');
                         } else {
                             isAuthenticated = false;
                             console.error('Auth failed: ' + (data.message || 'Unknown error'));
@@ -403,6 +431,14 @@
                 isConnected = false;
                 isAuthenticated = false;
                 
+                if (isBlockedByServer) {
+                    reconnectTimer = null;
+                    reconnectAttempts = 0;
+                    updateConnectButton();
+                    updateStreamSharingVisibility();
+                    return;
+                }
+
                 if (isEnabled && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
                     // Exponential backoff reconnection
                     const delay = Math.min(
@@ -438,7 +474,23 @@
             reconnectTimer = null;
         }
         
-        if (ws) {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            // Send disconnect message to server for immediate deactivation
+            try {
+                ws.send(JSON.stringify({
+                    type: 'disconnect'
+                }));
+            } catch (e) {
+                console.warn('Failed to send disconnect message:', e);
+            }
+            // Small delay to ensure message is sent before closing
+            setTimeout(() => {
+                if (ws) {
+                    ws.close();
+                    ws = null;
+                }
+            }, 100);
+        } else if (ws) {
             ws.close();
             ws = null;
         }
@@ -456,7 +508,9 @@
         
         // Disable button if not streaming
         if (!isObsStreaming) {
-            if (autoResumeEnabled && autoResumePending) {
+            if (isBlockedByServer) {
+                btn.textContent = 'Connect (Blocked)';
+            } else if (autoResumeEnabled && autoResumePending) {
                 btn.textContent = 'Auto-resume when Live';
             } else {
                 btn.textContent = 'Connect (Not Streaming)';
@@ -480,7 +534,12 @@
         btn.disabled = false;
         btn.style.cursor = 'pointer';
         
-        if (isEnabled && isConnected && isAuthenticated) {
+        if (isBlockedByServer) {
+            btn.textContent = 'Connect (Blocked)';
+            btn.style.backgroundColor = '#999';
+            btn.disabled = true;
+            btn.style.cursor = 'not-allowed';
+        } else if (isEnabled && isConnected && isAuthenticated) {
             btn.textContent = 'Disconnect';
             btn.style.backgroundColor = 'red'; // Red - matches WebSocket button
         } else if (isEnabled && isConnected) {
@@ -525,7 +584,9 @@
         // Apply styling based on streaming state
         streamElements.forEach(el => {
             if (el) {
-                if (!isObsStreaming) {
+                if (isBlockedByServer) {
+                    el.style.opacity = '0.4';
+                } else if (!isObsStreaming) {
                     el.style.opacity = '0.6';
                 } else {
                     el.style.opacity = '1';
@@ -536,7 +597,7 @@
 
     function handleStreamingStopped() {
         const wasSharing = isEnabled && (isConnected || isAuthenticated);
-        const shouldResume = autoResumeEnabled && (wasSharing || autoResumePending);
+        const shouldResume = !isBlockedByServer && autoResumeEnabled && (wasSharing || autoResumePending);
 
         if (isConnected || isAuthenticated) {
             console.log('OBS stopped streaming, disconnecting stream sharing');
@@ -582,14 +643,14 @@
 
                 // If streaming has started and sharing is enabled, ensure connection
                 if (!wasStreaming && isObsStreaming) {
-                    if (autoResumeEnabled && autoResumePending) {
+                    if (!isBlockedByServer && autoResumeEnabled && autoResumePending) {
                         isEnabled = true;
                         setStorageItem('enabled', 'true');
                         autoResumePending = autoResumeEnabled;
                         setStorageItem('autoResumePending', autoResumePending ? 'true' : 'false');
                     }
 
-                    if (isEnabled && (!isConnected || !isAuthenticated)) {
+                    if (!isBlockedByServer && isEnabled && (!isConnected || !isAuthenticated)) {
                         console.log('OBS streaming detected, reconnecting stream sharing');
                         connect();
                     }
@@ -620,6 +681,12 @@
     
     // Toggle stream sharing on/off
     function toggleShareStream() {
+        if (isBlockedByServer) {
+            const reason = blockedReason || 'API key is blocked by administrator';
+            alert(`Stream sharing is blocked:\n${reason}`);
+            return;
+        }
+
         // Don't allow connection if not streaming
         if (!isObsStreaming) {
             alert('OBS must be streaming to share your game data.');
@@ -664,6 +731,8 @@
             const newKey = generateApiKey();
             setStorageItem('apiKey', newKey);
             updateApiKeyDisplay();
+            isBlockedByServer = false;
+            blockedReason = null;
             
             if (isConnected) {
                 disconnect();
