@@ -463,20 +463,26 @@ for more information about Salotto please visit https://salotto.app
                 </div>
                 <div class="form-row">
                     <div class="field">
-                            <label for="manualStreamUrl">Stream URL:</label>
-                            <input type="text" id="manualStreamUrl" placeholder="Example: https://www.twitch.tv/yourchannel" style="width: 300px;" />
-                            <style>
-                                #manualStreamUrl::placeholder {
-                                    color: #666;
-                                    opacity: 1;
-                                }
-                            </style>
+                        <label for="manualStreamUrl">Stream URL:</label>
+                        <input type="text" id="manualStreamUrl" placeholder="Example: https://www.twitch.tv/yourchannel" style="width: 300px;" />
+                        <style>
+                            #manualStreamUrl::placeholder {
+                                color: #666;
+                                opacity: 1;
+                            }
+                        </style>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="field" style="display: flex; align-items: center; gap: 8px;">
+                        <label for="autoResumeSharing" style="margin: 0;">Auto-resume Sharing</label>
+                        <input type="checkbox" class="smallSize" id="autoResumeSharing" />
+                    </div>
+                    <div class="field">
+                        <div class="hover obs28 button" id="streamConnectBtn" onclick="toggleShareStream()" style="background-color: green;">
+                            Connect
                         </div>
-                        <div class="field">
-                            <div class="hover obs28 button" id="streamConnectBtn" onclick="toggleShareStream()" style="background-color: green;">
-                                Connect
-                            </div>
-                        </div>
+                    </div>
                 </div>
                 <div class="section-header" id="replaySettingsLabel">Replay Source Settings</div>
                 <div class="form-row">

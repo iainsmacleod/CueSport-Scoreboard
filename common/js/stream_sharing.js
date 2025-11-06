@@ -20,6 +20,7 @@
     let isAuthenticated = false;
     let isObsStreaming = false;
     let streamingCheckInterval = null;
+    let autoResumeEnabled = false;
     
     // Helper function to get storage item (compatible with existing codebase pattern)
     function getStorageItem(key) {
@@ -454,7 +455,11 @@
         
         // Disable button if not streaming
         if (!isObsStreaming) {
-            btn.textContent = 'Connect (Not Streaming)';
+            if (autoResumeEnabled && isEnabled) {
+                btn.textContent = 'Auto-resume when Live';
+            } else {
+                btn.textContent = 'Connect (Not Streaming)';
+            }
             btn.style.backgroundColor = '#999'; // Gray
             btn.disabled = true;
             btn.style.cursor = 'not-allowed';
@@ -507,11 +512,13 @@
         const connectBtn = document.getElementById('streamConnectBtn');
         const statusEl = document.getElementById('streamConnectionStatus');
         const manualUrlField = document.getElementById('manualStreamUrl');
+        const autoResumeCheckbox = document.getElementById('autoResumeSharing');
         
         if (apiKeyField) streamElements.push(apiKeyField.parentElement);
         if (connectBtn) streamElements.push(connectBtn.parentElement);
         if (statusEl) streamElements.push(statusEl.parentElement);
         if (manualUrlField) streamElements.push(manualUrlField.parentElement);
+        if (autoResumeCheckbox) streamElements.push(autoResumeCheckbox.parentElement);
         
         // Apply styling based on streaming state
         streamElements.forEach(el => {
@@ -551,11 +558,15 @@
                 isObsStreaming = status.outputActive === true;
                 
                 // If streaming stopped and we were connected, disconnect
-                if (wasStreaming && !isObsStreaming && isConnected) {
-                    console.log('OBS stopped streaming, disconnecting stream sharing');
-                    disconnect();
-                    isEnabled = false;
-                    setStorageItem('enabled', 'false');
+                if (wasStreaming && !isObsStreaming) {
+                    const shouldResume = autoResumeEnabled && isEnabled;
+                    if (isConnected || isAuthenticated) {
+                        console.log('OBS stopped streaming, disconnecting stream sharing');
+                        disconnect();
+                    }
+
+                    isEnabled = shouldResume;
+                    setStorageItem('enabled', shouldResume ? 'true' : 'false');
                 }
 
                 // If streaming has started and sharing is enabled, ensure connection
@@ -676,6 +687,28 @@
         const manualUrlField = document.getElementById('manualStreamUrl');
         if (manualUrlField && savedStreamUrl) {
             manualUrlField.value = savedStreamUrl;
+        }
+
+        // Load auto-resume sharing preference
+        const autoResumeCheckbox = document.getElementById('autoResumeSharing');
+        autoResumeEnabled = getStorageItem('autoResumeSharing') === 'true';
+        if (autoResumeCheckbox) {
+            autoResumeCheckbox.checked = autoResumeEnabled;
+            autoResumeCheckbox.addEventListener('change', () => {
+                autoResumeEnabled = autoResumeCheckbox.checked;
+                setStorageItem('autoResumeSharing', autoResumeEnabled ? 'true' : 'false');
+
+                if (!autoResumeEnabled && !isObsStreaming && !isConnected && isEnabled) {
+                    // If auto-resume is disabled while waiting for streaming, clear pending state
+                    isEnabled = false;
+                    setStorageItem('enabled', 'false');
+                    updateConnectButton();
+                }
+
+                updateConnectButton();
+            });
+            // Ensure button reflects persisted state on load
+            updateConnectButton();
         }
         
         // Save manual URL when changed and update button state
