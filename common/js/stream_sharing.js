@@ -21,6 +21,7 @@
     let isObsStreaming = false;
     let streamingCheckInterval = null;
     let autoResumeEnabled = false;
+    let autoResumePending = false;
     
     // Helper function to get storage item (compatible with existing codebase pattern)
     function getStorageItem(key) {
@@ -455,7 +456,7 @@
         
         // Disable button if not streaming
         if (!isObsStreaming) {
-            if (autoResumeEnabled && isEnabled) {
+            if (autoResumeEnabled && autoResumePending) {
                 btn.textContent = 'Auto-resume when Live';
             } else {
                 btn.textContent = 'Connect (Not Streaming)';
@@ -513,12 +514,13 @@
         const statusEl = document.getElementById('streamConnectionStatus');
         const manualUrlField = document.getElementById('manualStreamUrl');
         const autoResumeCheckbox = document.getElementById('autoResumeSharing');
+        const autoResumeField = autoResumeCheckbox ? autoResumeCheckbox.closest('.field') : null;
         
         if (apiKeyField) streamElements.push(apiKeyField.parentElement);
         if (connectBtn) streamElements.push(connectBtn.parentElement);
         if (statusEl) streamElements.push(statusEl.parentElement);
         if (manualUrlField) streamElements.push(manualUrlField.parentElement);
-        if (autoResumeCheckbox) streamElements.push(autoResumeCheckbox.parentElement);
+        if (autoResumeField) streamElements.push(autoResumeField);
         
         // Apply styling based on streaming state
         streamElements.forEach(el => {
@@ -530,6 +532,22 @@
                 }
             }
         });
+    }
+
+    function handleStreamingStopped() {
+        const wasSharing = isEnabled && (isConnected || isAuthenticated);
+        const shouldResume = autoResumeEnabled && (wasSharing || autoResumePending);
+
+        if (isConnected || isAuthenticated) {
+            console.log('OBS stopped streaming, disconnecting stream sharing');
+            disconnect();
+        }
+
+        isEnabled = false;
+        setStorageItem('enabled', 'false');
+
+        autoResumePending = shouldResume;
+        setStorageItem('autoResumePending', autoResumePending ? 'true' : 'false');
     }
     
     // Check OBS streaming status
@@ -559,20 +577,22 @@
                 
                 // If streaming stopped and we were connected, disconnect
                 if (wasStreaming && !isObsStreaming) {
-                    const shouldResume = autoResumeEnabled && isEnabled;
-                    if (isConnected || isAuthenticated) {
-                        console.log('OBS stopped streaming, disconnecting stream sharing');
-                        disconnect();
-                    }
-
-                    isEnabled = shouldResume;
-                    setStorageItem('enabled', shouldResume ? 'true' : 'false');
+                    handleStreamingStopped();
                 }
 
                 // If streaming has started and sharing is enabled, ensure connection
-                if (!wasStreaming && isObsStreaming && isEnabled && (!isConnected || !isAuthenticated)) {
-                    console.log('OBS streaming detected, reconnecting stream sharing');
-                    connect();
+                if (!wasStreaming && isObsStreaming) {
+                    if (autoResumeEnabled && autoResumePending) {
+                        isEnabled = true;
+                        setStorageItem('enabled', 'true');
+                        autoResumePending = autoResumeEnabled;
+                        setStorageItem('autoResumePending', autoResumePending ? 'true' : 'false');
+                    }
+
+                    if (isEnabled && (!isConnected || !isAuthenticated)) {
+                        console.log('OBS streaming detected, reconnecting stream sharing');
+                        connect();
+                    }
                 }
                 
                 updateConnectButton();
@@ -580,12 +600,18 @@
             } catch (error) {
                 // If we can't check status, assume not streaming
                 console.warn('Could not check OBS streaming status:', error);
+                if (isObsStreaming) {
+                    handleStreamingStopped();
+                }
                 isObsStreaming = false;
                 updateConnectButton();
                 updateStreamSharingVisibility();
             }
         } catch (error) {
             console.warn('Error checking OBS streaming status:', error);
+            if (isObsStreaming) {
+                handleStreamingStopped();
+            }
             isObsStreaming = false;
             updateConnectButton();
             updateStreamSharingVisibility();
@@ -615,13 +641,19 @@
             // Disconnect
             isEnabled = false;
             setStorageItem('enabled', 'false');
+            autoResumePending = autoResumeEnabled;
+            setStorageItem('autoResumePending', autoResumePending ? 'true' : 'false');
             disconnect();
             updateConnectButton();
+            updateStreamSharingVisibility();
         } else {
             // Connect
             isEnabled = true;
             setStorageItem('enabled', 'true');
+            autoResumePending = autoResumeEnabled;
+            setStorageItem('autoResumePending', autoResumePending ? 'true' : 'false');
             updateConnectButton();
+            updateStreamSharingVisibility();
             connect();
         }
     }
@@ -692,24 +724,45 @@
         // Load auto-resume sharing preference
         const autoResumeCheckbox = document.getElementById('autoResumeSharing');
         autoResumeEnabled = getStorageItem('autoResumeSharing') === 'true';
+        autoResumePending = getStorageItem('autoResumePending') === 'true';
+
+        if (!autoResumeEnabled && autoResumePending) {
+            autoResumePending = false;
+            setStorageItem('autoResumePending', 'false');
+        }
+
+        if (autoResumeEnabled && isEnabled) {
+            autoResumePending = true;
+            setStorageItem('autoResumePending', 'true');
+        }
+
         if (autoResumeCheckbox) {
             autoResumeCheckbox.checked = autoResumeEnabled;
             autoResumeCheckbox.addEventListener('change', () => {
                 autoResumeEnabled = autoResumeCheckbox.checked;
                 setStorageItem('autoResumeSharing', autoResumeEnabled ? 'true' : 'false');
 
-                if (!autoResumeEnabled && !isObsStreaming && !isConnected && isEnabled) {
-                    // If auto-resume is disabled while waiting for streaming, clear pending state
-                    isEnabled = false;
-                    setStorageItem('enabled', 'false');
-                    updateConnectButton();
+                if (autoResumeEnabled) {
+                    if (isConnected || isAuthenticated || isEnabled) {
+                        autoResumePending = true;
+                    }
+                } else {
+                    autoResumePending = false;
+                    if (!isObsStreaming && !isConnected && isEnabled) {
+                        isEnabled = false;
+                        setStorageItem('enabled', 'false');
+                    }
                 }
 
+                setStorageItem('autoResumePending', autoResumePending ? 'true' : 'false');
+
                 updateConnectButton();
+                updateStreamSharingVisibility();
             });
-            // Ensure button reflects persisted state on load
-            updateConnectButton();
         }
+
+        updateConnectButton();
+        updateStreamSharingVisibility();
         
         // Save manual URL when changed and update button state
         if (manualUrlField) {
@@ -825,11 +878,14 @@
         
         // Disconnect stream sharing (called when WebSocket disconnects)
         disconnect: function() {
-            if (isEnabled && (isConnected || isAuthenticated)) {
+            if (isConnected || isAuthenticated) {
                 isEnabled = false;
                 setStorageItem('enabled', 'false');
+                autoResumePending = false;
+                setStorageItem('autoResumePending', 'false');
                 disconnect();
                 updateConnectButton();
+                updateStreamSharingVisibility();
             }
         },
         
