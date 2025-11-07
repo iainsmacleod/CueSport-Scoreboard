@@ -1014,7 +1014,8 @@ function pushScores() {
     if (window.streamSharing) {
         window.streamSharing.sendUpdate();
     }
-
+    resetBallTracker();
+    resetBallSet();
     updateScoreControlAvailability();
 }
 
@@ -1096,7 +1097,8 @@ function postScore(opt1, player) {
     if (window.streamSharing) {
         window.streamSharing.sendUpdate();
     }
-
+    resetBallTracker();
+    resetBallSet();
     updateScoreControlAvailability();
 }
 
