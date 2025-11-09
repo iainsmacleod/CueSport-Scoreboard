@@ -43,15 +43,6 @@ function clearWinBlink() {
 	}
 }
 
-function sleep(milliseconds) {
-	var start = new Date().getTime();
-	for (var i = 0; i < 1e7; i++) {
-		if ((new Date().getTime() - start) > milliseconds) {
-			break;
-		}
-	}
-}
-
 function shotTimer(shottime) {
     // Add debug logging
     console.log("Starting timer with:", shottime, "milliseconds");
