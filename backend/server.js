@@ -342,10 +342,28 @@ const restApiLimiter = rateLimit({
 // Apply rate limiting to REST API
 app.use('/api/', restApiLimiter);
 
-// Admin endpoints need stricter rate limiting
-const adminLimiter = rateLimit({
+// Admin endpoints rate limiting - separate limits for different operations
+// Login endpoint: More lenient (brute force protection)
+const adminLoginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 10, // 10 requests per 15 minutes per IP
+    max: 20, // 20 login attempts per 15 minutes per IP
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: true, // Don't count successful logins
+    handler: (req, res) => {
+        const clientIP = getClientIP(req);
+        securityLogger.logRateLimit(clientIP, req.path);
+        res.status(429).json({
+            success: false,
+            error: 'Too many login attempts, please try again later.'
+        });
+    }
+});
+
+// Stats endpoint: More lenient (for auto-refresh)
+const adminStatsLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minute
+    max: 30, // 30 stats requests per minute per IP (allows auto-refresh every 2 seconds if needed)
     standardHeaders: true,
     legacyHeaders: false,
     handler: (req, res) => {
@@ -353,11 +371,42 @@ const adminLimiter = rateLimit({
         securityLogger.logRateLimit(clientIP, req.path);
         res.status(429).json({
             success: false,
-            error: 'Too many admin requests, please try again later.'
+            error: 'Too many stats requests, please slow down.'
         });
     }
 });
-app.use('/api/admin/', adminLimiter);
+
+// Admin actions (delete, block, unblock, clear): Stricter limit
+const adminActionLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minute
+    max: 30, // 30 actions per minute per IP
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req, res) => {
+        const clientIP = getClientIP(req);
+        securityLogger.logRateLimit(clientIP, req.path);
+        res.status(429).json({
+            success: false,
+            error: 'Too many admin actions, please slow down.'
+        });
+    }
+});
+
+// Token refresh: Moderate limit
+const adminRefreshLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minute
+    max: 10, // 10 refresh requests per minute per IP
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req, res) => {
+        const clientIP = getClientIP(req);
+        securityLogger.logRateLimit(clientIP, req.path);
+        res.status(429).json({
+            success: false,
+            error: 'Too many token refresh requests, please try again later.'
+        });
+    }
+});
 
 // Serve static files from public directory
 app.use(express.static(path.join(__dirname, 'public')));
@@ -856,7 +905,7 @@ app.get('/api/streams', (req, res) => {
 });
 
 // Admin authentication endpoints
-app.post('/api/admin/login', async (req, res) => {
+app.post('/api/admin/login', adminLoginLimiter, async (req, res) => {
     const clientIP = getClientIP(req);
     const userAgent = req.headers['user-agent'] || 'unknown';
     
@@ -904,7 +953,7 @@ app.post('/api/admin/login', async (req, res) => {
 });
 
 // Token refresh endpoint
-app.post('/api/admin/refresh', (req, res) => {
+app.post('/api/admin/refresh', adminRefreshLimiter, (req, res) => {
     const clientIP = getClientIP(req);
     const { refreshToken } = req.body;
     
@@ -947,7 +996,7 @@ app.post('/api/admin/logout', (req, res) => {
 });
 
 // Admin routes
-app.get('/api/admin/stats', requireAdminAuth, (req, res) => {
+app.get('/api/admin/stats', adminStatsLimiter, requireAdminAuth, (req, res) => {
     try {
         const search = typeof req.query.search === 'string' && req.query.search.trim() !== ''
             ? req.query.search.trim()
@@ -978,7 +1027,7 @@ app.get('/api/admin/stats', requireAdminAuth, (req, res) => {
     }
 });
 
-app.post('/api/admin/block', requireAdminAuth, (req, res) => {
+app.post('/api/admin/block', adminActionLimiter, requireAdminAuth, (req, res) => {
     const apiKey = (req.body && typeof req.body.apiKey === 'string') ? req.body.apiKey.trim() : '';
     const reason = req.body && typeof req.body.reason === 'string' ? req.body.reason.trim() : null;
 
@@ -1007,7 +1056,7 @@ app.post('/api/admin/block', requireAdminAuth, (req, res) => {
     }
 });
 
-app.post('/api/admin/unblock', requireAdminAuth, (req, res) => {
+app.post('/api/admin/unblock', adminActionLimiter, requireAdminAuth, (req, res) => {
     const apiKey = (req.body && typeof req.body.apiKey === 'string') ? req.body.apiKey.trim() : '';
 
     if (!apiKey) {
@@ -1029,7 +1078,7 @@ app.post('/api/admin/unblock', requireAdminAuth, (req, res) => {
     }
 });
 
-app.post('/api/admin/clear', requireAdminAuth, (req, res) => {
+app.post('/api/admin/clear', adminActionLimiter, requireAdminAuth, (req, res) => {
     const apiKey = (req.body && typeof req.body.apiKey === 'string') ? req.body.apiKey.trim() : '';
 
     if (!apiKey) {
@@ -1051,6 +1100,36 @@ app.post('/api/admin/clear', requireAdminAuth, (req, res) => {
     }
 });
 
+app.post('/api/admin/delete', adminActionLimiter, requireAdminAuth, (req, res) => {
+    const apiKey = (req.body && typeof req.body.apiKey === 'string') ? req.body.apiKey.trim() : '';
+
+    if (!apiKey) {
+        return res.status(400).json({
+            success: false,
+            error: 'apiKey is required'
+        });
+    }
+
+    try {
+        // Close any active WebSocket connections for this API key
+        const session = activeConnections.get(apiKey);
+        if (session && session.ws && session.ws.readyState === WebSocket.OPEN) {
+            session.ws.close(4003, 'API key deleted by administrator');
+        }
+        activeConnections.delete(apiKey);
+
+        // Delete the API key and all associated data
+        dbOps.deleteApiKey(apiKey);
+        
+        res.json({ success: true });
+    } catch (error) {
+        logger.error('ERROR_DELETING_API_KEY', { error: error.message });
+        res.status(500).json({
+            success: false,
+            error: 'Failed to delete API key'
+        });
+    }
+});
 
 // Get specific stream by ID
 app.get('/api/streams/:id', (req, res) => {

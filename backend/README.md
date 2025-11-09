@@ -6,9 +6,13 @@ Backend server for sharing CueSport Scoreboard game data via WebSocket.
 
 - WebSocket server for real-time game state updates
 - REST API for public stream listing
+- Admin dashboard with statistics and API key management
 - SQLite database for persistence
 - API key authentication
-- Rate limiting
+- JWT-based session management for admin access
+- Comprehensive logging and monitoring
+- Rate limiting (separate limits for different operations)
+- IP whitelisting for admin endpoints
 - Input sanitization
 - Docker support
 
@@ -43,11 +47,22 @@ docker run -p 3000:3000 -v $(pwd)/data:/app/data cuesport-stream-backend
 
 ## API Endpoints
 
-### REST API
+### Public REST API
 
 - `GET /api/streams` - Get all active streams
 - `GET /api/streams/:id` - Get specific stream by ID
-- `GET /health` - Health check
+- `GET /health` - Health check endpoint
+
+### Admin REST API (Requires Authentication)
+
+- `POST /api/admin/login` - Authenticate and receive JWT tokens
+- `POST /api/admin/refresh` - Refresh access token
+- `POST /api/admin/logout` - Revoke session
+- `GET /api/admin/stats` - Get statistics for all API keys
+- `POST /api/admin/block` - Block an API key
+- `POST /api/admin/unblock` - Unblock an API key
+- `POST /api/admin/clear` - Clear statistics for an API key
+- `POST /api/admin/delete` - Delete an API key and all associated data
 
 ### WebSocket
 
@@ -99,12 +114,59 @@ Environment variables:
 
 ## Security
 
+### Authentication & Authorization
 - API keys must be at least 16 character hex strings
-- Rate limiting: 60 requests per minute per API key (WebSocket), 100/minute per IP (REST API)
+- JWT-based session management for admin access (access tokens + refresh tokens)
+- IP binding on tokens to prevent token theft
+- IP whitelisting support for admin endpoints (supports IPs, CIDR ranges, and domains)
+- Automatic session expiration and refresh
+
+### Rate Limiting
+- **REST API**: 100 requests per minute per IP
+- **WebSocket Updates**: 60 update messages per minute per API key
+- **Admin Login**: 20 attempts per 15 minutes per IP (successful logins don't count)
+- **Admin Stats**: 30 requests per minute per IP
+- **Admin Actions** (block/unblock/clear/delete): 30 actions per minute per IP
+- **Token Refresh**: 10 requests per minute per IP
+
+### Connection Limits
+- Maximum 5 WebSocket connections per IP address
+- Maximum 1000 total concurrent WebSocket connections
+- 10KB maximum message size limit
+
+### Other Security Features
 - Input sanitization on all fields
+- SQL injection prevention
 - Automatic cleanup of inactive streams after 24 hours
-- JWT-based session management for admin access
-- IP whitelisting support for admin endpoints
-- Comprehensive security event logging
-- Connection limits to prevent DoS attacks
+- Comprehensive security event logging (authentication attempts, access denials, rate limits, suspicious activity)
+- Structured logging with daily rotation
+- Security headers (Helmet.js)
+- Request size limits (10KB for JSON/URL-encoded)
+- Request timeouts (30 seconds default)
+
+## Logging
+
+The application uses Winston for structured logging with daily rotation:
+
+- **Error logs**: `logs/error-YYYY-MM-DD.log` - Errors only
+- **Combined logs**: `logs/combined-YYYY-MM-DD.log` - All log levels
+- **Security logs**: `logs/security-YYYY-MM-DD.log` - Security events (kept for 30 days)
+
+Logs are automatically rotated daily, compressed, and retained based on configuration (14 days for errors/combined, 30 days for security).
+
+## Admin Dashboard
+
+The admin dashboard is available at `/admin-stats.html` and provides:
+
+- Real-time statistics for all API keys
+- Connection history and duration tracking
+- Game type and feature usage analytics
+- Ability to block/unblock API keys
+- Ability to clear or delete API key data
+- Search and filtering capabilities
+- Auto-refresh every 60 seconds
+
+Access requires:
+1. Valid admin password
+2. IP address in whitelist (if `ADMIN_IP_WHITELIST` is configured)
 
