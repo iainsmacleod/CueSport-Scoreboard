@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Stream Statistics</title>
+    <link rel="icon" type="image/x-icon" href="/images/favicon.ico" />
+    <style>
+        :root {
+            color-scheme: dark;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: #111;
+            color: #f5f5f5;
+        }
+
+        a {
+            color: #58a6ff;
+        }
+
+        .page {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 32px 20px 60px;
+        }
+
+        h1 {
+            font-size: 1.75rem;
+            margin-bottom: 16px;
+        }
+
+        p {
+            margin-top: 0;
+            margin-bottom: 24px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        input[type="password"],
+        input[type="text"] {
+            width: 100%;
+            padding: 10px 12px;
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(0, 0, 0, 0.4);
+            color: #f5f5f5;
+            font-size: 1rem;
+        }
+
+        input[type="password"]:focus,
+        input[type="text"]:focus {
+            outline: 2px solid #58a6ff;
+            outline-offset: 0;
+        }
+
+        button {
+            padding: 10px 16px;
+            border-radius: 6px;
+            border: none;
+            background: #58a6ff;
+            color: #0a101a;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.15s ease, box-shadow 0.2s ease;
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(88, 166, 255, 0.35);
+        }
+
+        button.secondary {
+            background: rgba(88, 166, 255, 0.12);
+            color: #58a6ff;
+        }
+
+        button.danger {
+            background: #f85149;
+            color: #0a101a;
+        }
+
+        button.warning {
+            background: #f0883e;
+            color: #0a101a;
+        }
+
+        .icon-button {
+            appearance: none;
+            background: rgba(255, 255, 255, 0.12);
+            border: none;
+            color: #f5f5f5;
+            border-radius: 6px;
+            width: 28px;
+            height: 28px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background 0.2s ease;
+            font-size: 0.8rem;
+        }
+
+        .icon-button:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .icon-button:active {
+            background: rgba(255, 255, 255, 0.28);
+        }
+
+        .icon-button.copy-success {
+            background: rgba(87, 227, 137, 0.28);
+            color: #57e389;
+        }
+
+        .icon-button.copy-failure {
+            background: rgba(248, 81, 73, 0.28);
+            color: #ff938d;
+        }
+
+        .code-pill {
+            display: inline-flex;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 999px;
+            padding: 2px 10px;
+            font-family: "SFMono-Regular", Consolas, "Courier New", monospace;
+            font-size: 0.85rem;
+            letter-spacing: 0.04em;
+        }
+
+        .top-key-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .top-key-actions {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        #refreshBtn.loading {
+            position: relative;
+            padding-left: 40px;
+            cursor: wait;
+            opacity: 0.85;
+        }
+
+        #refreshBtn.loading::after {
+            content: '';
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            width: 14px;
+            height: 14px;
+            margin-top: -7px;
+            border-radius: 50%;
+            border: 2px solid rgba(10, 16, 26, 0.35);
+            border-top-color: rgba(10, 16, 26, 0.9);
+            animation: refresh-spin 0.7s linear infinite;
+        }
+
+        @keyframes refresh-spin {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .login-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .stats-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .stats-controls .control {
+            flex: 1 1 260px;
+        }
+
+        .search-input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .search-input-wrapper input {
+            padding-right: 38px;
+        }
+
+        .clear-search-btn {
+            position: absolute;
+            right: 8px;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.12);
+            border: none;
+            color: #f5f5f5;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+            transition: background 0.2s ease, opacity 0.2s ease;
+        }
+
+        .clear-search-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .clear-search-btn.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .button-row {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            align-items: flex-end;
+        }
+
+        .status-filter-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+
+        .status-filter-button {
+            border: none;
+            border-radius: 999px;
+            padding: 6px 14px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            background: rgba(255, 255, 255, 0.12);
+            color: #f5f5f5;
+            cursor: pointer;
+            transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease;
+        }
+
+        .status-filter-button:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-1px);
+        }
+
+        .status-filter-button.active {
+            background: #58a6ff;
+            color: #0a101a;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+        }
+
+        th,
+        td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            vertical-align: top;
+        }
+
+        th {
+            background: rgba(255, 255, 255, 0.05);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        tbody tr:hover {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .badge.blocked {
+            background: rgba(248, 81, 73, 0.18);
+            color: #ff938d;
+        }
+
+        .badge.status-live {
+            background: rgba(63, 185, 80, 0.18);
+            color: #57e389;
+        }
+
+        .badge.status-active {
+            background: rgba(63, 185, 80, 0.18);
+            color: #57e389;
+        }
+
+        .badge.status-inactive {
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .badge.status-blocked {
+            background: rgba(248, 81, 73, 0.18);
+            color: #ff938d;
+        }
+
+        .badge-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .game-type-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-size: 0.9rem;
+        }
+
+        .feature-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-size: 0.9rem;
+        }
+
+        .notice {
+            margin-top: 18px;
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.65);
+        }
+
+        .error-message {
+            margin-top: 14px;
+            color: #ff938d;
+            font-weight: 600;
+        }
+
+        .global-stats {
+            margin-bottom: 28px;
+        }
+
+        .global-stats h2 {
+            margin: 0 0 18px 0;
+            font-size: 1.3rem;
+            letter-spacing: 0.02em;
+        }
+
+        .global-grid {
+            display: grid;
+            gap: 16px;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            margin-bottom: 18px;
+        }
+
+        .global-card {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 10px;
+            padding: 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .global-card h3 {
+            margin: 0;
+            font-size: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .metric-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+        }
+
+        .metric-sub {
+            font-size: 0.92rem;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .feature-metrics {
+            list-style: none;
+            margin: 4px 0 0 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .feature-metrics li {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.95rem;
+        }
+
+        .feature-metrics span.value {
+            font-weight: 600;
+            color: #58a6ff;
+        }
+
+        .sparkline-card {
+            width: 100%;
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+
+        #sparklineContainer {
+            display: flex;
+            align-items: flex-end;
+            gap: 4px;
+            height: 80px;
+            margin-top: 12px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        #sparklineContainer .bar {
+            flex: 1 1 auto;
+            min-width: 3px;
+            border-radius: 3px 3px 0 0;
+            background: linear-gradient(180deg, rgba(88, 166, 255, 0.85) 0%, rgba(88, 166, 255, 0.35) 100%);
+            position: relative;
+        }
+
+        #sparklineContainer .bar:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translate(-50%, -6px);
+            background: rgba(0, 0, 0, 0.85);
+            color: #f5f5f5;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            white-space: nowrap;
+            pointer-events: none;
+        }
+
+        .sparkline-empty {
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 900px) {
+            table {
+                font-size: 0.9rem;
+            }
+
+            th,
+            td {
+                padding: 10px;
+            }
+        }
+    </style>
+    <script defer src="/js/admin-stats.js"></script>
+</head>
+
+<body>
+    <div class="page">
+        <h1>Stream Statistics</h1>
+        <p>Authenticate with the admin password to review API key usage, connection metrics, and manage access.</p>
+
+        <div id="loginCard" class="card">
+            <label for="adminPassword">Admin Password</label>
+            <input type="password" id="adminPassword" autocomplete="current-password" placeholder="Enter password" />
+            <div class="login-actions">
+                <button id="loginBtn">View Statistics</button>
+                <button class="secondary" id="clearPasswordBtn">Clear</button>
+            </div>
+            <div id="loginError" class="error-message hidden"></div>
+        </div>
+
+        <div id="statsPanel" class="card hidden">
+            <div class="stats-controls">
+                <div class="control">
+                    <label for="searchInput">Search (API key or stream URL)</label>
+                    <div class="search-input-wrapper">
+                        <input type="text" id="searchInput" placeholder="Start typing to filter results" />
+                        <button id="clearSearchBtn" class="clear-search-btn hidden" type="button" aria-label="Clear search">✕</button>
+                    </div>
+                </div>
+                <div class="control button-row">
+                    <button id="refreshBtn">Refresh</button>
+                    <button class="secondary" id="signOutBtn">Sign Out</button>
+                </div>
+            </div>
+
+            <div id="globalStats" class="global-stats hidden">
+                <h2>Global Overview</h2>
+                <div class="global-grid">
+                    <div class="global-card">
+                        <h3>Sessions</h3>
+                        <div class="metric-value" id="totalSessionsValue">0</div>
+                        <div class="metric-sub">Average length: <span id="averageDurationValue">0m 0s</span></div>
+                        <div class="metric-sub">Longest session: <span id="longestDurationValue">0m 0s</span></div>
+                        <div class="metric-sub">Peak concurrent: <span id="peakConcurrentValue">0</span></div>
+                    </div>
+
+                    <div class="global-card">
+                        <h3>Feature Adoption</h3>
+                        <ul class="feature-metrics">
+                            <li><span>Score Display</span><span class="value" id="featureScoreValue">0%</span></li>
+                            <li><span>Ball Tracker</span><span class="value" id="featureBallValue">0%</span></li>
+                            <li><span>Shot Clock</span><span class="value" id="featureShotValue">0%</span></li>
+                            <li><span>Breaking Player</span><span class="value" id="featureBreakingPlayerValue">0%</span></li>
+                            <li><span>Ball Type</span><span class="value" id="featureBallSetValue">—</span></li>
+                        </ul>
+                    </div>
+
+                    <div class="global-card">
+                        <h3>Top API Keys</h3>
+                        <div class="metric-sub top-key-row">
+                            <span>Most sessions:</span>
+                            <span class="top-key-actions">
+                                <span id="topSessionsKey" class="code-pill">—</span>
+                                <button id="copyTopSessions" class="icon-button" type="button" title="Copy API key" aria-label="Copy API key">📋</button>
+                            </span>
+                        </div>
+                        <div class="metric-sub" id="topSessionsValue">0</div>
+                        <div class="metric-sub top-key-row">
+                            <span>Longest total time:</span>
+                            <span class="top-key-actions">
+                                <span id="topDurationKey" class="code-pill">—</span>
+                                <button id="copyTopDuration" class="icon-button" type="button" title="Copy API key" aria-label="Copy API key">📋</button>
+                            </span>
+                        </div>
+                        <div class="metric-sub" id="topDurationValue">0m 0s</div>
+                    </div>
+                </div>
+
+                <div class="global-card sparkline-card">
+                    <h3>Activity (Last 24 Hours)</h3>
+                    <div id="sparklineContainer" class="sparkline-empty">No activity yet.</div>
+                    <div class="metric-sub" id="sparklineCaption"></div>
+                </div>
+            </div>
+
+            <div class="notice" style="display:flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <div id="statsSummary">Showing 0 API keys.</div>
+                <div class="status-filter-bar" id="statusFilterBar">
+                    <button class="status-filter-button active" data-filter="all">All</button>
+                    <button class="status-filter-button" data-filter="live">Live</button>
+                    <button class="status-filter-button" data-filter="inactive">Inactive</button>
+                    <button class="status-filter-button" data-filter="blocked">Blocked</button>
+                </div>
+            </div>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>API Key</th>
+                            <th>Connections</th>
+                            <th>Durations</th>
+                            <th>Game Types</th>
+                            <th>Feature Usage</th>
+                            <th>Latest Stream</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="statsBody">
+                        <tr>
+                            <td colspan="7" style="text-align: center; padding: 32px; color: rgba(255, 255, 255, 0.6);">
+                                No statistics loaded yet.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
+

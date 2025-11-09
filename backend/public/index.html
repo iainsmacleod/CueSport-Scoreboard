@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CueSport Live Games</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header-logo {
+            height: 50px;
+            vertical-align: middle;
+            margin-right: 10px;
+        }
+        
+        .subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .status {
+            text-align: center;
+            color: white;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+        }
+        
+        .controls {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .search-box {
+            flex: 1;
+            min-width: 250px;
+            max-width: 400px;
+        }
+        
+        .search-box input {
+            width: 100%;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            background: white;
+            color: #333;
+        }
+        
+        .search-box input::placeholder {
+            color: #999;
+        }
+        
+        .search-box input:focus {
+            outline: 2px solid rgba(255, 255, 255, 0.5);
+            outline-offset: 2px;
+        }
+        
+        .filter-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .filter-btn {
+            padding: 8px 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .filter-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+        
+        .filter-btn.active {
+            background: white;
+            color: #667eea;
+            border-color: white;
+        }
+        
+        .filter-label {
+            color: white;
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-right: 5px;
+        }
+        
+        .games-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .game-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .game-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        }
+        
+        .game-card.clickable {
+            cursor: pointer;
+        }
+        
+        .game-card.clickable:hover {
+            box-shadow: 0 6px 12px rgba(102, 126, 234, 0.4);
+            border: 2px solid rgba(102, 126, 234, 0.3);
+        }
+        
+        .game-header {
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        
+        .game-title {
+            margin: 0 0 10px 0;
+            color: #333;
+            font-size: 1.2rem;
+            font-weight: 600;
+            word-wrap: break-word;
+            width: 100%;
+        }
+        
+        .game-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .game-type {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            display: inline-block;
+        }
+        
+        .watch-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-block;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .watch-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 8px rgba(102, 126, 234, 0.4);
+        }
+        
+        .players {
+            margin: 15px 0;
+        }
+        
+        .player {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            margin: 8px 0;
+            background: #f8f9fa;
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .player-content {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+        }
+        
+        .player.casual-message {
+            justify-content: center;
+            text-align: center;
+            color: #667eea;
+        }
+
+        .player.casual-message .player-name {
+            width: 100%;
+        }
+
+        .player.no-score {
+            justify-content: center;
+            text-align: center;
+        }
+
+        .player.no-score .player-name {
+            width: 100%;
+        }
+
+        .player .player-progress {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+            background: rgba(99, 164, 255, 0.15);
+        }
+
+        .player .player-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, rgba(99, 164, 255, 0.35), rgba(131, 88, 255, 0.45));
+            transition: width 0.3s ease;
+        }
+
+        .player .player-progress-fill-p2 {
+            background: linear-gradient(90deg, rgba(255, 142, 83, 0.35), rgba(255, 106, 136, 0.45));
+        }
+
+        .player.winner {
+            background: linear-gradient(135deg, #fff6d6, #ffe599);
+            box-shadow: 0 6px 14px rgba(255, 193, 7, 0.35);
+        }
+
+        .player.winner .player-name,
+        .player.winner .player-score {
+            color: #b7791f;
+            font-weight: 700;
+        }
+
+        .winner-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 8px;
+            border-radius: 999px;
+            background: rgba(255, 193, 7, 0.25);
+            color: #b7791f;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-left: 8px;
+        }
+        
+        .player-name {
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+        
+        .player-score {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .scoreboard-disabled {
+            margin-top: 12px;
+            padding: 10px 14px;
+            border-radius: 8px;
+            background: #eef0ff;
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            color: #4a56b8;
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .feature-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 12px 0 0 0;
+        }
+
+        .feature-badge {
+            background: rgba(255, 255, 255, 0.25);
+            color: #243b73;
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            border-radius: 999px;
+            padding: 4px 12px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(4px);
+        }
+
+        .feature-badge::before {
+            content: '•';
+            color: #ffce3d;
+            margin-right: 6px;
+        }
+
+        .race-progress {
+            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .progress-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .progress-label {
+            min-width: 70px;
+            font-weight: 600;
+            font-size: 0.8rem;
+            color: #4a4a6a;
+        }
+
+        .progress-bar {
+            flex: 1;
+            height: 8px;
+            background: #e4e7ff;
+            border-radius: 999px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: inherit;
+            transition: width 0.3s ease;
+        }
+
+        .progress-fill-p1 {
+            background: linear-gradient(90deg, #63a4ff, #8358ff);
+        }
+
+        .progress-fill-p2 {
+            background: linear-gradient(90deg, #ff8e53, #ff6a88);
+        }
+
+        .progress-score {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #4a4a6a;
+            min-width: 50px;
+            text-align: right;
+        }
+
+        .hot-match-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 6px;
+            font-size: 1rem;
+            filter: drop-shadow(0 0 4px rgba(255, 102, 0, 0.6));
+        }
+        
+        .game-info {
+            margin-top: auto;
+            padding-top: 15px;
+            border-top: 1px solid #f0f0f0;
+        }
+        
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 6px 0;
+            font-size: 0.9rem;
+            color: #666;
+        }
+        
+        .info-label {
+            font-weight: 600;
+        }
+        
+        .no-games {
+            text-align: center;
+            color: white;
+            padding: 60px 20px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 12px;
+            margin-top: 20px;
+        }
+        
+        .no-games h2 {
+            margin-bottom: 10px;
+        }
+        
+        .no-games .layout-image {
+            max-width: 100%;
+            width: 100%;
+            max-width: 800px;
+            height: auto;
+            border-radius: 8px;
+            margin: 30px auto;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            display: block;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .no-games .layout-image-link {
+            display: inline-block;
+            text-decoration: none;
+        }
+        
+        .no-games .layout-image-link:hover .layout-image {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+        }
+        
+        .loading {
+            text-align: center;
+            color: white;
+            padding: 40px;
+            font-size: 1.2rem;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .loading {
+            animation: pulse 2s infinite;
+        }
+
+        .page-footer {
+            margin-top: 50px;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.85rem;
+        }
+
+        .page-footer span {
+            font-weight: 600;
+        }
+        
+        .promo-section {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 30px;
+            color: white;
+            text-align: center;
+        }
+        
+        .promo-section h2 {
+            margin-bottom: 15px;
+            font-size: 1.5rem;
+        }
+        
+        .promo-section p {
+            margin-bottom: 20px;
+            font-size: 1rem;
+            line-height: 1.6;
+            opacity: 0.95;
+        }
+        
+        .promo-links {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .promo-link {
+            display: inline-block;
+            padding: 12px 24px;
+            background: white;
+            color: #667eea;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .promo-link:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 255, 255, 0.3);
+        }
+        
+        .promo-link.support {
+            background: linear-gradient(135deg, #ff5e62 0%, #ff8a80 100%);
+            color: white;
+        }
+        
+        .promo-link.support:hover {
+            box-shadow: 0 4px 12px rgba(255, 94, 98, 0.4);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><img src="/images/8-ball.png" alt="8-Ball" class="header-logo"> CueSport Live Games</h1>
+            <p class="subtitle">Watch live billiards games being streamed</p>
+        </header>
+        
+        <div class="promo-section">
+            <h2>Powered by CueSport Scoreboard</h2>
+            <p>
+                These live games are powered by the <strong>CueSport Scoreboard</strong> OBS overlay. 
+                A comprehensive scoreboard solution for pool, billiards, darts, and board games with 
+                features like replay buffer integration, shot clock, player tracking, and more.
+            </p>
+            <div class="promo-links">
+                <a href="https://obsproject.com/forum/resources/cuesport-scoreboard-pool-8-ball-9-ball-darts-board-games.2082/" 
+                   target="_blank" 
+                   rel="noopener noreferrer" 
+                   class="promo-link">
+                    📥 Get CueSport Scoreboard
+                </a>
+                <a href="https://ko-fi.com/iainsmacleod" 
+                   target="_blank" 
+                   rel="noopener noreferrer" 
+                   class="promo-link support">
+                    ☕ Support the Developer
+                </a>
+            </div>
+        </div>
+        
+        <div class="status" id="status">Loading games...</div>
+        
+        <div class="controls" id="controls" style="display: none;">
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="Search games..." />
+            </div>
+            <div class="filter-buttons">
+                <span class="filter-label">Filter:</span>
+                <button class="filter-btn active" data-filter="all">All</button>
+                <button class="filter-btn" data-filter="game1">8-Ball</button>
+                <button class="filter-btn" data-filter="game2">9-Ball</button>
+                <button class="filter-btn" data-filter="game3">10-Ball</button>
+                <button class="filter-btn" data-filter="game4">Straight</button>
+                <button class="filter-btn" data-filter="game5">Bank</button>
+                <button class="filter-btn" data-filter="game6">One Pocket</button>
+                <button class="filter-btn" data-filter="game7">Custom</button>
+            </div>
+        </div>
+        
+        <div id="games-container">
+            <div class="loading">Loading games...</div>
+        </div>
+
+        <footer class="page-footer">
+            <p>CueSport Live Games · <span id="appVersion">v0.0.0</span></p>
+        </footer>
+    </div>
+    
+    <script>
+        const APP_VERSION = '2025.11.04';
+        const gameTypeMap = {
+            'game1': '8-Ball',
+            'game2': '9-Ball',
+            'game3': '10-Ball',
+            'game4': 'Straight',
+            'game5': 'Bank',
+            'game6': 'One Pocket',
+            'game7': 'Custom'
+        };
+        
+        let allGames = [];
+        let currentFilter = 'all';
+        let currentSearch = '';
+        
+        function createGameCard(game) {
+            const card = document.createElement('div');
+            const hasStreamUrl = game.streamUrl && game.streamUrl.trim() !== '';
+            
+            card.className = hasStreamUrl ? 'game-card clickable' : 'game-card';
+            card.dataset.gameType = game.gameType;
+            card.dataset.gameInfo = (game.gameInfo || '').toLowerCase();
+            card.dataset.player1Name = (game.player1Name || '').toLowerCase();
+            card.dataset.player2Name = (game.player2Name || '').toLowerCase();
+            
+            const gameType = gameTypeMap[game.gameType] || game.gameType;
+            const gameTitle = game.gameInfo || 'Live Game';
+            const rawPlayer1Name = (game.player1Name || '').trim();
+            const rawPlayer2Name = (game.player2Name || '').trim();
+            const displayNameP1 = rawPlayer1Name.length > 0 ? rawPlayer1Name : 'Player 1';
+            const displayNameP2 = rawPlayer2Name.length > 0 ? rawPlayer2Name : 'Player 2';
+            const player1EnabledFlag = game.player1Enabled;
+            const player2EnabledFlag = game.player2Enabled;
+            const player1Active = player1EnabledFlag !== undefined ? Boolean(player1EnabledFlag) : rawPlayer1Name.length > 0;
+            const player2Active = player2EnabledFlag !== undefined ? Boolean(player2EnabledFlag) : rawPlayer2Name.length > 0;
+            const bothPlayersDisabled = !player1Active && !player2Active;
+            const anyPlayerDisabled = !player1Active || !player2Active;
+            const scoreDisplayFlag = game.scoreDisplay;
+            const showScores = scoreDisplayFlag !== undefined ? Boolean(scoreDisplayFlag) : true;
+            const ballTrackerEnabled = Boolean(game.ballTrackerEnabled);
+            const shotClockEnabled = Boolean(game.shotClockEnabled);
+            const p1Score = typeof game.p1Score === 'number' ? game.p1Score : parseInt(game.p1Score, 10) || 0;
+            const p2Score = typeof game.p2Score === 'number' ? game.p2Score : parseInt(game.p2Score, 10) || 0;
+
+            const raceInfoString = typeof game.raceInfo === 'string' ? game.raceInfo : '';
+            const trimmedRaceInfo = raceInfoString.trim();
+            let targetNumber = null;
+            if (trimmedRaceInfo) {
+                const matches = trimmedRaceInfo.match(/\d+/g);
+                if (matches && matches.length > 0) {
+                    targetNumber = parseInt(matches[matches.length - 1], 10);
+                    if (isNaN(targetNumber) || targetNumber <= 0) {
+                        targetNumber = null;
+                    }
+                }
+            }
+
+            const showRaceInfo = showScores && !anyPlayerDisabled && trimmedRaceInfo.length > 0;
+            const showRaceProgress = showRaceInfo && targetNumber;
+            const clampedTarget = showRaceProgress ? targetNumber : null;
+            const p1Percent = clampedTarget ? Math.min(p1Score, clampedTarget) / clampedTarget * 100 : 0;
+            const p2Percent = clampedTarget ? Math.min(p2Score, clampedTarget) / clampedTarget * 100 : 0;
+            const hillHill = showRaceProgress && clampedTarget > 1 && p1Score === clampedTarget - 1 && p2Score === clampedTarget - 1;
+            const hotMatchBadge = hillHill ? ' <span class="hot-match-badge" title="Hill-hill game">🔥</span>' : '';
+            const p1Winner = showRaceProgress && p1Score >= clampedTarget;
+            const p2Winner = showRaceProgress && p2Score >= clampedTarget;
+
+            const buildPlayerRow = (displayName, score, active, percent, isWinner, isPlayerOne) => {
+                if (!active) {
+                    return '';
+                }
+
+                const progressFillClass = isPlayerOne ? 'player-progress-fill' : 'player-progress-fill player-progress-fill-p2';
+                const progressFill = showRaceProgress ? `<div class="player-progress"><div class="${progressFillClass}" style="width: ${Math.min(Math.max(percent, 0), 100)}%"></div></div>` : '';
+                const winnerBadge = isWinner ? '<span class="winner-badge">Winner</span>' : '';
+                const scoreMarkup = showScores ? `<span class="player-score">${score}</span>` : '';
+                const rowClasses = `player${showScores ? '' : ' no-score'}${isWinner ? ' winner' : ''}`;
+                return `
+                    <div class="${rowClasses}">
+                        ${progressFill}
+                        <div class="player-content">
+                            <span class="player-name">${displayName}${winnerBadge}</span>
+                            ${scoreMarkup}
+                        </div>
+                    </div>
+                `;
+            };
+
+            let playerRows = '';
+            playerRows += buildPlayerRow(displayNameP1, p1Score, player1Active, p1Percent, p1Winner, true);
+            playerRows += buildPlayerRow(displayNameP2, p2Score, player2Active, p2Percent, p2Winner, false);
+
+            if (bothPlayersDisabled) {
+                playerRows = `
+                    <div class="player casual-message">
+                        <span class="player-name">Casual game in progress</span>
+                    </div>
+                `;
+            }
+
+            const playersSection = `
+                <div class="players">
+                    ${playerRows}
+                </div>
+            `;
+
+            let noticeText = '';
+            if (!showScores && anyPlayerDisabled) {
+                noticeText = 'Scoreboard updates are disabled—scores won’t update.';
+            } else if (!showScores) {
+                noticeText = 'Score display is disabled—scores won’t update.';
+            } else if (anyPlayerDisabled) {
+                noticeText = 'Players have scoreboard disabled—scores won’t update.';
+            }
+
+            const scoreboardNotice = noticeText ? `
+                <div class="scoreboard-disabled">
+                    ${noticeText}
+                </div>
+            ` : '';
+
+            const features = [];
+            if (ballTrackerEnabled) {
+                features.push('Ball Tracker');
+            }
+            if (shotClockEnabled) {
+                features.push('Shot Clock');
+            }
+
+            const featureBadges = features.length > 0 ? `
+                <div class="feature-badges">
+                    ${features.map(feature => `<span class="feature-badge">${feature}</span>`).join('')}
+                </div>
+            ` : '';
+
+            const showRaceInfoRow = showRaceInfo ? `<div class="info-row"><span class="info-label">Race:</span><span>${trimmedRaceInfo}</span></div>` : '';
+            
+            card.innerHTML = `
+                <div class="game-header">
+                    <h3 class="game-title">${gameTitle}${hotMatchBadge}</h3>
+                    <div class="game-meta">
+                        <span class="game-type">${gameType}</span>
+                        ${hasStreamUrl ? `<a href="${game.streamUrl}" target="_blank" rel="noopener noreferrer" class="watch-button" onclick="event.stopPropagation();">▶ Watch</a>` : ''}
+                    </div>
+                </div>
+                
+                ${playersSection}
+                ${scoreboardNotice}
+                
+                <div class="game-info">
+                    ${featureBadges}
+                    ${showRaceInfoRow}
+                </div>
+            `;
+            
+            // Make entire card clickable if it has a stream URL
+            if (hasStreamUrl) {
+                card.onclick = (e) => {
+                    // Don't trigger if clicking the watch button
+                    if (!e.target.closest('.watch-button')) {
+                        window.open(game.streamUrl, '_blank', 'noopener,noreferrer');
+                    }
+                };
+            }
+            
+            return card;
+        }
+        
+        function filterAndSearchGames() {
+            const container = document.getElementById('games-container');
+            const grid = container.querySelector('.games-grid');
+            
+            if (!grid) return;
+            
+            const cards = Array.from(grid.querySelectorAll('.game-card'));
+            let visibleCount = 0;
+            
+            cards.forEach(card => {
+                const gameType = card.dataset.gameType;
+                const gameInfo = card.dataset.gameInfo;
+                const player1Name = card.dataset.player1Name;
+                const player2Name = card.dataset.player2Name;
+                
+                // Apply filter
+                const matchesFilter = currentFilter === 'all' || gameType === currentFilter;
+                
+                // Apply search
+                const matchesSearch = !currentSearch || 
+                    gameInfo.includes(currentSearch.toLowerCase()) ||
+                    player1Name.includes(currentSearch.toLowerCase()) ||
+                    player2Name.includes(currentSearch.toLowerCase());
+                
+                if (matchesFilter && matchesSearch) {
+                    card.style.display = '';
+                    visibleCount++;
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+            
+            // Update status
+            const statusEl = document.getElementById('status');
+            if (visibleCount === 0) {
+                statusEl.textContent = 'No games match your filters';
+            } else {
+                statusEl.textContent = `${visibleCount} ${visibleCount === 1 ? 'game' : 'games'} ${currentFilter !== 'all' || currentSearch ? 'matching filters' : 'live'}`;
+            }
+        }
+        
+        async function loadGames() {
+            try {
+                const response = await fetch('/api/streams');
+                const data = await response.json();
+                
+                const statusEl = document.getElementById('status');
+                const container = document.getElementById('games-container');
+                const controls = document.getElementById('controls');
+                
+                if (!data.success) {
+                    statusEl.textContent = 'Error loading games';
+                    container.innerHTML = '<div class="no-games"><h2>Error</h2><p>Failed to load games. Please try again later.</p><a href="https://obsproject.com/forum/resources/cuesport-scoreboard-pool-8-ball-9-ball-darts-board-games.2082/" target="_blank" rel="noopener noreferrer" class="layout-image-link"><img src="/images/layout.png" alt="CueSport Scoreboard Layout" class="layout-image" onerror="this.style.display=\'none\'"></a></div>';
+                    controls.style.display = 'none';
+                    return;
+                }
+                
+                allGames = data.streams || [];
+                
+                if (allGames.length === 0) {
+                    statusEl.textContent = 'No active games';
+                    container.innerHTML = `
+                        <div class="no-games">
+                            <h2>No Active Games</h2>
+                            <p>No games are currently being streamed. Check back soon!</p>
+                            <a href="https://obsproject.com/forum/resources/cuesport-scoreboard-pool-8-ball-9-ball-darts-board-games.2082/" target="_blank" rel="noopener noreferrer" class="layout-image-link"><img src="/images/layout.png" alt="CueSport Scoreboard Layout" class="layout-image" onerror="this.style.display='none'"></a>
+                        </div>
+                    `;
+                    controls.style.display = 'none';
+                } else {
+                    container.innerHTML = '';
+                    const grid = document.createElement('div');
+                    grid.className = 'games-grid';
+                    
+                    allGames.forEach(game => {
+                        grid.appendChild(createGameCard(game));
+                    });
+                    
+                    container.appendChild(grid);
+                    controls.style.display = 'flex';
+                    
+                    // Apply current filters
+                    filterAndSearchGames();
+                }
+            } catch (error) {
+                console.error('Error loading games:', error);
+                const statusEl = document.getElementById('status');
+                const container = document.getElementById('games-container');
+                const controls = document.getElementById('controls');
+                statusEl.textContent = 'Error loading games';
+                container.innerHTML = '<div class="no-games"><h2>Error</h2><p>Failed to connect to server. Please try again later.</p><a href="https://obsproject.com/forum/resources/cuesport-scoreboard-pool-8-ball-9-ball-darts-board-games.2082/" target="_blank" rel="noopener noreferrer" class="layout-image-link"><img src="/images/layout.png" alt="CueSport Scoreboard Layout" class="layout-image" onerror="this.style.display=\'none\'"></a></div>';
+                controls.style.display = 'none';
+            }
+        }
+        
+        // Filter button handlers
+        document.addEventListener('DOMContentLoaded', function() {
+            const filterButtons = document.querySelectorAll('.filter-btn');
+            filterButtons.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    // Update active state
+                    filterButtons.forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // Update filter
+                    currentFilter = this.dataset.filter;
+                    filterAndSearchGames();
+                });
+            });
+            
+            // Search input handler
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput) {
+                searchInput.addEventListener('input', function() {
+                    currentSearch = this.value.trim();
+                    filterAndSearchGames();
+                });
+            }
+
+            const versionEl = document.getElementById('appVersion');
+            if (versionEl) {
+                versionEl.textContent = `v${APP_VERSION}`;
+            }
+        });
+        
+        // Load games on page load
+        loadGames();
+        
+        // Refresh every 10 seconds
+        setInterval(loadGames, 10000);
+    </script>
+</body>
+</html>
