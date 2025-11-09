@@ -794,12 +794,10 @@ function clearGame() {
     setStorageItem("p2NameCtrlPanel", "");
     setStorageItem("raceInfo", "");
     setStorageItem("gameInfo", "");
-    resetBallTracker();
-    resetBallSet();
+    resetScores();
     postNames();
     pushScores();
     postInfo();
-    // Note: postNames, pushScores, and postInfo already send updates
 }
 
 function postNames() {
