@@ -96,17 +96,18 @@ function getClientIP(req) {
     return 'unknown';
 }
 
-function getAdminPasswordFromRequest(req) {
-    // Security: Only accept password from headers or body, NOT query strings
-    // Query strings are logged in access logs and are insecure
-    if (req.headers['x-admin-password']) {
-        return req.headers['x-admin-password'];
-    }
-    if (req.body && typeof req.body.password === 'string') {
-        return req.body.password;
-    }
-    // REMOVED: Query string option for security reasons
-    return null;
+// Helper function to check if an IP is a private/localhost IP
+function isPrivateIP(ip) {
+    if (!ip || ip === 'unknown') return false;
+    // Check for localhost/private IPs
+    return ip.startsWith('127.') || 
+           ip.startsWith('192.168.') || 
+           ip.startsWith('10.') || 
+           (ip.startsWith('172.') && parseInt(ip.split('.')[1]) >= 16 && parseInt(ip.split('.')[1]) <= 31) ||
+           ip === '::1' ||
+           ip.startsWith('::ffff:127.') ||
+           ip.startsWith('::ffff:192.168.') ||
+           ip.startsWith('::ffff:10.');
 }
 
 // Helper function to check IP whitelist (used by both login and requireAdminAuth)
@@ -216,33 +217,6 @@ async function requireAdminAuth(req, res, next) {
     // Allow IP mismatch if both are private/localhost IPs (behind proxy scenarios)
     const tokenIP = verification.decoded.ip;
     const isIPMismatch = tokenIP !== clientIP;
-    const isPrivateIP = (ip) => {
-        if (!ip || ip === 'unknown') return false;
-        // Check for localhost/private IPs
-        return ip.startsWith('127.') || 
-               ip.startsWith('192.168.') || 
-               ip.startsWith('10.') || 
-               ip.startsWith('172.16.') || 
-               ip.startsWith('172.17.') ||
-               ip.startsWith('172.18.') ||
-               ip.startsWith('172.19.') ||
-               ip.startsWith('172.20.') ||
-               ip.startsWith('172.21.') ||
-               ip.startsWith('172.22.') ||
-               ip.startsWith('172.23.') ||
-               ip.startsWith('172.24.') ||
-               ip.startsWith('172.25.') ||
-               ip.startsWith('172.26.') ||
-               ip.startsWith('172.27.') ||
-               ip.startsWith('172.28.') ||
-               ip.startsWith('172.29.') ||
-               ip.startsWith('172.30.') ||
-               ip.startsWith('172.31.') ||
-               ip === '::1' ||
-               ip.startsWith('::ffff:127.') ||
-               ip.startsWith('::ffff:192.168.') ||
-               ip.startsWith('::ffff:10.');
-    };
     
     // Only enforce IP check if not both private IPs (more lenient for proxy scenarios)
     if (isIPMismatch && !(isPrivateIP(tokenIP) && isPrivateIP(clientIP))) {

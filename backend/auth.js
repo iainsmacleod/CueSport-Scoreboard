@@ -101,6 +101,9 @@ function refreshAccessToken(refreshToken, clientIP) {
     // Verify IP matches (prevent token theft)
     // Allow IP mismatch if both are private/localhost IPs (behind proxy scenarios)
     const tokenIP = verification.decoded.ip;
+    
+    // Import isPrivateIP from server.js (or define locally if needed)
+    // For now, using inline check to avoid circular dependency
     const isPrivateIP = (ip) => {
         if (!ip || ip === 'unknown') return false;
         return ip.startsWith('127.') || 
