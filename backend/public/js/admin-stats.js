@@ -1,6 +1,8 @@
 (function () {
     const state = {
-        password: null,
+        accessToken: null,
+        refreshToken: null,
+        tokenExpiry: null,
         stats: [],
         global: null,
         searchTerm: '',
@@ -354,7 +356,7 @@
     function startAutoRefresh() {
         stopAutoRefresh();
         refreshIntervalId = setInterval(() => {
-            if (state.password) {
+            if (state.accessToken) {
                 fetchStats();
             }
         }, 60000);
@@ -399,30 +401,107 @@
         }
     }
 
+    // Token refresh helper
+    async function refreshTokenIfNeeded(refreshToken) {
+        if (!refreshToken) return false;
+        
+        try {
+            const response = await fetch('/api/admin/refresh', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ refreshToken })
+            });
+
+            if (!response.ok) {
+                return false;
+            }
+
+            const data = await response.json();
+            state.accessToken = data.accessToken;
+            state.tokenExpiry = Date.now() + (data.expiresIn * 1000);
+            // Update sessionStorage
+            if (state.refreshToken) {
+                sessionStorage.setItem('adminRefreshToken', state.refreshToken);
+            }
+            return true;
+        } catch (error) {
+            return false;
+        }
+    }
+
     async function fetchStats() {
+        // Don't fetch stats if not authenticated
+        if (!state.accessToken) {
+            // Try to refresh token from sessionStorage
+            const refreshToken = sessionStorage.getItem('adminRefreshToken');
+            if (refreshToken && await refreshTokenIfNeeded(refreshToken)) {
+                state.refreshToken = refreshToken;
+                // Token refreshed, continue
+            } else {
+                togglePanels(false);
+                return;
+            }
+        }
+        
+        // Check if token expired
+        if (state.tokenExpiry && Date.now() >= state.tokenExpiry) {
+            const refreshed = await refreshTokenIfNeeded(state.refreshToken);
+            if (!refreshed) {
+                togglePanels(false);
+                handleSignOut();
+                return;
+            }
+        }
+
         const params = state.searchTerm ? `?search=${encodeURIComponent(state.searchTerm)}` : '';
 
         setRefreshing(true);
 
         try {
+            if (!state.accessToken) {
+                console.error('No access token available');
+                togglePanels(false);
+                return;
+            }
+
+            console.log('Fetching stats with token:', state.accessToken.substring(0, 20) + '...');
             const response = await fetch(`/api/admin/stats${params}`, {
                 headers: {
-                    'x-admin-password': state.password
+                    'Authorization': `Bearer ${state.accessToken}`
                 }
             });
 
             if (response.status === 401) {
-                state.password = null;
-                state.global = null;
+                const errorData = await response.json().catch(() => ({}));
+                console.error('401 Unauthorized:', errorData);
+                // Token expired, try refresh
+                const refreshed = await refreshTokenIfNeeded(state.refreshToken);
+                if (refreshed) {
+                    console.log('Token refreshed, retrying fetchStats');
+                    return fetchStats(); // Retry with new token
+                }
+                // Refresh failed, logout
+                console.error('Token refresh failed');
+                handleSignOut();
+                showLoginError(errorData.error || 'Session expired. Please log in again.');
+                return;
+            }
+
+            if (response.status === 403) {
+                const errorData = await response.json().catch(() => ({}));
+                handleSignOut();
                 togglePanels(false);
-                showLoginError('Unauthorized. Please re-enter the admin password.');
+                showLoginError(errorData.error || 'Access denied: Your IP address is not whitelisted.');
                 stopAutoRefresh();
                 renderGlobalStats();
                 return;
             }
 
             if (!response.ok) {
-                throw new Error('Failed to retrieve statistics');
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || 'Failed to retrieve statistics');
             }
 
             const payload = await response.json();
@@ -430,8 +509,13 @@
             state.global = payload.global || null;
             renderGlobalStats();
             renderStats();
+            setRefreshing(false);
         } catch (error) {
             console.error(error);
+            // If we get an error and token is cleared (auth failed), hide panel
+            if (!state.accessToken) {
+                togglePanels(false);
+            }
             selectors.statsSummary.textContent = 'Unable to load statistics. Please try again.';
             state.global = null;
             renderGlobalStats();
@@ -593,18 +677,59 @@ function renderStats() {
             return;
         }
 
-        state.password = password;
         clearLoginError();
-        togglePanels(true);
-        selectors.searchInput.focus();
-        await fetchStats();
-        if (state.password) {
+        
+        try {
+            const response = await fetch('/api/admin/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ password })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                console.error('Login failed:', response.status, errorData);
+                showLoginError(errorData.error || 'Authentication failed.');
+                return;
+            }
+
+            const data = await response.json();
+            console.log('Login successful, tokens received');
+            state.accessToken = data.accessToken;
+            state.refreshToken = data.refreshToken;
+            state.tokenExpiry = Date.now() + (data.expiresIn * 1000);
+            
+            // Store refresh token in sessionStorage (not localStorage for security)
+            sessionStorage.setItem('adminRefreshToken', data.refreshToken);
+            
+            togglePanels(true);
+            selectors.searchInput.focus();
+            await fetchStats();
             startAutoRefresh();
+        } catch (error) {
+            showLoginError('Failed to authenticate. Please try again.');
+            togglePanels(false);
         }
     }
 
     function handleSignOut() {
-        state.password = null;
+        // Revoke token on server
+        if (state.accessToken) {
+            fetch('/api/admin/logout', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${state.accessToken}`
+                }
+            }).catch(() => {
+                // Ignore errors on logout
+            });
+        }
+        
+        state.accessToken = null;
+        state.refreshToken = null;
+        state.tokenExpiry = null;
         state.stats = [];
         state.global = null;
         state.searchTerm = '';
@@ -612,6 +737,7 @@ function renderStats() {
         setRefreshing(false);
         selectors.passwordInput.value = '';
         selectors.searchInput.value = '';
+        sessionStorage.removeItem('adminRefreshToken');
         stopAutoRefresh();
         togglePanels(false);
         renderGlobalStats();
@@ -667,18 +793,36 @@ function renderStats() {
     }
 
     async function postAdminAction(endpoint, body) {
+        if (!state.accessToken) {
+            throw new Error('Not authenticated');
+        }
+
+        // Check if token expired and refresh if needed
+        if (state.tokenExpiry && Date.now() >= state.tokenExpiry) {
+            const refreshed = await refreshTokenIfNeeded(state.refreshToken);
+            if (!refreshed) {
+                handleSignOut();
+                throw new Error('Session expired');
+            }
+        }
+
         const response = await fetch(endpoint, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'x-admin-password': state.password
+                'Authorization': `Bearer ${state.accessToken}`
             },
             body: JSON.stringify(body)
         });
 
         if (response.status === 401) {
-            state.password = null;
-            state.global = null;
+            // Token expired, try refresh
+            const refreshed = await refreshTokenIfNeeded(state.refreshToken);
+            if (refreshed) {
+                // Retry with new token
+                return postAdminAction(endpoint, body);
+            }
+            handleSignOut();
             togglePanels(false);
             showLoginError('Session expired. Please re-authenticate.');
             renderGlobalStats();

@@ -22,7 +22,8 @@ yarn.lock
 backend/data/
 data/
 
-# Logs
+# Log files
+backend/logs/
 logs/
 *.log
 npm-debug.log*

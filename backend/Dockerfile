@@ -11,10 +11,12 @@ RUN npm install --omit=dev
 # Copy application files
 COPY server.js ./
 COPY db.js ./
+COPY logger.js ./
+COPY auth.js ./
 COPY public/ ./public/
 
-# Create data directory for SQLite database
-RUN mkdir -p /app/data
+# Create data and logs directories
+RUN mkdir -p /app/data /app/logs
 
 # Expose port
 EXPOSE 3000
