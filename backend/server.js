@@ -612,21 +612,23 @@ wss.on('connection', (ws, req) => {
                     isAuthenticated = true;
 
                     const existingConnection = activeConnections.get(apiKey);
+                    const existingConnectionId = existingConnection ? existingConnection.connectionId : null;
+                    
                     if (existingConnection && existingConnection.ws !== ws) {
+                        // There's an active WebSocket connection - close it
                         try {
                             existingConnection.ws.close(4002, 'Superseded by new connection');
                         } catch (closeError) {
                             logger.warn('FAILED_TO_CLOSE_CONNECTION', { error: closeError.message });
                         }
-
-                        try {
-                            dbOps.finalizeConnection(existingConnection.connectionId);
-                        } catch (finalizeError) {
-                            logger.warn('FAILED_TO_FINALIZE_CONNECTION', { error: finalizeError.message });
-                        }
+                        // Don't finalize - we'll reuse the session if it's active
                     }
 
+                    // Get or create connection ID (will reuse active session if exists)
                     const connectionId = dbOps.recordConnectionStart(apiKey);
+
+                    // Check if this is a reconnection (reusing existing session)
+                    const isReconnection = existingConnectionId && existingConnectionId === connectionId;
 
                     activeConnections.set(apiKey, {
                         ws,
@@ -645,12 +647,13 @@ wss.on('connection', (ws, req) => {
                     ws.send(JSON.stringify({
                         type: 'auth',
                         status: 'success',
-                        message: 'Authenticated'
+                        message: isReconnection ? 'Reconnected' : 'Authenticated'
                     }));
 
                     logger.info('WEBSOCKET_AUTHENTICATED', {
                         apiKey: apiKey.substring(0, 8) + '...',
-                        ip: clientIP
+                        ip: clientIP,
+                        isReconnection: isReconnection
                     });
                 } else {
                     ws.send(JSON.stringify({
@@ -769,25 +772,33 @@ wss.on('connection', (ws, req) => {
             const isCurrentConnection = connectionInfo && connectionInfo.ws === ws;
 
             if (isCurrentConnection) {
-                try {
-                    dbOps.finalizeConnection(connectionInfo.connectionId);
-                } catch (error) {
-                    logger.warn('FAILED_TO_FINALIZE_CONNECTION_CLOSE', { error: error.message });
-                }
-
+                // Don't immediately finalize - wait a bit in case of reconnection
+                // The new connection will reuse the session if it comes within grace period
                 activeConnections.delete(apiKey);
 
                 const closedWs = ws;
-                // Mark stream as inactive after a delay (in case of temporary disconnect)
+                const closedConnectionId = connectionInfo.connectionId;
+                
+                // Grace period: Wait before finalizing (in case of reconnection)
+                // If client reconnects within this time, the session will be reused
                 setTimeout(() => {
+                    // Check if session was reused (new connection came in)
                     const current = activeConnections.get(apiKey);
-                    if (!current || current.ws === closedWs) {
+                    if (!current) {
+                        // No new connection - finalize the session
+                        try {
+                            dbOps.finalizeConnection(closedConnectionId);
+                        } catch (error) {
+                            logger.warn('FAILED_TO_FINALIZE_CONNECTION_CLOSE', { error: error.message });
+                        }
+                        
                         dbOps.deactivateStream(apiKey);
                         logger.info('STREAM_DEACTIVATED', {
                             apiKey: apiKey.substring(0, 8) + '...'
                         });
                     }
-                }, 60000); // 1 minute grace period
+                    // If current exists, session was reused - don't finalize
+                }, 30000); // 30 second grace period for reconnection
             }
         }
         logger.info('WEBSOCKET_CLOSED', { ip: clientIP });
@@ -811,12 +822,21 @@ wss.on('connection', (ws, req) => {
         if (apiKey) {
             const connectionInfo = activeConnections.get(apiKey);
             if (connectionInfo && connectionInfo.ws === ws) {
-                try {
-                    dbOps.finalizeConnection(connectionInfo.connectionId);
-                } catch (finalizeError) {
-                    logger.warn('FAILED_TO_FINALIZE_CONNECTION_ERROR', { error: finalizeError.message });
-                }
+                // Use same grace period logic as close handler
                 activeConnections.delete(apiKey);
+                
+                const closedConnectionId = connectionInfo.connectionId;
+                
+                setTimeout(() => {
+                    const current = activeConnections.get(apiKey);
+                    if (!current) {
+                        try {
+                            dbOps.finalizeConnection(closedConnectionId);
+                        } catch (finalizeError) {
+                            logger.warn('FAILED_TO_FINALIZE_CONNECTION_ERROR', { error: finalizeError.message });
+                        }
+                    }
+                }, 30000); // 30 second grace period for reconnection
             }
         }
     });

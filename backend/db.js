@@ -246,9 +246,45 @@ const dbOps = {
         }
     },
 
+    // Find active session for API key (if exists)
+    findActiveSession(apiKey) {
+        const stmt = db.prepare(`
+            SELECT connection_id, connected_at
+            FROM connections
+            WHERE api_key = ?
+            AND disconnected_at IS NULL
+            ORDER BY connected_at DESC
+            LIMIT 1
+        `);
+        
+        return stmt.get(apiKey);
+    },
+
     recordConnectionStart(apiKey) {
         this.ensureApiKeyRecord(apiKey);
 
+        // Check if there's already an active session for this API key
+        const activeSession = this.findActiveSession(apiKey);
+        
+        if (activeSession) {
+            // Reuse existing active session (reconnection)
+            // Update last_update_at to show it's still active
+            const updateStmt = db.prepare(`
+                UPDATE connections
+                SET last_update_at = CURRENT_TIMESTAMP
+                WHERE connection_id = ?
+            `);
+            updateStmt.run(activeSession.connection_id);
+            
+            console.log('SESSION_REUSED', {
+                apiKey: apiKey.substring(0, 8) + '...',
+                connectionId: activeSession.connection_id
+            });
+            
+            return activeSession.connection_id;
+        }
+
+        // No active session found - create a new one
         const connectionId = `${apiKey}-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
 
         const stmt = db.prepare(`
@@ -260,6 +296,11 @@ const dbOps = {
         `);
 
         stmt.run(connectionId, apiKey, JSON.stringify({}));
+
+        console.log('SESSION_CREATED', {
+            apiKey: apiKey.substring(0, 8) + '...',
+            connectionId: connectionId
+        });
 
         return connectionId;
     },
