@@ -447,6 +447,12 @@ const handlers = {
             document.getElementById("scoreBallContainerP1").classList.add("noShow");
             document.getElementById("scoreBallContainerP2").classList.add("noShow");
         }
+    },
+
+    refresh(data) {
+        // Reload the browser source page when refresh is requested
+        console.log('Refresh requested, reloading browser_source page');
+        window.location.reload();
     }
 };
 
@@ -467,13 +473,50 @@ bc.onmessage = (event) => {
 //							autostart stuff
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+
 $(document).ready(function () {
-    // Initialize draggable elements
-    $("#scoreBoardDiv").draggable();
-    $("#gameInfo").draggable();
-    $("#logoSlideshowDiv").draggable();
-    $("#ballTracker").draggable();
-    $("#videoContainer").draggable();
+    // List of draggable element IDs
+    const draggableElements = [
+        "scoreBoardDiv",
+        "gameInfo", 
+        "logoSlideshowDiv",
+        "ballTracker",
+        "videoContainer"
+    ];
+
+    // Initialize draggable elements with position saving
+    draggableElements.forEach(elementId => {
+        const $element = $(`#${elementId}`);
+        
+        // Restore saved position on load
+        const savedPosition = getStorageItem(`elementPosition_${elementId}`);
+        if (savedPosition) {
+            try {
+                const position = JSON.parse(savedPosition);
+                $element.css({
+                    position: 'absolute',
+                    left: position.left + 'px',
+                    top: position.top + 'px'
+                });
+                console.log(`Restored position for ${elementId}:`, position);
+            } catch (e) {
+                console.warn(`Failed to restore position for ${elementId}:`, e);
+            }
+        }
+
+        // Initialize draggable with position saving
+        $element.draggable({
+            stop: function(event, ui) {
+                // Save position when dragging stops
+                const position = {
+                    left: ui.position.left,
+                    top: ui.position.top
+                };
+                setStorageItem(`elementPosition_${elementId}`, JSON.stringify(position));
+                console.log(`Saved position for ${elementId}:`, position);
+            }
+        });
+    });
 });
 
 // Setting defaults in storage so functions execute correctly, in the event values are not being retrieved from storage successfully due to initialization or similar

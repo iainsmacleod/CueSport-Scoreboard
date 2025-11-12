@@ -1602,6 +1602,8 @@ function clearAllData() {
     if (confirm('Are you sure you want to clear ALL locally stored data for CueSports Scoreboard, and reset to defaults?')) {
         removeAllData(INSTANCE_ID);
         location.reload(); // Reload the page to start fresh
+        // Send refresh message to browser_source before clearing data
+        bc.postMessage({ refresh: true });
     }
 }
 function removeAllData() {
@@ -1623,6 +1625,8 @@ function clearInstanceData() {
         const INSTANCE_ID = urlParams.get('instance') || '';
         removeInstanceData(INSTANCE_ID);
         location.reload(); // Reload the page to start fresh
+        // Send refresh message to browser_source before clearing data
+        bc.postMessage({ refresh: true });
     }
 }
 
