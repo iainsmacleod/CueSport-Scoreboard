@@ -9,6 +9,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const dns = require('dns').promises;
 const dbOps = require('./db');
+const db = require('./db').db; // Add this if db is exported
 const { logger, securityLogger } = require('./logger');
 const auth = require('./auth');
 
