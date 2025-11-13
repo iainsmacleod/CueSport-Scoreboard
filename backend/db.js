@@ -978,17 +978,29 @@ const dbOps = {
     // Get streamer statistics (most streams and longest stream)
     getStreamerStats() {
         try {
-            // Get streamer with most streams (by counting unique stream URLs)
-            const mostStreamsQuery = db.prepare(`
-                SELECT stream_url, COUNT(*) as stream_count
-                FROM streams
-                WHERE is_active = 1 AND stream_url != '' AND stream_url IS NOT NULL
-                GROUP BY stream_url
-                ORDER BY stream_count DESC
+            // Get API key with most sessions (matching admin backend logic)
+            const mostSessionsQuery = db.prepare(`
+                SELECT api_key, COUNT(*) AS total_connections
+                FROM connections
+                GROUP BY api_key
+                ORDER BY total_connections DESC, api_key ASC
                 LIMIT 1
             `).get();
 
-            // Get streamer with longest stream duration
+            // Get the latest stream URL for the API key with most sessions
+            let mostStreamsUrl = null;
+            if (mostSessionsQuery && mostSessionsQuery.api_key) {
+                const latestStreamQuery = db.prepare(`
+                    SELECT last_stream_url
+                    FROM connections
+                    WHERE api_key = ? AND last_stream_url != '' AND last_stream_url IS NOT NULL
+                    ORDER BY connected_at DESC
+                    LIMIT 1
+                `).get(mostSessionsQuery.api_key);
+                mostStreamsUrl = latestStreamQuery ? latestStreamQuery.last_stream_url : null;
+            }
+
+            // Get streamer with longest stream duration (single connection)
             const longestStreamQuery = db.prepare(`
                 SELECT last_stream_url, MAX(duration_seconds) as max_duration
                 FROM connections
@@ -1001,7 +1013,7 @@ const dbOps = {
             `).get();
 
             return {
-                mostStreams: mostStreamsQuery ? mostStreamsQuery.stream_url : null,
+                mostStreams: mostStreamsUrl,
                 longestStream: longestStreamQuery ? longestStreamQuery.last_stream_url : null
             };
         } catch (error) {

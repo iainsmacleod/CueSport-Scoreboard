@@ -432,6 +432,7 @@
             background: rgba(255, 255, 255, 0.1);
             border-radius: 12px;
             margin-top: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
 
         .no-games h2 {
@@ -499,8 +500,8 @@
             backdrop-filter: blur(10px);
             border-radius: 12px;
             padding: 25px;
-            margin-bottom: 30px;
             color: white;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             text-align: center;
         }
 
@@ -549,50 +550,42 @@
             box-shadow: 0 4px 12px rgba(255, 94, 98, 0.4);
         }
 
-        .global-stats-section {
+        .promo-stats-wrapper {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1fr 320px;
             gap: 20px;
-            margin-bottom: 30px;
+            align-items: stretch; /* Changed from 'start' to 'stretch' */
+            margin-bottom: 30px; /* Add margin-bottom to wrapper instead */
         }
 
         .stats-card {
+            width: 320px;
+            max-width: 320px;
             background: rgba(255, 255, 255, 0.15);
             backdrop-filter: blur(10px);
             border-radius: 12px;
             padding: 25px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
             color: white;
+            transition: none;
         }
 
-        .stats-card h3 {
-            margin: 0 0 15px 0;
-            font-size: 1.3rem;
-            font-weight: 600;
-        }
-
-        .stats-item {
-            margin: 10px 0;
-            font-size: 1rem;
-        }
-
-        .stats-label {
-            font-weight: 600;
-            margin-right: 8px;
-        }
-
-        .stats-link {
-            color: #fff;
-            text-decoration: underline;
-            transition: opacity 0.2s;
-        }
-
-        .stats-link:hover {
-            opacity: 0.8;
-        }
+        /* .stats-card:hover {
+            transform: none;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border: none;
+        } */
 
         @media (max-width: 768px) {
-            .global-stats-section {
-                grid-template-columns: 1fr;
+            .promo-stats-wrapper {
+                grid-template-columns: 1fr; /* Changed from .global-stats-section */
+            }
+            
+            .stats-card {
+                width: 100%;
+                max-width: 100%;
             }
         }
     </style>
@@ -605,28 +598,29 @@
             <p class="subtitle">Watch live billiards games being streamed</p>
         </header>
 
-        <div class="promo-section">
-            <h2>Powered by CueSport Scoreboard</h2>
-            <p>
-                These live games are powered by the <strong>CueSport Scoreboard</strong> OBS overlay.
-                A comprehensive scoreboard solution for pool, billiards, darts, and board games with
-                features like replay buffer integration, shot clock, player tracking, and more.
-            </p>
-            <div class="promo-links">
-                <a href="https://obsproject.com/forum/resources/cuesport-scoreboard-pool-8-ball-9-ball-darts-board-games.2082/"
-                    target="_blank" rel="noopener noreferrer" class="promo-link">
-                    📥 Get CueSport Scoreboard
-                </a>
-                <a href="https://ko-fi.com/iainsmacleod" target="_blank" rel="noopener noreferrer"
-                    class="promo-link support">
-                    ☕ Support the Developer
-                </a>
-            </div>
-        </div>
+        
 
-        <div class="global-stats-section" id="global-stats-section" style="display: none;">
-            <div class="stats-card">
-                <h3>Global Statistics</h3>
+        <div class="promo-stats-wrapper">
+            <div class="promo-section">
+                <h2>Powered by CueSport Scoreboard</h2>
+                <p>
+                    These live games are powered by the <strong>CueSport Scoreboard</strong> OBS overlay.
+                    A comprehensive scoreboard solution for pool, billiards, darts, and board games with
+                    features like replay buffer integration, shot clock, player tracking, and more.
+                </p>
+                <div class="promo-links">
+                    <a href="https://obsproject.com/forum/resources/cuesport-scoreboard-pool-8-ball-9-ball-darts-board-games.2082/"
+                        target="_blank" rel="noopener noreferrer" class="promo-link">
+                        📥 Get CueSport Scoreboard
+                    </a>
+                    <a href="https://ko-fi.com/iainsmacleod" target="_blank" rel="noopener noreferrer"
+                        class="promo-link support">
+                        ☕ Support the Developer
+                    </a>
+                </div>
+            </div>
+            <div class="stats-card" id="global-stats-section">
+                <h3 style="margin: 0 0 15px 0; font-size: 1.3rem; font-weight: 600; color: #ffffff;">Global Statistics</h3>
                 <div class="stats-item">
                     <span class="stats-label">Most Streams:</span>
                     <a href="#" id="most-streams-link" target="_blank" rel="noopener noreferrer" class="stats-link">Loading...</a>
@@ -943,7 +937,7 @@
                     if (data.mostStreams) {
                         mostStreamsLink.href = data.mostStreams;
                         mostStreamsLink.textContent = data.mostStreams;
-                        statsSection.style.display = 'grid';
+                        //statsSection.style.display = 'grid';
                     } else {
                         mostStreamsLink.textContent = 'N/A';
                         mostStreamsLink.href = '#';
@@ -953,7 +947,7 @@
                     if (data.longestStream) {
                         longestStreamLink.href = data.longestStream;
                         longestStreamLink.textContent = data.longestStream;
-                        statsSection.style.display = 'grid';
+                        //statsSection.style.display = 'grid';
                     } else {
                         longestStreamLink.textContent = 'N/A';
                         longestStreamLink.href = '#';
