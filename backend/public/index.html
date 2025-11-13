@@ -881,7 +881,7 @@
 
                 if (!data.success) {
                     statusEl.textContent = 'Error loading games';
-                    container.innerHTML = '<div class="no-games"><h2>Error</h2><p>Failed to load games. Please try again later.</p><a href="https://obsproject.com/forum/resources/cuesport-scoreboard-pool-8-ball-9-ball-darts-board-games.2082/" target="_blank" rel="noopener noreferrer" class="layout-image-link"><img src="/images/layout.png" alt="CueSport Scoreboard Layout" class="layout-image" onerror="this.style.display=\'none\'"></a></div>';
+                    container.innerHTML = '<div class="no-games"><h2>Error</h2><p>Failed to load games. Please try again later.</p><a href="https://obsproject.com/forum/resources/cuesport-scoreboard-pool-8-ball-9-ball-darts-board-games.2082/" target="_blank" rel="noopener noreferrer" class="layout-image-link"><img src="/images/run-through.gif" alt="CueSport Scoreboard Layout" class="layout-image" onerror="this.style.display=\'none\'"></a></div>';
                     controls.style.display = 'none';
                     return;
                 }
@@ -894,7 +894,7 @@
                         <div class="no-games">
                             <h2>No Active Games</h2>
                             <p>No games are currently being streamed. Check back soon!</p>
-                            <a href="https://obsproject.com/forum/resources/cuesport-scoreboard-pool-8-ball-9-ball-darts-board-games.2082/" target="_blank" rel="noopener noreferrer" class="layout-image-link"><img src="/images/layout.png" alt="CueSport Scoreboard Layout" class="layout-image" onerror="this.style.display='none'"></a>
+                            <a href="https://obsproject.com/forum/resources/cuesport-scoreboard-pool-8-ball-9-ball-darts-board-games.2082/" target="_blank" rel="noopener noreferrer" class="layout-image-link"><img src="/images/run-through.gif" alt="CueSport Scoreboard Layout" class="layout-image" onerror="this.style.display='none'"></a>
                         </div>
                     `;
                     controls.style.display = 'none';
@@ -919,7 +919,7 @@
                 const container = document.getElementById('games-container');
                 const controls = document.getElementById('controls');
                 statusEl.textContent = 'Error loading games';
-                container.innerHTML = '<div class="no-games"><h2>Error</h2><p>Failed to connect to server. Please try again later.</p><a href="https://obsproject.com/forum/resources/cuesport-scoreboard-pool-8-ball-9-ball-darts-board-games.2082/" target="_blank" rel="noopener noreferrer" class="layout-image-link"><img src="/images/layout.png" alt="CueSport Scoreboard Layout" class="layout-image" onerror="this.style.display=\'none\'"></a></div>';
+                container.innerHTML = '<div class="no-games"><h2>Error</h2><p>Failed to connect to server. Please try again later.</p><a href="https://obsproject.com/forum/resources/cuesport-scoreboard-pool-8-ball-9-ball-darts-board-games.2082/" target="_blank" rel="noopener noreferrer" class="layout-image-link"><img src="/images/run-through.gif" alt="CueSport Scoreboard Layout" class="layout-image" onerror="this.style.display=\'none\'"></a></div>';
                 controls.style.display = 'none';
             }
         }
