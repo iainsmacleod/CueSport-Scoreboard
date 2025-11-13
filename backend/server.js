@@ -248,9 +248,19 @@ app.use(helmet({
         directives: {
             defaultSrc: ["'self'"],
             styleSrc: ["'self'", "'unsafe-inline'"],
-            scriptSrc: ["'self'", "'unsafe-inline'"],
+            scriptSrc: [
+                "'self'", 
+                "'unsafe-inline'",
+                "https://www.googletagmanager.com"
+            ],
             imgSrc: ["'self'", "data:", "https:"],
-            connectSrc: ["'self'", "ws:", "wss:"],
+            connectSrc: [
+                "'self'", 
+                "ws:", 
+                "wss:",
+                "https://www.google-analytics.com",
+                "https://www.googletagmanager.com"
+            ],
         },
     },
     crossOriginEmbedderPolicy: false,
