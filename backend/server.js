@@ -865,6 +865,11 @@ wss.on('connection', (ws, req) => {
 
 // REST API Endpoints
 
+// Cache for global statistics (60 second TTL)
+let globalStatsCache = null;
+let globalStatsCacheTimestamp = 0;
+const GLOBAL_STATS_CACHE_TTL = 60000; // 60 seconds
+
 // Get all active streams
 app.get('/api/streams', (req, res) => {
     try {
@@ -1170,33 +1175,27 @@ app.get('/api/streams/:id', (req, res) => {
 // Get global statistics (public endpoint)
 app.get('/api/global-stats', (req, res) => {
     try {
-        const globalStats = dbOps.getGlobalStats();
+        const now = Date.now();
         
-        // Get streamer with most streams
-        const mostStreamsQuery = dbOps.prepare(`
-            SELECT stream_url, COUNT(*) as stream_count
-            FROM streams
-            WHERE is_active = 1 AND stream_url != '' AND stream_url IS NOT NULL
-            GROUP BY stream_url
-            ORDER BY stream_count DESC
-            LIMIT 1
-        `).get();
+        // Return cached data if still valid
+        if (globalStatsCache && (now - globalStatsCacheTimestamp) < GLOBAL_STATS_CACHE_TTL) {
+            return res.json(globalStatsCache);
+        }
         
-        // Get streamer with longest stream duration
-        const longestStreamQuery = dbOps.prepare(`
-            SELECT api_key, MAX(duration_seconds) as max_duration, last_stream_url
-            FROM connections
-            WHERE duration_seconds IS NOT NULL AND last_stream_url != '' AND last_stream_url IS NOT NULL
-            GROUP BY api_key, last_stream_url
-            ORDER BY max_duration DESC
-            LIMIT 1
-        `).get();
+        // Fetch fresh data from database
+        const streamerStats = dbOps.getStreamerStats();
         
-        res.json({
+        const response = {
             success: true,
-            mostStreams: mostStreamsQuery ? mostStreamsQuery.stream_url : null,
-            longestStream: longestStreamQuery ? longestStreamQuery.last_stream_url : null
-        });
+            mostStreams: streamerStats.mostStreams,
+            longestStream: streamerStats.longestStream
+        };
+        
+        // Update cache
+        globalStatsCache = response;
+        globalStatsCacheTimestamp = now;
+        
+        res.json(response);
     } catch (error) {
         logger.error('ERROR_FETCHING_GLOBAL_STATS', { error: error.message });
         res.status(500).json({

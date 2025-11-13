@@ -973,6 +973,45 @@ const dbOps = {
 
         const result = stmt.run();
         return result.changes;
+    },
+
+    // Get streamer statistics (most streams and longest stream)
+    getStreamerStats() {
+        try {
+            // Get streamer with most streams (by counting unique stream URLs)
+            const mostStreamsQuery = db.prepare(`
+                SELECT stream_url, COUNT(*) as stream_count
+                FROM streams
+                WHERE is_active = 1 AND stream_url != '' AND stream_url IS NOT NULL
+                GROUP BY stream_url
+                ORDER BY stream_count DESC
+                LIMIT 1
+            `).get();
+
+            // Get streamer with longest stream duration
+            const longestStreamQuery = db.prepare(`
+                SELECT last_stream_url, MAX(duration_seconds) as max_duration
+                FROM connections
+                WHERE duration_seconds IS NOT NULL 
+                    AND last_stream_url != '' 
+                    AND last_stream_url IS NOT NULL
+                GROUP BY last_stream_url
+                ORDER BY max_duration DESC
+                LIMIT 1
+            `).get();
+
+            return {
+                mostStreams: mostStreamsQuery ? mostStreamsQuery.stream_url : null,
+                longestStream: longestStreamQuery ? longestStreamQuery.last_stream_url : null
+            };
+        } catch (error) {
+            // Error is logged by the server endpoint, just return null values
+            // This prevents exposing internal error details to clients
+            return {
+                mostStreams: null,
+                longestStream: null
+            };
+        }
     }
 };
 
