@@ -1166,6 +1166,45 @@ app.get('/api/streams/:id', (req, res) => {
     }
 });
 
+// Get global statistics (public endpoint)
+app.get('/api/global-stats', (req, res) => {
+    try {
+        const globalStats = dbOps.getGlobalStats();
+        
+        // Get streamer with most streams
+        const mostStreamsQuery = dbOps.prepare(`
+            SELECT stream_url, COUNT(*) as stream_count
+            FROM streams
+            WHERE is_active = 1 AND stream_url != '' AND stream_url IS NOT NULL
+            GROUP BY stream_url
+            ORDER BY stream_count DESC
+            LIMIT 1
+        `).get();
+        
+        // Get streamer with longest stream duration
+        const longestStreamQuery = dbOps.prepare(`
+            SELECT api_key, MAX(duration_seconds) as max_duration, last_stream_url
+            FROM connections
+            WHERE duration_seconds IS NOT NULL AND last_stream_url != '' AND last_stream_url IS NOT NULL
+            GROUP BY api_key, last_stream_url
+            ORDER BY max_duration DESC
+            LIMIT 1
+        `).get();
+        
+        res.json({
+            success: true,
+            mostStreams: mostStreamsQuery ? mostStreamsQuery.stream_url : null,
+            longestStream: longestStreamQuery ? longestStreamQuery.last_stream_url : null
+        });
+    } catch (error) {
+        logger.error('ERROR_FETCHING_GLOBAL_STATS', { error: error.message });
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch global statistics'
+        });
+    }
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
     const clientIP = getClientIP(req);

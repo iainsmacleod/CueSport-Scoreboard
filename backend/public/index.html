@@ -548,6 +548,53 @@
         .promo-link.support:hover {
             box-shadow: 0 4px 12px rgba(255, 94, 98, 0.4);
         }
+
+        .global-stats-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stats-card {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 25px;
+            color: white;
+        }
+
+        .stats-card h3 {
+            margin: 0 0 15px 0;
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+
+        .stats-item {
+            margin: 10px 0;
+            font-size: 1rem;
+        }
+
+        .stats-label {
+            font-weight: 600;
+            margin-right: 8px;
+        }
+
+        .stats-link {
+            color: #fff;
+            text-decoration: underline;
+            transition: opacity 0.2s;
+        }
+
+        .stats-link:hover {
+            opacity: 0.8;
+        }
+
+        @media (max-width: 768px) {
+            .global-stats-section {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 
@@ -574,6 +621,20 @@
                     class="promo-link support">
                     ☕ Support the Developer
                 </a>
+            </div>
+        </div>
+
+        <div class="global-stats-section" id="global-stats-section" style="display: none;">
+            <div class="stats-card">
+                <h3>Global Statistics</h3>
+                <div class="stats-item">
+                    <span class="stats-label">Most Streams:</span>
+                    <a href="#" id="most-streams-link" target="_blank" rel="noopener noreferrer" class="stats-link">Loading...</a>
+                </div>
+                <div class="stats-item">
+                    <span class="stats-label">Longest Stream:</span>
+                    <a href="#" id="longest-stream-link" target="_blank" rel="noopener noreferrer" class="stats-link">Loading...</a>
+                </div>
             </div>
         </div>
 
@@ -869,6 +930,43 @@
             }
         }
 
+        async function loadGlobalStats() {
+            try {
+                const response = await fetch('/api/global-stats');
+                const data = await response.json();
+
+                if (data.success) {
+                    const statsSection = document.getElementById('global-stats-section');
+                    const mostStreamsLink = document.getElementById('most-streams-link');
+                    const longestStreamLink = document.getElementById('longest-stream-link');
+
+                    if (data.mostStreams) {
+                        mostStreamsLink.href = data.mostStreams;
+                        mostStreamsLink.textContent = data.mostStreams;
+                        statsSection.style.display = 'grid';
+                    } else {
+                        mostStreamsLink.textContent = 'N/A';
+                        mostStreamsLink.href = '#';
+                        mostStreamsLink.style.pointerEvents = 'none';
+                    }
+
+                    if (data.longestStream) {
+                        longestStreamLink.href = data.longestStream;
+                        longestStreamLink.textContent = data.longestStream;
+                        statsSection.style.display = 'grid';
+                    } else {
+                        longestStreamLink.textContent = 'N/A';
+                        longestStreamLink.href = '#';
+                        longestStreamLink.style.pointerEvents = 'none';
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading global stats:', error);
+                // Hide section on error
+                document.getElementById('global-stats-section').style.display = 'none';
+            }
+        }
+
         // Filter button handlers
         document.addEventListener('DOMContentLoaded', function () {
             const filterButtons = document.querySelectorAll('.filter-btn');
@@ -901,6 +999,12 @@
 
         // Load games on page load
         loadGames();
+
+        // Refresh global stats on page load
+        loadGlobalStats();
+
+        // Refresh global stats every 30 seconds
+        setInterval(loadGlobalStats, 30000);
 
         // Refresh every 10 seconds
         setInterval(loadGames, 10000);
