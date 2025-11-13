@@ -253,6 +253,11 @@ app.use(helmet({
                 "'unsafe-inline'",
                 "https://www.googletagmanager.com"
             ],
+            scriptSrcElem: [  // ← Add this for CSP Level 3
+                "'self'",
+                "'unsafe-inline'",
+                "https://www.googletagmanager.com"
+            ],
             imgSrc: ["'self'", "data:", "https:"],
             connectSrc: [
                 "'self'", 
