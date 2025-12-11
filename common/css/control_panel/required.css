@@ -114,6 +114,21 @@ div {
 	/* For Firefox */
 }
 
+.one-pocket-ball-input {
+	cursor: pointer;
+	width: 50px;
+	height: 28px;
+	border: 0px;
+	border-radius: 0px;
+	background-color: #ed4e54;
+	font-size: 14pt;
+	font-weight: bold;
+	text-align: center;
+	vertical-align: middle;
+	color: black !important;
+	padding: 0px;
+}
+
 /* Add to one of your CSS files */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
@@ -129,6 +144,20 @@ input[type="number"]::-webkit-outer-spin-button {
 	width: 40px;
 	height: 28px;
 	border: 0px solid #000;
+	border-radius: 0px;
+	font-size: 14pt;
+	font-weight: bold;
+	text-align: center;
+	vertical-align: middle;
+	color: black;
+	padding: 0px;
+}
+
+.ball-adjust-btn {
+	cursor: pointer;
+	width: 40px;
+	height: 28px;
+	border: 0px;
 	border-radius: 0px;
 	font-size: 14pt;
 	font-weight: bold;
@@ -277,6 +306,31 @@ input {
 	display: flex;
 	align-items: center;
 	/* This ensures the controls are grouped together */
+}
+
+#onePocketBallControls {
+	flex-direction: column;
+	align-items: stretch;
+	gap: 10px;
+}
+
+.one-pocket-ball-row {
+	width: 100%;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 10px;
+}
+
+.one-pocket-ball-row label {
+	flex: 1;
+	display: flex;
+	justify-content: flex-start;
+}
+
+.one-pocket-ball-actions {
+	width: 100%;
+	justify-content: flex-start;
 }
 
 .tooltip {

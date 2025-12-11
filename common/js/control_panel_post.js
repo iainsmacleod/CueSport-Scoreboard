@@ -78,6 +78,7 @@ window.onload = function () {
 	if (getStorageItem("usePlayer2") === null) {
 		setStorageItem("usePlayer2", "yes");
 	}
+	ensureOnePocketBallDefaults();
 
 	if (getStorageItem("scoreDisplay") === null) {
 		setStorageItem("scoreDisplay", "yes");
@@ -572,6 +573,8 @@ document.getElementById("p1Score").value = getStorageItem("p1ScoreCtrlPanel");
 document.getElementById("p2Name").value = getStorageItem("p2NameCtrlPanel");
 document.getElementById("p2Score").value = getStorageItem("p2ScoreCtrlPanel");
 document.getElementById("gameType").value = getStorageItem("gameType");
+document.getElementById("p1OnePocketBalls").value = getStorageItem("p1OnePocketBalls") || 0;
+document.getElementById("p2OnePocketBalls").value = getStorageItem("p2OnePocketBalls") || 0;
 if (getStorageItem("gameType") === "game3") {
 	document.getElementById("ball 10").classList.add("noShow");
 	document.getElementById("ball 11").classList.add("noShow");

@@ -139,6 +139,7 @@ const handlers = {
         } else {
             document.getElementById("player" + data.player + "Name").innerHTML = "Player " + data.player;
         }
+        updateOnePocketBallLabel(data.player, data.name);
     },
 
     playerDisplay(data) {
@@ -453,6 +454,18 @@ const handlers = {
         // Reload the browser source page when refresh is requested
         console.log('Refresh requested, reloading browser_source page');
         window.location.reload();
+    },
+
+    onePocketMode(data) {
+        toggleOnePocketOverlay(data.onePocketMode === true);
+    },
+
+    onePocketBalls(data) {
+        if (!data.onePocketBalls) {
+            return;
+        }
+        const state = parseOnePocketBallState(data.onePocketBalls);
+        updateOnePocketBallCounts(state.player1, state.player2);
     }
 };
 
@@ -473,6 +486,61 @@ bc.onmessage = (event) => {
 //							autostart stuff
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+
+function toggleOnePocketOverlay(show) {
+    const container = document.getElementById("onePocketBallDisplay");
+    if (!container) {
+        return;
+    }
+    if (show) {
+        container.classList.remove("noShow");
+    } else {
+        container.classList.add("noShow");
+    }
+}
+
+function updateOnePocketBallCounts(player1Value, player2Value) {
+    const p1Element = document.getElementById("onePocketBallsP1");
+    const p2Element = document.getElementById("onePocketBallsP2");
+    if (p1Element) {
+        p1Element.textContent = player1Value;
+    }
+    if (p2Element) {
+        p2Element.textContent = player2Value;
+    }
+}
+
+function updateOnePocketBallLabel(player, name) {
+    const target = document.getElementById(player === "1" ? "onePocketBallLabelP1" : "onePocketBallLabelP2");
+    if (!target) {
+        return;
+    }
+    const displayName = name && name.trim() !== "" ? name : `Player ${player}`;
+    target.textContent = `${displayName} Balls`;
+}
+
+function parseOnePocketBallState(payload) {
+    const p1 = parseInt(payload.player1 ?? payload.p1, 10);
+    const p2 = parseInt(payload.player2 ?? payload.p2, 10);
+    return {
+        player1: isNaN(p1) ? 0 : p1,
+        player2: isNaN(p2) ? 0 : p2
+    };
+}
+
+function initializeOnePocketOverlay() {
+    const isOnePocket = getStorageItem("gameType") === "game6";
+    toggleOnePocketOverlay(isOnePocket);
+    const storedState = parseOnePocketBallState({
+        player1: getStorageItem("p1OnePocketBalls"),
+        player2: getStorageItem("p2OnePocketBalls")
+    });
+    updateOnePocketBallCounts(storedState.player1, storedState.player2);
+    updateOnePocketBallLabel("1", getStorageItem("p1NameCtrlPanel"));
+    updateOnePocketBallLabel("2", getStorageItem("p2NameCtrlPanel"));
+}
+
+document.addEventListener("DOMContentLoaded", initializeOnePocketOverlay);
 
 $(document).ready(function () {
     // List of draggable element IDs

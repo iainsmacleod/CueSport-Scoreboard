@@ -26,6 +26,7 @@ let isObsReady = false;
 let isMonitoringActive = getStorageItem('isMonitoringActive') === 'true' || false;
 let isConnected = getStorageItem('isConnected') === 'true' || false;
 let replayHistory = JSON.parse(localStorage.getItem('replayHistory')) || [];
+const ONE_POCKET_MAX_BALLS = 15;
 
 // function updateTabVisibility() {
 //     // Get the state of the player settings
@@ -85,6 +86,9 @@ document.addEventListener("DOMContentLoaded", function () {
     updateReplayButtonsVisibility();
     updateReplaySourceSettingsVisibility();
     updatePlayerBallControlVisibility();
+    ensureOnePocketBallDefaults();
+    toggleOnePocketControls(getStorageItem("gameType") === "game6");
+    syncOnePocketBallInputs();
 });
 
 function openTab(evt, tabName) {
@@ -211,6 +215,7 @@ function gameType(value) {
         console.log("Ball style reset to American for non-8-ball game");
     }
     useBallSetToggle()
+    updateOnePocketMode(value);
 }
 
 function ballType(value) {
@@ -394,6 +399,124 @@ function toggleBallSelection() {
     updateControlPanelBallImages(newSelection);
     ballType(newSelection);
     ballSetChange();
+}
+
+function ensureOnePocketBallDefaults() {
+    if (getStorageItem("p1OnePocketBalls") === null) {
+        setStorageItem("p1OnePocketBalls", "0");
+    }
+    if (getStorageItem("p2OnePocketBalls") === null) {
+        setStorageItem("p2OnePocketBalls", "0");
+    }
+}
+
+function toggleOnePocketControls(show) {
+    ["onePocketBallControlsHeader", "onePocketBallControls"].forEach((id) => {
+        const element = document.getElementById(id);
+        if (!element) {
+            return;
+        }
+        if (show) {
+            element.classList.remove("noShow");
+        } else {
+            element.classList.add("noShow");
+        }
+    });
+}
+
+function getOnePocketBallKey(player) {
+    return player === "1" ? "p1OnePocketBalls" : "p2OnePocketBalls";
+}
+
+function persistOnePocketBallValue(player, value) {
+    const sanitized = Math.max(
+        0,
+        Math.min(ONE_POCKET_MAX_BALLS, parseInt(value, 10) || 0)
+    );
+    const key = getOnePocketBallKey(player);
+    setStorageItem(key, sanitized);
+    const input = document.getElementById(player === "1" ? "p1OnePocketBalls" : "p2OnePocketBalls");
+    if (input) {
+        input.value = sanitized;
+    }
+    return sanitized;
+}
+
+function syncOnePocketBallInputs() {
+    persistOnePocketBallValue("1", getStorageItem("p1OnePocketBalls") || 0);
+    persistOnePocketBallValue("2", getStorageItem("p2OnePocketBalls") || 0);
+}
+
+function getOnePocketBallState() {
+    return {
+        player1: parseInt(getStorageItem("p1OnePocketBalls"), 10) || 0,
+        player2: parseInt(getStorageItem("p2OnePocketBalls"), 10) || 0
+    };
+}
+
+function sendOnePocketBallUpdate() {
+    bc.postMessage({ onePocketBalls: getOnePocketBallState() });
+    if (window.streamSharing) {
+        window.streamSharing.sendUpdate();
+    }
+}
+
+function updateOnePocketBalls(action, player) {
+    if (getStorageItem("gameType") !== "game6") {
+        return;
+    }
+    const key = getOnePocketBallKey(player);
+    let current = parseInt(getStorageItem(key), 10);
+    if (isNaN(current)) {
+        current = 0;
+    }
+    if (action === "add" && current < ONE_POCKET_MAX_BALLS) {
+        current += 1;
+    } else if (action === "sub" && current > 0) {
+        current -= 1;
+    }
+    persistOnePocketBallValue(player, current);
+    sendOnePocketBallUpdate();
+}
+
+function handleOnePocketBallInput(player) {
+    if (getStorageItem("gameType") !== "game6") {
+        return;
+    }
+    const input = document.getElementById(player === "1" ? "p1OnePocketBalls" : "p2OnePocketBalls");
+    if (!input) {
+        return;
+    }
+    persistOnePocketBallValue(player, input.value);
+    sendOnePocketBallUpdate();
+}
+
+function resetOnePocketBalls() {
+    persistOnePocketBallValue("1", 0);
+    persistOnePocketBallValue("2", 0);
+    sendOnePocketBallUpdate();
+}
+
+function updateOnePocketMode(gameValue) {
+    const isOnePocket = gameValue === "game6";
+    toggleOnePocketControls(isOnePocket);
+    bc.postMessage({ onePocketMode: isOnePocket });
+    if (isOnePocket) {
+        ensureOnePocketBallDefaults();
+        syncOnePocketBallInputs();
+        sendOnePocketBallUpdate();
+    }
+}
+
+function updateOnePocketBallLabels(p1Label, p2Label) {
+    const p1Element = document.getElementById("p1OnePocketBallsLabel");
+    const p2Element = document.getElementById("p2OnePocketBallsLabel");
+    if (p1Element) {
+        p1Element.textContent = p1Label ? `${p1Label} - Balls` : "Player/Team 1 Balls";
+    }
+    if (p2Element) {
+        p2Element.textContent = p2Label ? `${p2Label} - Balls` : "Player/Team 2 Balls";
+    }
 }
 
 function togglePot(element) {
@@ -811,6 +934,7 @@ function postNames() {
     if (!p2Name.value == "") { document.getElementById("p2extensionBtn").innerHTML = p2FirstName.substring(0, 9) + "'s Extension"; } else { document.getElementById("p2extensionBtn").innerHTML = "P2's Extension"; }
     if (!p1Name.value == "") { document.getElementById("p1ScoreLabel").innerHTML = p1namemsg + " - Score/Rack(s)/Ball(s)"; } else { document.getElementById("p1ScoreLabel").innerHTML = "Player/Team 1 - Score/Rack(s)/Ball(s)"; }
     if (!p2Name.value == "") { document.getElementById("p2ScoreLabel").innerHTML = p2namemsg + " - Score/Rack(s)/Ball(s)"; } else { document.getElementById("p2ScoreLabel").innerHTML = "Player/Team 2 - Score/Rack(s)/Ball(s)"; }
+    updateOnePocketBallLabels(p1namemsg, p2namemsg);
     setStorageItem("p1NameCtrlPanel", p1Name.value);
     setStorageItem("p2NameCtrlPanel", p2Name.value);
     // Send update to stream sharing if enabled
@@ -1477,6 +1601,10 @@ function resetScores() {
         // Store reset scores in localStorage
         setStorageItem("p1ScoreCtrlPanel", 0);
         setStorageItem("p2ScoreCtrlPanel", 0);
+
+        if (getStorageItem("gameType") === "game6") {
+            resetOnePocketBalls();
+        }
 
         resetExt('p1', 'noflash');
         resetExt('p2', 'noflash');

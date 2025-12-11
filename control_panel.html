@@ -172,6 +172,34 @@ for more information about Salotto please visit https://salotto.app
                         box, use "Push Scores" to update the overlay.</span>
                 </div>
             </div>
+            <div class="section-header noShow" id="onePocketBallControlsHeader">
+                One Pocket Ball Tracker
+            </div>
+            <div class="column noShow" id="onePocketBallControls">
+                <div class="one-pocket-ball-row">
+                    <label id="p1OnePocketBallsLabel" for="p1OnePocketBalls">Player/Team 1 Balls</label>
+                    <div class="score-control">
+                        <button class="ball-adjust-btn" onclick="updateOnePocketBalls('sub','1')">-</button>
+                        <input type="number" min="0" max="8" inputmode="numeric" id="p1OnePocketBalls"
+                            class="one-pocket-ball-input" value="0" onchange="handleOnePocketBallInput('1')" />
+                        <button class="ball-adjust-btn" onclick="updateOnePocketBalls('add','1')">+</button>
+                    </div>
+                </div>
+                <div class="one-pocket-ball-row">
+                    <label id="p2OnePocketBallsLabel" for="p2OnePocketBalls">Player/Team 2 Balls</label>
+                    <div class="score-control">
+                        <button class="ball-adjust-btn" onclick="updateOnePocketBalls('sub','2')">-</button>
+                        <input type="number" min="0" max="8" inputmode="numeric" id="p2OnePocketBalls"
+                            class="one-pocket-ball-input" value="0" onchange="handleOnePocketBallInput('2')" />
+                        <button class="ball-adjust-btn" onclick="updateOnePocketBalls('add','2')">+</button>
+                    </div>
+                </div>
+                <div class="one-pocket-ball-actions">
+                    <div class="hover obs28 button" id="resetOnePocketBallsBtn" onclick="resetOnePocketBalls()">
+                        Reset Ball Counts
+                    </div>
+                </div>
+            </div>
             <!-- Player Toggle -->
             <div class="section-header" id="playerToggleLabel">Player and Ball Controls</div>
             <div class="column" id="playerToggle">

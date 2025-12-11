@@ -341,6 +341,36 @@ body {
     box-shadow: 0 8px 16px 0 rgba(0, 0, 0, 0.6);
 }
 
+#onePocketBallDisplay {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: calc(18px * var(--ui-scaling));
+    margin-top: calc(8px * var(--ui-scaling));
+    padding: calc(8px * var(--ui-scaling));
+    background: rgba(0, 0, 0, 0.6);
+    border: 2px solid black;
+    border-radius: 8px;
+    color: white;
+    text-shadow: 1px 1px 2px black, 0 0 25px black, 0 0 5px black;
+    font-size: calc(28px * var(--ui-scaling));
+    font-weight: bold;
+}
+
+.one-pocket-inline-connector {
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.one-pocket-bracketed-count {
+    background: #ed4e54;
+    border: 2px solid black;
+    border-radius: 6px;
+    padding: calc(4px * var(--ui-scaling)) calc(16px * var(--ui-scaling));
+    min-width: calc(64px * var(--ui-scaling));
+    text-align: center;
+}
+
 /* Custom logos */
 .customLogo1,
 .customLogo2 {
