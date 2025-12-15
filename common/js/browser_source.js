@@ -367,7 +367,13 @@ function playWebmAnimation(gameType, containerSelector = '#videoContainer') {
     switch (gameType) {
         case 'game1':
             // Use different default animations based on ball style
-            videoUrl = ballSelection === "international" ? './common/video/international8ballwin.webm' : './common/video/defaultanimation.webm';
+            if (ballSelection === "international") {
+                videoUrl = './common/video/international8ballwin.webm';
+            } else if (ballSelection === "unity") {
+                videoUrl = './common/video/8ballunitywin.webm';
+            } else {
+                videoUrl = './common/video/defaultanimation.webm';
+            }
             break;
         case 'game2':
             videoUrl = './common/video/9ballwin.webm';
@@ -378,7 +384,13 @@ function playWebmAnimation(gameType, containerSelector = '#videoContainer') {
         // Add more cases as needed
         default:
             // Use different default animations based on ball style
-            videoUrl = ballSelection === "international" ? './common/video/international8ballwin.webm' : './common/video/defaultanimation.webm';
+            if (ballSelection === "international") {
+                videoUrl = './common/video/international8ballwin.webm';
+            } else if (ballSelection === "unity") {
+                videoUrl = './common/video/8ballunitywin.webm';
+            } else {
+                videoUrl = './common/video/defaultanimation.webm';
+            }
             break;
     }
 
@@ -440,6 +452,9 @@ function updateBallImages(selection) {
                     } else if (i === 8) {
                         imageSrc = `./common/images/international-8-small-ball.png`;
                     }
+                } else if (selection === "unity") {
+                    // Unity ball naming convention
+                    imageSrc = `./common/images/${i}-ball-unity-small.png`;
                 } else {
                     // American ball naming convention (default)
                     imageSrc = `./common/images/${i}ball_small.png`;

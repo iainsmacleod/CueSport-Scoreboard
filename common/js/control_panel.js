@@ -222,6 +222,8 @@ function ballType(value) {
     if (redLabel) {
         if (value === "american") {
             redLabel.textContent = "Smalls/Lows/Solids";
+        } else if (value === "unity") {
+            redLabel.textContent = "Pink";
         } else {
             redLabel.textContent = "Red";
         }
@@ -229,6 +231,8 @@ function ballType(value) {
     if (yellowLabel) {
         if (value === "american") {
             yellowLabel.textContent = "Bigs/Highs/Stripes";
+        } else if (value === "unity") {
+            yellowLabel.textContent = "Blue";
         } else {
             yellowLabel.textContent = "Yellow";
         }
@@ -363,6 +367,9 @@ function updateControlPanelBallImages(selection) {
                     } else if (i >= 9 && i <= 15) {
                         imageSrc = `./common/images/red-international-small-ball.png`;
                     }
+                } else if (selection === "unity") {
+                    // Unity ball naming convention
+                    imageSrc = `./common/images/${i}-ball-unity-small.png`;
                 } else {
                     // American ball naming convention (default)
                     imageSrc = `./common/images/${i}ball_small.png`;
@@ -374,16 +381,21 @@ function updateControlPanelBallImages(selection) {
 }
 
 function toggleBallSelection() {
-    // Get current selection from localStorage or default to "american"
-    const currentSelection = getStorageItem("ballSelection") || "american";
-    // Only allow toggling ball style for 8-ball (game1)
+    // Get the selected value from the dropdown
+    const ballSelectionElement = document.getElementById("ballSelection");
+    const newSelection = ballSelectionElement ? ballSelectionElement.value : "american";
+    
+    // Only allow changing ball style for 8-ball (game1) and custom (game7)
     const currentGame = getStorageItem("gameType") || (document.getElementById("gameType") ? document.getElementById("gameType").value : "game1");
     if (currentGame === "game2" || currentGame === "game3") {
-        console.log("Ball style toggle is not available for 9- or 10-ball (game2/game3)");
+        console.log("Ball style selection is not available for 9- or 10-ball (game2/game3)");
+        // Reset to american if trying to change during 9-ball or 10-ball
+        if (ballSelectionElement) {
+            ballSelectionElement.value = "american";
+        }
         return;
     }
-    // Toggle selection
-    const newSelection = currentSelection === "international" ? "american" : "international";
+    
     // Send message to browser source
     bc.postMessage({ ballSelection: newSelection });
     // Update localStorage

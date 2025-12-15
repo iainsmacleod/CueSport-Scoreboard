@@ -153,6 +153,8 @@ window.onload = function () {
 		const currentBallType = getStorageItem("ballSelection");
 		if (currentBallType === "american") {
 			redLabel.textContent = "Smalls/Lows/Solids";
+		} else if (currentBallType === "unity") {
+			redLabel.textContent = "Pink";
 		} else {
 			redLabel.textContent = "Red";
 		}
@@ -163,6 +165,8 @@ window.onload = function () {
 		const currentBallType = getStorageItem("ballSelection");
 		if (currentBallType === "american") {
 			yellowLabel.textContent = "Bigs/Highs/Stripes";
+		} else if (currentBallType === "unity") {
+			yellowLabel.textContent = "Blue";
 		} else {
 			yellowLabel.textContent = "Yellow";
 		}
