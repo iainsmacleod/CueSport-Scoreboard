@@ -441,7 +441,8 @@
                     return;
                 }
 
-                if (isEnabled && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                // Don't reconnect if streaming has stopped - only reconnect if streaming is active
+                if (isEnabled && isObsStreaming && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
                     // Exponential backoff reconnection
                     const delay = Math.min(
                         INITIAL_RECONNECT_DELAY * Math.pow(2, reconnectAttempts),
