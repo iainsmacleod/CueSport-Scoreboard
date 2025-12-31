@@ -419,71 +419,37 @@ for more information about Salotto please visit https://salotto.app
         </div> <!-- Images Tab-->
         <!-- Replay Settings Tab -->
         <div id="ReplaySettings" class="tabcontent">
-            <div class="section-header" id="replaySettingsLabel">WebSocket Settings</div>
-            <div class="column form-rows">
-                <div class="form-row">
-                    <div class="field">
-                        <label for="obsAddress">OBS WebSocket Address *:</label>
-                        <input type="text" id="obsAddress" value="ws://127.0.0.1:4455" />
-                    </div>
-                    <div class="field">
-                        <label for="obsPassword">Password:</label>
-                        <div style="display: flex; align-items: center;">
-                            <input type="password" id="obsPassword" placeholder="Enter password" />
-                        </div>
-                    </div>
+            <!-- Enable Sharing and Replay Settings Section -->
+            <div class="section-header-with-controls">
+                <span id="replaySettingsLabel">Enable Sharing and Replay Settings</span>
+                <div class="section-controls">
+                    <button class="settings-cog-btn" id="websocketSettingsCog" onclick="openWebSocketSettingsModal()" title="WebSocket Settings">
+                        &#x2699;
+                    </button>
+                    <label class="switch toggle">
+                        <input type="checkbox" id="websocketToggle" onchange="toggleWebSocketConnection()" />
+                        <span class="slider_round"></span>
+                    </label>
                 </div>
-                <div class="form-row">
-                    <div class="field">
-                        <div class="hover obs28 button" id="togglePassword">Show Password</div>
-                    </div>
-                    <div class="field">
-                        <div class="tooltip">
-                            <div class="hover obs28 button" id="connectBtn" style="background-color:green;"
-                                onclick="connectToObsWebSocket()">Connect</div>
-                            <span class="tooltiptext">WebSocket connection must be enabled and configured under OBS
-                                tools.</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="section-header" id="streamSharingLabel">
+            </div>
+            
+            <!-- Stream Promotion Section -->
+            <div class="section-header-with-controls">
+                <span id="streamSharingLabel">
                     Stream Promotion (<a href="https://cuesports.macleod.systems" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: underline;">https://cuesports.macleod.systems</a>)
+                </span>
+                <div class="section-controls">
+                    <button class="settings-cog-btn" id="streamPromotionSettingsCog" onclick="openStreamPromotionSettingsModal()" title="Stream Promotion Settings">
+                        &#x2699;
+                    </button>
+                    <label class="switch toggle">
+                        <input type="checkbox" id="streamPromotionToggle" onchange="toggleStreamPromotion()" />
+                        <span class="slider_round"></span>
+                    </label>
                 </div>
-                <div class="form-row" style="display: none;">
-                    <div class="field">
-                        <label for="streamApiKey">API Key: </label>
-                        <input type="text" id="streamApiKey" readonly style="width: 250px; background-color: #f0f0f0;" />
-                        <button class="hover obs28 button" onclick="copyApiKey()" style="margin-left: 5px;">Copy</button>
-                    </div>
-                    <div class="field">
-                        <div class="hover obs28 button" onclick="generateApiKey()">
-                            Generate New API Key
-                        </div>
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="field">
-                        <label for="manualStreamUrl">Stream URL:</label>
-                        <input type="text" id="manualStreamUrl" placeholder="Example: https://www.twitch.tv/yourchannel" style="width: 300px;" />
-                        <style>
-                            #manualStreamUrl::placeholder {
-                                color: #666;
-                                opacity: 1;
-                            }
-                        </style>
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="field" style="display: flex; align-items: center; gap: 8px;">
-                        <label for="autoResumeSharing" style="margin: 0;">Auto-resume Stream Promotion</label>
-                        <input type="checkbox" class="smallSize" id="autoResumeSharing" />
-                    </div>
-                    <div class="field">
-                        <div class="hover obs28 button" id="streamConnectBtn" onclick="toggleShareStream()" style="background-color: green;">
-                            Connect
-                        </div>
-                    </div>
-                </div>
+            </div>
+            
+            <div class="column form-rows">
                 <div class="section-header" id="replaySettingsLabel">Replay Source Settings</div>
                 <div class="form-row">
                     <div class="field">
@@ -509,6 +475,70 @@ for more information about Salotto please visit https://salotto.app
                 <div class="form-row" style="margin-top: 15px;">
                     <div class="field">
                         *Required Fields
+                    </div>
+                </div>
+            </div>
+            
+            <!-- WebSocket Settings Modal -->
+            <div id="websocketSettingsModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2>Enable Sharing and Replay Settings</h2>
+                        <span class="modal-close" onclick="closeWebSocketSettingsModal()">&times;</span>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-row">
+                            <div class="field">
+                                <label for="obsAddressModal">OBS WebSocket Address *:</label>
+                                <input type="text" id="obsAddressModal" value="ws://127.0.0.1:4455" />
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="field">
+                                <label for="obsPasswordModal">Password:</label>
+                                <div class="password-input-wrapper">
+                                    <input type="password" id="obsPasswordModal" placeholder="Enter password" />
+                                    <button class="password-toggle-btn" id="togglePasswordModal" onclick="togglePasswordVisibility()" type="button" title="Toggle password visibility">
+                                        <span class="eye-icon">👁</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-row" style="margin-top: 15px;">
+                            <div class="field">
+                                *Required Fields
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <div class="modal-footer-buttons">
+                            <button class="modal-save-btn hover obs28 button" onclick="saveWebSocketSettings()">Save</button>
+                            <button class="modal-cancel-btn hover obs28 button" onclick="closeWebSocketSettingsModal()">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Stream Promotion Settings Modal -->
+            <div id="streamPromotionSettingsModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2>Stream Promotion</h2>
+                        <span class="modal-close" onclick="closeStreamPromotionSettingsModal()">&times;</span>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-row">
+                            <div class="field">
+                                <label for="manualStreamUrlModal">Stream URL:</label>
+                                <input type="text" id="manualStreamUrlModal" placeholder="Example: https://www.twitch.tv/yourchannel" style="width: 100%;" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <div class="modal-footer-buttons">
+                            <button class="modal-save-btn hover obs28 button" onclick="saveStreamPromotionSettings()">Save</button>
+                            <button class="modal-cancel-btn hover obs28 button" onclick="closeStreamPromotionSettingsModal()">Cancel</button>
+                        </div>
                     </div>
                 </div>
             </div>

@@ -1741,18 +1741,61 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+    
+    // Initialize WebSocket toggle state and auto-connect if previously enabled
+    initializeWebSocketSettings();
 });
 
+// Initialize WebSocket settings and auto-connect if previously enabled
+function initializeWebSocketSettings() {
+    // Update toggle state based on current connection status
+    updateWebSocketToggle();
+    
+    // Check if WebSocket was previously enabled and configured
+    const wasEnabled = getStorageItem('websocketEnabled') === 'true';
+    const isConfigured = isWebSocketConfigured();
+    
+    if (wasEnabled && isConfigured && !isConnected) {
+        // Auto-connect after a short delay to ensure DOM is ready
+        setTimeout(() => {
+            const toggle = document.getElementById('websocketToggle');
+            if (toggle && !toggle.checked) {
+                toggle.checked = true;
+                connectWebSocket();
+            }
+        }, 500);
+    } else if (!isConfigured && wasEnabled) {
+        // Was enabled but configuration is missing - show modal
+        const toggle = document.getElementById('websocketToggle');
+        if (toggle) toggle.checked = false;
+        setStorageItem('websocketEnabled', 'false');
+    }
+}
+
 function getObsAddress() {
-    const input = document.getElementById('obsAddress');
-    const address = input ? input.value.trim() : '';
-    return address || 'ws://127.0.0.1:4455'; // fallback to default if empty
+    // Try modal input first, then fallback to localStorage, then default
+    const modalInput = document.getElementById('obsAddressModal');
+    if (modalInput && modalInput.value.trim()) {
+        return modalInput.value.trim();
+    }
+    const saved = getStorageItem('obsAddress');
+    return saved || 'ws://127.0.0.1:4455'; // fallback to default if empty
 }
 
 function getObsPassword() {
-    const input = document.getElementById('obsPassword');
-    const password = input ? input.value.trim() : '';
-    return password || ''; // fallback to default if empty
+    // Try modal input first, then fallback to localStorage
+    const modalInput = document.getElementById('obsPasswordModal');
+    if (modalInput && modalInput.value.trim()) {
+        return modalInput.value.trim();
+    }
+    const saved = getStorageItem('obsPassword');
+    return saved || ''; // fallback to empty if not set
+}
+
+function isWebSocketConfigured() {
+    const address = getObsAddress();
+    // Address is required, password is optional
+    return address && address.trim() !== '';
 }
 
 function autoResumeReplayBuffer() {
@@ -1766,64 +1809,209 @@ function autoResumeReplayBuffer() {
     }
 }
 
-async function connectToObsWebSocket() {
-    // Get isConnected from localStorage (default to false if not set)
-    if (isConnected) {
-        if (getStorageItem("isMonitoringActive") === "true") {
-            await toggleReplayMonitoring();
-        }
-        // Disconnect
-        try {
-            await obs.disconnect();
-            isConnected = false;
-            setStorageItem('isConnected', 'false');
-            updateConnectButton();
-            updateReplayButtonsVisibility();
-            updateReplaySourceSettingsVisibility();
-            
-            // Disconnect stream promotion since it requires WebSocket to check OBS streaming status
-            if (window.streamSharing && typeof window.streamSharing.disconnect === 'function') {
-                window.streamSharing.disconnect();
-            }
-            
-            console.log('Disconnected from OBS WebSocket');
-        } catch (err) {
-            console.error('Failed to disconnect:', err);
-            alert('Failed to disconnect: ' + (err.message || err.toString()));
-        }
-    } else {
+async function toggleWebSocketConnection() {
+    const toggle = document.getElementById('websocketToggle');
+    if (!toggle) return;
+    
+    // If trying to enable but not configured, show modal
+    if (toggle.checked && !isWebSocketConfigured()) {
+        toggle.checked = false;
+        openWebSocketSettingsModal();
+        return;
+    }
+    
+    if (toggle.checked) {
         // Connect
-        const address = getObsAddress();
-        const password = getObsPassword();
+        await connectWebSocket();
+    } else {
+        // Disconnect
+        await disconnectWebSocket();
+    }
+}
 
-        try {
-            await obs.connect(address, password);
-            isConnected = true;
-            setStorageItem('isConnected', 'true');
-            updateConnectButton();
-            updateReplayButtonsVisibility();
-            updateReplaySourceSettingsVisibility();
-            console.log('OBS WebSocket: Connected and authenticated');
-        } catch (err) {
-            console.error('Failed to connect:', err);
-            alert('Failed to connect. Is OBS running and WebSocket enabled? Check your OBS settings.\n\nDetails: ' + (err.message || err.toString()));
+async function connectWebSocket() {
+    if (isConnected) return; // Already connected
+    
+    const address = getObsAddress();
+    const password = getObsPassword();
+
+    if (!address || address.trim() === '') {
+        const toggle = document.getElementById('websocketToggle');
+        if (toggle) toggle.checked = false;
+        openWebSocketSettingsModal();
+        return;
+    }
+
+    try {
+        await obs.connect(address, password);
+        isConnected = true;
+        setStorageItem('isConnected', 'true');
+        setStorageItem('websocketEnabled', 'true'); // Persistent enabled state
+        updateWebSocketToggle();
+        updateReplayButtonsVisibility();
+        updateReplaySourceSettingsVisibility();
+        console.log('OBS WebSocket: Connected and authenticated');
+    } catch (err) {
+        console.error('Failed to connect:', err);
+        const toggle = document.getElementById('websocketToggle');
+        if (toggle) toggle.checked = false;
+        setStorageItem('websocketEnabled', 'false');
+        updateWebSocketToggle();
+        alert('Failed to connect. Is OBS running and WebSocket enabled? Check your OBS settings.\n\nDetails: ' + (err.message || err.toString()));
+        // Show modal if connection fails due to configuration
+        openWebSocketSettingsModal();
+    }
+}
+
+async function disconnectWebSocket() {
+    if (!isConnected) return; // Already disconnected
+    
+    if (getStorageItem("isMonitoringActive") === "true") {
+        await toggleReplayMonitoring();
+    }
+    
+    try {
+        await obs.disconnect();
+        isConnected = false;
+        setStorageItem('isConnected', 'false');
+        setStorageItem('websocketEnabled', 'false'); // Persistent enabled state
+        updateWebSocketToggle();
+        updateReplayButtonsVisibility();
+        updateReplaySourceSettingsVisibility();
+        
+        // Disconnect stream promotion since it requires WebSocket to check OBS streaming status
+        if (window.streamSharing && typeof window.streamSharing.disconnect === 'function') {
+            window.streamSharing.disconnect();
         }
+        
+        console.log('Disconnected from OBS WebSocket');
+    } catch (err) {
+        console.error('Failed to disconnect:', err);
+        alert('Failed to disconnect: ' + (err.message || err.toString()));
+    }
+}
+
+// Legacy function for backwards compatibility
+async function connectToObsWebSocket() {
+    const toggle = document.getElementById('websocketToggle');
+    if (toggle) {
+        toggle.checked = !toggle.checked;
+        await toggleWebSocketConnection();
+    }
+}
+
+// WebSocket Settings Modal Functions
+function openWebSocketSettingsModal() {
+    const modal = document.getElementById('websocketSettingsModal');
+    if (!modal) return;
+    
+    // Load current values into modal
+    const addressInput = document.getElementById('obsAddressModal');
+    const passwordInput = document.getElementById('obsPasswordModal');
+    
+    if (addressInput) {
+        const saved = getStorageItem('obsAddress');
+        addressInput.value = saved || 'ws://127.0.0.1:4455';
+    }
+    
+    if (passwordInput) {
+        const saved = getStorageItem('obsPassword');
+        passwordInput.value = saved || '';
+        passwordInput.type = 'password';
+        const toggleBtn = document.getElementById('togglePasswordModal');
+        if (toggleBtn) {
+            const eyeIcon = toggleBtn.querySelector('.eye-icon');
+            if (eyeIcon) {
+                eyeIcon.textContent = '👁'; // Start with closed/hidden state (styled with CSS line through)
+                toggleBtn.classList.add('hidden');
+            }
+        }
+    }
+    
+    modal.style.display = 'block';
+}
+
+function closeWebSocketSettingsModal() {
+    const modal = document.getElementById('websocketSettingsModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+function saveWebSocketSettings() {
+    const addressInput = document.getElementById('obsAddressModal');
+    const passwordInput = document.getElementById('obsPasswordModal');
+    
+    if (!addressInput) return;
+    
+    const address = addressInput.value.trim();
+    if (!address) {
+        alert('OBS WebSocket Address is required.');
+        return;
+    }
+    
+    // Save to localStorage
+    setStorageItem('obsAddress', address);
+    if (passwordInput) {
+        setStorageItem('obsPassword', passwordInput.value);
+    }
+    
+    closeWebSocketSettingsModal();
+    
+    // If toggle is on, attempt to connect
+    const toggle = document.getElementById('websocketToggle');
+    if (toggle && toggle.checked) {
+        connectWebSocket();
+    }
+}
+
+function togglePasswordVisibility() {
+    const passwordInput = document.getElementById('obsPasswordModal');
+    const toggleBtn = document.getElementById('togglePasswordModal');
+    
+    if (!passwordInput || !toggleBtn) return;
+    
+    const eyeIcon = toggleBtn.querySelector('.eye-icon');
+    if (!eyeIcon) return;
+    
+    if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        eyeIcon.textContent = '👁'; // Open eye when visible
+        toggleBtn.classList.remove('hidden');
+        toggleBtn.title = 'Hide password';
+    } else {
+        passwordInput.type = 'password';
+        eyeIcon.textContent = '👁'; // Same icon, styled as closed with CSS (line through)
+        toggleBtn.classList.add('hidden');
+        toggleBtn.title = 'Show password';
+    }
+}
+
+// Close modal when clicking outside of it
+window.onclick = function(event) {
+    const websocketModal = document.getElementById('websocketSettingsModal');
+    const streamModal = document.getElementById('streamPromotionSettingsModal');
+    
+    if (event.target === websocketModal) {
+        closeWebSocketSettingsModal();
+    }
+    if (event.target === streamModal) {
+        closeStreamPromotionSettingsModal();
     }
 }
 
 
 function updateConnectButton() {
-    const connectBtn = document.getElementById('connectBtn');
-    isConnected = getStorageItem('isConnected') === 'true';
+    // Legacy function - now updates toggle instead
+    updateWebSocketToggle();
+}
 
-    if (!connectBtn) return;
-    if (isConnected) {
-        connectBtn.textContent = 'Disconnect';
-        connectBtn.style.backgroundColor = 'red';
-    } else {
-        connectBtn.textContent = 'Connect';
-        connectBtn.style.backgroundColor = 'green';
-    }
+function updateWebSocketToggle() {
+    const toggle = document.getElementById('websocketToggle');
+    if (!toggle) return;
+    
+    isConnected = getStorageItem('isConnected') === 'true';
+    toggle.checked = isConnected;
     
     // Update replay source settings visibility based on WebSocket connection
     updateReplaySourceSettingsVisibility();

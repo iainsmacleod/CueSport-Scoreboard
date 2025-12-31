@@ -20,8 +20,6 @@
     let isAuthenticated = false;
     let isObsStreaming = false;
     let streamingCheckInterval = null;
-    let autoResumeEnabled = false;
-    let autoResumePending = false;
     let isBlockedByServer = false;
     let blockedReason = null;
     
@@ -132,12 +130,17 @@
     
     // Get manual stream URL synchronously (for button state checks)
     function getManualStreamUrl() {
-        const manualUrlField = document.getElementById('manualStreamUrl');
-        if (manualUrlField && manualUrlField.value) {
-            const manualUrl = String(manualUrlField.value).trim();
+        // Try modal input first, then fallback to localStorage
+        const modalInput = document.getElementById('manualStreamUrlModal');
+        if (modalInput && modalInput.value) {
+            const manualUrl = String(modalInput.value).trim();
             if (manualUrl && isValidStreamUrl(manualUrl)) {
                 return manualUrl;
             }
+        }
+        const saved = getStorageItem('manualStreamUrl');
+        if (saved && isValidStreamUrl(saved)) {
+            return saved;
         }
         return '';
     }
@@ -393,10 +396,9 @@
                             isBlockedByServer = true;
                             isAuthenticated = false;
                             isEnabled = false;
-                            autoResumePending = false;
                             setStorageItem('enabled', 'false');
-                            setStorageItem('autoResumePending', 'false');
-                            updateConnectButton();
+                            setStorageItem('streamPromotionEnabled', 'false');
+                            updateStreamPromotionToggle();
                             updateStreamSharingVisibility();
                             alert(`Stream sharing blocked:\n${blockedReason}`);
                             ws.close(4003, 'API key blocked');
@@ -501,54 +503,18 @@
         console.log('Disconnected');
     }
     
-    // Update connect/disconnect button text and visibility
+    // Update connect/disconnect button text and visibility (legacy - now updates toggle)
     function updateConnectButton() {
-        const btn = document.getElementById('streamConnectBtn');
-        if (!btn) return;
+        updateStreamPromotionToggle();
+    }
+    
+    // Update stream promotion toggle state
+    function updateStreamPromotionToggle() {
+        const toggle = document.getElementById('streamPromotionToggle');
+        if (!toggle) return;
         
-        // Disable button if not streaming
-        if (!isObsStreaming) {
-            if (isBlockedByServer) {
-                btn.textContent = 'Connect (Blocked)';
-            } else if (autoResumeEnabled && autoResumePending) {
-                btn.textContent = 'Auto-resume when Live';
-            } else {
-                btn.textContent = 'Connect (Not Streaming)';
-            }
-            btn.style.backgroundColor = '#999'; // Gray
-            btn.disabled = true;
-            btn.style.cursor = 'not-allowed';
-            return;
-        }
-        
-        // Disable button if stream URL is missing
-        const streamUrl = getManualStreamUrl();
-        if (!streamUrl || streamUrl === '') {
-            btn.textContent = 'Connect (URL Required)';
-            btn.style.backgroundColor = '#999'; // Gray
-            btn.disabled = true;
-            btn.style.cursor = 'not-allowed';
-            return;
-        }
-        
-        btn.disabled = false;
-        btn.style.cursor = 'pointer';
-        
-        if (isBlockedByServer) {
-            btn.textContent = 'Connect (Blocked)';
-            btn.style.backgroundColor = '#999';
-            btn.disabled = true;
-            btn.style.cursor = 'not-allowed';
-        } else if (isEnabled && isConnected && isAuthenticated) {
-            btn.textContent = 'Disconnect';
-            btn.style.backgroundColor = 'red'; // Red - matches WebSocket button
-        } else if (isEnabled && isConnected) {
-            btn.textContent = 'Connecting...';
-            btn.style.backgroundColor = '#FF9800'; // Orange
-        } else {
-            btn.textContent = 'Connect';
-            btn.style.backgroundColor = 'green'; // Green - matches WebSocket button
-        }
+        // Update toggle state based on connection status
+        toggle.checked = isEnabled && (isConnected || isAuthenticated);
     }
     
     // Update stream sharing UI visibility based on streaming state
@@ -567,19 +533,16 @@
         const streamElements = [];
         streamElements.push(section);
         
-        // Find elements by their IDs
+        // Find elements by their IDs (legacy elements that may not exist anymore)
         const apiKeyField = document.getElementById('streamApiKey');
         const connectBtn = document.getElementById('streamConnectBtn');
         const statusEl = document.getElementById('streamConnectionStatus');
         const manualUrlField = document.getElementById('manualStreamUrl');
-        const autoResumeCheckbox = document.getElementById('autoResumeSharing');
-        const autoResumeField = autoResumeCheckbox ? autoResumeCheckbox.closest('.field') : null;
         
         if (apiKeyField) streamElements.push(apiKeyField.parentElement);
         if (connectBtn) streamElements.push(connectBtn.parentElement);
         if (statusEl) streamElements.push(statusEl.parentElement);
         if (manualUrlField) streamElements.push(manualUrlField.parentElement);
-        if (autoResumeField) streamElements.push(autoResumeField);
         
         // Apply styling based on streaming state
         streamElements.forEach(el => {
@@ -596,19 +559,15 @@
     }
 
     function handleStreamingStopped() {
-        const wasSharing = isEnabled && (isConnected || isAuthenticated);
-        const shouldResume = !isBlockedByServer && autoResumeEnabled && (wasSharing || autoResumePending);
-
         if (isConnected || isAuthenticated) {
             console.log('OBS stopped streaming, disconnecting stream sharing');
             disconnect();
         }
 
-        isEnabled = false;
-        setStorageItem('enabled', 'false');
-
-        autoResumePending = shouldResume;
-        setStorageItem('autoResumePending', autoResumePending ? 'true' : 'false');
+        // Note: We keep isEnabled true to maintain persistent state
+        // Connection will resume automatically when streaming starts again
+        updateStreamPromotionToggle();
+        updateStreamSharingVisibility();
     }
     
     // Check OBS streaming status
@@ -643,13 +602,6 @@
 
                 // If streaming has started and sharing is enabled, ensure connection
                 if (!wasStreaming && isObsStreaming) {
-                    if (!isBlockedByServer && autoResumeEnabled && autoResumePending) {
-                        isEnabled = true;
-                        setStorageItem('enabled', 'true');
-                        autoResumePending = autoResumeEnabled;
-                        setStorageItem('autoResumePending', autoResumePending ? 'true' : 'false');
-                    }
-
                     if (!isBlockedByServer && isEnabled && (!isConnected || !isAuthenticated)) {
                         console.log('OBS streaming detected, reconnecting stream sharing');
                         connect();
@@ -679,49 +631,58 @@
         }
     }
     
-    // Toggle stream sharing on/off
-    function toggleShareStream() {
+    // Toggle stream sharing on/off (new toggle-based version)
+    function toggleStreamPromotion() {
+        const toggle = document.getElementById('streamPromotionToggle');
+        if (!toggle) return;
+        
         if (isBlockedByServer) {
+            toggle.checked = false;
             const reason = blockedReason || 'API key is blocked by administrator';
             alert(`Stream sharing is blocked:\n${reason}`);
             return;
         }
 
-        // Don't allow connection if not streaming
-        if (!isObsStreaming) {
-            alert('OBS must be streaming to share your game data.');
-            return;
-        }
-        
-        // Require stream URL before connecting
-        const streamUrl = getManualStreamUrl();
-        if (!streamUrl || streamUrl === '') {
-            alert('Stream URL is required. Please enter your stream URL before connecting.');
-            const manualUrlField = document.getElementById('manualStreamUrl');
-            if (manualUrlField) {
-                manualUrlField.focus();
+        // If trying to enable but not configured, show modal
+        if (toggle.checked) {
+            const streamUrl = getManualStreamUrl();
+            if (!streamUrl || streamUrl === '') {
+                toggle.checked = false;
+                openStreamPromotionSettingsModal();
+                return;
             }
-            return;
-        }
-        
-        if (isEnabled && isConnected) {
-            // Disconnect
-            isEnabled = false;
-            setStorageItem('enabled', 'false');
-            autoResumePending = autoResumeEnabled;
-            setStorageItem('autoResumePending', autoResumePending ? 'true' : 'false');
-            disconnect();
-            updateConnectButton();
-            updateStreamSharingVisibility();
-        } else {
+            
+            // Don't allow connection if not streaming
+            if (!isObsStreaming) {
+                toggle.checked = false;
+                alert('OBS must be streaming to share your game data.');
+                return;
+            }
+            
             // Connect
             isEnabled = true;
             setStorageItem('enabled', 'true');
-            autoResumePending = autoResumeEnabled;
-            setStorageItem('autoResumePending', autoResumePending ? 'true' : 'false');
-            updateConnectButton();
+            setStorageItem('streamPromotionEnabled', 'true'); // Persistent enabled state
+            updateStreamPromotionToggle();
             updateStreamSharingVisibility();
             connect();
+        } else {
+            // Disconnect
+            isEnabled = false;
+            setStorageItem('enabled', 'false');
+            setStorageItem('streamPromotionEnabled', 'false'); // Persistent enabled state
+            disconnect();
+            updateStreamPromotionToggle();
+            updateStreamSharingVisibility();
+        }
+    }
+    
+    // Legacy function for backwards compatibility
+    function toggleShareStream() {
+        const toggle = document.getElementById('streamPromotionToggle');
+        if (toggle) {
+            toggle.checked = !toggle.checked;
+            toggleStreamPromotion();
         }
     }
     
@@ -779,108 +740,13 @@
     
     // Initialize on page load
     function init() {
-        // Load saved settings
-        const savedEnabled = getStorageItem('enabled') === 'true';
+        // Load saved settings - check for persistent enabled state
+        const savedEnabled = getStorageItem('streamPromotionEnabled') === 'true' || getStorageItem('enabled') === 'true';
         isEnabled = savedEnabled;
         
-        // Load saved manual stream URL
-        const savedStreamUrl = getStorageItem('manualStreamUrl');
-        const manualUrlField = document.getElementById('manualStreamUrl');
-        if (manualUrlField && savedStreamUrl) {
-            manualUrlField.value = savedStreamUrl;
-        }
-
-        // Load auto-resume sharing preference
-        const autoResumeCheckbox = document.getElementById('autoResumeSharing');
-        autoResumeEnabled = getStorageItem('autoResumeSharing') === 'true';
-        autoResumePending = getStorageItem('autoResumePending') === 'true';
-
-        if (!autoResumeEnabled && autoResumePending) {
-            autoResumePending = false;
-            setStorageItem('autoResumePending', 'false');
-        }
-
-        if (autoResumeEnabled && isEnabled) {
-            autoResumePending = true;
-            setStorageItem('autoResumePending', 'true');
-        }
-
-        if (autoResumeCheckbox) {
-            autoResumeCheckbox.checked = autoResumeEnabled;
-            autoResumeCheckbox.addEventListener('change', () => {
-                autoResumeEnabled = autoResumeCheckbox.checked;
-                setStorageItem('autoResumeSharing', autoResumeEnabled ? 'true' : 'false');
-
-                if (autoResumeEnabled) {
-                    if (isConnected || isAuthenticated || isEnabled) {
-                        autoResumePending = true;
-                    }
-                } else {
-                    autoResumePending = false;
-                    if (!isObsStreaming && !isConnected && isEnabled) {
-                        isEnabled = false;
-                        setStorageItem('enabled', 'false');
-                    }
-                }
-
-                setStorageItem('autoResumePending', autoResumePending ? 'true' : 'false');
-
-                updateConnectButton();
-                updateStreamSharingVisibility();
-            });
-        }
-
-        updateConnectButton();
+        // Update toggle state
+        updateStreamPromotionToggle();
         updateStreamSharingVisibility();
-        
-        // Save manual URL when changed and update button state
-        if (manualUrlField) {
-            // Add visual feedback for URL validation
-            const updateUrlValidation = () => {
-                const urlValue = manualUrlField.value.trim();
-                if (urlValue && !isValidStreamUrl(urlValue)) {
-                    manualUrlField.style.borderColor = '#f44336'; // Red border for invalid
-                    manualUrlField.style.backgroundColor = '#ffebee'; // Light red background
-                } else {
-                    manualUrlField.style.borderColor = '';
-                    manualUrlField.style.backgroundColor = '';
-                }
-            };
-            
-            manualUrlField.addEventListener('blur', function() {
-                const trimmed = this.value.trim();
-                updateUrlValidation();
-                
-                // Only save if valid URL
-                if (trimmed && isValidStreamUrl(trimmed)) {
-                    setStorageItem('manualStreamUrl', trimmed);
-                } else if (trimmed) {
-                    // Show alert for invalid URL
-                    alert('Please enter a valid URL starting with http:// or https://');
-                    this.focus();
-                    return;
-                } else {
-                    setStorageItem('manualStreamUrl', '');
-                }
-                
-                updateConnectButton();
-                if (isEnabled && isConnected && isAuthenticated) {
-                    sendGameState();
-                }
-            });
-            manualUrlField.addEventListener('input', function() {
-                updateUrlValidation();
-                updateConnectButton();
-            });
-            manualUrlField.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    this.blur();
-                }
-            });
-            
-            // Initial validation check
-            updateUrlValidation();
-        }
         
         // Update API key display
         updateApiKeyDisplay();
@@ -914,17 +780,93 @@
             });
         }
         
-        // Don't auto-connect on page load - user must manually connect
-        // But if they were connected and OBS is streaming, we can reconnect
-        if (isEnabled && isObsStreaming) {
-            // Delay connection slightly to ensure DOM is ready
-            setTimeout(() => {
-                if (isEnabled && isObsStreaming) {
-                    connect();
+        // Auto-connect if previously enabled and configured
+        if (isEnabled) {
+            const streamUrl = getManualStreamUrl();
+            if (!streamUrl || streamUrl === '') {
+                // Was enabled but URL is missing - disable and show modal if toggle is on
+                isEnabled = false;
+                setStorageItem('enabled', 'false');
+                setStorageItem('streamPromotionEnabled', 'false');
+                const toggle = document.getElementById('streamPromotionToggle');
+                if (toggle && toggle.checked) {
+                    toggle.checked = false;
+                    openStreamPromotionSettingsModal();
                 }
-            }, 500);
+            } else {
+                // Was enabled and configured - auto-connect when OBS starts streaming
+                // Connection will happen automatically when OBS streaming is detected
+                // Delay slightly to ensure DOM is ready
+                setTimeout(() => {
+                    if (isEnabled && isObsStreaming) {
+                        connect();
+                    }
+                }, 500);
+            }
         }
     }
+    
+    // Stream Promotion Settings Modal Functions
+    function openStreamPromotionSettingsModal() {
+        const modal = document.getElementById('streamPromotionSettingsModal');
+        if (!modal) return;
+        
+        // Load current values into modal
+        const urlInput = document.getElementById('manualStreamUrlModal');
+        if (urlInput) {
+            const saved = getStorageItem('manualStreamUrl');
+            urlInput.value = saved || '';
+        }
+        
+        modal.style.display = 'block';
+    }
+    
+    function closeStreamPromotionSettingsModal() {
+        const modal = document.getElementById('streamPromotionSettingsModal');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+    }
+    
+    function saveStreamPromotionSettings() {
+        const urlInput = document.getElementById('manualStreamUrlModal');
+        if (!urlInput) return;
+        
+        const url = urlInput.value.trim();
+        
+        // Validate URL if provided
+        if (url && !isValidStreamUrl(url)) {
+            alert('Please enter a valid URL starting with http:// or https://');
+            urlInput.focus();
+            return;
+        }
+        
+        // Save to localStorage
+        if (url) {
+            setStorageItem('manualStreamUrl', url);
+        } else {
+            setStorageItem('manualStreamUrl', '');
+        }
+        
+        closeStreamPromotionSettingsModal();
+        
+        // If toggle is on, attempt to connect (if OBS is streaming)
+        const toggle = document.getElementById('streamPromotionToggle');
+        if (toggle && toggle.checked && isObsStreaming) {
+            if (!isConnected && !isAuthenticated) {
+                connect();
+            }
+        }
+        
+        updateStreamPromotionToggle();
+        updateStreamSharingVisibility();
+    }
+    
+    // Expose modal functions globally
+    window.openStreamPromotionSettingsModal = openStreamPromotionSettingsModal;
+    window.closeStreamPromotionSettingsModal = closeStreamPromotionSettingsModal;
+    window.saveStreamPromotionSettings = saveStreamPromotionSettings;
+    window.toggleStreamPromotion = toggleStreamPromotion;
     
     // Export public API
     window.streamSharing = {
@@ -950,10 +892,9 @@
             if (isConnected || isAuthenticated) {
                 isEnabled = false;
                 setStorageItem('enabled', 'false');
-                autoResumePending = false;
-                setStorageItem('autoResumePending', 'false');
+                setStorageItem('streamPromotionEnabled', 'false');
                 disconnect();
-                updateConnectButton();
+                updateStreamPromotionToggle();
                 updateStreamSharingVisibility();
             }
         },

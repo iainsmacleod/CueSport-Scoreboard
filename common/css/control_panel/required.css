@@ -359,6 +359,49 @@ input {
 	font-variant: small-caps;
 }
 
+.section-header-with-controls {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 15px 0 0 0;
+	clear: both;
+	font-weight: bold;
+	font-size: 16px;
+	font-variant: small-caps;
+	width: 100%;
+}
+
+.section-header-with-controls > span {
+	text-decoration: underline;
+	flex: 1;
+}
+
+.section-controls {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+.settings-cog-btn {
+	background: transparent;
+	border: none;
+	color: white;
+	font-size: 18px;
+	cursor: pointer;
+	padding: 4px 8px;
+	border-radius: 4px;
+	transition: background-color 0.2s;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 28px;
+	height: 28px;
+}
+
+.settings-cog-btn:hover {
+	background-color: rgba(255, 255, 255, 0.1);
+}
+
 #ballTracker {
 	display: flex;
 	justify-content: center;
@@ -615,4 +658,199 @@ input:checked+.slider_round:before {
 
 #btnMonitorGame{
     min-width: 134px;
+}
+
+/* Modal Styles */
+.modal {
+	display: none;
+	position: fixed;
+	z-index: 1000;
+	left: 0;
+	top: 0;
+	width: 100%;
+	height: 100%;
+	overflow: auto;
+	background-color: rgba(0, 0, 0, 0.6);
+	backdrop-filter: blur(2px);
+}
+
+.modal-content {
+	background-color: #2b2e38;
+	margin: 10% auto;
+	padding: 0;
+	border: 2px solid #000;
+	border-radius: 0px 0px 10px 0px;
+	display: table;
+	width: 90%;
+	max-width: 500px;
+	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.modal-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 15px 20px;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modal-header h2 {
+	margin: 0;
+	font-size: 18px;
+	font-weight: bold;
+	text-decoration: underline;
+	font-variant: small-caps;
+}
+
+.modal-close {
+	color: white;
+	font-size: 28px;
+	font-weight: bold;
+	cursor: pointer;
+	line-height: 1;
+	transition: color 0.2s;
+}
+
+.modal-close:hover {
+	color: #ed4e54;
+}
+
+.modal-body {
+	padding: 20px;
+	display: block;
+}
+
+#websocketSettingsModal .modal-body .form-row,
+#streamPromotionSettingsModal .modal-body .form-row {
+	display: flex !important;
+	flex-direction: column !important;
+	align-items: stretch !important;
+	justify-content: flex-start !important;
+	gap: 8px !important;
+	margin-bottom: 15px !important;
+	column-gap: 0 !important;
+	width: 100% !important;
+}
+
+#websocketSettingsModal .modal-body .form-row .field,
+#streamPromotionSettingsModal .modal-body .form-row .field {
+	display: flex !important;
+	flex-direction: column !important;
+	align-items: flex-start !important;
+	justify-content: flex-start !important;
+	gap: 5px !important;
+	width: 100% !important;
+	flex-wrap: nowrap !important;
+}
+
+#websocketSettingsModal .modal-body .form-row .field label,
+#streamPromotionSettingsModal .modal-body .form-row .field label {
+	display: block !important;
+	margin-bottom: 5px !important;
+	width: 100% !important;
+	flex-shrink: 0 !important;
+	text-align: left !important;
+}
+
+#websocketSettingsModal .modal-body .form-row .field input,
+#streamPromotionSettingsModal .modal-body .form-row .field input {
+	width: 100% !important;
+	box-sizing: border-box !important;
+	flex-shrink: 0 !important;
+}
+
+#websocketSettingsModal .password-input-wrapper,
+#streamPromotionSettingsModal .password-input-wrapper {
+	display: flex !important;
+	align-items: center !important;
+	gap: 8px !important;
+	width: 100% !important;
+}
+
+#websocketSettingsModal .password-input-wrapper input,
+#streamPromotionSettingsModal .password-input-wrapper input {
+	flex: 1 !important;
+	width: auto !important;
+}
+
+.password-toggle-btn {
+	background: transparent;
+	border: none;
+	cursor: pointer;
+	padding: 4px 8px;
+	font-size: 18px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 32px;
+	height: 32px;
+	border-radius: 4px;
+	transition: background-color 0.2s;
+	color: inherit;
+}
+
+.password-toggle-btn:hover {
+	background-color: rgba(255, 255, 255, 0.1);
+}
+
+.eye-icon {
+	display: inline-block;
+	font-size: 18px;
+	line-height: 1;
+	transition: all 0.2s;
+	position: relative;
+	color: inherit;
+}
+
+.password-toggle-btn.hidden .eye-icon {
+	opacity: 0.5;
+}
+
+.password-toggle-btn.hidden .eye-icon::after {
+	content: '';
+	position: absolute;
+	left: 0;
+	top: 50%;
+	width: 100%;
+	height: 2px;
+	background-color: currentColor;
+	transform: translateY(-50%) rotate(-45deg);
+	transform-origin: center;
+}
+
+.modal-footer {
+	display: flex;
+	justify-content: flex-end;
+	padding: 15px 20px;
+	border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modal-footer-buttons {
+	display: flex;
+	gap: 10px;
+	width: 100%;
+	justify-content: flex-end;
+}
+
+.modal-save-btn {
+	background: green;
+	color: black;
+	min-width: 100px;
+}
+
+.modal-cancel-btn {
+	background: red;
+	color: black;
+	min-width: 100px;
+}
+
+/* Toggle states for connection status */
+#websocketToggle:checked + .slider_round,
+#streamPromotionToggle:checked + .slider_round {
+	background-color: #4caf50; /* Green when connected */
+}
+
+#websocketToggle:not(:checked) + .slider_round,
+#streamPromotionToggle:not(:checked) + .slider_round {
+	background-color: #cc8181; /* Gray/red when disconnected */
 }
