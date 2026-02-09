@@ -388,6 +388,17 @@ const dbOps = {
         stmt.run(connectionId);
     },
 
+    getConnectionLastGameType(connectionId) {
+        if (!connectionId) {
+            return null;
+        }
+        const row = db.prepare(`
+            SELECT last_game_type FROM connections WHERE connection_id = ?
+        `).get(connectionId);
+        const value = row && row.last_game_type && String(row.last_game_type).trim();
+        return value || null;
+    },
+
     incrementGameTypeUsage(connectionId, gameType) {
         if (!connectionId || !gameType) {
             return;

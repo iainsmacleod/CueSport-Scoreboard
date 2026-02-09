@@ -643,13 +643,17 @@ wss.on('connection', (ws, req) => {
                     // Get or create connection ID (will reuse active session if exists)
                     const connectionId = dbOps.recordConnectionStart(apiKey);
 
+                    // Restore last known game type so the first state update after reconnect
+                    // is not counted as a game-type change (avoids inflating stats on refresh/reconnect)
+                    const lastGameType = dbOps.getConnectionLastGameType(connectionId);
+
                     // Check if this is a reconnection (reusing existing session)
                     const isReconnection = existingConnectionId && existingConnectionId === connectionId;
 
                     activeConnections.set(apiKey, {
                         ws,
                         connectionId,
-                        currentGameType: null,
+                        currentGameType: lastGameType,
                         lastUpdate: Date.now(),
                         features: {
                             player1Enabled: false,
@@ -721,8 +725,11 @@ wss.on('connection', (ws, req) => {
                         features: featureSnapshot
                     });
 
-                    if (sanitizedState.gameType && sanitizedState.gameType !== connectionInfo.currentGameType) {
+                    // Only count as a change when user actually switched game type (not initial state or reconnect)
+                    if (sanitizedState.gameType && connectionInfo.currentGameType != null && sanitizedState.gameType !== connectionInfo.currentGameType) {
                         dbOps.incrementGameTypeUsage(connectionInfo.connectionId, sanitizedState.gameType);
+                    }
+                    if (sanitizedState.gameType) {
                         connectionInfo.currentGameType = sanitizedState.gameType;
                     }
 
