@@ -160,6 +160,26 @@ function initDatabase() {
         // If migration fails, it's not critical - the column might already exist
     }
 
+    try {
+        const connectionsInfo = db.prepare('PRAGMA table_info(connections)').all();
+        const hasRacksNet = connectionsInfo.some(col => col.name === 'racks_net');
+        if (!hasRacksNet) {
+            console.log('Migrating database: Adding rack score tracking columns...');
+            db.exec(`
+                ALTER TABLE connections ADD COLUMN racks_net INTEGER DEFAULT 0
+            `);
+            db.exec(`
+                ALTER TABLE connections ADD COLUMN last_p1_score INTEGER
+            `);
+            db.exec(`
+                ALTER TABLE connections ADD COLUMN last_p2_score INTEGER
+            `);
+            console.log('Migration complete: rack score tracking columns added');
+        }
+    } catch (error) {
+        console.error('Error during connections migration:', error);
+    }
+
     console.log('Database initialized successfully');
 }
 
@@ -399,6 +419,52 @@ const dbOps = {
         return value || null;
     },
 
+    getConnectionScoreState(connectionId) {
+        if (!connectionId) {
+            return { lastP1Score: null, lastP2Score: null, scoresInitialized: false };
+        }
+        const row = db.prepare(`
+            SELECT last_p1_score, last_p2_score FROM connections WHERE connection_id = ?
+        `).get(connectionId);
+
+        if (!row) {
+            return { lastP1Score: null, lastP2Score: null, scoresInitialized: false };
+        }
+
+        const scoresInitialized = row.last_p1_score !== null && row.last_p2_score !== null;
+        return {
+            lastP1Score: row.last_p1_score,
+            lastP2Score: row.last_p2_score,
+            scoresInitialized
+        };
+    },
+
+    updateConnectionScores(connectionId, p1Score, p2Score) {
+        if (!connectionId) {
+            return;
+        }
+        db.prepare(`
+            UPDATE connections
+            SET last_p1_score = ?, last_p2_score = ?, last_update_at = CURRENT_TIMESTAMP
+            WHERE connection_id = ?
+        `).run(p1Score, p2Score, connectionId);
+    },
+
+    addRacksNet(connectionId, delta, p1Score, p2Score) {
+        if (!connectionId) {
+            return;
+        }
+        db.prepare(`
+            UPDATE connections
+            SET
+                racks_net = COALESCE(racks_net, 0) + ?,
+                last_p1_score = ?,
+                last_p2_score = ?,
+                last_update_at = CURRENT_TIMESTAMP
+            WHERE connection_id = ?
+        `).run(delta, p1Score, p2Score, connectionId);
+    },
+
     incrementGameTypeUsage(connectionId, gameType) {
         if (!connectionId || !gameType) {
             return;
@@ -522,7 +588,8 @@ const dbOps = {
                 AVG(duration_seconds) AS avg_seconds,
                 SUM(used_score_display) AS score_sessions,
                 SUM(used_ball_tracker) AS ball_tracker_sessions,
-                SUM(used_shot_clock) AS shot_clock_sessions
+                SUM(used_shot_clock) AS shot_clock_sessions,
+                SUM(COALESCE(racks_net, 0)) AS racks_net
             FROM connections
             GROUP BY api_key
         `).all();
@@ -554,10 +621,10 @@ const dbOps = {
             // Count ball type usage
             if (features.ballType) {
                 if (!ballTypeMap.has(apiKey)) {
-                    ballTypeMap.set(apiKey, { World: 0, International: 0 });
+                    ballTypeMap.set(apiKey, { World: 0, International: 0, Unity: 0 });
                 }
                 const counts = ballTypeMap.get(apiKey);
-                if (features.ballType === 'World' || features.ballType === 'International') {
+                if (features.ballType === 'World' || features.ballType === 'International' || features.ballType === 'Unity') {
                     counts[features.ballType] = (counts[features.ballType] || 0) + 1;
                 }
             }
@@ -682,7 +749,8 @@ const dbOps = {
                     ballTrackerSessions: summary.ball_tracker_sessions || 0,
                     shotClockSessions: summary.shot_clock_sessions || 0,
                     breakingPlayerSessions: breakingPlayerMap.get(apiKey) || 0,
-                    ballType: ballTypeMap.get(apiKey) || { World: 0, International: 0 }
+                    ballType: ballTypeMap.get(apiKey) || { World: 0, International: 0, Unity: 0 },
+                    racksNet: summary.racks_net || 0
                 },
                 isBlocked: meta.is_blocked === 1,
                 blockedReason: meta.blocked_reason || null,
@@ -714,7 +782,8 @@ const dbOps = {
                 SUM(duration_seconds) AS total_duration,
                 SUM(CASE WHEN used_score_display > 0 THEN 1 ELSE 0 END) AS score_sessions,
                 SUM(CASE WHEN used_ball_tracker > 0 THEN 1 ELSE 0 END) AS ball_sessions,
-                SUM(CASE WHEN used_shot_clock > 0 THEN 1 ELSE 0 END) AS shot_sessions
+                SUM(CASE WHEN used_shot_clock > 0 THEN 1 ELSE 0 END) AS shot_sessions,
+                SUM(COALESCE(racks_net, 0)) AS total_racks_net
             FROM connections
         `).get();
 
@@ -724,6 +793,7 @@ const dbOps = {
             averageDurationSeconds: aggregate && typeof aggregate.average_duration === 'number' ? aggregate.average_duration : 0,
             longestDurationSeconds: aggregate && typeof aggregate.longest_duration === 'number' ? aggregate.longest_duration : 0,
             totalDurationSeconds: aggregate && typeof aggregate.total_duration === 'number' ? aggregate.total_duration : 0,
+            totalRacksNet: aggregate && typeof aggregate.total_racks_net === 'number' ? aggregate.total_racks_net : 0,
             featureUsageCounts: {
                 scoreDisplay: aggregate && typeof aggregate.score_sessions === 'number' ? aggregate.score_sessions : 0,
                 ballTracker: aggregate && typeof aggregate.ball_sessions === 'number' ? aggregate.ball_sessions : 0,
@@ -737,7 +807,7 @@ const dbOps = {
         `).all();
 
         let breakingPlayerCount = 0;
-        const ballTypeCounts = { World: 0, International: 0 };
+        const ballTypeCounts = { World: 0, International: 0, Unity: 0 };
         
         allConnectionsForGlobal.forEach(row => {
             let features = {};
@@ -753,7 +823,7 @@ const dbOps = {
                 breakingPlayerCount++;
             }
             
-            if (features.ballType === 'World' || features.ballType === 'International') {
+            if (features.ballType === 'World' || features.ballType === 'International' || features.ballType === 'Unity') {
                 ballTypeCounts[features.ballType] = (ballTypeCounts[features.ballType] || 0) + 1;
             }
         });

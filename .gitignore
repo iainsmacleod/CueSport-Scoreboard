@@ -69,6 +69,10 @@ dist/
 build/
 *.tsbuildinfo
 
+# Local Docker build/push scripts (do not commit)
+backend/build-and-push.ps1
+backend/build-and-push.sh
+
 # Temporary files
 tmp/
 temp/

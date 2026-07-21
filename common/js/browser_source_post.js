@@ -74,6 +74,19 @@ const handlers = {
         }
     },
 
+    balls(data) {
+        console.log(`Player: ${data.player}, Balls: ${data.balls}`);
+        const ballsElement = document.getElementById(`player${data.player}Balls`);
+        if (ballsElement) {
+            ballsElement.innerHTML = data.balls;
+        }
+    },
+
+    dualScoreDisplay(data) {
+        setStorageItem("dualScoreDisplay", data.dualScoreDisplay);
+        syncBallsVisibility();
+    },
+
     opacity(data) {
         console.log(`Opacity setting: ${data.opacity}`);
         const elements = ["scoreBoardDiv", "gameInfo", "ballTracker", "videoContainer"];
@@ -238,6 +251,7 @@ const handlers = {
         } else {
             hideScores();
         }
+        syncBallsVisibility();
     },
 
     clockDisplay(data) {
@@ -372,6 +386,9 @@ const handlers = {
 
     gameType(data) {
         console.log('Game type value:', data.gameType);
+        if (data.gameType) {
+            setStorageItem("gameType", data.gameType);
+        }
         if (data.gameType === "game2") {
             // 9-ball
             ["10", "11", "12", "13", "14", "15"].forEach(num => {
@@ -389,6 +406,7 @@ const handlers = {
                 document.getElementById(`ball ${num}`).classList.remove("noShow");
             });
         }
+        syncBallsVisibility();
     },
 
     ballSelection(data) {
@@ -586,6 +604,8 @@ document.getElementById("player2Name").innerHTML = getStorageItem("p2NameCtrlPan
 // Initialize scores from storage on overlay load
 document.getElementById("player1Score").innerHTML = getStorageItem("p1ScoreCtrlPanel") || getStorageItem("p1Score") || 0;
 document.getElementById("player2Score").innerHTML = getStorageItem("p2ScoreCtrlPanel") || getStorageItem("p2Score") || 0;
+document.getElementById("player1Balls").innerHTML = getStorageItem("p1BallsCtrlPanel") || getStorageItem("p1Balls") || 0;
+document.getElementById("player2Balls").innerHTML = getStorageItem("p2BallsCtrlPanel") || getStorageItem("p2Balls") || 0;
 
 // Code to assist with displaying active player image when only two players are enabled, on reload.
 const player1Enabled = getStorageItem("usePlayer1") === "yes";
@@ -664,6 +684,8 @@ if (getStorageItem("raceInfo") != "" && getStorageItem("raceInfo") != null && bo
     document.getElementById("customLogo1").classList.add("customLogoWide1");
     document.getElementById("customLogo2").classList.add("customLogoWide2");
 }
+
+syncBallsVisibility();
 
 
 

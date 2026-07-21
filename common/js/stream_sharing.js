@@ -278,13 +278,21 @@
         const breakingPlayerEnabled = breakingPlayerSetting === 'yes' || breakingPlayerSetting === 'true' || breakingPlayerSetting === '1';
         
         const ballSelection = String(getStorage(`${storagePrefix}ballSelection`, getStorage('ballSelection', 'american')) || 'american').toLowerCase();
-        const ballType = ballSelection === 'international' ? 'International' : 'World';
+        let ballType = 'World';
+        if (ballSelection === 'international') {
+            ballType = 'International';
+        } else if (ballSelection === 'unity') {
+            ballType = 'Unity';
+        }
         
         return {
             player1Name: getValue('p1Name', '') || getStorage(`${storagePrefix}p1NameCtrlPanel`, ''),
             player2Name: getValue('p2Name', '') || getStorage(`${storagePrefix}p2NameCtrlPanel`, ''),
             p1Score: parseInt(getValue('p1Score', '0')) || parseInt(getStorage(`${storagePrefix}p1ScoreCtrlPanel`, '0')) || 0,
             p2Score: parseInt(getValue('p2Score', '0')) || parseInt(getStorage(`${storagePrefix}p2ScoreCtrlPanel`, '0')) || 0,
+            p1Balls: parseInt(getValue('p1Balls', '0')) || parseInt(getStorage(`${storagePrefix}p1BallsCtrlPanel`, '0')) || 0,
+            p2Balls: parseInt(getValue('p2Balls', '0')) || parseInt(getStorage(`${storagePrefix}p2BallsCtrlPanel`, '0')) || 0,
+            pointBased: getStorage(`${storagePrefix}pointBased`, 'no'),
             gameType: getStorage(`${storagePrefix}gameType`, 'game1'),
             raceInfo: getValue('raceInfoTxt', '') || getStorage(`${storagePrefix}raceInfo`, ''),
             gameInfo: getValue('gameInfoTxt', '') || getStorage(`${storagePrefix}gameInfo`, ''),

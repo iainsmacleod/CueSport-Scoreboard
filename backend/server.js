@@ -448,18 +448,92 @@ function checkRateLimit(apiKey) {
 }
 
 // Sanitize input to prevent injection
-function sanitizeInput(input) {
-    if (typeof input === 'string') {
-        // Remove control characters and limit length
-        return input
-            .replace(/[\x00-\x1F\x7F]/g, '')
-            .substring(0, 100);
+const ALLOWED_GAME_TYPES = new Set(['game1', 'game2', 'game3', 'game4', 'game5', 'game6', 'game7']);
+const RECONNECT_GRACE_MS = 90000;
+
+function sanitizeInput(input, maxLength = 100) {
+    if (typeof input !== 'string') {
+        return '';
     }
-    return input;
+    return input
+        .replace(/[\x00-\x1F\x7F]/g, '')
+        .replace(/<[^>]*>/g, '')
+        .replace(/[<>&"'`]/g, '')
+        .trim()
+        .substring(0, maxLength);
+}
+
+function sanitizeGameType(value) {
+    const cleaned = sanitizeInput(String(value || 'game1'), 10);
+    return ALLOWED_GAME_TYPES.has(cleaned) ? cleaned : 'game1';
+}
+
+function sanitizeBallType(value) {
+    const normalized = sanitizeInput(String(value || ''), 20).toLowerCase();
+    if (normalized === 'international') {
+        return 'International';
+    }
+    if (normalized === 'unity') {
+        return 'Unity';
+    }
+    return 'World';
+}
+
+function sanitizeStreamUrl(raw) {
+    if (!raw || typeof raw !== 'string') {
+        return '';
+    }
+    try {
+        const url = new URL(raw.trim());
+        if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+            return '';
+        }
+        if (url.username || url.password) {
+            return '';
+        }
+        return url.href.substring(0, 500);
+    } catch (e) {
+        return '';
+    }
+}
+
+function applyRackScoreDelta(connectionInfo, connectionId, sanitizedState) {
+    const p1Score = sanitizedState.p1Score;
+    const p2Score = sanitizedState.p2Score;
+    const scoringActive = sanitizedState.scoreDisplay
+        && sanitizedState.player1Enabled
+        && sanitizedState.player2Enabled
+        && sanitizedState.gameType !== 'game4';
+
+    if (!connectionInfo.scoresInitialized) {
+        connectionInfo.lastP1Score = p1Score;
+        connectionInfo.lastP2Score = p2Score;
+        connectionInfo.scoresInitialized = true;
+        dbOps.updateConnectionScores(connectionId, p1Score, p2Score);
+        return;
+    }
+
+    let rackDelta = 0;
+    if (scoringActive) {
+        rackDelta = (p1Score - connectionInfo.lastP1Score) + (p2Score - connectionInfo.lastP2Score);
+    }
+
+    connectionInfo.lastP1Score = p1Score;
+    connectionInfo.lastP2Score = p2Score;
+
+    if (rackDelta !== 0) {
+        dbOps.addRacksNet(connectionId, rackDelta, p1Score, p2Score);
+    } else {
+        dbOps.updateConnectionScores(connectionId, p1Score, p2Score);
+    }
 }
 
 // Sanitize game state
 function sanitizeState(state) {
+    if (!state || typeof state !== 'object' || Array.isArray(state)) {
+        return null;
+    }
+
     const normalizeEnabled = (value) => {
         if (value === null || value === undefined) return true;
         if (typeof value === 'boolean') return value;
@@ -493,26 +567,14 @@ function sanitizeState(state) {
     };
 
     // Sanitize URL
-    let streamUrl = '';
-    if (state.streamUrl && typeof state.streamUrl === 'string') {
-        try {
-            const url = new URL(state.streamUrl);
-            // Only allow http/https URLs
-            if (url.protocol === 'http:' || url.protocol === 'https:') {
-                streamUrl = state.streamUrl.substring(0, 500); // Limit length
-            }
-        } catch (e) {
-            // Invalid URL, ignore
-            streamUrl = '';
-        }
-    }
+    const streamUrl = sanitizeStreamUrl(state.streamUrl || '');
     
     return {
         player1Name: sanitizeInput(state.player1Name || ''),
         player2Name: sanitizeInput(state.player2Name || ''),
-        p1Score: Math.max(0, Math.min(999, parseInt(state.p1Score) || 0)),
-        p2Score: Math.max(0, Math.min(999, parseInt(state.p2Score) || 0)),
-        gameType: sanitizeInput(state.gameType || 'game1'),
+        p1Score: Math.max(0, Math.min(999, parseInt(state.p1Score, 10) || 0)),
+        p2Score: Math.max(0, Math.min(999, parseInt(state.p2Score, 10) || 0)),
+        gameType: sanitizeGameType(state.gameType),
         raceInfo: sanitizeInput(state.raceInfo || ''),
         gameInfo: sanitizeInput(state.gameInfo || ''),
         streamUrl: streamUrl,
@@ -522,7 +584,7 @@ function sanitizeState(state) {
         ballTrackerEnabled: normalizeBoolean(state.ballTrackerEnabled ?? state.enableBallTracker),
         shotClockEnabled: normalizeBoolean(state.shotClockEnabled ?? state.useClock),
         breakingPlayerEnabled: normalizeBoolean(state.breakingPlayerEnabled ?? state.usePlayerToggle),
-        ballType: sanitizeInput(state.ballType || ''),
+        ballType: sanitizeBallType(state.ballType),
         timestamp: new Date().toISOString()
     };
 }
@@ -646,6 +708,7 @@ wss.on('connection', (ws, req) => {
                     // Restore last known game type so the first state update after reconnect
                     // is not counted as a game-type change (avoids inflating stats on refresh/reconnect)
                     const lastGameType = dbOps.getConnectionLastGameType(connectionId);
+                    const scoreState = dbOps.getConnectionScoreState(connectionId);
 
                     // Check if this is a reconnection (reusing existing session)
                     const isReconnection = existingConnectionId && existingConnectionId === connectionId;
@@ -654,6 +717,9 @@ wss.on('connection', (ws, req) => {
                         ws,
                         connectionId,
                         currentGameType: lastGameType,
+                        lastP1Score: scoreState.lastP1Score ?? 0,
+                        lastP2Score: scoreState.lastP2Score ?? 0,
+                        scoresInitialized: scoreState.scoresInitialized,
                         lastUpdate: Date.now(),
                         features: {
                             player1Enabled: false,
@@ -700,6 +766,14 @@ wss.on('connection', (ws, req) => {
 
                 // Sanitize and validate state
                 const sanitizedState = sanitizeState(data.state);
+                if (!sanitizedState) {
+                    ws.send(JSON.stringify({
+                        type: 'ack',
+                        status: 'error',
+                        message: 'Invalid state payload'
+                    }));
+                    return;
+                }
 
                 const connectionInfo = activeConnections.get(apiKey);
 
@@ -725,12 +799,16 @@ wss.on('connection', (ws, req) => {
                         features: featureSnapshot
                     });
 
-                    // Only count as a change when user actually switched game type (not initial state or reconnect)
-                    if (sanitizedState.gameType && connectionInfo.currentGameType != null && sanitizedState.gameType !== connectionInfo.currentGameType) {
-                        dbOps.incrementGameTypeUsage(connectionInfo.connectionId, sanitizedState.gameType);
-                    }
+                    applyRackScoreDelta(connectionInfo, connectionInfo.connectionId, sanitizedState);
+
                     if (sanitizedState.gameType) {
-                        connectionInfo.currentGameType = sanitizedState.gameType;
+                        if (connectionInfo.currentGameType == null) {
+                            dbOps.incrementGameTypeUsage(connectionInfo.connectionId, sanitizedState.gameType);
+                            connectionInfo.currentGameType = sanitizedState.gameType;
+                        } else if (sanitizedState.gameType !== connectionInfo.currentGameType) {
+                            dbOps.incrementGameTypeUsage(connectionInfo.connectionId, sanitizedState.gameType);
+                            connectionInfo.currentGameType = sanitizedState.gameType;
+                        }
                     }
 
                     connectionInfo.lastUpdate = Date.now();
@@ -821,7 +899,7 @@ wss.on('connection', (ws, req) => {
                         });
                     }
                     // If current exists, session was reused - don't finalize
-                }, 30000); // 30 second grace period for reconnection
+                }, RECONNECT_GRACE_MS);
             }
         }
         logger.info('WEBSOCKET_CLOSED', { ip: clientIP });
@@ -859,7 +937,7 @@ wss.on('connection', (ws, req) => {
                             logger.warn('FAILED_TO_FINALIZE_CONNECTION_ERROR', { error: finalizeError.message });
                         }
                     }
-                }, 30000); // 30 second grace period for reconnection
+                }, RECONNECT_GRACE_MS);
             }
         }
     });
@@ -1051,7 +1129,9 @@ app.get('/api/admin/stats', adminStatsLimiter, requireAdminAuth, (req, res) => {
 
 app.post('/api/admin/block', adminActionLimiter, requireAdminAuth, (req, res) => {
     const apiKey = (req.body && typeof req.body.apiKey === 'string') ? req.body.apiKey.trim() : '';
-    const reason = req.body && typeof req.body.reason === 'string' ? req.body.reason.trim() : null;
+    const reason = req.body && typeof req.body.reason === 'string'
+        ? sanitizeInput(req.body.reason.trim(), 200) || null
+        : null;
 
     if (!apiKey) {
         return res.status(400).json({

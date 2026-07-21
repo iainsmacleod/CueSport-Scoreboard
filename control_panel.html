@@ -24,7 +24,7 @@ for more information about Salotto please visit https://salotto.app
     <link rel="stylesheet" href="./common/css/control_panel/required.css" />
     <script>
         //---------------------------------------------------------------------------------------------
-        var versionNum = "4.4.0";
+        var versionNum = "5.0.0";
         //---------------------------------------------------------------------------------------------
     </script>
     <script src="./common/js/obs-websocket-js.js"></script>
@@ -69,7 +69,7 @@ for more information about Salotto please visit https://salotto.app
             <div class="section-header" id="gameDetailLabel">Game Details</div>
             <div class="column">
                 <text id="raceInfo">Race Info:</text>
-                <input style="width: 100px" type="text" id="raceInfoTxt" maxlength="4" pattern="\d*" inputmode="numeric" />
+                <input style="width: 100px" type="text" id="raceInfoTxt" maxlength="3" pattern="\d*" inputmode="numeric" />
                 <text>Game/Other Info:</text>
                 <input style="width: 350px" type="text" id="gameInfoTxt" placeholder="" maxlength="60" />
             </div>
@@ -143,7 +143,7 @@ for more information about Salotto please visit https://salotto.app
             <!-- Score Control -->
             <div class="section-header" id="scoreLabel">Score Controls</div>
             <div class="column" id="scoreInfoP1">
-                <label id="p1ScoreLabel" for="sendP1ScoreSub">Player/Team 1 - Score/Rack(s)/Ball(s)</label>
+                <label id="p1ScoreLabel" for="sendP1ScoreSub">Player/Team 1 - Racks</label>
                 <div class="score-control">
                     <button id="sendP1ScoreSub" onclick="postScore('sub','1')">-</button>
                     <input type="text" pattern="[0-9]" inputmode="numeric" min="0" max="999" maxlength="3" id="p1Score"
@@ -151,13 +151,31 @@ for more information about Salotto please visit https://salotto.app
                     <button id="sendP1Score" onclick="postScore('add','1')">+</button>
                 </div>
             </div>
+            <div class="column noShow" id="scoreInfoP1Balls">
+                <label id="p1BallsLabel" for="sendP1BallsSub">Player/Team 1 - Balls</label>
+                <div class="score-control">
+                    <button id="sendP1BallsSub" onclick="postBalls('sub','1')">-</button>
+                    <input type="text" pattern="[0-9]" inputmode="numeric" min="0" max="999" maxlength="3" id="p1Balls"
+                        placeholder="0" />
+                    <button id="sendP1Balls" onclick="postBalls('add','1')">+</button>
+                </div>
+            </div>
             <div class="column" id="scoreInfoP2">
-                <label id="p2ScoreLabel" for="sendP2Score">Player/Team 2 - Score/Rack(s)/Ball(s)</label>
+                <label id="p2ScoreLabel" for="sendP2Score">Player/Team 2 - Racks</label>
                 <div class="score-control">
                     <button id="sendP2ScoreSub" onclick="postScore('sub','2')">-</button>
                     <input type="text" pattern="[0-9]" inputmode="numeric" min="0" max="999" maxlength="3" id="p2Score"
                         placeholder="0" />
                     <button id="sendP2Score" onclick="postScore('add','2')">+</button>
+                </div>
+            </div>
+            <div class="column noShow" id="scoreInfoP2Balls">
+                <label id="p2BallsLabel" for="sendP2BallsSub">Player/Team 2 - Balls</label>
+                <div class="score-control">
+                    <button id="sendP2BallsSub" onclick="postBalls('sub','2')">-</button>
+                    <input type="text" pattern="[0-9]" inputmode="numeric" min="0" max="999" maxlength="3" id="p2Balls"
+                        placeholder="0" />
+                    <button id="sendP2Balls" onclick="postBalls('add','2')">+</button>
                 </div>
             </div>
             <div class="column" id="scoreEditing">
@@ -166,10 +184,10 @@ for more information about Salotto please visit https://salotto.app
                 </div>
                 <div class="tooltip">
                     <div class="hover obs28 button" id="sendPScores" onclick="pushScores()">
-                        Push Scores
+                        Push Entered Scores
                     </div>
                     <span class="tooltiptext">Manual adjustments to scores can be entered directly in each players score
-                        box, use "Push Scores" to update the overlay.</span>
+                        box, use "Push Entered Scores" to update the overlay.</span>
                 </div>
             </div>
             <!-- Player Toggle -->
@@ -575,6 +593,11 @@ for more information about Salotto please visit https://salotto.app
                     <option value="game6">One Pocket</option>
                     <option value="game7">Custom</option>
                 </select>
+                <span></span>
+                <div class="noShow" id="pointBasedDiv">
+                    Point Based<input type="checkbox" class="smallSize" id="pointBased"
+                        onchange="pointBasedSetting()" />
+                </div>
                 <span></span>
                 <label class="slidecontainer" id="opacityLabel" for="scoreOpacity">Overlay Opacity</label>
                 <span></span>

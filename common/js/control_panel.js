@@ -136,6 +136,77 @@ function toggleAnimationSetting() {
     }
 }
 
+function isDualScoreMode() {
+    const type = getStorageItem("gameType");
+    if (type === "game5" || type === "game6") {
+        return true;
+    }
+    return type === "game7" && getStorageItem("pointBased") === "yes";
+}
+
+function isStraightPool() {
+    return getStorageItem("gameType") === "game4";
+}
+
+function getPrimaryScoreSuffix() {
+    return isStraightPool() ? "Balls" : "Racks";
+}
+
+function updateScoreLabels() {
+    const suffix = getPrimaryScoreSuffix();
+    const p1Name = (document.getElementById("p1Name")?.value || "").trim();
+    const p2Name = (document.getElementById("p2Name")?.value || "").trim();
+    const p1BallsLabel = document.getElementById("p1BallsLabel");
+    const p2BallsLabel = document.getElementById("p2BallsLabel");
+
+    document.getElementById("p1ScoreLabel").innerHTML = (p1Name || "Player/Team 1") + " - " + suffix;
+    document.getElementById("p2ScoreLabel").innerHTML = (p2Name || "Player/Team 2") + " - " + suffix;
+
+    if (p1BallsLabel) {
+        p1BallsLabel.innerHTML = (p1Name || "Player/Team 1") + " - Balls";
+    }
+    if (p2BallsLabel) {
+        p2BallsLabel.innerHTML = (p2Name || "Player/Team 2") + " - Balls";
+    }
+}
+
+function updateScoreModeUI() {
+    const bothPlayersEnabled = getStorageItem("usePlayer1") === "yes" && getStorageItem("usePlayer2") === "yes";
+    const dualMode = isDualScoreMode() && bothPlayersEnabled;
+    const isCustom = getStorageItem("gameType") === "game7";
+    const pointBasedDiv = document.getElementById("pointBasedDiv");
+    const scoreInfoP1Balls = document.getElementById("scoreInfoP1Balls");
+    const scoreInfoP2Balls = document.getElementById("scoreInfoP2Balls");
+
+    if (pointBasedDiv) {
+        pointBasedDiv.classList[isCustom ? "remove" : "add"]("noShow");
+    }
+
+    if (scoreInfoP1Balls) {
+        scoreInfoP1Balls.classList[dualMode ? "remove" : "add"]("noShow");
+    }
+    if (scoreInfoP2Balls) {
+        scoreInfoP2Balls.classList[dualMode ? "remove" : "add"]("noShow");
+    }
+
+    updateScoreLabels();
+
+    const dualDisplay = dualMode ? "yes" : "no";
+    setStorageItem("dualScoreDisplay", dualDisplay);
+    bc.postMessage({ dualScoreDisplay: dualDisplay });
+}
+
+function pointBasedSetting() {
+    const checkbox = document.getElementById("pointBased");
+    const enabled = checkbox && checkbox.checked;
+    setStorageItem("pointBased", enabled ? "yes" : "no");
+    updateScoreModeUI();
+
+    if (window.streamSharing) {
+        window.streamSharing.sendUpdate();
+    }
+}
+
 function gameType(value) {
     setStorageItem("gameType", value);
 
@@ -196,6 +267,7 @@ function gameType(value) {
         document.getElementById("ball 15").classList.remove("noShow");
     }
     bc.postMessage({ gameType: value });
+    updateScoreModeUI();
     resetBallTracker();
     
     // Send update to stream sharing if enabled
@@ -729,6 +801,7 @@ function playerSetting(player) {
     document.getElementById("scoreInfoP1").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
     document.getElementById("scoreInfoP2").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
     document.getElementById("scoreEditing").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
+    updateScoreModeUI();
     // document.getElementById("ballTypeDiv").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
     // document.getElementById("ballSet").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
 
@@ -821,8 +894,7 @@ function postNames() {
     var p2FirstName = document.getElementById("p2Name").value.split(" ")[0];
     if (!p1Name.value == "") { document.getElementById("p1extensionBtn").innerHTML = p1FirstName.substring(0, 9) + "'s Extension"; } else { document.getElementById("p1extensionBtn").innerHTML = "P1's Extension"; }
     if (!p2Name.value == "") { document.getElementById("p2extensionBtn").innerHTML = p2FirstName.substring(0, 9) + "'s Extension"; } else { document.getElementById("p2extensionBtn").innerHTML = "P2's Extension"; }
-    if (!p1Name.value == "") { document.getElementById("p1ScoreLabel").innerHTML = p1namemsg + " - Score/Rack(s)/Ball(s)"; } else { document.getElementById("p1ScoreLabel").innerHTML = "Player/Team 1 - Score/Rack(s)/Ball(s)"; }
-    if (!p2Name.value == "") { document.getElementById("p2ScoreLabel").innerHTML = p2namemsg + " - Score/Rack(s)/Ball(s)"; } else { document.getElementById("p2ScoreLabel").innerHTML = "Player/Team 2 - Score/Rack(s)/Ball(s)"; }
+    updateScoreLabels();
     setStorageItem("p1NameCtrlPanel", p1Name.value);
     setStorageItem("p2NameCtrlPanel", p2Name.value);
     // Send update to stream sharing if enabled
@@ -1003,6 +1075,9 @@ function pushScores() {
         }
     }
 
+    enteredP1 = Math.min(Math.max(enteredP1, 0), 999);
+    enteredP2 = Math.min(Math.max(enteredP2, 0), 999);
+
     if (p1Input) {
         p1Input.value = enteredP1;
     }
@@ -1021,12 +1096,89 @@ function pushScores() {
     setStorageItem("p2ScoreCtrlPanel", p2ScoreValue);
     setStorageItem("p2Score", p2ScoreValue);
 
+    if (isDualScoreMode()) {
+        const p1BallsInput = document.getElementById("p1Balls");
+        const p2BallsInput = document.getElementById("p2Balls");
+        let enteredP1Balls = p1BallsInput ? parseInt(p1BallsInput.value, 10) || 0 : 0;
+        let enteredP2Balls = p2BallsInput ? parseInt(p2BallsInput.value, 10) || 0 : 0;
+        enteredP1Balls = Math.min(Math.max(enteredP1Balls, 0), 999);
+        enteredP2Balls = Math.min(Math.max(enteredP2Balls, 0), 999);
+
+        if (p1BallsInput) {
+            p1BallsInput.value = enteredP1Balls;
+        }
+        if (p2BallsInput) {
+            p2BallsInput.value = enteredP2Balls;
+        }
+
+        bc.postMessage({ player: '1', balls: enteredP1Balls });
+        bc.postMessage({ player: '2', balls: enteredP2Balls });
+        setStorageItem("p1BallsCtrlPanel", enteredP1Balls);
+        setStorageItem("p1Balls", enteredP1Balls);
+        setStorageItem("p2BallsCtrlPanel", enteredP2Balls);
+        setStorageItem("p2Balls", enteredP2Balls);
+    }
+
     if (window.streamSharing) {
         window.streamSharing.sendUpdate();
     }
     resetBallTracker();
     resetBallSet();
     updateScoreControlAvailability();
+}
+
+function postBalls(opt1, player) {
+    let p1BallsValue = parseInt(getStorageItem("p1BallsCtrlPanel")) || 0;
+    let p2BallsValue = parseInt(getStorageItem("p2BallsCtrlPanel")) || 0;
+
+    if (player == "1") {
+        if (opt1 == "add") {
+            if (p1BallsValue < 999) {
+                p1BallsValue = p1BallsValue + 1;
+            }
+        } else if (p1BallsValue > 0) {
+            p1BallsValue = p1BallsValue - 1;
+        }
+        bc.postMessage({ player: player, balls: p1BallsValue });
+        setStorageItem("p1BallsCtrlPanel", p1BallsValue);
+        setStorageItem("p1Balls", p1BallsValue);
+        document.getElementById("p1Balls").value = p1BallsValue;
+        stopClock();
+        resetExt('p1', 'noflash');
+        resetExt('p2', 'noflash');
+    } else if (player == "2") {
+        if (opt1 == "add") {
+            if (p2BallsValue < 999) {
+                p2BallsValue = p2BallsValue + 1;
+            }
+        } else if (p2BallsValue > 0) {
+            p2BallsValue = p2BallsValue - 1;
+        }
+        bc.postMessage({ player: player, balls: p2BallsValue });
+        setStorageItem("p2BallsCtrlPanel", p2BallsValue);
+        setStorageItem("p2Balls", p2BallsValue);
+        document.getElementById("p2Balls").value = p2BallsValue;
+        stopClock();
+        resetExt('p1', 'noflash');
+        resetExt('p2', 'noflash');
+    }
+
+    if (window.streamSharing) {
+        window.streamSharing.sendUpdate();
+    }
+}
+
+function resetPlayerBalls(player) {
+    if (!isDualScoreMode()) {
+        return;
+    }
+    const ballsInput = document.getElementById("p" + player + "Balls");
+    if (ballsInput) {
+        ballsInput.value = "0";
+    }
+    setStorageItem("p" + player + "BallsCtrlPanel", 0);
+    setStorageItem("p" + player + "Balls", 0);
+    bc.postMessage({ player: player, balls: 0 });
 }
 
 function postScore(opt1, player) {
@@ -1063,6 +1215,7 @@ function postScore(opt1, player) {
                 document.getElementById("p" + player + "Score").value = p1ScoreValue;
                 resetExt('p1', 'noflash');
                 resetExt('p2', 'noflash');
+                resetPlayerBalls(player);
             }
         } else if (p1ScoreValue > 0) {
             p1ScoreValue = p1ScoreValue - 1;
@@ -1092,6 +1245,7 @@ function postScore(opt1, player) {
                 document.getElementById("p" + player + "Score").value = p2ScoreValue;
                 resetExt('p1', 'noflash');
                 resetExt('p2', 'noflash');
+                resetPlayerBalls(player);
             }
         } else if (p2ScoreValue > 0) {
             p2ScoreValue = p2ScoreValue - 1;
@@ -1489,6 +1643,23 @@ function resetScores() {
         // Store reset scores in localStorage
         setStorageItem("p1ScoreCtrlPanel", 0);
         setStorageItem("p2ScoreCtrlPanel", 0);
+        setStorageItem("p1Score", 0);
+        setStorageItem("p2Score", 0);
+
+        const p1BallsInput = document.getElementById("p1Balls");
+        const p2BallsInput = document.getElementById("p2Balls");
+        if (p1BallsInput) {
+            p1BallsInput.value = "0";
+        }
+        if (p2BallsInput) {
+            p2BallsInput.value = "0";
+        }
+        bc.postMessage({ player: '1', balls: 0 });
+        bc.postMessage({ player: '2', balls: 0 });
+        setStorageItem("p1BallsCtrlPanel", 0);
+        setStorageItem("p2BallsCtrlPanel", 0);
+        setStorageItem("p1Balls", 0);
+        setStorageItem("p2Balls", 0);
 
         resetExt('p1', 'noflash');
         resetExt('p2', 'noflash');

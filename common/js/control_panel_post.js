@@ -133,6 +133,21 @@ window.onload = function () {
 	if (getStorageItem("p2Score") === null) {
 		setStorageItem("p2Score", "0");
 	}
+	if (getStorageItem("p1Balls") === null) {
+		setStorageItem("p1Balls", "0");
+	}
+	if (getStorageItem("p2Balls") === null) {
+		setStorageItem("p2Balls", "0");
+	}
+	if (getStorageItem("p1BallsCtrlPanel") === null) {
+		setStorageItem("p1BallsCtrlPanel", getStorageItem("p1Balls") || "0");
+	}
+	if (getStorageItem("p2BallsCtrlPanel") === null) {
+		setStorageItem("p2BallsCtrlPanel", getStorageItem("p2Balls") || "0");
+	}
+	if (getStorageItem("pointBased") === null) {
+		setStorageItem("pointBased", "no");
+	}
 
 	if (getStorageItem("gameType") === null) {
 		setStorageItem("gameType", "game1");
@@ -512,6 +527,11 @@ if (getStorageItem('p2ScoreCtrlPanel') > 0 || getStorageItem('p2ScoreCtrlPanel')
 	bc.postMessage(msg);
 }
 
+const p1BallsValue = parseInt(getStorageItem('p1BallsCtrlPanel'), 10) || 0;
+const p2BallsValue = parseInt(getStorageItem('p2BallsCtrlPanel'), 10) || 0;
+bc.postMessage({ player: '1', balls: p1BallsValue });
+bc.postMessage({ player: '2', balls: p2BallsValue });
+
 if (getStorageItem("useCustomLogo") == "yes") {
 	console.log("customLogo1 = TRUE");
 	document.getElementById("customLogo1").checked = true;
@@ -575,6 +595,15 @@ document.getElementById("p1Name").value = getStorageItem("p1NameCtrlPanel");
 document.getElementById("p1Score").value = getStorageItem("p1ScoreCtrlPanel");
 document.getElementById("p2Name").value = getStorageItem("p2NameCtrlPanel");
 document.getElementById("p2Score").value = getStorageItem("p2ScoreCtrlPanel");
+const p1BallsInput = document.getElementById("p1Balls");
+const p2BallsInput = document.getElementById("p2Balls");
+if (p1BallsInput) {
+	p1BallsInput.value = getStorageItem("p1BallsCtrlPanel") || "0";
+}
+if (p2BallsInput) {
+	p2BallsInput.value = getStorageItem("p2BallsCtrlPanel") || "0";
+}
+document.getElementById("pointBased").checked = getStorageItem("pointBased") === "yes";
 document.getElementById("gameType").value = getStorageItem("gameType");
 if (getStorageItem("gameType") === "game3") {
 	document.getElementById("ball 10").classList.add("noShow");

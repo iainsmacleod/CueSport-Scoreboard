@@ -32,6 +32,7 @@
         featureShotValue: document.getElementById('featureShotValue'),
         featureBreakingPlayerValue: document.getElementById('featureBreakingPlayerValue'),
         featureBallSetValue: document.getElementById('featureBallSetValue'),
+        totalRacksNetValue: document.getElementById('totalRacksNetValue'),
         topSessionsKey: document.getElementById('topSessionsKey'),
         topSessionsValue: document.getElementById('topSessionsValue'),
         topDurationKey: document.getElementById('topDurationKey'),
@@ -50,8 +51,36 @@
         game3: '10-Ball',
         game4: 'Straight',
         game5: 'Bank',
-        game6: 'One Pocket'
+        game6: 'One Pocket',
+        game7: 'Custom'
     };
+
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function safeStreamUrl(url) {
+        if (!url || typeof url !== 'string') {
+            return null;
+        }
+        try {
+            const parsed = new URL(url.trim());
+            if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+                return null;
+            }
+            if (parsed.username || parsed.password) {
+                return null;
+            }
+            return parsed.href;
+        } catch (error) {
+            return null;
+        }
+    }
 
     let searchDebounce = null;
     let refreshIntervalId = null;
@@ -312,13 +341,17 @@
             selectors.featureBreakingPlayerValue.textContent = `${formatPercent(metric.percent)}${metric.count ? ` (${metric.count})` : ' (0)'}`;
         }
         if (selectors.featureBallSetValue) {
-            const ballType = featureAdoption.ballType || { World: 0, International: 0 };
-            const total = ballType.World + ballType.International;
+            const ballType = featureAdoption.ballType || { World: 0, International: 0, Unity: 0 };
+            const total = (ballType.World || 0) + (ballType.International || 0) + (ballType.Unity || 0);
             if (total > 0) {
-                selectors.featureBallSetValue.textContent = `World ${ballType.World}, International ${ballType.International}`;
+                selectors.featureBallSetValue.textContent = `World ${ballType.World || 0}, International ${ballType.International || 0}, Unity ${ballType.Unity || 0}`;
             } else {
                 selectors.featureBallSetValue.textContent = '—';
             }
+        }
+        if (selectors.totalRacksNetValue) {
+            const racksNet = global.totalRacksNet || 0;
+            selectors.totalRacksNetValue.textContent = racksNet.toLocaleString();
         }
 
         const topApiKeys = global.topApiKeys || {};
@@ -583,48 +616,55 @@ function renderStats() {
 
             let statusBadge = '';
             if (item.isBlocked) {
-                const reasonText = item.blockedReason ? `Blocked: ${item.blockedReason}` : 'Blocked by administrator';
+                const reasonText = item.blockedReason
+                    ? `Blocked: ${escapeHtml(item.blockedReason)}`
+                    : 'Blocked by administrator';
                 statusBadge = `<span class="badge status-blocked" title="${reasonText}">Blocked</span>`;
             } else if (item.isLive || item.isStreaming) {
-                const tooltip = item.isLive && liveSince ? `Live since ${liveSince}` : (lastStreamUpdate ? `Last active ${lastStreamUpdate}` : 'Currently active');
+                const tooltip = item.isLive && liveSince
+                    ? `Live since ${escapeHtml(liveSince)}`
+                    : (lastStreamUpdate ? `Last active ${escapeHtml(lastStreamUpdate)}` : 'Currently active');
                 statusBadge = `<span class="badge status-live" title="${tooltip}">Live</span>`;
             } else {
-                const tooltip = lastStreamUpdate ? `Last update ${lastStreamUpdate}` : 'No recent updates';
+                const tooltip = lastStreamUpdate ? `Last update ${escapeHtml(lastStreamUpdate)}` : 'No recent updates';
                 statusBadge = `<span class="badge status-inactive" title="${tooltip}">Inactive</span>`;
             }
 
             const gameTypes = Object.entries(item.gameTypes || {}).map(([gameType, count]) => {
-                const label = gameTypeLabels[gameType] || gameType;
+                const label = escapeHtml(gameTypeLabels[gameType] || gameType);
                 return `<span>${label}: ${count}</span>`;
             }).join('') || '<span>No data</span>';
 
             const totalSessions = item.totalConnections || 0;
             const featureUsage = item.featureUsage || {};
-            const ballType = featureUsage.ballType || { World: 0, International: 0 };
-            const totalBallType = ballType.World + ballType.International;
+            const ballType = featureUsage.ballType || { World: 0, International: 0, Unity: 0 };
+            const totalBallType = (ballType.World || 0) + (ballType.International || 0) + (ballType.Unity || 0);
+            const racksNet = featureUsage.racksNet || 0;
 
             const featureLines = [
                 `<span>Score Display: ${featureUsage.scoreDisplaySessions || 0}${totalSessions ? ` / ${totalSessions}` : ''}</span>`,
                 `<span>Ball Tracker: ${featureUsage.ballTrackerSessions || 0}${totalSessions ? ` / ${totalSessions}` : ''}</span>`,
                 `<span>Shot Clock: ${featureUsage.shotClockSessions || 0}${totalSessions ? ` / ${totalSessions}` : ''}</span>`,
                 `<span>Breaking Player: ${featureUsage.breakingPlayerSessions || 0}${totalSessions ? ` / ${totalSessions}` : ''}</span>`,
-                `<span>Ball Type: World ${ballType.World || 0}, International ${ballType.International || 0}${totalBallType > 0 ? ` (${totalBallType} total)` : ''}</span>`
+                `<span>Ball Type: World ${ballType.World || 0}, International ${ballType.International || 0}, Unity ${ballType.Unity || 0}${totalBallType > 0 ? ` (${totalBallType} total)` : ''}</span>`,
+                `<span title="Net rack score changes while Show Scores is on; Straight Pool excluded.">Racks (net): ${racksNet}</span>`
             ].join('');
 
-            const latestStreamContent = item.latestStreamUrl
-                ? `<a href="${item.latestStreamUrl}" target="_blank" rel="noopener noreferrer">${item.latestStreamUrl}</a>`
+            const safeUrl = safeStreamUrl(item.latestStreamUrl);
+            const latestStreamContent = safeUrl
+                ? `<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(safeUrl)}</a>`
                 : '<span>—</span>';
 
             const blockedInfo = item.isBlocked
                 ? (() => {
                     let text = '';
                     if (item.blockedAt) {
-                        text = `Blocked at ${item.blockedAt}`;
+                        text = `Blocked at ${escapeHtml(item.blockedAt)}`;
                     } else {
                         text = 'Blocked';
                     }
                     if (item.blockedReason) {
-                        text += `: ${item.blockedReason}`;
+                        text += `: ${escapeHtml(item.blockedReason)}`;
                     }
                     return `<div style="font-size: 0.8rem; color: rgba(255, 255, 255, 0.6); margin-top: 4px;">${text}</div>`;
                 })()
@@ -632,15 +672,15 @@ function renderStats() {
 
             let lastUpdateInfo = '';
             if (item.isLive && liveSince) {
-                lastUpdateInfo = `<div style="font-size: 0.8rem; color: rgba(255, 255, 255, 0.6); margin-top: 4px;">Live since ${liveSince}</div>`;
+                lastUpdateInfo = `<div style="font-size: 0.8rem; color: rgba(255, 255, 255, 0.6); margin-top: 4px;">Live since ${escapeHtml(liveSince)}</div>`;
             } else if (lastStreamUpdate) {
-                lastUpdateInfo = `<div style="font-size: 0.8rem; color: rgba(255, 255, 255, 0.6); margin-top: 4px;">Last live: ${lastStreamUpdate}</div>`;
+                lastUpdateInfo = `<div style="font-size: 0.8rem; color: rgba(255, 255, 255, 0.6); margin-top: 4px;">Last live: ${escapeHtml(lastStreamUpdate)}</div>`;
             }
 
             return `
-                <tr data-api-key="${item.apiKey}">
+                <tr data-api-key="${escapeHtml(item.apiKey)}">
                     <td style="max-width: 220px;">
-                        <code>${item.apiKey}</code>
+                        <code>${escapeHtml(item.apiKey)}</code>
                         <div style="margin-top: 6px; display:flex; flex-direction: column; gap:6px;">
                             <div class="badge-group">${statusBadge}</div>
                             ${blockedInfo}

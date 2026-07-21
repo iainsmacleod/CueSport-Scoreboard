@@ -195,12 +195,61 @@ function showScores() {
 	document.getElementById("player1Score").classList.replace("fadeOutElm", "fadeInElm");
 	document.getElementById("player2Score").classList.replace("fadeOutElm", "fadeInElm");
 	document.getElementById("raceInfo").classList.replace("fadeOutElm", "fadeInElm");
+	if (getStorageItem("dualScoreDisplay") === "yes") {
+		showBalls();
+	} else {
+		hideBalls();
+	}
 }
 
 function hideScores() {
 	document.getElementById("player1Score").classList.replace("fadeInElm", "fadeOutElm");
 	document.getElementById("player2Score").classList.replace("fadeInElm", "fadeOutElm");
 	document.getElementById("raceInfo").classList.replace("fadeInElm", "fadeOutElm");
+	hideBalls();
+}
+
+function showBalls() {
+	const p1Balls = document.getElementById("player1Balls");
+	const p2Balls = document.getElementById("player2Balls");
+	if (!p1Balls || !p2Balls) {
+		return;
+	}
+	p1Balls.classList.remove("noShow");
+	p2Balls.classList.remove("noShow");
+	p1Balls.classList.replace("fadeOutElm", "fadeInElm");
+	p2Balls.classList.replace("fadeOutElm", "fadeInElm");
+}
+
+function hideBalls() {
+	const p1Balls = document.getElementById("player1Balls");
+	const p2Balls = document.getElementById("player2Balls");
+	if (!p1Balls || !p2Balls) {
+		return;
+	}
+	p1Balls.classList.replace("fadeInElm", "fadeOutElm");
+	p2Balls.classList.replace("fadeInElm", "fadeOutElm");
+	p1Balls.classList.add("noShow");
+	p2Balls.classList.add("noShow");
+}
+
+function syncBallsVisibility() {
+	const bothPlayersEnabled = getStorageItem("usePlayer1") === "yes" && getStorageItem("usePlayer2") === "yes";
+	const scoresVisible = getStorageItem("scoreDisplay") === "yes";
+	let dualMode = getStorageItem("dualScoreDisplay") === "yes";
+
+	// Fallback if dualScoreDisplay hasn't been broadcast yet
+	if (getStorageItem("dualScoreDisplay") === null) {
+		const gameType = getStorageItem("gameType");
+		dualMode = gameType === "game5" || gameType === "game6" ||
+			(gameType === "game7" && getStorageItem("pointBased") === "yes");
+	}
+
+	if (bothPlayersEnabled && scoresVisible && dualMode) {
+		showBalls();
+	} else {
+		hideBalls();
+	}
 }
 
 

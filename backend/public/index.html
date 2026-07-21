@@ -672,26 +672,53 @@
             'game7': 'Custom'
         };
 
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function safeStreamUrl(url) {
+            if (!url || typeof url !== 'string') {
+                return null;
+            }
+            try {
+                const parsed = new URL(url.trim());
+                if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+                    return null;
+                }
+                if (parsed.username || parsed.password) {
+                    return null;
+                }
+                return parsed.href;
+            } catch (error) {
+                return null;
+            }
+        }
+
         let allGames = [];
         let currentFilter = 'all';
         let currentSearch = '';
 
         function createGameCard(game) {
             const card = document.createElement('div');
-            const hasStreamUrl = game.streamUrl && game.streamUrl.trim() !== '';
+            const safeUrl = safeStreamUrl(game.streamUrl);
 
-            card.className = hasStreamUrl ? 'game-card clickable' : 'game-card';
+            card.className = safeUrl ? 'game-card clickable' : 'game-card';
             card.dataset.gameType = game.gameType;
             card.dataset.gameInfo = (game.gameInfo || '').toLowerCase();
             card.dataset.player1Name = (game.player1Name || '').toLowerCase();
             card.dataset.player2Name = (game.player2Name || '').toLowerCase();
 
-            const gameType = gameTypeMap[game.gameType] || game.gameType;
-            const gameTitle = game.gameInfo || 'Live Game';
+            const gameType = escapeHtml(gameTypeMap[game.gameType] || game.gameType);
+            const gameTitle = escapeHtml(game.gameInfo || 'Live Game');
             const rawPlayer1Name = (game.player1Name || '').trim();
             const rawPlayer2Name = (game.player2Name || '').trim();
-            const displayNameP1 = rawPlayer1Name.length > 0 ? rawPlayer1Name : 'Player 1';
-            const displayNameP2 = rawPlayer2Name.length > 0 ? rawPlayer2Name : 'Player 2';
+            const displayNameP1 = escapeHtml(rawPlayer1Name.length > 0 ? rawPlayer1Name : 'Player 1');
+            const displayNameP2 = escapeHtml(rawPlayer2Name.length > 0 ? rawPlayer2Name : 'Player 2');
             const player1EnabledFlag = game.player1Enabled;
             const player2EnabledFlag = game.player2Enabled;
             const player1Active = player1EnabledFlag !== undefined ? Boolean(player1EnabledFlag) : rawPlayer1Name.length > 0;
@@ -796,14 +823,14 @@
                 </div>
             ` : '';
 
-            const showRaceInfoRow = showRaceInfo ? `<div class="info-row"><span class="info-label">Race:</span><span>${trimmedRaceInfo}</span></div>` : '';
+            const showRaceInfoRow = showRaceInfo ? `<div class="info-row"><span class="info-label">Race:</span><span>${escapeHtml(trimmedRaceInfo)}</span></div>` : '';
 
             card.innerHTML = `
                 <div class="game-header">
                     <h3 class="game-title">${gameTitle}${hotMatchBadge}</h3>
                     <div class="game-meta">
                         <span class="game-type">${gameType}</span>
-                        ${hasStreamUrl ? `<a href="${game.streamUrl}" target="_blank" rel="noopener noreferrer" class="watch-button" onclick="event.stopPropagation();">▶ Watch</a>` : ''}
+                        ${safeUrl ? `<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener noreferrer" class="watch-button" onclick="event.stopPropagation();">▶ Watch</a>` : ''}
                     </div>
                 </div>
                 
@@ -817,11 +844,11 @@
             `;
 
             // Make entire card clickable if it has a stream URL
-            if (hasStreamUrl) {
+            if (safeUrl) {
                 card.onclick = (e) => {
                     // Don't trigger if clicking the watch button
                     if (!e.target.closest('.watch-button')) {
-                        window.open(game.streamUrl, '_blank', 'noopener,noreferrer');
+                        window.open(safeUrl, '_blank', 'noopener,noreferrer');
                     }
                 };
             }
