@@ -195,6 +195,7 @@ function showScores() {
 	document.getElementById("player1Score").classList.replace("fadeOutElm", "fadeInElm");
 	document.getElementById("player2Score").classList.replace("fadeOutElm", "fadeInElm");
 	document.getElementById("raceInfo").classList.replace("fadeOutElm", "fadeInElm");
+	// Strict dualScoreDisplay only — callers own player/scoreDisplay gating
 	if (getStorageItem("dualScoreDisplay") === "yes") {
 		showBalls();
 	} else {
@@ -233,17 +234,24 @@ function hideBalls() {
 	p2Balls.classList.add("noShow");
 }
 
+function isDualScoreDisplayActive() {
+	const dualScoreDisplay = getStorageItem("dualScoreDisplay");
+	if (dualScoreDisplay === "yes") {
+		return true;
+	}
+	if (dualScoreDisplay === "no") {
+		return false;
+	}
+	// Fallback if dualScoreDisplay hasn't been broadcast yet
+	const gameType = getStorageItem("gameType");
+	return gameType === "game5" || gameType === "game6" ||
+		(gameType === "game7" && getStorageItem("pointBased") === "yes");
+}
+
 function syncBallsVisibility() {
 	const bothPlayersEnabled = getStorageItem("usePlayer1") === "yes" && getStorageItem("usePlayer2") === "yes";
 	const scoresVisible = getStorageItem("scoreDisplay") === "yes";
-	let dualMode = getStorageItem("dualScoreDisplay") === "yes";
-
-	// Fallback if dualScoreDisplay hasn't been broadcast yet
-	if (getStorageItem("dualScoreDisplay") === null) {
-		const gameType = getStorageItem("gameType");
-		dualMode = gameType === "game5" || gameType === "game6" ||
-			(gameType === "game7" && getStorageItem("pointBased") === "yes");
-	}
+	const dualMode = isDualScoreDisplayActive();
 
 	if (bothPlayersEnabled && scoresVisible && dualMode) {
 		showBalls();
