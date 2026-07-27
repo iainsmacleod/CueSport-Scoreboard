@@ -14,16 +14,17 @@ yarn.lock
 .env.development
 *.env
 
+# Backend (not deployed with the OBS scoreboard package)
+backend/
+
 # Database files (SQLite)
 *.db
 *.db-shm
 *.db-wal
 *.db-journal
-backend/data/
 data/
 
 # Log files
-backend/logs/
 logs/
 *.log
 npm-debug.log*
@@ -68,10 +69,6 @@ docker-volumes/
 dist/
 build/
 *.tsbuildinfo
-
-# Local Docker build/push scripts (do not commit)
-backend/build-and-push.ps1
-backend/build-and-push.sh
 
 # Temporary files
 tmp/

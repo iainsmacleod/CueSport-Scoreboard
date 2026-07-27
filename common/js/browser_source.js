@@ -195,7 +195,7 @@ function showScores() {
 	document.getElementById("player1Score").classList.replace("fadeOutElm", "fadeInElm");
 	document.getElementById("player2Score").classList.replace("fadeOutElm", "fadeInElm");
 	document.getElementById("raceInfo").classList.replace("fadeOutElm", "fadeInElm");
-	// Strict dualScoreDisplay only — callers own player/scoreDisplay gating
+	// Strict dualScoreDisplay only ï¿½ callers own player/scoreDisplay gating
 	if (getStorageItem("dualScoreDisplay") === "yes") {
 		showBalls();
 	} else {
