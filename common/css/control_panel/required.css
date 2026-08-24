@@ -913,6 +913,11 @@ input:checked+.slider_round:before {
 	min-width: 200px;
 }
 
+.autocomplete-list.autocomplete-browse {
+	max-height: 280px;
+	min-width: 240px;
+}
+
 .autocomplete-item {
 	padding: 6px 10px;
 	cursor: pointer;

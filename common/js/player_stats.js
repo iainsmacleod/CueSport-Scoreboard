@@ -315,8 +315,14 @@
     async function searchPlayers(query, limit) {
         const normalizedQuery = normalizeName(query);
         const all = await getAllPlayers();
+        const maxResults = typeof limit === 'number' ? limit : 8;
         if (!normalizedQuery) {
-            return all.slice(0, limit || 8);
+            return all
+                .slice()
+                .sort(function (a, b) {
+                    return (a.name || '').localeCompare(b.name || '');
+                })
+                .slice(0, maxResults);
         }
         return all
             .filter(function (p) {
@@ -338,7 +344,7 @@
                 }
                 return (a.name || '').localeCompare(b.name || '');
             })
-            .slice(0, limit || 8);
+            .slice(0, maxResults);
     }
 
     function isPlayerSlotEnabled(slot) {
@@ -1585,6 +1591,12 @@
             refreshAutocomplete(slot, input, list);
         });
 
+        input.addEventListener('dblclick', function (e) {
+            e.preventDefault();
+            input.select();
+            refreshAutocomplete(slot, input, list, { browseAll: true });
+        });
+
         input.addEventListener('keydown', function (e) {
             const state = autocompleteState[slot];
             const listVisible = !list.classList.contains('noShow');
@@ -1642,23 +1654,36 @@
         }
     }
 
-    async function refreshAutocomplete(slot, input, list) {
+    async function refreshAutocomplete(slot, input, list, options) {
+        const browseAll = options && options.browseAll;
         const query = input.value.trim();
-        if (!query) {
+        if (!query && !browseAll) {
             autocompleteState[slot].createNewName = null;
+            list.classList.remove('autocomplete-browse');
             list.classList.add('noShow');
             list.innerHTML = '';
             return;
         }
 
         try {
-            const results = await searchPlayers(query, 8);
+            const results = browseAll
+                ? await searchPlayers('', 250)
+                : await searchPlayers(query, 8);
             autocompleteState[slot].results = results;
             autocompleteState[slot].activeIndex = -1;
             autocompleteState[slot].createNewName = null;
             list.innerHTML = '';
+            list.classList.toggle('autocomplete-browse', !!browseAll);
 
             if (results.length === 0) {
+                if (browseAll) {
+                    const empty = document.createElement('div');
+                    empty.className = 'autocomplete-item autocomplete-new';
+                    empty.textContent = 'No saved players yet.';
+                    list.appendChild(empty);
+                    list.classList.remove('noShow');
+                    return;
+                }
                 const createName = truncateName(query);
                 autocompleteState[slot].createNewName = createName;
                 autocompleteState[slot].activeIndex = 0;
@@ -1687,6 +1712,9 @@
                 list.appendChild(item);
             });
             list.classList.remove('noShow');
+            if (browseAll) {
+                list.scrollTop = 0;
+            }
         } catch (err) {
             console.error('Autocomplete error:', err);
         }

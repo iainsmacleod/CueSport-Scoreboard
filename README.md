@@ -139,7 +139,7 @@ Tabs: **Game Setup**, **Controls**, **Image ⚙**, **Replay/Share ⚙**, **Gener
 - **Race Info** — short numeric race-to (the last number in the field is used as the race target). Leave blank for no race lock.
 - **Game/Other Info** — free text (max 60 characters).
 - **Update Info** — push race/game text to the overlay.
-- **Player/Team names** — max 20 characters each; autocomplete from your stats roster when names match known players.
+- **Player/Team names** — max 20 characters each. Type to autocomplete from your stats roster, or **double-click** a name field to open the full scrollable player list (A–Z) without typing.
 - **Colors** — per-player color for the scoreboard bars.
 - **Update Names** / **Swap Colors** / **Clear Game**.
 - **Stats** — opens the Player Statistics modal (see [Player Statistics](#player-statistics)).
@@ -148,7 +148,7 @@ Tabs: **Game Setup**, **Controls**, **Image ⚙**, **Replay/Share ⚙**, **Gener
 
 - **Score** — increment, decrement, or type a value then **Push Entered Scores**. Primary score is labeled **Racks** for most games, or **Balls** in Straight Pool.
 - **Balls** (Bank, One Pocket, or Custom with Point Based) — secondary ball counters (−999 to 999). Fouls can go below zero; that display foul does not undo recorded ball stats.
-- **Reset Scores** — clears primary (and dual-score ball) scores for a new game.
+- **Reset Score/Next Rack** — clears primary (and dual-score ball) scores for a new game.
 - **Stats Overlay** — **P1 Stats**, **P2 Stats**, **H2H Stats**. Toggle the same button again to hide. Off by default.
 - **Breaking Player**, **Chosen Ball** (when Ball Set Toggle is on), and the **Ball Tracker** grid (when enabled).
 - **Replay Controls** — appear for use once OBS WebSocket is connected (see [Instant Replay](#instant-replay)).
@@ -175,7 +175,7 @@ Details: [OBS WebSocket Setup](#obs-websocket-setup), [Instant Replay](#instant-
 - Feature toggles: Player 1 / Player 2, Show Scores, Shot Clock, Breaker Indicator, Win Animation.
 - Ball Tracker, Vertical Ball Tracker, Ball Set Toggle, Ball Type (World / International / Unity).
 - **Check for Update** (compares to the latest GitHub release).
-- **Clear Instance Data** / **Clear All Data** — scoreboard settings only; player stats are kept (see [Data, Clearing & Privacy](#data-clearing--privacy)).
+- **Clear Instance Data** / **Clear All Data** — clears scoreboard settings only; does not affect player statistics (use Stats → Clear All Stats for that). See [Data, Clearing & Privacy](#data-clearing--privacy).
 
 ---
 
@@ -276,28 +276,35 @@ Local history for a shared roster of players (not tied to a single OBS `instance
 - Survives **Clear Instance Data** and **Clear All Data**
 - Cleared only via Stats → **Data** → **Clear All Stats** (or by clearing site data for that origin)
 
+### Choosing players (name fields)
+
+- Start typing in **Player/Team 1** or **Player/Team 2** to filter the roster and pick a match (or create a new player).
+- **Double-click** either name field to browse the full saved roster in a scrollable list, then click a name to select it.
+- Click **Update Names** after selecting so the active match and stats session use those players.
+
 ### Recording during play
 
 1. Enter distinct player names and click **Update Names** (same name on both sides disables recording for that pairing).
 2. Score **+** records a rack (or Straight Pool primary point) and checks race completion.
 3. In dual-score games, ball **+** records balls potted; ball **−** from a positive value undoes the last pot. Going from `0` to `-1` is a foul display and does not change stats.
 4. Completing a race marks the match completed and updates games won/lost.
+5. Use **Reset Score/Next Rack** when starting a fresh rack/game scoreline (clears on-screen scores; does not delete stats history).
 
 ### Stats modal (Game Setup → Stats)
 
 | Tab | Use |
 |-----|-----|
 | **Board** | Leaderboard: Name, Games W/L, Win%, Racks W/L, Last played. Click a row for detail. |
-| **Player** | Per-player breakdown, win streak, opponent H2H, match history, rename/delete, add match. |
+| **Player** | Per-player breakdown (Games W/L, Racks W/L, Balls Potted when dual-score games apply), win streak, opponent H2H, match history, rename/delete, add match. |
 | **H2H** | Pick two players for head-to-head summary and history. |
-| **Data** | Export JSON backup; Import JSON **replaces** all current stats (warning + confirmation); Clear All Stats (double confirmation). |
+| **Data** | **Export JSON** backup; **Import JSON** replaces all current statistics (warning + confirmation); **Clear All Stats** permanently deletes the roster (double confirmation). |
 
 ### Overlay stats (Controls tab)
 
-- **P1 Stats** / **P2 Stats** / **H2H Stats** — one mode at a time; click again to hide.
-- Individual panels: **Games W/L** (with win %), **Rack W/L**, optional **Balls Potted** (total), Win Streak.
-- H2H: games, **Rack W/L**, and optional balls potted totals for both players.
-- **Balls Potted** appears only in dual-score game types (see below). It is a **total**, not a win/loss record.
+- **P1 Stats** / **P2 Stats** / **H2H Stats** — one mode at a time; click again to hide. Off by default.
+- Individual panels: **Games W/L** (with win %), **Rack W/L**, optional **Balls Potted** (single total), **Win Streak**.
+- H2H: game scoreline between the two players, **Rack W/L**, and optional **Balls Potted** totals for each side.
+- **Balls Potted** appears only in dual-score game types (see below). It is a **count**, not a win/loss record.
 
 ### Manual matches
 
@@ -364,12 +371,13 @@ Player logos look best square. Clear a logo with the clear control after upload 
 
 ## Data, Clearing & Privacy
 
-| Action | Clears |
+| Action | Effect |
 |--------|--------|
-| **Clear Game** | Current match names/info (and ends the active stats session appropriately) |
-| **Clear Instance Data** | localStorage for this `instance` (scores, toggles, etc.) |
-| **Clear All Data** | Almost all scoreboard localStorage (all instances). Keeps overlay stats mode/payload keys. **Does not** clear IndexedDB stats. |
-| **Stats → Clear All Stats** | All players and matches in `cuesport_stats` |
+| **Clear Game** | Clears current match names/info (and ends the active stats session appropriately). |
+| **Clear Instance Data** | Clears scoreboard settings for this `instance` only. Does **not** affect player statistics. |
+| **Clear All Data** | Clears scoreboard settings/layout localStorage (all instances). Keeps overlay stats mode/payload keys. Does **not** clear IndexedDB statistics. |
+| **Stats → Import JSON** | **Replaces** all current players and matches with the file. Requires warning + confirmation. Export a backup first if you need to keep existing data. |
+| **Stats → Clear All Stats** | Permanently deletes all players and matches in `cuesport_stats` (double confirmation). Does not change live scoreboard settings. |
 
 Stream promotion sends only the match metadata described above, and only while you enable it and OBS is streaming.
 
@@ -383,7 +391,7 @@ From the project root:
 python -m http.server 8765
 ```
 
-Open `http://localhost:8765/tests/smoke_test.html` and click **Run all tests**. This checks core wiring, overlay toggles, stats APIs, scoring edge cases, and Balls Potted visibility/labels.
+Open `http://localhost:8765/tests/smoke_test.html` and click **Run all tests**. This checks core wiring, overlay toggles, stats APIs, scoring edge cases, Balls Potted visibility/labels, and related UI copy.
 
 ---
 
