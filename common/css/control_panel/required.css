@@ -1227,6 +1227,12 @@ input:checked+.slider_round:before {
 	margin-top: 0;
 }
 
+.stats-win-streak {
+	margin: 8px 0 0;
+	font-size: 0.9em;
+	font-weight: bold;
+}
+
 .stats-overall-row td {
 	font-weight: bold;
 }

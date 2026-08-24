@@ -194,6 +194,10 @@ function updateScoreModeUI() {
     const dualDisplay = dualMode ? "yes" : "no";
     setStorageItem("dualScoreDisplay", dualDisplay);
     bc.postMessage({ dualScoreDisplay: dualDisplay });
+
+    if (window.PlayerStats && typeof window.PlayerStats.onScoreModeChanged === "function") {
+        window.PlayerStats.onScoreModeChanged();
+    }
 }
 
 function pointBasedSetting() {
@@ -1213,6 +1217,11 @@ function resetPlayerBalls(player) {
     bc.postMessage({ player: player, balls: 0 });
 }
 
+function resetBothPlayersBalls() {
+    resetPlayerBalls('1');
+    resetPlayerBalls('2');
+}
+
 function postScore(opt1, player) {
     // Parse stored scores as integers
     let p1ScoreValue = parseInt(getStorageItem("p1ScoreCtrlPanel")) || 0;
@@ -1248,7 +1257,7 @@ function postScore(opt1, player) {
                 document.getElementById("p" + player + "Score").value = p1ScoreValue;
                 resetExt('p1', 'noflash');
                 resetExt('p2', 'noflash');
-                resetPlayerBalls(player);
+                resetBothPlayersBalls();
                 scoreChanged = true;
             }
         } else if (p1ScoreValue > 0) {
@@ -1280,7 +1289,7 @@ function postScore(opt1, player) {
                 document.getElementById("p" + player + "Score").value = p2ScoreValue;
                 resetExt('p1', 'noflash');
                 resetExt('p2', 'noflash');
-                resetPlayerBalls(player);
+                resetBothPlayersBalls();
                 scoreChanged = true;
             }
         } else if (p2ScoreValue > 0) {

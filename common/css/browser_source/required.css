@@ -537,11 +537,11 @@ body {
     z-index: 20;
     background: rgba(0, 0, 0, 0.75);
     color: #fff;
-    padding: 12px 18px;
+    padding: 14px 22px;
     border: 2px solid rgba(255, 255, 255, 0.3);
     border-radius: 6px;
     font-family: Arial, sans-serif;
-    min-width: 280px;
+    min-width: 360px;
     text-align: center;
     cursor: move;
 }
@@ -551,36 +551,44 @@ body {
 }
 
 .overlay-stats-title {
-    font-size: 14px;
+    font-size: calc(var(--small-font-size) * var(--ui-scaling));
     text-transform: uppercase;
     letter-spacing: 1px;
     opacity: 0.8;
-    margin-bottom: 6px;
+    margin-bottom: 8px;
+}
+
+.overlay-stats-title.overlay-stats-player-name {
+    font-weight: bold;
+    font-size: calc(var(--standard-font-size) * var(--ui-scaling));
+    text-transform: none;
+    letter-spacing: normal;
+    opacity: 1;
 }
 
 .overlay-stats-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 12px;
-    font-size: calc(var(--standard-font-size) * 0.5);
+    gap: 16px;
+    font-size: calc(var(--standard-font-size) * var(--ui-scaling));
     font-weight: bold;
 }
 
 .overlay-stats-row span:nth-child(2) {
-    font-size: calc(var(--standard-font-size) * 0.65);
+    font-size: calc(var(--standard-font-size) * var(--ui-scaling));
     white-space: nowrap;
 }
 
 .overlay-stats-sub,
 .overlay-stats-line {
-    font-size: calc(var(--standard-font-size) * 0.35);
-    margin-top: 4px;
+    font-size: calc(var(--small-font-size) * var(--ui-scaling));
+    margin-top: 6px;
     opacity: 0.85;
 }
 
 .overlay-stats-empty {
-    font-size: calc(var(--standard-font-size) * 0.4);
+    font-size: calc(var(--small-font-size) * var(--ui-scaling));
     font-style: italic;
     opacity: 0.75;
     padding: 4px 0;

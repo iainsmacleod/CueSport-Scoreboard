@@ -24,7 +24,7 @@ for more information about Salotto please visit https://salotto.app
     <link rel="stylesheet" href="./common/css/control_panel/required.css" />
     <script>
         //---------------------------------------------------------------------------------------------
-        var versionNum = "6.0.0";
+        var versionNum = "6.1.0";
         //---------------------------------------------------------------------------------------------
     </script>
     <script src="./common/js/obs-websocket-js.js"></script>
@@ -702,7 +702,7 @@ for more information about Salotto please visit https://salotto.app
                     Clear All Data
                 </div>
             </div>
-            <p class="stats-hint">Clears scoreboard settings and layout for this instance. Player statistics are not affected - use Stats &gt; Clear All Stats to remove match history.</p>
+            <p class="stats-hint">Clears scoreboard settings - does not effect player statistics - use Stats &gt; Clear All Stats to remove statistics history.</p>
         </div> <!-- General Settings Tab-->
     </div> <!-- End of tab content -->
 
@@ -726,9 +726,9 @@ for more information about Salotto please visit https://salotto.app
                         <thead>
                             <tr>
                                 <th>Name</th>
-                                <th>G W/L</th>
+                                <th>Games W/L</th>
                                 <th>Win%</th>
-                                <th>R W/L</th>
+                                <th>Racks W/L</th>
                                 <th>Last</th>
                             </tr>
                         </thead>
@@ -780,7 +780,7 @@ for more information about Salotto please visit https://salotto.app
                         <input type="file" id="statsImportFile" accept=".json,application/json" class="noShow" onchange="handleStatsImportFile(this)" />
                         <div class="hover obs28 button stats-danger-btn" onclick="clearAllStatsConfirmed()">Clear All Stats</div>
                     </div>
-                    <p class="stats-hint">Export creates a backup file. Import merges data by ID. Clear All Stats removes all player and match history (does not affect current game settings).</p>
+                    <p class="stats-hint">Export creates a backup file. Import replaces all current statistics after confirmation. Clear All Stats permanently deletes statistics history (does not affect current game settings).</p>
                 </div>
             </div>
             <div class="modal-footer">
@@ -808,7 +808,7 @@ for more information about Salotto please visit https://salotto.app
                 <div class="form-row">
                     <div class="field">
                         <label for="statsMatchGameType">Game type:</label>
-                        <select id="statsMatchGameType">
+                        <select id="statsMatchGameType" onchange="updateMatchBallFieldsVisibility()">
                             <option value="game1">8-Ball</option>
                             <option value="game2">9-Ball</option>
                             <option value="game3">10-Ball</option>
@@ -838,13 +838,13 @@ for more information about Salotto please visit https://salotto.app
                         </select>
                     </div>
                 </div>
-                <div class="form-row stats-match-form-row">
+                <div id="statsMatchBallsRow" class="form-row stats-match-form-row noShow">
                     <div class="field">
-                        <label for="statsMatchBallsP1">Balls (P1, optional):</label>
+                        <label for="statsMatchBallsP1">Balls potted (P1, optional):</label>
                         <input type="number" id="statsMatchBallsP1" min="0" max="999" value="0" />
                     </div>
                     <div class="field">
-                        <label for="statsMatchBallsP2">Balls (P2, optional):</label>
+                        <label for="statsMatchBallsP2">Balls potted (P2, optional):</label>
                         <input type="number" id="statsMatchBallsP2" min="0" max="999" value="0" />
                     </div>
                 </div>

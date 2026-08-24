@@ -504,24 +504,29 @@ function applyOverlayStats(stats) {
     }
     if (titleEl) {
         titleEl.textContent = stats.title || 'Stats';
+        if (stats.mode === 'p1' || stats.mode === 'p2') {
+            titleEl.classList.add('overlay-stats-player-name');
+        } else {
+            titleEl.classList.remove('overlay-stats-player-name');
+        }
     }
     if (stats.emptyMessage) {
         bodyEl.innerHTML = '<div class="overlay-stats-empty">' + stats.emptyMessage + '</div>';
     } else if (stats.mode === 'h2h') {
-        const hasBalls = (stats.p1Balls || 0) + (stats.p2Balls || 0) > 0;
         bodyEl.innerHTML =
             '<div class="overlay-stats-row">' +
             '<span>' + (stats.p1Name || 'Player 1') + '</span>' +
             '<span>' + (stats.p1Games || 0) + '-' + (stats.p2Games || 0) + '</span>' +
             '<span>' + (stats.p2Name || 'Player 2') + '</span>' +
             '</div>' +
-            '<div class="overlay-stats-sub">Racks: ' + (stats.p1Racks || 0) + '-' + (stats.p2Racks || 0) + '</div>' +
-            (hasBalls ? '<div class="overlay-stats-sub">Balls: ' + (stats.p1Balls || 0) + '-' + (stats.p2Balls || 0) + '</div>' : '');
+            '<div class="overlay-stats-sub">Rack W/L: ' + (stats.p1Racks || 0) + '-' + (stats.p2Racks || 0) + '</div>' +
+            (stats.showBalls ? '<div class="overlay-stats-sub">Balls Potted: ' + (stats.p1Balls || 0) + '-' + (stats.p2Balls || 0) + '</div>' : '');
     } else {
         bodyEl.innerHTML =
-            '<div class="overlay-stats-line">Games: ' + stats.gamesWL + ' (' + stats.winRate + '%)</div>' +
-            '<div class="overlay-stats-line">Racks: ' + stats.racksWL + '</div>' +
-            '<div class="overlay-stats-line">Balls: ' + stats.ballsWL + '</div>';
+            '<div class="overlay-stats-line">Games W/L: ' + stats.gamesWL + ' (' + stats.winRate + '%)</div>' +
+            '<div class="overlay-stats-line">Rack W/L: ' + stats.racksWL + '</div>' +
+            (stats.showBalls ? '<div class="overlay-stats-line">Balls Potted: ' + (stats.ballsPotted || 0) + '</div>' : '') +
+            '<div class="overlay-stats-line">Win Streak: ' + (stats.winStreak || 0) + '</div>';
     }
     panel.classList.remove('noShow', 'fadeOutElm');
     panel.classList.add('fadeInElm');

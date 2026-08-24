@@ -18,6 +18,14 @@
         game7: 'Custom'
     };
 
+    function gameTypeHasBallScoring(gameType) {
+        return gameType === 'game5' || gameType === 'game6' || gameType === 'game7';
+    }
+
+    function showsBallStats() {
+        return typeof isDualScoreMode === 'function' && isDualScoreMode();
+    }
+
     let db = null;
     let initPromise = null;
 
@@ -87,7 +95,10 @@
     }
 
     function getWinRate(stats) {
-        const played = stats.gamesWon + stats.gamesLost;
+        if (!stats) {
+            return 0;
+        }
+        const played = (stats.gamesWon || 0) + (stats.gamesLost || 0);
         if (played === 0) {
             return 0;
         }
@@ -99,9 +110,87 @@
     }
 
     function formatPlayerPreview(stats) {
-        const g = formatWL(stats.gamesWon, stats.gamesLost) + 'G';
-        const r = stats.racksWon + 'R';
+        const safe = stats || createEmptyStats();
+        const g = formatWL(safe.gamesWon, safe.gamesLost) + 'G';
+        const r = (safe.racksWon || 0) + 'R';
         return g + ' \u00b7 ' + r;
+    }
+
+    function ensurePlayerRecordShape(player) {
+        if (!player || typeof player !== 'object') {
+            return null;
+        }
+        const displayName = truncateName(player.name || '');
+        const normalized = normalizeName(displayName) || normalizeName(player.nameNormalized || '');
+        if (!normalized) {
+            return null;
+        }
+
+        const stats = player.stats && typeof player.stats === 'object'
+            ? player.stats
+            : createEmptyStats();
+        if (!stats.byGameType || typeof stats.byGameType !== 'object') {
+            stats.byGameType = {};
+        }
+        stats.racksWon = stats.racksWon || 0;
+        stats.racksLost = stats.racksLost || 0;
+        stats.gamesWon = stats.gamesWon || 0;
+        stats.gamesLost = stats.gamesLost || 0;
+        stats.ballsWon = stats.ballsWon || 0;
+        stats.ballsLost = stats.ballsLost || 0;
+
+        return {
+            id: player.id || generateId(),
+            name: displayName || truncateName(normalized),
+            nameNormalized: normalized,
+            stats: stats,
+            createdAt: player.createdAt || new Date().toISOString(),
+            updatedAt: player.updatedAt || new Date().toISOString(),
+            lastPlayedAt: player.lastPlayedAt || null
+        };
+    }
+
+    async function repairPlayerRecords() {
+        await openDatabase();
+        const players = await getAllPlayers();
+        let repaired = 0;
+        for (let i = 0; i < players.length; i++) {
+            const original = players[i];
+            const shaped = ensurePlayerRecordShape(original);
+            if (!shaped) {
+                continue;
+            }
+            const needsRepair =
+                original.nameNormalized !== shaped.nameNormalized ||
+                original.name !== shaped.name ||
+                !original.stats ||
+                !original.stats.byGameType;
+            if (needsRepair) {
+                await putPlayer(shaped);
+                repaired++;
+            }
+        }
+        return repaired;
+    }
+
+    /** Current consecutive game wins from most recent completed match (matches newest-first). */
+    function getCurrentWinStreak(playerId, matches) {
+        if (!playerId || !matches || matches.length === 0) {
+            return 0;
+        }
+        let streak = 0;
+        for (let i = 0; i < matches.length; i++) {
+            const m = matches[i];
+            if (m.status !== 'completed' || !m.winnerId) {
+                continue;
+            }
+            if (m.winnerId === playerId) {
+                streak++;
+            } else {
+                break;
+            }
+        }
+        return streak;
     }
 
     function openDatabase() {
@@ -231,16 +320,23 @@
         }
         return all
             .filter(function (p) {
-                return p.nameNormalized.indexOf(normalizedQuery) === 0 ||
-                    p.name.toLowerCase().indexOf(normalizedQuery) !== -1;
+                const nameNorm = p.nameNormalized || normalizeName(p.name);
+                const nameLower = (p.name || '').toLowerCase();
+                if (!nameNorm && !nameLower) {
+                    return false;
+                }
+                return (nameNorm && nameNorm.indexOf(normalizedQuery) === 0) ||
+                    nameLower.indexOf(normalizedQuery) !== -1;
             })
             .sort(function (a, b) {
-                const aStarts = a.nameNormalized.indexOf(normalizedQuery) === 0 ? 0 : 1;
-                const bStarts = b.nameNormalized.indexOf(normalizedQuery) === 0 ? 0 : 1;
+                const aNorm = a.nameNormalized || normalizeName(a.name);
+                const bNorm = b.nameNormalized || normalizeName(b.name);
+                const aStarts = aNorm.indexOf(normalizedQuery) === 0 ? 0 : 1;
+                const bStarts = bNorm.indexOf(normalizedQuery) === 0 ? 0 : 1;
                 if (aStarts !== bStarts) {
                     return aStarts - bStarts;
                 }
-                return a.name.localeCompare(b.name);
+                return (a.name || '').localeCompare(b.name || '');
             })
             .slice(0, limit || 8);
     }
@@ -1028,8 +1124,9 @@
 
         const scoreP1 = clampScore(matchPayload.scoreP1);
         const scoreP2 = clampScore(matchPayload.scoreP2);
-        const ballsP1 = clampScore(matchPayload.ballsP1);
-        const ballsP2 = clampScore(matchPayload.ballsP2);
+        const includeBalls = gameTypeHasBallScoring(matchPayload.gameType);
+        const ballsP1 = includeBalls ? clampScore(matchPayload.ballsP1) : 0;
+        const ballsP2 = includeBalls ? clampScore(matchPayload.ballsP2) : 0;
         let status = matchPayload.status === 'completed' ? 'completed' : 'active';
         const now = new Date().toISOString();
         const dateIso = matchPayload.date ? (matchPayload.date + 'T12:00:00.000Z') : now;
@@ -1204,7 +1301,7 @@
         return data;
     }
 
-    async function importData(data, merge) {
+    async function importData(data) {
         if (!data || !Array.isArray(data.players) || !Array.isArray(data.matches)) {
             throw new Error('Invalid import file format.');
         }
@@ -1213,44 +1310,45 @@
                 'Import file uses a newer schema (v' + data.schemaVersion + '). Continue anyway?'
             );
             if (!proceed) {
-                return { players: 0, matches: 0, updated: 0 };
+                return { cancelled: true, players: 0, matches: 0 };
             }
         }
 
-        let playersAdded = 0;
-        let matchesAdded = 0;
-        let updated = 0;
+        await clearAllStats();
 
-        for (const player of data.players) {
-            const existing = await getPlayer(player.id);
-            if (existing && merge) {
-                await putPlayer(player);
-                updated++;
-            } else if (!existing) {
-                await putPlayer(player);
-                playersAdded++;
-            } else {
-                await putPlayer(player);
-                updated++;
+        let playersImported = 0;
+        let matchesImported = 0;
+        const usedNormalized = {};
+
+        for (let i = 0; i < data.players.length; i++) {
+            const shaped = ensurePlayerRecordShape(data.players[i]);
+            if (!shaped) {
+                continue;
             }
+            // Keep unique nameNormalized index happy if file has duplicates.
+            let uniqueNorm = shaped.nameNormalized;
+            let suffix = 2;
+            while (usedNormalized[uniqueNorm]) {
+                uniqueNorm = shaped.nameNormalized + '-' + suffix;
+                suffix++;
+            }
+            shaped.nameNormalized = uniqueNorm;
+            usedNormalized[uniqueNorm] = true;
+            await putPlayer(shaped);
+            playersImported++;
         }
 
-        for (const match of data.matches) {
-            const existing = await getMatch(match.id);
-            if (!existing) {
-                await putMatch(match);
-                matchesAdded++;
-            } else if (merge) {
-                await putMatch(match);
-                updated++;
-            } else {
-                await putMatch(match);
-                updated++;
+        for (let j = 0; j < data.matches.length; j++) {
+            const match = data.matches[j];
+            if (!match || !match.id) {
+                continue;
             }
+            await putMatch(match);
+            matchesImported++;
         }
 
         await setMeta('schemaVersion', SCHEMA_VERSION);
-        return { players: playersAdded, matches: matchesAdded, updated: updated };
+        return { players: playersImported, matches: matchesImported };
     }
 
     async function clearAllStats() {
@@ -1344,14 +1442,17 @@
             };
         }
 
+        const matches = await getMatchesForPlayer(playerId);
         return {
             visible: visible,
             mode: mode,
             title: player.name,
+            showBalls: showsBallStats(),
             gamesWL: formatWL(player.stats.gamesWon, player.stats.gamesLost),
             racksWL: formatWL(player.stats.racksWon, player.stats.racksLost),
-            ballsWL: formatWL(player.stats.ballsWon, player.stats.ballsLost),
-            winRate: getWinRate(player.stats)
+            ballsPotted: player.stats.ballsWon || 0,
+            winRate: getWinRate(player.stats),
+            winStreak: getCurrentWinStreak(playerId, matches)
         };
     }
 
@@ -1385,6 +1486,7 @@
             visible: visible,
             mode: 'h2h',
             title: 'Head to Head',
+            showBalls: showsBallStats(),
             p1Name: h2h.player1.name,
             p2Name: h2h.player2.name,
             p1Games: h2h.gamesWon[p1Id] || 0,
@@ -1411,6 +1513,14 @@
             return buildH2HOverlayPayload();
         }
         return { visible: false };
+    }
+
+    function onScoreModeChanged() {
+        broadcastOverlayStatsIfEnabled();
+        const modal = document.getElementById('statsModal');
+        if (modal && modal.style.display === 'block') {
+            refreshStatsUI();
+        }
     }
 
     function persistOverlayStatsPayload(payload) {
@@ -1667,6 +1777,7 @@
                         document.getElementById('statsMatchStatus').value = match.status === 'completed' ? 'completed' : 'active';
                         document.getElementById('statsMatchBallsP1').value = countBallsForPlayer(match, match.player1Id);
                         document.getElementById('statsMatchBallsP2').value = countBallsForPlayer(match, match.player2Id);
+                        updateMatchBallFieldsVisibility();
                         modal.style.display = 'block';
                     });
                 });
@@ -1696,8 +1807,29 @@
                 document.getElementById('statsMatchStatus').value = 'completed';
                 document.getElementById('statsMatchBallsP1').value = 0;
                 document.getElementById('statsMatchBallsP2').value = 0;
+                updateMatchBallFieldsVisibility();
                 modal.style.display = 'block';
             });
+        }
+    }
+
+    function updateMatchBallFieldsVisibility() {
+        const row = document.getElementById('statsMatchBallsRow');
+        const select = document.getElementById('statsMatchGameType');
+        if (!row) {
+            return;
+        }
+        const show = gameTypeHasBallScoring(select && select.value);
+        row.classList.toggle('noShow', !show);
+        if (!show) {
+            const p1 = document.getElementById('statsMatchBallsP1');
+            const p2 = document.getElementById('statsMatchBallsP2');
+            if (p1) {
+                p1.value = 0;
+            }
+            if (p2) {
+                p2.value = 0;
+            }
         }
     }
 
@@ -1923,7 +2055,9 @@
         }
         const players = await getAllPlayers();
         players.sort(function (a, b) {
-            return b.stats.gamesWon - a.stats.gamesWon || b.stats.racksWon - a.stats.racksWon;
+            const aStats = a.stats || createEmptyStats();
+            const bStats = b.stats || createEmptyStats();
+            return bStats.gamesWon - aStats.gamesWon || bStats.racksWon - aStats.racksWon;
         });
 
         if (players.length === 0) {
@@ -1932,12 +2066,13 @@
         }
 
         tbody.innerHTML = players.map(function (p) {
-            const wr = getWinRate(p.stats);
+            const stats = p.stats || createEmptyStats();
+            const wr = getWinRate(stats);
             return '<tr class="stats-row" data-player-id="' + p.id + '">' +
                 '<td>' + escapeHtml(p.name) + '</td>' +
-                '<td>' + formatWL(p.stats.gamesWon, p.stats.gamesLost) + '</td>' +
+                '<td>' + formatWL(stats.gamesWon, stats.gamesLost) + '</td>' +
                 '<td>' + wr + '%</td>' +
-                '<td>' + formatWL(p.stats.racksWon, p.stats.racksLost) + '</td>' +
+                '<td>' + formatWL(stats.racksWon, stats.racksLost) + '</td>' +
                 '<td>' + formatDate(p.lastPlayedAt) + '</td>' +
                 '</tr>';
         }).join('');
@@ -1949,30 +2084,36 @@
         });
     }
 
-    function renderPlayerStatsTable(player) {
+    function renderPlayerStatsTable(player, winStreak) {
         const wr = getWinRate(player.stats);
+        const showBalls = showsBallStats();
         let typeRows = '';
         Object.keys(GAME_TYPE_LABELS).forEach(function (gt) {
             const ts = player.stats.byGameType[gt];
-            if (!ts || (ts.gamesWon + ts.gamesLost + ts.racksWon) === 0) {
+            const typeBalls = ts ? (ts.ballsWon || 0) : 0;
+            if (!ts || (ts.gamesWon + ts.gamesLost + ts.racksWon + (showBalls ? typeBalls : 0)) === 0) {
                 return;
             }
             typeRows += '<tr><td>' + GAME_TYPE_LABELS[gt] + '</td>' +
                 '<td>' + formatWL(ts.gamesWon, ts.gamesLost) + '</td>' +
                 '<td>' + formatWL(ts.racksWon, ts.racksLost) + '</td>' +
-                '<td>' + formatWL(ts.ballsWon, ts.ballsLost) + '</td>' +
+                (showBalls ? '<td>' + typeBalls + '</td>' : '') +
                 '<td></td></tr>';
         });
 
         const overallRow = '<tr class="stats-overall-row"><td><strong>Overall</strong></td>' +
             '<td>' + formatWL(player.stats.gamesWon, player.stats.gamesLost) + ' (' + wr + '%)</td>' +
             '<td>' + formatWL(player.stats.racksWon, player.stats.racksLost) + '</td>' +
-            '<td>' + formatWL(player.stats.ballsWon, player.stats.ballsLost) + '</td>' +
+            (showBalls ? '<td>' + (player.stats.ballsWon || 0) + '</td>' : '') +
             '<td>' + formatDate(player.lastPlayedAt) + '</td></tr>';
 
+        const streak = typeof winStreak === 'number' ? winStreak : 0;
         return '<table class="stats-table stats-player-stats-table"><thead><tr>' +
-            '<th>Category</th><th>G W/L</th><th>R W/L</th><th>B W/L</th><th>Last</th>' +
-            '</tr></thead><tbody>' + overallRow + typeRows + '</tbody></table>';
+            '<th>Category</th><th>Games W/L</th><th>Racks W/L</th>' +
+            (showBalls ? '<th>Balls Potted</th>' : '') +
+            '<th>Last</th>' +
+            '</tr></thead><tbody>' + overallRow + typeRows + '</tbody></table>' +
+            '<p class="stats-win-streak">Win Streak: ' + streak + '</p>';
     }
 
     function renderH2HComparisonTable(viewerId, opponentId, h2h) {
@@ -1982,25 +2123,29 @@
 
         const viewer = h2h.player1.id === viewerId ? h2h.player1 : h2h.player2;
         const opponent = h2h.player1.id === viewerId ? h2h.player2 : h2h.player1;
+        const showBalls = showsBallStats();
         const totalGames = (h2h.gamesWon[viewerId] || 0) + (h2h.gamesWon[opponentId] || 0);
         const totalRacks = (h2h.racksWon[viewerId] || 0) + (h2h.racksWon[opponentId] || 0);
         const totalBalls = (h2h.ballsWon[viewerId] || 0) + (h2h.ballsWon[opponentId] || 0);
 
-        if (totalGames + totalRacks + totalBalls === 0) {
+        if (totalGames + totalRacks + (showBalls ? totalBalls : 0) === 0) {
             return '<p class="stats-empty">No matches recorded vs this opponent.</p>';
         }
 
         let html = '<table class="stats-table stats-h2h-comparison-table"><thead><tr>' +
-            '<th>Player</th><th>G W/L</th><th>R W/L</th><th>B W/L</th>' +
+            '<th>Player</th><th>Games W/L</th><th>Racks W/L</th>' +
+            (showBalls ? '<th>Balls Potted</th>' : '') +
             '</tr></thead><tbody>' +
             '<tr><td>' + escapeHtml(viewer.name) + '</td>' +
             '<td>' + formatWL(h2h.gamesWon[viewerId] || 0, h2h.gamesWon[opponentId] || 0) + '</td>' +
             '<td>' + formatWL(h2h.racksWon[viewerId] || 0, h2h.racksWon[opponentId] || 0) + '</td>' +
-            '<td>' + formatWL(h2h.ballsWon[viewerId] || 0, h2h.ballsWon[opponentId] || 0) + '</td></tr>' +
+            (showBalls ? '<td>' + (h2h.ballsWon[viewerId] || 0) + '</td>' : '') +
+            '</tr>' +
             '<tr><td>' + escapeHtml(opponent.name) + '</td>' +
             '<td>' + formatWL(h2h.gamesWon[opponentId] || 0, h2h.gamesWon[viewerId] || 0) + '</td>' +
             '<td>' + formatWL(h2h.racksWon[opponentId] || 0, h2h.racksWon[viewerId] || 0) + '</td>' +
-            '<td>' + formatWL(h2h.ballsWon[opponentId] || 0, h2h.ballsWon[viewerId] || 0) + '</td></tr>' +
+            (showBalls ? '<td>' + (h2h.ballsWon[opponentId] || 0) + '</td>' : '') +
+            '</tr>' +
             '</tbody></table>';
 
         if (h2h.lastPlayedAt) {
@@ -2013,15 +2158,16 @@
         if (!h2h || !playerId || !otherId) {
             return '<span class="stats-empty">&mdash;</span>';
         }
+        const showBalls = showsBallStats();
         const totalGames = (h2h.gamesWon[playerId] || 0) + (h2h.gamesWon[otherId] || 0);
         const totalRacks = (h2h.racksWon[playerId] || 0) + (h2h.racksWon[otherId] || 0);
         const totalBalls = (h2h.ballsWon[playerId] || 0) + (h2h.ballsWon[otherId] || 0);
-        if (totalGames + totalRacks + totalBalls === 0) {
+        if (totalGames + totalRacks + (showBalls ? totalBalls : 0) === 0) {
             return '<span class="stats-empty">No recorded matches</span>';
         }
-        return 'G ' + formatWL(h2h.gamesWon[playerId] || 0, h2h.gamesWon[otherId] || 0) +
-            ' &middot; R ' + formatWL(h2h.racksWon[playerId] || 0, h2h.racksWon[otherId] || 0) +
-            ' &middot; B ' + formatWL(h2h.ballsWon[playerId] || 0, h2h.ballsWon[otherId] || 0);
+        return 'Games ' + formatWL(h2h.gamesWon[playerId] || 0, h2h.gamesWon[otherId] || 0) +
+            ' &middot; Racks ' + formatWL(h2h.racksWon[playerId] || 0, h2h.racksWon[otherId] || 0) +
+            (showBalls ? ' &middot; Balls Potted ' + (h2h.ballsWon[playerId] || 0) : '');
     }
 
     function renderPlayerMatchHistoryRows(playerId, matches) {
@@ -2080,15 +2226,16 @@
             }).join('');
 
         const matchRows = renderPlayerMatchHistoryRows(playerId, matches);
+        const winStreak = getCurrentWinStreak(playerId, matches);
 
         detailPanel.innerHTML =
             '<div class="stats-player-header">' +
             '<h3>' + escapeHtml(player.name) + '</h3>' +
             '<div class="stats-player-header-actions">' +
             '<div class="hover obs28 button stats-edit-btn" onclick="promptRenamePlayer()">Edit Name</div>' +
-            '<div class="hover obs28 button stats-danger-btn" onclick="confirmDeletePlayer()">Delete Player</div>' +
+            '<div class="hover obs28 button stats-edit-btn stats-danger-btn" onclick="confirmDeletePlayer()">Delete Player</div>' +
             '</div></div>' +
-            '<div class="stats-section">' + renderPlayerStatsTable(player) + '</div>' +
+            '<div class="stats-section">' + renderPlayerStatsTable(player, winStreak) + '</div>' +
             '<div class="stats-section stats-opponent-row">' +
             '<label>Opponent:' +
             '<select id="statsPlayerOpponentSelect" onchange="refreshPlayerOpponentH2H()">' +
@@ -2220,21 +2367,49 @@
     async function importStatsJson(file) {
         const text = await file.text();
         const data = JSON.parse(text);
-        const result = await importData(data, true);
-        alert('Import complete: ' + result.players + ' players added, ' +
-            result.matches + ' matches added, ' + result.updated + ' updated.');
+
+        if (!data || !Array.isArray(data.players) || !Array.isArray(data.matches)) {
+            throw new Error('Invalid import file format.');
+        }
+
+        const playerCount = data.players.length;
+        const matchCount = data.matches.length;
+        if (!confirm(
+            'Import will REPLACE all current player statistics and match history with this file (' +
+            playerCount + ' player(s), ' + matchCount + ' match(es)).\n\n' +
+            'Existing stats will be permanently overwritten. Continue?'
+        )) {
+            return;
+        }
+        if (!confirm('Are you sure? This cannot be undone. Export a backup first if you need to keep current data.')) {
+            return;
+        }
+
+        const result = await importData(data);
+        if (result.cancelled) {
+            return;
+        }
+
+        alert('Import complete: ' + result.players + ' player(s) and ' +
+            result.matches + ' match(es) loaded.');
+        statsModalSelectedPlayerId = null;
+        document.getElementById('statsPlayerDetail').innerHTML =
+            '<p class="stats-empty">Select a player from the leaderboard.</p>';
         await renderStatsLeaderboard();
         await populateH2HPlayerSelects();
+        await refreshH2HView();
+        broadcastOverlayStatsIfEnabled();
     }
 
     async function clearAllStatsConfirmed() {
-        if (!confirm('Clear ALL player statistics and match history? This cannot be undone.')) {
+        if (!confirm('Clear ALL player statistics and match history?\n\nThis permanently deletes your stats roster and cannot be undone.')) {
             return;
         }
-        if (!confirm('Are you absolutely sure? All recorded stats will be permanently deleted.')) {
+        if (!confirm('Are you absolutely sure? All recorded statistics will be permanently deleted.')) {
             return;
         }
         await clearAllStats();
+        statsModalSelectedPlayerId = null;
         await renderStatsLeaderboard();
         await populateH2HPlayerSelects();
         document.getElementById('statsPlayerDetail').innerHTML = '<p class="stats-empty">Select a player from the leaderboard.</p>';
@@ -2250,9 +2425,15 @@
         broadcastOverlayStatsIfEnabled();
     }
 
+    async function initPlayerStats() {
+        await openDatabase();
+        await repairPlayerRecords();
+        return db;
+    }
+
     // Expose API
     window.PlayerStats = {
-        init: openDatabase,
+        init: initPlayerStats,
         ensurePlayer: ensurePlayer,
         findPlayerByNormalizedName: findPlayerByNormalizedName,
         searchPlayers: searchPlayers,
@@ -2277,6 +2458,7 @@
         importData: importData,
         clearAllStats: clearAllStats,
         broadcastOverlayStatsIfEnabled: broadcastOverlayStatsIfEnabled,
+        onScoreModeChanged: onScoreModeChanged,
         syncOverlayButtonsFromStorage: syncOverlayButtonsFromStorage,
         initPlayerAutocomplete: initPlayerAutocomplete,
         buildOverlayStatsPayload: buildOverlayStatsPayload
@@ -2304,6 +2486,7 @@
     };
     window.clearAllStatsConfirmed = clearAllStatsConfirmed;
     window.toggleOverlayStats = toggleOverlayStats;
+    window.updateMatchBallFieldsVisibility = updateMatchBallFieldsVisibility;
     window.openMatchEditModal = openMatchEditModal;
     window.closeMatchEditModal = closeMatchEditModal;
     window.saveMatchFromModal = saveMatchFromModal;
@@ -2317,7 +2500,9 @@
     window.savePlayerRenameFromModal = savePlayerRenameFromModal;
     window.confirmDeletePlayer = confirmDeletePlayer;
 
-    openDatabase().catch(function (err) {
+    openDatabase().then(function () {
+        return repairPlayerRecords();
+    }).catch(function (err) {
         console.error('PlayerStats DB init failed:', err);
     });
 })();

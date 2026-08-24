@@ -214,7 +214,7 @@
 
             // --- Core ---
             assert('Core', 'PlayerStats loaded', !!cp.PlayerStats);
-            assert('Core', 'Version 6.0.0', cp.versionNum === '6.0.0', cp.versionNum);
+            assert('Core', 'Version 6.1.0', cp.versionNum === '6.1.0', cp.versionNum);
             assert('Core', 'Stats modal present', !!cp.document.getElementById('statsModal'));
             assert('Core', 'Overlay panel in browser source', !!bs.document.getElementById('overlayStatsPanel'));
 
@@ -376,10 +376,144 @@
                 return c.textContent.indexOf('Clear Instance Data') !== -1;
             });
             const hint = Array.from(cp.document.querySelectorAll('p.stats-hint')).find(function (p) {
-                return p.textContent.indexOf('Player statistics are not affected') !== -1;
+                return p.textContent.indexOf('does not effect player statistics') !== -1;
             });
             assert('Stats UI', 'Clear buttons row', dataCol && dataCol.children.length === 2);
             assert('Stats UI', 'Clear-data hint on separate line', hint && dataCol && !dataCol.contains(hint));
+
+            // --- Ball stats visibility & labels ---
+            const prevGameType = cp.getStorageItem('gameType') || 'game1';
+            const prevPointBased = cp.getStorageItem('pointBased') || 'no';
+            const boardHeaders = Array.from(cp.document.querySelectorAll('#statsTab-leaderboard th'))
+                .map(function (th) { return th.textContent.trim(); });
+            assert('Ball Stats', 'Board header Games W/L', boardHeaders.indexOf('Games W/L') !== -1, boardHeaders.join('|'));
+            assert('Ball Stats', 'Board header Racks W/L', boardHeaders.indexOf('Racks W/L') !== -1, boardHeaders.join('|'));
+            assert('Ball Stats', 'Board has no Balls Potted column', boardHeaders.indexOf('Balls Potted') === -1);
+
+            cp.document.getElementById('gameType').value = 'game1';
+            cp.gameType('game1');
+            await sleep(150);
+            assert('Ball Stats', '8-Ball is not dual score', cp.isDualScoreMode() === false);
+
+            const bankPlayer = await cp.PlayerStats.ensurePlayer(tag + '_BallA');
+            const bankOpp = await cp.PlayerStats.ensurePlayer(tag + '_BallB');
+            await cp.PlayerStats.saveMatch({
+                player1Id: bankPlayer.id,
+                player2Id: bankOpp.id,
+                gameType: 'game5',
+                scoreP1: 2,
+                scoreP2: 1,
+                status: 'completed',
+                date: new Date().toISOString().slice(0, 10),
+                ballsP1: 9,
+                ballsP2: 4
+            });
+
+            cp.document.getElementById('p1Name').value = bankPlayer.name;
+            cp.document.getElementById('p2Name').value = bankOpp.name;
+            cp.document.getElementById('p1Name').setAttribute('data-player-id', bankPlayer.id);
+            cp.document.getElementById('p2Name').setAttribute('data-player-id', bankOpp.id);
+
+            cp.localStorage.setItem('overlayStatsMode', 'p1');
+            let overlayPayload = await cp.PlayerStats.buildOverlayStatsPayload();
+            assert('Ball Stats', 'P1 overlay hides balls in 8-Ball', overlayPayload.showBalls !== true,
+                JSON.stringify({ showBalls: overlayPayload.showBalls, ballsPotted: overlayPayload.ballsPotted }));
+
+            cp.document.getElementById('gameType').value = 'game5';
+            cp.gameType('game5');
+            await sleep(200);
+            assert('Ball Stats', 'Bank is dual score', cp.isDualScoreMode() === true);
+            overlayPayload = await cp.PlayerStats.buildOverlayStatsPayload();
+            assert('Ball Stats', 'P1 overlay shows balls in Bank', overlayPayload.showBalls === true);
+            assert('Ball Stats', 'P1 overlay Balls Potted is a total',
+                typeof overlayPayload.ballsPotted === 'number' && overlayPayload.ballsWL === undefined,
+                String(overlayPayload.ballsPotted));
+            assert('Ball Stats', 'P1 overlay Balls Potted value',
+                overlayPayload.ballsPotted >= 9, String(overlayPayload.ballsPotted));
+
+            cp.localStorage.setItem('overlayStatsMode', 'h2h');
+            const h2hPayload = await cp.PlayerStats.buildOverlayStatsPayload();
+            assert('Ball Stats', 'H2H overlay shows balls in Bank', h2hPayload.showBalls === true);
+            assert('Ball Stats', 'H2H overlay has per-player totals',
+                typeof h2hPayload.p1Balls === 'number' && typeof h2hPayload.p2Balls === 'number');
+
+            cp.openStatsModal();
+            await sleep(200);
+            const ballRow = Array.from(cp.document.querySelectorAll('#statsLeaderboardBody tr.stats-row'))
+                .find(function (row) { return row.dataset.playerId === bankPlayer.id; });
+            if (ballRow) {
+                ballRow.click();
+                await sleep(250);
+            }
+            const detailHeaders = Array.from(cp.document.querySelectorAll('#statsTab-detail .stats-player-stats-table th'))
+                .map(function (th) { return th.textContent.trim(); });
+            assert('Ball Stats', 'Player detail has Balls Potted', detailHeaders.indexOf('Balls Potted') !== -1, detailHeaders.join('|'));
+            assert('Ball Stats', 'Player detail Games W/L label', detailHeaders.indexOf('Games W/L') !== -1);
+            assert('Ball Stats', 'Player detail Racks W/L label', detailHeaders.indexOf('Racks W/L') !== -1);
+            const overallCells = Array.from(cp.document.querySelectorAll('#statsTab-detail .stats-overall-row td'))
+                .map(function (td) { return td.textContent.trim(); });
+            assert('Ball Stats', 'Player detail Balls Potted is numeric total',
+                overallCells.length >= 4 && /^\d+$/.test(overallCells[3]), overallCells.join('|'));
+            cp.closeStatsModal();
+
+            cp.document.getElementById('statsMatchGameType').value = 'game1';
+            cp.updateMatchBallFieldsVisibility();
+            assert('Ball Stats', 'Match form hides balls for 8-Ball',
+                cp.document.getElementById('statsMatchBallsRow').classList.contains('noShow'));
+            cp.document.getElementById('statsMatchGameType').value = 'game5';
+            cp.updateMatchBallFieldsVisibility();
+            assert('Ball Stats', 'Match form shows balls for Bank',
+                !cp.document.getElementById('statsMatchBallsRow').classList.contains('noShow'));
+
+            bs.applyOverlayStats({
+                visible: true,
+                mode: 'p1',
+                title: 'Smoke',
+                showBalls: true,
+                gamesWL: '1/0',
+                racksWL: '2/1',
+                winRate: 100,
+                ballsPotted: 9,
+                winStreak: 1
+            });
+            await sleep(50);
+            const overlayText = (bs.document.getElementById('overlayStatsBody').innerText || '');
+            assert('Ball Stats', 'Browser source labels Games W/L',
+                overlayText.indexOf('Games W/L: 1/0') !== -1, overlayText.replace(/\n/g, ' | '));
+            assert('Ball Stats', 'Browser source labels Rack W/L',
+                overlayText.indexOf('Rack W/L: 2/1') !== -1, overlayText.replace(/\n/g, ' | '));
+            assert('Ball Stats', 'Browser source labels Balls Potted',
+                overlayText.indexOf('Balls Potted: 9') !== -1, overlayText.replace(/\n/g, ' | '));
+            assert('Ball Stats', 'Browser source omits bare Balls label',
+                !/(^|\n)Balls:/.test(overlayText), overlayText.replace(/\n/g, ' | '));
+            assert('Ball Stats', 'Browser source omits bare Games/Racks labels',
+                overlayText.indexOf('Games:') === -1 && overlayText.indexOf('Racks:') === -1,
+                overlayText.replace(/\n/g, ' | '));
+
+            cp.document.getElementById('gameType').value = 'game7';
+            cp.gameType('game7');
+            const pointBased = cp.document.getElementById('pointBased');
+            if (pointBased) {
+                pointBased.checked = false;
+                cp.pointBasedSetting();
+                await sleep(100);
+                assert('Ball Stats', 'Custom without Point Based hides balls', cp.isDualScoreMode() === false);
+                pointBased.checked = true;
+                cp.pointBasedSetting();
+                await sleep(100);
+                assert('Ball Stats', 'Custom with Point Based shows balls', cp.isDualScoreMode() === true);
+                pointBased.checked = prevPointBased === 'yes';
+                cp.pointBasedSetting();
+            }
+
+            cp.document.getElementById('gameType').value = prevGameType;
+            cp.gameType(prevGameType);
+            cp.localStorage.removeItem('overlayStatsMode');
+            cp.localStorage.removeItem('overlayStatsPayload');
+            bs.applyOverlayStats({ visible: false });
+
+            try { await cp.PlayerStats.deletePlayer(bankPlayer.id); } catch (e) { /* ignore */ }
+            try { await cp.PlayerStats.deletePlayer(bankOpp.id); } catch (e) { /* ignore */ }
 
         } catch (err) {
             assert('Runner', 'Test harness', false, err.message || String(err));
