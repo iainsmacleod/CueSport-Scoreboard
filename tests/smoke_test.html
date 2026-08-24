@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CueSport Scoreboard — Smoke Tests</title>
+    <style>
+        :root {
+            color-scheme: dark;
+            --pass: #3d9a5c;
+            --fail: #c44;
+            --bg: #1a1d24;
+            --panel: #252830;
+            --text: #e8e8e8;
+            --muted: #9aa0aa;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            padding: 24px;
+            font-family: Segoe UI, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.45;
+        }
+        h1 { margin: 0 0 8px; font-size: 1.4rem; }
+        .intro { color: var(--muted); margin-bottom: 16px; max-width: 720px; }
+        .intro code { background: var(--panel); padding: 2px 6px; border-radius: 3px; }
+        .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 16px; }
+        button {
+            cursor: pointer;
+            border: 2px solid #000;
+            background: #3a7;
+            color: #111;
+            font-weight: bold;
+            padding: 8px 16px;
+            border-radius: 0 0 8px 0;
+        }
+        button:disabled { opacity: 0.5; cursor: wait; }
+        button.secondary { background: #556; color: #fff; }
+        #summary {
+            padding: 12px 14px;
+            background: var(--panel);
+            border: 1px solid #333;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            max-width: 720px;
+        }
+        #summary.pass { border-color: var(--pass); }
+        #summary.fail { border-color: var(--fail); }
+        table {
+            width: 100%;
+            max-width: 960px;
+            border-collapse: collapse;
+            font-size: 0.92rem;
+        }
+        th, td {
+            border: 1px solid #333;
+            padding: 6px 10px;
+            text-align: left;
+            vertical-align: top;
+        }
+        th { background: #2b2e38; }
+        tr.pass td:first-child { color: var(--pass); font-weight: bold; }
+        tr.fail td:first-child { color: var(--fail); font-weight: bold; }
+        .suite { color: var(--muted); font-size: 0.82em; }
+        .detail { color: var(--muted); font-family: Consolas, monospace; font-size: 0.85em; word-break: break-word; }
+        iframe { display: none; }
+    </style>
+</head>
+<body>
+    <h1>CueSport Scoreboard — Smoke Tests</h1>
+    <p class="intro">
+        Run from a local HTTP server (IndexedDB and iframes need it). From the repo root:
+        <code>python -m http.server 8765</code> then open
+        <code>http://localhost:8765/tests/smoke_test.html</code>
+    </p>
+    <div class="toolbar">
+        <button type="button" id="runBtn">Run all tests</button>
+        <button type="button" id="reloadBtn" class="secondary">Reload frames</button>
+        <span id="status" class="intro" style="margin:0"></span>
+    </div>
+    <div id="summary">Ready.</div>
+    <table>
+        <thead>
+            <tr>
+                <th style="width:72px">Result</th>
+                <th style="width:140px">Suite</th>
+                <th>Test</th>
+                <th>Detail</th>
+            </tr>
+        </thead>
+        <tbody id="resultsBody"></tbody>
+    </table>
+
+    <iframe id="cpFrame" title="control panel" src="../control_panel.html"></iframe>
+    <iframe id="bsFrame" title="browser source" src="../browser_source.html"></iframe>
+
+    <script>
+    'use strict';
+
+    const cpFrame = document.getElementById('cpFrame');
+    const bsFrame = document.getElementById('bsFrame');
+    const runBtn = document.getElementById('runBtn');
+    const reloadBtn = document.getElementById('reloadBtn');
+    const summaryEl = document.getElementById('summary');
+    const resultsBody = document.getElementById('resultsBody');
+    const statusEl = document.getElementById('status');
+
+    function sleep(ms) {
+        return new Promise(function (resolve) { setTimeout(resolve, ms); });
+    }
+
+    function frameLoaded(frame) {
+        return new Promise(function (resolve) {
+            if (frame.contentDocument && frame.contentDocument.readyState === 'complete') {
+                resolve();
+                return;
+            }
+            frame.addEventListener('load', function () { resolve(); }, { once: true });
+        });
+    }
+
+    function overlayHidden(win) {
+        const panel = win.document.getElementById('overlayStatsPanel');
+        if (!panel) {
+            return false;
+        }
+        return win.getComputedStyle(panel).display === 'none' ||
+            panel.classList.contains('noShow');
+    }
+
+    async function reloadBSFrame() {
+        bsFrame.src = '../browser_source.html?_=' + Date.now();
+        await frameLoaded(bsFrame);
+        await sleep(400);
+        return getBS();
+    }
+
+    async function reloadFrames() {
+        statusEl.textContent = 'Loading frames…';
+        cpFrame.src = '../control_panel.html?_=' + Date.now();
+        bsFrame.src = '../browser_source.html?_=' + Date.now();
+        await Promise.all([frameLoaded(cpFrame), frameLoaded(bsFrame)]);
+        await sleep(400);
+        statusEl.textContent = 'Frames loaded.';
+    }
+
+    async function getCP() {
+        const cp = cpFrame.contentWindow;
+        for (let i = 0; i < 80; i++) {
+            if (cp && cp.PlayerStats) {
+                await cp.PlayerStats.init().catch(function () {});
+                await sleep(200);
+                return cp;
+            }
+            await sleep(100);
+        }
+        throw new Error('Control panel / PlayerStats not ready');
+    }
+
+    async function getBS() {
+        const bs = bsFrame.contentWindow;
+        for (let i = 0; i < 50; i++) {
+            if (bs && typeof bs.restoreOverlayStatsFromStorage === 'function') {
+                return bs;
+            }
+            await sleep(100);
+        }
+        throw new Error('Browser source not ready');
+    }
+
+    function renderResults(rows) {
+        resultsBody.innerHTML = rows.map(function (r) {
+            return '<tr class="' + (r.pass ? 'pass' : 'fail') + '">' +
+                '<td>' + (r.pass ? 'PASS' : 'FAIL') + '</td>' +
+                '<td class="suite">' + escapeHtml(r.suite) + '</td>' +
+                '<td>' + escapeHtml(r.name) + '</td>' +
+                '<td class="detail">' + escapeHtml(r.detail || '') + '</td></tr>';
+        }).join('');
+
+        const passed = rows.filter(function (r) { return r.pass; }).length;
+        const total = rows.length;
+        summaryEl.className = passed === total ? 'pass' : 'fail';
+        summaryEl.textContent = passed + ' / ' + total + ' passed' +
+            (passed === total ? ' — all good.' : ' — see failures below.');
+    }
+
+    function escapeHtml(s) {
+        return String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
+
+    async function runAllTests() {
+        runBtn.disabled = true;
+        reloadBtn.disabled = true;
+        statusEl.textContent = 'Running…';
+        const rows = [];
+        const assert = function (suite, name, cond, detail) {
+            rows.push({ suite: suite, name: name, pass: !!cond, detail: detail || '' });
+        };
+
+        let cp;
+        let bs;
+        let testPlayerId = null;
+        let testOpponentId = null;
+        const tag = 'Smoke_' + Date.now().toString().slice(-6);
+
+        try {
+            cp = await getCP();
+            bs = await getBS();
+
+            // --- Core ---
+            assert('Core', 'PlayerStats loaded', !!cp.PlayerStats);
+            assert('Core', 'Version 6.0.0', cp.versionNum === '6.0.0', cp.versionNum);
+            assert('Core', 'Stats modal present', !!cp.document.getElementById('statsModal'));
+            assert('Core', 'Overlay panel in browser source', !!bs.document.getElementById('overlayStatsPanel'));
+
+            // --- Overlay ---
+            cp.localStorage.removeItem('overlayStatsMode');
+            cp.localStorage.setItem('h2hOverlayEnabled', 'yes');
+            cp.PlayerStats.syncOverlayButtonsFromStorage();
+            assert('Overlay', 'Legacy h2h flag does not enable mode',
+                (cp.localStorage.getItem('overlayStatsMode') || '') === '');
+            assert('Overlay', 'Legacy h2h flag cleared',
+                cp.localStorage.getItem('h2hOverlayEnabled') === null);
+
+            const h2hBtn = cp.document.getElementById('overlayH2HBtn');
+            cp.toggleOverlayStats('h2h');
+            assert('Overlay', 'H2H toggle on', cp.localStorage.getItem('overlayStatsMode') === 'h2h');
+            cp.toggleOverlayStats('h2h');
+            await sleep(150);
+            const offPayload = await cp.PlayerStats.buildOverlayStatsPayload();
+            assert('Overlay', 'H2H toggle off', (cp.localStorage.getItem('overlayStatsMode') || '') === '');
+            assert('Overlay', 'Payload hidden when off', offPayload.visible === false);
+            assert('Overlay', 'No overlay button active after off',
+                h2hBtn && !h2hBtn.classList.contains('active'));
+
+            bs = await reloadBSFrame();
+            bs.localStorage.removeItem('overlayStatsMode');
+            bs.localStorage.removeItem('overlayStatsPayload');
+            bs.localStorage.setItem('overlayStatsPayload', JSON.stringify({
+                visible: true, mode: 'h2h', p1Name: 'A', p2Name: 'B', p1Games: 1, p2Games: 0
+            }));
+            bs.restoreOverlayStatsFromStorage();
+            await sleep(150);
+            assert('Overlay', 'Browser source hides stale payload without mode', overlayHidden(bs));
+
+            bs.localStorage.setItem('overlayStatsMode', 'h2h');
+            bs.restoreOverlayStatsFromStorage();
+            await sleep(150);
+            assert('Overlay', 'Browser source restores with mode + payload', !overlayHidden(bs));
+            bs.localStorage.removeItem('overlayStatsMode');
+            bs.localStorage.setItem('overlayStatsPayload', JSON.stringify({ visible: false }));
+            bs.restoreOverlayStatsFromStorage();
+
+            // --- PlayerStats API ---
+            const player = await cp.PlayerStats.ensurePlayer(tag + '_P1');
+            testPlayerId = player.id;
+            assert('PlayerStats API', 'Create player', player && player.name === (tag + '_P1').substring(0, 20));
+            const found = await cp.PlayerStats.findPlayerByNormalizedName((tag + '_p1').toLowerCase());
+            assert('PlayerStats API', 'Find by normalized name', found && found.id === player.id);
+            await cp.PlayerStats.updatePlayerName(player.id, tag + '_Renamed');
+            const renamed = await cp.PlayerStats.getPlayer(player.id);
+            assert('PlayerStats API', 'Rename player', renamed.name.indexOf('Renamed') !== -1);
+
+            const searchHits = await cp.PlayerStats.searchPlayers(tag, 5);
+            assert('PlayerStats API', 'Search players', searchHits.some(function (p) { return p.id === player.id; }),
+                searchHits.length + ' hit(s)');
+
+            const opp = await cp.PlayerStats.ensurePlayer(tag + '_P2');
+            testOpponentId = opp.id;
+            await cp.PlayerStats.saveMatch({
+                player1Id: player.id,
+                player2Id: opp.id,
+                player1Name: renamed.name,
+                player2Name: opp.name,
+                gameType: 'game2',
+                scoreP1: 5,
+                scoreP2: 2,
+                status: 'completed',
+                date: new Date().toISOString().slice(0, 10),
+                ballsP1: 0,
+                ballsP2: 0
+            });
+            const h2h = await cp.PlayerStats.getHeadToHead(player.id, opp.id);
+            const gamesTotal = (h2h.gamesWon[player.id] || 0) + (h2h.gamesWon[opp.id] || 0);
+            assert('PlayerStats API', 'H2H after manual match', gamesTotal >= 1);
+
+            const exp = await cp.PlayerStats.exportData();
+            assert('PlayerStats API', 'Export schemaVersion', exp.schemaVersion >= 1);
+            assert('PlayerStats API', 'Export players array', Array.isArray(exp.players));
+
+            // --- Scoring ---
+            if (typeof cp.resetScores === 'function') {
+                try { cp.resetScores(); } catch (e) { /* confirm dialog blocked in iframe */ }
+            }
+            cp.document.getElementById('p1Name').value = tag + '_Live1';
+            cp.document.getElementById('p2Name').value = tag + '_Live2';
+            cp.document.getElementById('p1Name').removeAttribute('data-player-id');
+            cp.document.getElementById('p2Name').removeAttribute('data-player-id');
+            cp.document.getElementById('raceInfoTxt').value = 'Race to 5';
+            cp.postNames();
+            await sleep(400);
+
+            const scoreBefore = parseInt(cp.getStorageItem('p1ScoreCtrlPanel') || '0', 10);
+            cp.postScore('add', '1');
+            await sleep(300);
+            const scoreAfter = parseInt(cp.getStorageItem('p1ScoreCtrlPanel') || '0', 10);
+            assert('Scoring', 'Rack increment', scoreAfter === scoreBefore + 1, scoreBefore + ' → ' + scoreAfter);
+
+            cp.setStorageItem('p1BallsCtrlPanel', 0);
+            cp.setStorageItem('p1Balls', 0);
+            const p1BallsInput = cp.document.getElementById('p1Balls');
+            if (p1BallsInput) { p1BallsInput.value = '0'; }
+            cp.postBalls('sub', '1');
+            const foulVal = parseInt(cp.getStorageItem('p1BallsCtrlPanel'), 10);
+            assert('Scoring', 'Negative ball (foul)', foulVal === -1, String(foulVal));
+            cp.postBalls('add', '1');
+            assert('Scoring', 'Recover from foul', parseInt(cp.getStorageItem('p1BallsCtrlPanel'), 10) === 0);
+
+            if (bs.handlers && bs.handlers.balls) {
+                bs.handlers.balls({ player: '1', balls: -3 });
+                const ballsEl = bs.document.getElementById('player1Balls');
+                assert('Scoring', 'Overlay displays negative balls',
+                    (ballsEl.textContent || ballsEl.innerHTML) === '-3');
+            }
+
+            cp.localStorage.setItem('overlayStatsMode', 'p1');
+            cp.localStorage.setItem('overlayStatsPayload', '{"visible":true}');
+            if (typeof cp.removeInstanceData === 'function') {
+                cp.removeInstanceData(null);
+            }
+            assert('Scoring', 'Overlay mode survives data clear',
+                cp.localStorage.getItem('overlayStatsMode') === 'p1');
+            cp.localStorage.removeItem('overlayStatsMode');
+            cp.localStorage.removeItem('overlayStatsPayload');
+
+            // --- Stats modal UI ---
+            cp.openStatsModal();
+            await sleep(250);
+            const modal = cp.document.getElementById('statsModal');
+            const modalOpen = modal && cp.getComputedStyle(modal).display !== 'none';
+            assert('Stats UI', 'Modal opens', modalOpen);
+            assert('Stats UI', 'Leaderboard tab visible',
+                !cp.document.getElementById('statsTab-leaderboard').classList.contains('noShow'));
+            cp.switchStatsTab('h2h');
+            await sleep(50);
+            const h2hTab = cp.document.getElementById('statsTab-h2h');
+            assert('Stats UI', 'H2H tab switches', h2hTab && !h2hTab.classList.contains('noShow'));
+            const hiddenRect = cp.document.getElementById('statsTab-leaderboard').getBoundingClientRect();
+            assert('Stats UI', 'Hidden tab takes no space', hiddenRect.height === 0);
+
+            cp.switchStatsTab('detail');
+            await sleep(200);
+            const lbRows = cp.document.querySelectorAll('#statsLeaderboardBody tr.stats-row');
+            if (lbRows.length) {
+                cp.switchStatsTab('leaderboard');
+                await sleep(100);
+                lbRows[0].click();
+                cp.switchStatsTab('detail');
+                await sleep(200);
+                const editBtn = cp.document.querySelector('#statsPlayerDetail .stats-edit-btn');
+                if (editBtn) {
+                    const st = cp.getComputedStyle(editBtn);
+                    assert('Stats UI', 'Edit button align-items center', st.alignItems === 'center', st.alignItems);
+                } else {
+                    assert('Stats UI', 'Edit Name button present', false, 'no edit button');
+                }
+            }
+            cp.closeStatsModal();
+
+            const dataCol = Array.from(cp.document.querySelectorAll('.column')).find(function (c) {
+                return c.textContent.indexOf('Clear Instance Data') !== -1;
+            });
+            const hint = Array.from(cp.document.querySelectorAll('p.stats-hint')).find(function (p) {
+                return p.textContent.indexOf('Player statistics are not affected') !== -1;
+            });
+            assert('Stats UI', 'Clear buttons row', dataCol && dataCol.children.length === 2);
+            assert('Stats UI', 'Clear-data hint on separate line', hint && dataCol && !dataCol.contains(hint));
+
+        } catch (err) {
+            assert('Runner', 'Test harness', false, err.message || String(err));
+        } finally {
+            if (cp && testPlayerId) {
+                try { await cp.PlayerStats.deletePlayer(testPlayerId); } catch (e) { /* ignore */ }
+            }
+            if (cp && testOpponentId) {
+                try { await cp.PlayerStats.deletePlayer(testOpponentId); } catch (e) { /* ignore */ }
+            }
+            if (cp) {
+                try {
+                    const live1 = await cp.PlayerStats.findPlayerByNormalizedName((tag + '_live1').toLowerCase());
+                    const live2 = await cp.PlayerStats.findPlayerByNormalizedName((tag + '_live2').toLowerCase());
+                    if (live1) { await cp.PlayerStats.deletePlayer(live1.id); }
+                    if (live2) { await cp.PlayerStats.deletePlayer(live2.id); }
+                } catch (e) { /* ignore */ }
+            }
+        }
+
+        renderResults(rows);
+        statusEl.textContent = 'Done.';
+        runBtn.disabled = false;
+        reloadBtn.disabled = false;
+    }
+
+    window.runAllTests = runAllTests;
+
+    runBtn.addEventListener('click', function () {
+        runAllTests().catch(function (err) {
+            summaryEl.className = 'fail';
+            summaryEl.textContent = 'Runner error: ' + err.message;
+            runBtn.disabled = false;
+            reloadBtn.disabled = false;
+        });
+    });
+
+    reloadBtn.addEventListener('click', function () {
+        reloadFrames().catch(function (err) {
+            statusEl.textContent = 'Reload failed: ' + err.message;
+        });
+    });
+
+    reloadFrames().then(function () {
+        statusEl.textContent = 'Frames ready — click Run all tests.';
+    }).catch(function (err) {
+        statusEl.textContent = 'Frame load failed: ' + err.message;
+    });
+    </script>
+</body>
+</html>
