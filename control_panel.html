@@ -24,12 +24,13 @@ for more information about Salotto please visit https://salotto.app
     <link rel="stylesheet" href="./common/css/control_panel/required.css" />
     <script>
         //---------------------------------------------------------------------------------------------
-        var versionNum = "5.0.2";
+        var versionNum = "6.0.0";
         //---------------------------------------------------------------------------------------------
     </script>
     <script src="./common/js/obs-websocket-js.js"></script>
     <script src="./common/js/jquery.js"></script>
     <script src="./common/js/stream_sharing.js"></script>
+    <script src="./common/js/player_stats.js"></script>
     <script src="./common/js/control_panel.js"></script>
     <script src="hotkeys.js"></script>
 
@@ -84,9 +85,15 @@ for more information about Salotto please visit https://salotto.app
             </div>
             <div class="column" id="teamInfo">
                 <label id="p1NameLabel" for="p1Name">Player/Team 1 Name:</label>
-                <input type="text" id="p1Name" placeholder="Player 1" maxlength="20" />
+                <div class="autocomplete-wrapper">
+                    <input type="text" id="p1Name" placeholder="Player 1" maxlength="20" autocomplete="off" />
+                    <div id="p1Autocomplete" class="autocomplete-list noShow"></div>
+                </div>
                 <label id="p2NameLabel" for="p2Name">Player/Team 2 Name:</label>
-                <input type="text" id="p2Name" placeholder="Player 2" maxlength="20" />
+                <div class="autocomplete-wrapper">
+                    <input type="text" id="p2Name" placeholder="Player 2" maxlength="20" autocomplete="off" />
+                    <div id="p2Autocomplete" class="autocomplete-list noShow"></div>
+                </div>
             </div>
             <div class="column" id="gameInfo">
                 <label id="p1ColorLabel" for="p1colorDiv">Player/Team 1 Color:</label>
@@ -136,6 +143,9 @@ for more information about Salotto please visit https://salotto.app
                 <div class="hover obs28 button" id="sendPNames" onclick="postNames()">
                     Update Names
                 </div>
+                <div class="hover obs28 button" id="statsBtn" onclick="openStatsModal()">
+                    Stats
+                </div>
             </div>
         </div> <!-- Game Info Tab-->
         <!-- Controls Tab -->
@@ -155,7 +165,7 @@ for more information about Salotto please visit https://salotto.app
                 <label id="p1BallsLabel" for="sendP1BallsSub">Player/Team 1 - Balls</label>
                 <div class="score-control">
                     <button id="sendP1BallsSub" onclick="postBalls('sub','1')">-</button>
-                    <input type="text" pattern="[0-9]" inputmode="numeric" min="0" max="999" maxlength="3" id="p1Balls"
+                    <input type="text" inputmode="numeric" min="-999" max="999" maxlength="4" id="p1Balls"
                         placeholder="0" />
                     <button id="sendP1Balls" onclick="postBalls('add','1')">+</button>
                 </div>
@@ -173,7 +183,7 @@ for more information about Salotto please visit https://salotto.app
                 <label id="p2BallsLabel" for="sendP2BallsSub">Player/Team 2 - Balls</label>
                 <div class="score-control">
                     <button id="sendP2BallsSub" onclick="postBalls('sub','2')">-</button>
-                    <input type="text" pattern="[0-9]" inputmode="numeric" min="0" max="999" maxlength="3" id="p2Balls"
+                    <input type="text" inputmode="numeric" min="-999" max="999" maxlength="4" id="p2Balls"
                         placeholder="0" />
                     <button id="sendP2Balls" onclick="postBalls('add','2')">+</button>
                 </div>
@@ -189,6 +199,12 @@ for more information about Salotto please visit https://salotto.app
                     <span class="tooltiptext">Manual adjustments to scores can be entered directly in each players score
                         box, use "Push Entered Scores" to update the overlay.</span>
                 </div>
+            </div>
+            <div class="section-header">Stats Overlay</div>
+            <div class="column" id="statsOverlayControls">
+                <div class="hover obs28 button" id="overlayP1StatsBtn" onclick="toggleOverlayStats('p1')">P1 Stats</div>
+                <div class="hover obs28 button" id="overlayP2StatsBtn" onclick="toggleOverlayStats('p2')">P2 Stats</div>
+                <div class="hover obs28 button" id="overlayH2HBtn" onclick="toggleOverlayStats('h2h')">H2H Stats</div>
             </div>
             <!-- Player Toggle -->
             <div class="section-header" id="playerToggleLabel">Player and Ball Controls</div>
@@ -686,8 +702,187 @@ for more information about Salotto please visit https://salotto.app
                     Clear All Data
                 </div>
             </div>
+            <p class="stats-hint">Clears scoreboard settings and layout for this instance. Player statistics are not affected - use Stats &gt; Clear All Stats to remove match history.</p>
         </div> <!-- General Settings Tab-->
     </div> <!-- End of tab content -->
+
+    <!-- Player Statistics Modal -->
+    <div id="statsModal" class="modal">
+        <div class="modal-content stats-modal-content">
+            <div class="modal-header">
+                <h2>Player Statistics</h2>
+                <span class="modal-close" onclick="closeStatsModal()">&times;</span>
+            </div>
+            <div class="modal-body stats-modal-body">
+                <div class="stats-tab-bar">
+                    <button type="button" class="stats-tab-btn hover obs28 button active" data-tab="leaderboard" onclick="switchStatsTab('leaderboard')">Board</button>
+                    <button type="button" class="stats-tab-btn hover obs28 button" data-tab="detail" onclick="switchStatsTab('detail')">Player</button>
+                    <button type="button" class="stats-tab-btn hover obs28 button" data-tab="h2h" onclick="switchStatsTab('h2h')">H2H</button>
+                    <button type="button" class="stats-tab-btn hover obs28 button" data-tab="data" onclick="switchStatsTab('data')">Data</button>
+                </div>
+
+                <div id="statsTab-leaderboard" class="stats-tab-panel">
+                    <table class="stats-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>G W/L</th>
+                                <th>Win%</th>
+                                <th>R W/L</th>
+                                <th>Last</th>
+                            </tr>
+                        </thead>
+                        <tbody id="statsLeaderboardBody">
+                            <tr><td colspan="5" class="stats-empty">Loading…</td></tr>
+                        </tbody>
+                    </table>
+                    <p class="stats-hint">Click a row to view player details.</p>
+                </div>
+
+                <div id="statsTab-detail" class="stats-tab-panel noShow">
+                    <div id="statsPlayerDetail">
+                        <p class="stats-empty">Select a player from the leaderboard.</p>
+                    </div>
+                </div>
+
+                <div id="statsTab-h2h" class="stats-tab-panel noShow">
+                    <div class="stats-h2h-player-row">
+                        <div class="stats-h2h-select-col">
+                            <label for="h2hPlayer1Select">Player 1</label>
+                            <select id="h2hPlayer1Select" onchange="refreshH2HView()"></select>
+                        </div>
+                        <div id="h2hPlayer1Stats" class="stats-h2h-inline-stats">
+                            <span class="stats-empty">Select two different players.</span>
+                        </div>
+                    </div>
+                    <div class="stats-h2h-player-row">
+                        <div class="stats-h2h-select-col">
+                            <label for="h2hPlayer2Select">Player 2</label>
+                            <select id="h2hPlayer2Select" onchange="refreshH2HView()"></select>
+                        </div>
+                        <div id="h2hPlayer2Stats" class="stats-h2h-inline-stats"></div>
+                    </div>
+                    <div class="stats-section">
+                        <h4 class="stats-section-title">Match History</h4>
+                        <div id="h2hResults" class="stats-scroll-panel">
+                            <p class="stats-empty">Select two different players.</p>
+                        </div>
+                        <div class="stats-section-actions">
+                            <div class="hover obs28 button stats-edit-btn" onclick="openAddMatchForH2H()">Add Match</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="statsTab-data" class="stats-tab-panel noShow">
+                    <div class="stats-data-actions">
+                        <div class="hover obs28 button" onclick="exportStatsJson()">Export JSON</div>
+                        <div class="hover obs28 button" onclick="importStatsJsonFile()">Import JSON</div>
+                        <input type="file" id="statsImportFile" accept=".json,application/json" class="noShow" onchange="handleStatsImportFile(this)" />
+                        <div class="hover obs28 button stats-danger-btn" onclick="clearAllStatsConfirmed()">Clear All Stats</div>
+                    </div>
+                    <p class="stats-hint">Export creates a backup file. Import merges data by ID. Clear All Stats removes all player and match history (does not affect current game settings).</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <div class="modal-footer-buttons">
+                    <button class="modal-cancel-btn hover obs28 button" onclick="closeStatsModal()">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Match Edit Sub-Modal -->
+    <div id="statsMatchEditModal" class="modal stats-match-edit-modal" data-match-id="" data-player1-id="" data-player2-id="">
+        <div class="modal-content stats-modal-content">
+            <div class="modal-header">
+                <h2 id="statsMatchEditTitle">Edit Match</h2>
+                <span class="modal-close" onclick="closeMatchEditModal()">&times;</span>
+            </div>
+            <div class="modal-body stats-match-form">
+                <div class="form-row">
+                    <div class="field">
+                        <label for="statsMatchDate">Date:</label>
+                        <input type="date" id="statsMatchDate" />
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="field">
+                        <label for="statsMatchGameType">Game type:</label>
+                        <select id="statsMatchGameType">
+                            <option value="game1">8-Ball</option>
+                            <option value="game2">9-Ball</option>
+                            <option value="game3">10-Ball</option>
+                            <option value="game4">Straight</option>
+                            <option value="game5">Bank</option>
+                            <option value="game6">One Pocket</option>
+                            <option value="game7">Custom</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row stats-match-form-row">
+                    <div class="field">
+                        <label for="statsMatchScoreP1" id="statsMatchP1Label">Player 1 score:</label>
+                        <input type="number" id="statsMatchScoreP1" min="0" max="999" value="0" />
+                    </div>
+                    <div class="field">
+                        <label for="statsMatchScoreP2" id="statsMatchP2Label">Player 2 score:</label>
+                        <input type="number" id="statsMatchScoreP2" min="0" max="999" value="0" />
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="field">
+                        <label for="statsMatchStatus">Status:</label>
+                        <select id="statsMatchStatus">
+                            <option value="completed">Completed</option>
+                            <option value="active">Partial</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row stats-match-form-row">
+                    <div class="field">
+                        <label for="statsMatchBallsP1">Balls (P1, optional):</label>
+                        <input type="number" id="statsMatchBallsP1" min="0" max="999" value="0" />
+                    </div>
+                    <div class="field">
+                        <label for="statsMatchBallsP2">Balls (P2, optional):</label>
+                        <input type="number" id="statsMatchBallsP2" min="0" max="999" value="0" />
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <div class="modal-footer-buttons">
+                    <button type="button" class="modal-save-btn hover obs28 button" onclick="saveMatchFromModal()">Save</button>
+                    <button type="button" id="statsMatchDeleteBtn" class="stats-delete-btn hover obs28 button" onclick="deleteMatchFromModal()">Delete Match</button>
+                    <button type="button" class="modal-cancel-btn hover obs28 button" onclick="closeMatchEditModal()">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Player Rename Sub-Modal -->
+    <div id="statsPlayerRenameModal" class="modal stats-match-edit-modal" data-player-id="">
+        <div class="modal-content stats-modal-content">
+            <div class="modal-header">
+                <h2>Edit Player Name</h2>
+                <span class="modal-close" onclick="closePlayerRenameModal()">&times;</span>
+            </div>
+            <div class="modal-body stats-match-form">
+                <div class="form-row">
+                    <div class="field">
+                        <label for="statsPlayerRenameInput">Name (max 20 characters):</label>
+                        <input type="text" id="statsPlayerRenameInput" maxlength="20" autocomplete="off"
+                            onkeydown="if (event.key === 'Enter') { event.preventDefault(); savePlayerRenameFromModal(); }" />
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <div class="modal-footer-buttons">
+                    <button type="button" class="modal-save-btn hover obs28 button" onclick="savePlayerRenameFromModal()">Save</button>
+                    <button type="button" class="modal-cancel-btn hover obs28 button" onclick="closePlayerRenameModal()">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script src="./common/js/control_panel_post.js"></script>
     <script>

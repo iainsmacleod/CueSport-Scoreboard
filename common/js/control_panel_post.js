@@ -660,6 +660,19 @@ if (savedBallSet) {
 // document.getElementById("psVerNum").innerHTML = psVersionNum;
 postNames(); postInfo(); startThemeCheck();
 
+if (window.PlayerStats) {
+    window.PlayerStats.init().then(function () {
+        window.PlayerStats.initPlayerAutocomplete();
+        window.PlayerStats.syncOverlayButtonsFromStorage();
+        window.PlayerStats.broadcastOverlayStatsIfEnabled();
+        window.PlayerStats.onNamesUpdated().catch(function (err) {
+            console.error('PlayerStats init onNamesUpdated error:', err);
+        });
+    }).catch(function (err) {
+        console.error('PlayerStats init error:', err);
+    });
+}
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // broadcast channel events from browser_source
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////			

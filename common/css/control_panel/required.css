@@ -876,3 +876,477 @@ input:checked+.slider_round:before {
 #streamPromotionToggle:not(:checked) + .slider_round {
 	background-color: #cc8181; /* Gray/red when disconnected */
 }
+
+/* Player autocomplete — override global div { display:flex } */
+#teamInfo .autocomplete-wrapper {
+	display: block;
+	position: relative;
+	width: 150px;
+}
+
+#teamInfo .autocomplete-list {
+	display: block;
+	position: absolute;
+	top: 100%;
+	left: 0;
+	width: 100%;
+	min-width: 200px;
+	z-index: 200;
+}
+
+.autocomplete-wrapper {
+	position: relative;
+	display: block;
+}
+
+.autocomplete-list {
+	display: block;
+	position: absolute;
+	top: 100%;
+	left: 0;
+	right: 0;
+	z-index: 100;
+	background-color: #2b2e38;
+	border: 2px solid #000;
+	max-height: 200px;
+	overflow-y: auto;
+	min-width: 200px;
+}
+
+.autocomplete-item {
+	padding: 6px 10px;
+	cursor: pointer;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 8px;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.autocomplete-item:hover,
+.autocomplete-item.autocomplete-active {
+	background-color: rgba(255, 255, 255, 0.15);
+}
+
+.autocomplete-name {
+	font-weight: bold;
+}
+
+.autocomplete-preview {
+	font-size: 0.85em;
+	opacity: 0.8;
+	white-space: nowrap;
+}
+
+.autocomplete-new {
+	font-style: italic;
+	opacity: 0.9;
+}
+
+/* Stats modal */
+#statsModal.modal {
+	overflow: hidden;
+}
+
+#statsModal .modal-content.stats-modal-content {
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	justify-content: flex-start;
+	max-width: 650px;
+	width: 95%;
+	max-height: 88vh;
+	height: auto;
+	margin: 4vh auto;
+}
+
+#statsModal .modal-header,
+#statsModal .modal-footer {
+	flex-shrink: 0;
+}
+
+#statsModal .stats-modal-body {
+	display: block;
+	flex: 0 1 auto;
+	min-height: 0;
+	max-height: calc(88vh - 110px);
+	padding: 10px 15px;
+	overflow-x: hidden;
+	overflow-y: auto;
+}
+
+.stats-modal-content {
+	max-width: 650px;
+	width: 95%;
+}
+
+.stats-tab-bar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	margin-bottom: 8px;
+	flex-shrink: 0;
+}
+
+.stats-tab-btn {
+	min-width: 72px;
+	font-size: 0.85em;
+}
+
+.stats-tab-btn.active {
+	background: green;
+	color: black;
+}
+
+.stats-tab-panel {
+	width: 100%;
+}
+
+/* Override global div { display:flex } — stats modal uses vertical rows */
+#statsModal .stats-modal-body > * {
+	flex: 0 0 auto;
+	align-self: stretch;
+}
+
+#statsModal .stats-modal-body .stats-tab-bar,
+#statsModal .stats-modal-body .stats-tab-panel,
+#statsModal #statsPlayerDetail,
+#statsModal .stats-modal-body .stats-section,
+#statsModal .stats-modal-body .stats-scroll-panel,
+#statsModal .stats-modal-body .stats-h2h-player-row,
+#statsModal .stats-modal-body .stats-h2h-select-col,
+#statsModal .stats-modal-body .stats-h2h-inline-stats,
+#statsModal .stats-modal-body .stats-data-actions {
+	min-height: 0;
+}
+
+#statsModal .stats-modal-body .stats-tab-panel,
+#statsModal #statsPlayerDetail {
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	justify-content: flex-start;
+	width: 100%;
+}
+
+/* Must beat .stats-tab-panel { display:flex } or hidden tabs still occupy space */
+#statsModal .stats-modal-body .stats-tab-panel.noShow {
+	display: none !important;
+}
+
+#statsModal .stats-modal-body .stats-section,
+#statsModal .stats-modal-body .stats-scroll-panel,
+#statsModal .stats-modal-body .stats-h2h-inline-stats {
+	display: block;
+	width: 100%;
+}
+
+#statsModal .stats-modal-body .stats-tab-bar {
+	display: flex;
+	flex-direction: row;
+	flex-wrap: wrap;
+	justify-content: flex-start;
+	align-items: center;
+	width: 100%;
+}
+
+#statsModal .stats-modal-body .stats-data-actions {
+	display: flex;
+	flex-direction: row;
+	flex-wrap: wrap;
+	justify-content: flex-start;
+	align-items: flex-start;
+	gap: 10px;
+	width: 100%;
+	margin-bottom: 8px;
+}
+
+#statsModal .stats-modal-body .stats-h2h-player-row {
+	display: grid;
+	grid-template-columns: minmax(160px, 42%) 1fr;
+	gap: 8px 14px;
+	width: 100%;
+	align-items: end;
+	margin-bottom: 8px;
+}
+
+#statsModal .stats-modal-body .stats-h2h-select-col {
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	justify-content: flex-start;
+	gap: 4px;
+	min-height: 0;
+	width: 100%;
+}
+
+#statsModal .stats-modal-body .stats-h2h-select-col label {
+	display: block;
+	font-size: 0.85em;
+	margin: 0;
+}
+
+#statsModal .stats-modal-body .stats-h2h-player-row select {
+	display: block;
+	width: 100%;
+	box-sizing: border-box;
+}
+
+#statsModal .stats-modal-body .stats-opponent-row select {
+	display: block;
+	width: auto;
+	min-width: 200px;
+	max-width: 280px;
+	box-sizing: border-box;
+}
+
+#statsModal .stats-modal-body .stats-h2h-inline-stats {
+	display: block;
+	align-self: end;
+	padding-bottom: 4px;
+	text-align: left;
+}
+
+#statsModal .stats-modal-body .stats-player-header {
+	display: flex;
+	flex-direction: row;
+	justify-content: space-between;
+	align-items: center;
+	width: 100%;
+}
+
+#statsModal .stats-modal-body .stats-player-header-actions {
+	display: flex;
+	flex-direction: row;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	align-items: center;
+}
+
+#statsModal .stats-modal-body .stats-section.stats-section-actions {
+	display: flex;
+	flex-direction: row;
+	justify-content: flex-end;
+	align-items: center;
+	width: 100%;
+	border-bottom: none;
+	margin-bottom: 6px;
+	padding-bottom: 0;
+}
+
+#statsModal .stats-modal-body .stats-opponent-row label {
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	justify-content: flex-start;
+}
+
+.stats-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 0.82em;
+}
+
+.stats-table th,
+.stats-table td {
+	border: 1px solid rgba(255, 255, 255, 0.2);
+	padding: 3px 5px;
+	text-align: left;
+}
+
+.stats-table th {
+	background: rgba(0, 0, 0, 0.3);
+	font-weight: bold;
+}
+
+.stats-row {
+	cursor: pointer;
+}
+
+.stats-row:hover {
+	background: rgba(255, 255, 255, 0.1);
+}
+
+.stats-empty {
+	opacity: 0.7;
+	font-style: italic;
+	padding: 4px 0;
+	margin: 0;
+}
+
+.stats-hint {
+	font-size: 0.8em;
+	opacity: 0.7;
+	margin: 4px 0 0;
+}
+
+.stats-section {
+	margin-bottom: 10px;
+	padding-bottom: 8px;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.stats-section:last-child {
+	border-bottom: none;
+	margin-bottom: 0;
+	padding-bottom: 0;
+}
+
+.stats-section-title {
+	font-size: 0.78em;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	opacity: 0.75;
+	margin: 0 0 6px;
+	font-weight: bold;
+}
+
+.stats-player-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 10px;
+	margin-bottom: 8px;
+	padding-bottom: 8px;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.stats-player-header h3 {
+	margin: 0;
+	font-size: 1.15em;
+}
+
+.stats-player-header-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	flex-shrink: 0;
+}
+
+.stats-player-stats-table {
+	margin-top: 0;
+}
+
+.stats-overall-row td {
+	font-weight: bold;
+}
+
+.stats-opponent-row label {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	font-size: 0.85em;
+}
+
+.stats-opponent-row select {
+	min-width: 200px;
+	max-width: 280px;
+	width: auto;
+	padding: 4px;
+	font-size: 0.85em;
+}
+
+.stats-h2h-player-row {
+	display: grid;
+	grid-template-columns: minmax(160px, 42%) 1fr;
+	gap: 8px 14px;
+	align-items: end;
+	margin-bottom: 8px;
+}
+
+.stats-h2h-select-col {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	width: 100%;
+}
+
+.stats-h2h-select-col label {
+	font-size: 0.85em;
+}
+
+.stats-h2h-player-row select {
+	min-width: 0;
+	width: 100%;
+	padding: 4px;
+	font-size: 0.85em;
+}
+
+.stats-h2h-inline-stats {
+	font-size: 0.82em;
+	opacity: 0.9;
+	line-height: 1.4;
+}
+
+.stats-h2h-last {
+	font-size: 0.78em;
+	opacity: 0.7;
+	margin: 6px 0 0;
+}
+
+.stats-scroll-panel {
+	max-height: 180px;
+	overflow-y: auto;
+	overflow-x: auto;
+	margin-top: 4px;
+}
+
+.stats-section-actions {
+	display: flex;
+	justify-content: flex-end;
+	margin-top: 8px;
+}
+
+.stats-data-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+	margin-bottom: 10px;
+}
+
+.stats-danger-btn {
+	background: #8b0000;
+	color: white;
+}
+
+#statsOverlayControls {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.stats-match-form-row {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 8px;
+}
+
+.stats-match-edit-modal {
+	z-index: 1100;
+}
+
+.stats-actions-col {
+	white-space: nowrap;
+}
+
+.stats-edit-btn,
+.stats-delete-btn {
+	min-width: 48px;
+	font-size: 0.8em;
+	padding: 2px 6px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.stats-delete-btn {
+	background: #8b0000;
+	color: white;
+}
+
+.stats-match-form .field input,
+.stats-match-form .field select {
+	width: 100%;
+	box-sizing: border-box;
+	padding: 4px;
+}

@@ -483,8 +483,71 @@ const handlers = {
         // Reload the browser source page when refresh is requested
         console.log('Refresh requested, reloading browser_source page');
         window.location.reload();
+    },
+
+    overlayStats(data) {
+        applyOverlayStats(data && data.overlayStats);
     }
 };
+
+function applyOverlayStats(stats) {
+    const panel = document.getElementById('overlayStatsPanel');
+    const titleEl = document.getElementById('overlayStatsTitle');
+    const bodyEl = document.getElementById('overlayStatsBody');
+    if (!panel || !bodyEl || !stats) {
+        return;
+    }
+    if (!stats.visible) {
+        panel.classList.add('noShow', 'fadeOutElm');
+        panel.classList.remove('fadeInElm');
+        return;
+    }
+    if (titleEl) {
+        titleEl.textContent = stats.title || 'Stats';
+    }
+    if (stats.emptyMessage) {
+        bodyEl.innerHTML = '<div class="overlay-stats-empty">' + stats.emptyMessage + '</div>';
+    } else if (stats.mode === 'h2h') {
+        const hasBalls = (stats.p1Balls || 0) + (stats.p2Balls || 0) > 0;
+        bodyEl.innerHTML =
+            '<div class="overlay-stats-row">' +
+            '<span>' + (stats.p1Name || 'Player 1') + '</span>' +
+            '<span>' + (stats.p1Games || 0) + '-' + (stats.p2Games || 0) + '</span>' +
+            '<span>' + (stats.p2Name || 'Player 2') + '</span>' +
+            '</div>' +
+            '<div class="overlay-stats-sub">Racks: ' + (stats.p1Racks || 0) + '-' + (stats.p2Racks || 0) + '</div>' +
+            (hasBalls ? '<div class="overlay-stats-sub">Balls: ' + (stats.p1Balls || 0) + '-' + (stats.p2Balls || 0) + '</div>' : '');
+    } else {
+        bodyEl.innerHTML =
+            '<div class="overlay-stats-line">Games: ' + stats.gamesWL + ' (' + stats.winRate + '%)</div>' +
+            '<div class="overlay-stats-line">Racks: ' + stats.racksWL + '</div>' +
+            '<div class="overlay-stats-line">Balls: ' + stats.ballsWL + '</div>';
+    }
+    panel.classList.remove('noShow', 'fadeOutElm');
+    panel.classList.add('fadeInElm');
+}
+
+function restoreOverlayStatsFromStorage() {
+    const mode = getStorageItem('overlayStatsMode') || '';
+    if (!mode) {
+        applyOverlayStats({ visible: false });
+        return;
+    }
+    const raw = getStorageItem('overlayStatsPayload');
+    if (!raw) {
+        return;
+    }
+    try {
+        const payload = JSON.parse(raw);
+        if (!payload || !payload.visible) {
+            applyOverlayStats({ visible: false });
+            return;
+        }
+        applyOverlayStats(payload);
+    } catch (err) {
+        console.warn('Failed to restore overlay stats:', err);
+    }
+}
 
 
 // Main event handler
@@ -511,14 +574,17 @@ $(document).ready(function () {
         "gameInfo", 
         "logoSlideshowDiv",
         "ballTracker",
-        "videoContainer"
+        "videoContainer",
+        "overlayStatsPanel"
     ];
 
     // Initialize draggable elements with position saving
     draggableElements.forEach(elementId => {
         const $element = $(`#${elementId}`);
-        
-        // Restore saved position on load
+        if (!$element.length) {
+            return;
+        }
+
         const savedPosition = getStorageItem(`elementPosition_${elementId}`);
         if (savedPosition) {
             try {
@@ -528,16 +594,17 @@ $(document).ready(function () {
                     left: position.left + 'px',
                     top: position.top + 'px'
                 });
+                if (elementId === 'overlayStatsPanel') {
+                    $element.addClass('overlay-stats-positioned');
+                }
                 console.log(`Restored position for ${elementId}:`, position);
             } catch (e) {
                 console.warn(`Failed to restore position for ${elementId}:`, e);
             }
         }
 
-        // Initialize draggable with position saving
-        $element.draggable({
+        const dragOptions = {
             stop: function(event, ui) {
-                // Save position when dragging stops
                 const position = {
                     left: ui.position.left,
                     top: ui.position.top
@@ -545,8 +612,27 @@ $(document).ready(function () {
                 setStorageItem(`elementPosition_${elementId}`, JSON.stringify(position));
                 console.log(`Saved position for ${elementId}:`, position);
             }
-        });
+        };
+
+        if (elementId === 'overlayStatsPanel') {
+            dragOptions.start = function(event, ui) {
+                const el = $element[0];
+                if (!$element.hasClass('overlay-stats-positioned')) {
+                    const rect = el.getBoundingClientRect();
+                    $element.css({
+                        position: 'absolute',
+                        left: rect.left + window.scrollX + 'px',
+                        top: rect.top + window.scrollY + 'px',
+                        transform: 'none'
+                    }).addClass('overlay-stats-positioned');
+                }
+            };
+        }
+
+        $element.draggable(dragOptions);
     });
+
+    restoreOverlayStatsFromStorage();
 });
 
 // Setting defaults in storage so functions execute correctly, in the event values are not being retrieved from storage successfully due to initialization or similar

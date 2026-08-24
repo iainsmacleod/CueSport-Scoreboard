@@ -871,10 +871,17 @@ function clearGame() {
     }
 
     console.log('Clearing Match Data');
+    if (window.PlayerStats) {
+        window.PlayerStats.onClearGame().catch(function (err) {
+            console.error('PlayerStats onClearGame error:', err);
+        });
+    }
     document.getElementById("raceInfoTxt").value = "";
     document.getElementById("gameInfoTxt").value = "";
     document.getElementById("p1Name").value = "";
     document.getElementById("p2Name").value = "";
+    document.getElementById("p1Name").removeAttribute("data-player-id");
+    document.getElementById("p2Name").removeAttribute("data-player-id");
     setStorageItem("p1NameCtrlPanel", "");
     setStorageItem("p2NameCtrlPanel", "");
     setStorageItem("raceInfo", "");
@@ -900,6 +907,11 @@ function postNames() {
     // Send update to stream sharing if enabled
     if (window.streamSharing) {
         window.streamSharing.sendUpdate();
+    }
+    if (window.PlayerStats) {
+        window.PlayerStats.onNamesUpdated().catch(function (err) {
+            console.error('PlayerStats onNamesUpdated error:', err);
+        });
     }
 }
 
@@ -1101,8 +1113,8 @@ function pushScores() {
         const p2BallsInput = document.getElementById("p2Balls");
         let enteredP1Balls = p1BallsInput ? parseInt(p1BallsInput.value, 10) || 0 : 0;
         let enteredP2Balls = p2BallsInput ? parseInt(p2BallsInput.value, 10) || 0 : 0;
-        enteredP1Balls = Math.min(Math.max(enteredP1Balls, 0), 999);
-        enteredP2Balls = Math.min(Math.max(enteredP2Balls, 0), 999);
+        enteredP1Balls = Math.min(Math.max(enteredP1Balls, -999), 999);
+        enteredP2Balls = Math.min(Math.max(enteredP2Balls, -999), 999);
 
         if (p1BallsInput) {
             p1BallsInput.value = enteredP1Balls;
@@ -1128,16 +1140,21 @@ function pushScores() {
 }
 
 function postBalls(opt1, player) {
-    let p1BallsValue = parseInt(getStorageItem("p1BallsCtrlPanel")) || 0;
-    let p2BallsValue = parseInt(getStorageItem("p2BallsCtrlPanel")) || 0;
+    let p1BallsValue = parseInt(getStorageItem("p1BallsCtrlPanel"), 10) || 0;
+    let p2BallsValue = parseInt(getStorageItem("p2BallsCtrlPanel"), 10) || 0;
+    let ballsChanged = false;
+    let hadRecordedBallToUndo = false;
 
     if (player == "1") {
         if (opt1 == "add") {
             if (p1BallsValue < 999) {
                 p1BallsValue = p1BallsValue + 1;
+                ballsChanged = true;
             }
-        } else if (p1BallsValue > 0) {
+        } else if (p1BallsValue > -999) {
+            hadRecordedBallToUndo = p1BallsValue > 0;
             p1BallsValue = p1BallsValue - 1;
+            ballsChanged = true;
         }
         bc.postMessage({ player: player, balls: p1BallsValue });
         setStorageItem("p1BallsCtrlPanel", p1BallsValue);
@@ -1150,9 +1167,12 @@ function postBalls(opt1, player) {
         if (opt1 == "add") {
             if (p2BallsValue < 999) {
                 p2BallsValue = p2BallsValue + 1;
+                ballsChanged = true;
             }
-        } else if (p2BallsValue > 0) {
+        } else if (p2BallsValue > -999) {
+            hadRecordedBallToUndo = p2BallsValue > 0;
             p2BallsValue = p2BallsValue - 1;
+            ballsChanged = true;
         }
         bc.postMessage({ player: player, balls: p2BallsValue });
         setStorageItem("p2BallsCtrlPanel", p2BallsValue);
@@ -1165,6 +1185,18 @@ function postBalls(opt1, player) {
 
     if (window.streamSharing) {
         window.streamSharing.sendUpdate();
+    }
+
+    if (window.PlayerStats && ballsChanged) {
+        if (opt1 === 'add') {
+            window.PlayerStats.recordBallWin(player).catch(function (err) {
+                console.error('PlayerStats recordBallWin error:', err);
+            });
+        } else if (hadRecordedBallToUndo) {
+            window.PlayerStats.undoLastBall(player).catch(function (err) {
+                console.error('PlayerStats undoLastBall error:', err);
+            });
+        }
     }
 }
 
@@ -1190,6 +1222,7 @@ function postScore(opt1, player) {
     const winnerIsP1 = raceLocked && raceTarget !== null && p1ScoreValue >= raceTarget && p1ScoreValue >= p2ScoreValue;
     const winnerIsP2 = raceLocked && raceTarget !== null && p2ScoreValue >= raceTarget && p2ScoreValue >= p1ScoreValue;
     const isWinner = player === '1' ? winnerIsP1 : player === '2' ? winnerIsP2 : false;
+    let scoreChanged = false;
 
     if (raceLocked && !isWinner) {
         updateScoreControlAvailability();
@@ -1216,6 +1249,7 @@ function postScore(opt1, player) {
                 resetExt('p1', 'noflash');
                 resetExt('p2', 'noflash');
                 resetPlayerBalls(player);
+                scoreChanged = true;
             }
         } else if (p1ScoreValue > 0) {
             p1ScoreValue = p1ScoreValue - 1;
@@ -1224,6 +1258,7 @@ function postScore(opt1, player) {
             setStorageItem("p" + player + "ScoreCtrlPanel", p1ScoreValue);
             setStorageItem("p" + player + "Score", p1ScoreValue);
             document.getElementById("p" + player + "Score").value = p1ScoreValue;
+            scoreChanged = true;
         }
     }
     if (player == "2") {
@@ -1246,6 +1281,7 @@ function postScore(opt1, player) {
                 resetExt('p1', 'noflash');
                 resetExt('p2', 'noflash');
                 resetPlayerBalls(player);
+                scoreChanged = true;
             }
         } else if (p2ScoreValue > 0) {
             p2ScoreValue = p2ScoreValue - 1;
@@ -1254,6 +1290,7 @@ function postScore(opt1, player) {
             setStorageItem("p" + player + "ScoreCtrlPanel", p2ScoreValue);
             setStorageItem("p" + player + "Score", p2ScoreValue);
             document.getElementById("p" + player + "Score").value = p2ScoreValue;
+            scoreChanged = true;
         }
     }
 
@@ -1264,6 +1301,20 @@ function postScore(opt1, player) {
     resetBallTracker();
     resetBallSet();
     updateScoreControlAvailability();
+
+    if (window.PlayerStats && scoreChanged) {
+        if (opt1 === 'add') {
+            window.PlayerStats.recordRackWin(player).then(function () {
+                return window.PlayerStats.checkMatchCompletion();
+            }).catch(function (err) {
+                console.error('PlayerStats recordRackWin error:', err);
+            });
+        } else {
+            window.PlayerStats.undoLastRack(player).catch(function (err) {
+                console.error('PlayerStats undoLastRack error:', err);
+            });
+        }
+    }
 }
 
 function shotClock(timex) {
@@ -1671,6 +1722,12 @@ function resetScores() {
             window.streamSharing.sendUpdate();
         }
 
+        if (window.PlayerStats) {
+            window.PlayerStats.onResetScores().catch(function (err) {
+                console.error('PlayerStats onResetScores error:', err);
+            });
+        }
+
         updateScoreControlAvailability();
     } else { }
 }
@@ -1776,6 +1833,15 @@ function getStorageItem(key, defaultValue = null) {
     return value !== null ? value : defaultValue;
 }
 
+const STATS_PROTECTED_KEYS = ['overlayStatsMode', 'overlayStatsPayload'];
+
+function isStatsProtectedKey(key) {
+    if (!key) {
+        return false;
+    }
+    return STATS_PROTECTED_KEYS.includes(key);
+}
+
 function resetAll() {
     if (confirm("Click OK to confirm complete reset. This will clear all stored data for ALL scoreboard instance.")) {
         clearAllData();
@@ -1789,11 +1855,13 @@ function clearAllData() {
         bc.postMessage({ refresh: true });
     }
 }
+// cuesport_stats IndexedDB is never cleared here — only via Stats modal Clear All Stats.
 function removeAllData() {
-    // Remove all localStorage items for this instance
     for (let i = localStorage.length - 1; i >= 0; i--) {
         const key = localStorage.key(i);
-        localStorage.removeItem(key);
+        if (!isStatsProtectedKey(key)) {
+            localStorage.removeItem(key);
+        }
     }
 }
 
@@ -1815,10 +1883,11 @@ function clearInstanceData() {
 
 function removeInstanceData(instanceId) {
     if (instanceId === null || instanceId === undefined) {
-        // Remove all localStorage items
         for (let i = localStorage.length - 1; i >= 0; i--) {
             const key = localStorage.key(i);
-            localStorage.removeItem(key);
+            if (!isStatsProtectedKey(key)) {
+                localStorage.removeItem(key);
+            }
         }
     } else {
         // Remove only items for this instance
@@ -2162,12 +2231,24 @@ function togglePasswordVisibility() {
 window.onclick = function(event) {
     const websocketModal = document.getElementById('websocketSettingsModal');
     const streamModal = document.getElementById('streamPromotionSettingsModal');
+    const statsModal = document.getElementById('statsModal');
+    const matchEditModal = document.getElementById('statsMatchEditModal');
+    const playerRenameModal = document.getElementById('statsPlayerRenameModal');
     
     if (event.target === websocketModal) {
         closeWebSocketSettingsModal();
     }
     if (event.target === streamModal) {
         closeStreamPromotionSettingsModal();
+    }
+    if (event.target === statsModal) {
+        closeStatsModal();
+    }
+    if (event.target === matchEditModal) {
+        closeMatchEditModal();
+    }
+    if (event.target === playerRenameModal) {
+        closePlayerRenameModal();
     }
 }
 

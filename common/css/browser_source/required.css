@@ -527,3 +527,61 @@ body {
 .faded {
     opacity: 0.2;
 }
+
+/* Stats overlay panel */
+#overlayStatsPanel {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 20;
+    background: rgba(0, 0, 0, 0.75);
+    color: #fff;
+    padding: 12px 18px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 6px;
+    font-family: Arial, sans-serif;
+    min-width: 280px;
+    text-align: center;
+    cursor: move;
+}
+
+#overlayStatsPanel.overlay-stats-positioned {
+    transform: none;
+}
+
+.overlay-stats-title {
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    opacity: 0.8;
+    margin-bottom: 6px;
+}
+
+.overlay-stats-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    font-size: calc(var(--standard-font-size) * 0.5);
+    font-weight: bold;
+}
+
+.overlay-stats-row span:nth-child(2) {
+    font-size: calc(var(--standard-font-size) * 0.65);
+    white-space: nowrap;
+}
+
+.overlay-stats-sub,
+.overlay-stats-line {
+    font-size: calc(var(--standard-font-size) * 0.35);
+    margin-top: 4px;
+    opacity: 0.85;
+}
+
+.overlay-stats-empty {
+    font-size: calc(var(--standard-font-size) * 0.4);
+    font-style: italic;
+    opacity: 0.75;
+    padding: 4px 0;
+}
