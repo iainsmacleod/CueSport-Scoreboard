@@ -270,8 +270,10 @@
         const scoreDisplay = !(scoreDisplaySetting === 'no' || scoreDisplaySetting === 'false' || scoreDisplaySetting === '0');
 
         const ballTrackerSetting = String(getStorage(`${storagePrefix}enableBallTracker`, getStorage('enableBallTracker', 'no')) || 'no').toLowerCase();
+        const ballDisplaySetting = String(getStorage(`${storagePrefix}enableBallDisplay`, getStorage('enableBallDisplay', 'no')) || 'no').toLowerCase();
         const shotClockSetting = String(getStorage(`${storagePrefix}useClock`, getStorage('useClock', 'no')) || 'no').toLowerCase();
         const ballTrackerEnabled = ballTrackerSetting === 'yes' || ballTrackerSetting === 'true' || ballTrackerSetting === '1';
+        const ballDisplayEnabled = ballDisplaySetting === 'yes' || ballDisplaySetting === 'true' || ballDisplaySetting === '1';
         const shotClockEnabled = shotClockSetting === 'yes' || shotClockSetting === 'true' || shotClockSetting === '1';
 
         const breakingPlayerSetting = String(getStorage(`${storagePrefix}usePlayerToggle`, getStorage('usePlayerToggle', 'no')) || 'no').toLowerCase();
@@ -283,6 +285,8 @@
             ballType = 'International';
         } else if (ballSelection === 'unity') {
             ballType = 'Unity';
+        } else if (ballSelection === 'snooker') {
+            ballType = 'Snooker';
         }
         
         return {
@@ -301,6 +305,7 @@
             player2Enabled,
             scoreDisplay,
             ballTrackerEnabled,
+            ballDisplayEnabled,
             shotClockEnabled,
             breakingPlayerEnabled,
             ballType,

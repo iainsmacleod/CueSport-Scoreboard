@@ -27,6 +27,9 @@ function postLogo() {
 function clearWinBlink() {
 	document.getElementById("player1Score").classList.remove("winBlink");
 	document.getElementById("player2Score").classList.remove("winBlink");
+	if (typeof syncScoreBoxWidths === 'function') {
+		syncScoreBoxWidths();
+	}
 	var gameType = getStorageItem("gameType");
 
 	// Check if an animation is already in progress
@@ -201,6 +204,7 @@ function showScores() {
 	} else {
 		hideBalls();
 	}
+	syncScoreBoxWidths();
 }
 
 function hideScores() {
@@ -213,6 +217,7 @@ function hideScores() {
 function showBalls() {
 	const p1Balls = document.getElementById("player1Balls");
 	const p2Balls = document.getElementById("player2Balls");
+	const scoreBoard = document.getElementById("scoreBoard");
 	if (!p1Balls || !p2Balls) {
 		return;
 	}
@@ -220,11 +225,16 @@ function showBalls() {
 	p2Balls.classList.remove("noShow");
 	p1Balls.classList.replace("fadeOutElm", "fadeInElm");
 	p2Balls.classList.replace("fadeOutElm", "fadeInElm");
+	if (scoreBoard) {
+		scoreBoard.classList.add("dual-score");
+	}
+	syncScoreBoxWidths();
 }
 
 function hideBalls() {
 	const p1Balls = document.getElementById("player1Balls");
 	const p2Balls = document.getElementById("player2Balls");
+	const scoreBoard = document.getElementById("scoreBoard");
 	if (!p1Balls || !p2Balls) {
 		return;
 	}
@@ -232,6 +242,50 @@ function hideBalls() {
 	p2Balls.classList.replace("fadeInElm", "fadeOutElm");
 	p1Balls.classList.add("noShow");
 	p2Balls.classList.add("noShow");
+	if (scoreBoard) {
+		scoreBoard.classList.remove("dual-score");
+	}
+	syncScoreBoxWidths();
+}
+
+/** Make paired P1/P2 score boxes share the wider natural width so 999 vs 1 stays balanced. */
+function syncPairedScoreBoxWidths(elementIds) {
+	const elements = elementIds.map(function (id) {
+		return document.getElementById(id);
+	}).filter(Boolean);
+	if (elements.length < 2) {
+		return;
+	}
+	elements.forEach(function (el) {
+		el.style.minWidth = "";
+	});
+	const measurable = elements.filter(function (el) {
+		if (el.classList.contains("noShow")) {
+			return false;
+		}
+		const style = window.getComputedStyle(el);
+		return style.display !== "none" && style.visibility !== "hidden";
+	});
+	if (measurable.length === 0) {
+		return;
+	}
+	let maxWidth = 0;
+	measurable.forEach(function (el) {
+		maxWidth = Math.max(maxWidth, Math.ceil(el.getBoundingClientRect().width));
+	});
+	if (maxWidth <= 0) {
+		return;
+	}
+	measurable.forEach(function (el) {
+		el.style.minWidth = maxWidth + "px";
+	});
+}
+
+function syncScoreBoxWidths() {
+	requestAnimationFrame(function () {
+		syncPairedScoreBoxWidths(["player1Score", "player2Score"]);
+		syncPairedScoreBoxWidths(["player1Balls", "player2Balls"]);
+	});
 }
 
 function isDualScoreDisplayActive() {
@@ -245,7 +299,8 @@ function isDualScoreDisplayActive() {
 	// Fallback if dualScoreDisplay hasn't been broadcast yet
 	const gameType = getStorageItem("gameType");
 	return gameType === "game5" || gameType === "game6" ||
-		(gameType === "game7" && getStorageItem("pointBased") === "yes");
+		(gameType === "game7" && getStorageItem("pointBased") === "yes") ||
+		gameType === "game8";
 }
 
 function syncBallsVisibility() {
@@ -257,6 +312,37 @@ function syncBallsVisibility() {
 		showBalls();
 	} else {
 		hideBalls();
+	}
+}
+
+/** Snooker scoring is control-panel only — never show the ball grid on the OBS overlay. */
+function isOverlaySnookerMode() {
+	return getStorageItem("gameType") === "game8" || getStorageItem("ballSelection") === "snooker";
+}
+
+function applyOverlayBallTrackerLayout() {
+	const ballTracker = document.getElementById("ballTracker");
+	if (!ballTracker) {
+		return;
+	}
+	const direction = getStorageItem("ballTrackerDirection") || "vertical";
+	ballTracker.style.flexDirection = direction === "vertical" ? "column" : "row";
+}
+
+function setOverlayBallTrackerVisible(show) {
+	const ballTracker = document.getElementById("ballTracker");
+	if (!ballTracker) {
+		return;
+	}
+	const displayEnabled = getStorageItem("enableBallDisplay") === "yes";
+	const visible = !!(show && displayEnabled && !isOverlaySnookerMode());
+	if (visible) {
+		ballTracker.classList.remove("noShow");
+		ballTracker.style.display = "flex";
+		applyOverlayBallTrackerLayout();
+	} else {
+		ballTracker.classList.add("noShow");
+		ballTracker.style.display = "none";
 	}
 }
 

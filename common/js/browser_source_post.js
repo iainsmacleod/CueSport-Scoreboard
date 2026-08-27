@@ -50,14 +50,11 @@ initializeDefaults();
 const handlers = {
     ballTracker(data) {
         console.log('Ball tracker value:', data.ballTracker);
-        if (data.ballTracker === "vertical") {
-            document.getElementById("ballTracker").style.display = "flex";
-            document.getElementById("ballTracker").style.flexDirection = "column";
-            console.log('Changed ball tracker direction to vertical');
-        } else if (data.ballTracker === "horizontal") {
-            document.getElementById("ballTracker").style.display = "flex";
-            document.getElementById("ballTracker").style.flexDirection = "row";
-            console.log('Changed ball tracker direction to horizontal');
+        if (data.ballTracker === "vertical" || data.ballTracker === "horizontal") {
+            setStorageItem("ballTrackerDirection", data.ballTracker);
+            if (getStorageItem("enableBallDisplay") === "yes" && !isOverlaySnookerMode()) {
+                setOverlayBallTrackerVisible(true);
+            }
         }
     },
 
@@ -72,6 +69,9 @@ const handlers = {
         } else {
             scoreElement.innerHTML = data.score;
         }
+        if (typeof syncScoreBoxWidths === 'function') {
+            syncScoreBoxWidths();
+        }
     },
 
     balls(data) {
@@ -79,6 +79,9 @@ const handlers = {
         const ballsElement = document.getElementById(`player${data.player}Balls`);
         if (ballsElement) {
             ballsElement.innerHTML = data.balls;
+        }
+        if (typeof syncScoreBoxWidths === 'function') {
+            syncScoreBoxWidths();
         }
     },
 
@@ -212,8 +215,8 @@ const handlers = {
                 document.getElementById("raceInfo").classList.replace("fadeOutElm", "fadeInElm");
             }
 
-            if (getStorageItem("enableBallTracker") === "yes") {
-                document.getElementById("ballTracker").classList.remove("noShow");
+            if (getStorageItem("enableBallDisplay") === "yes") {
+                setOverlayBallTrackerVisible(true);
             }
 
             showPlayer(data.playerNumber);
@@ -369,18 +372,17 @@ const handlers = {
     },
 
     displayBallTracker(data) {
-        const ballTracker = document.getElementById("ballTracker");
-        if (!ballTracker) {
-            console.warn('Ball tracker element not found in DOM');
+        const snookerMode = isOverlaySnookerMode();
+        if (snookerMode || data.displayBallTracker === false) {
+            setStorageItem("enableBallDisplay", "no");
+            setOverlayBallTrackerVisible(false);
+            console.log('Hide ball tracker');
             return;
         }
-
         if (data.displayBallTracker === true) {
-            ballTracker.classList.remove("noShow");
+            setStorageItem("enableBallDisplay", "yes");
+            setOverlayBallTrackerVisible(true);
             console.log('Show ball tracker');
-        } else if (data.displayBallTracker === false) {
-            ballTracker.classList.add("noShow");
-            console.log('Hide ball tracker');
         }
     },
 
@@ -389,7 +391,12 @@ const handlers = {
         if (data.gameType) {
             setStorageItem("gameType", data.gameType);
         }
-        if (data.gameType === "game2") {
+        const selection = data.ballSelection || getStorageItem("ballSelection");
+        const snookerMode = data.gameType === "game8" || selection === "snooker";
+        if (snookerMode) {
+            setOverlayBallTrackerVisible(false);
+            setStorageItem("ballSelection", "snooker");
+        } else if (data.gameType === "game2") {
             // 9-ball
             ["10", "11", "12", "13", "14", "15"].forEach(num => {
                 document.getElementById(`ball ${num}`).classList.add("noShow");
@@ -406,11 +413,23 @@ const handlers = {
                 document.getElementById(`ball ${num}`).classList.remove("noShow");
             });
         }
+        // Re-apply tracker visibility after gameType is stored (snooker must stay hidden)
+        if (isOverlaySnookerMode()) {
+            setStorageItem("enableBallDisplay", "no");
+            setOverlayBallTrackerVisible(false);
+        } else if (getStorageItem("enableBallDisplay") === "yes") {
+            setOverlayBallTrackerVisible(true);
+        }
         syncBallsVisibility();
     },
 
     ballSelection(data) {
         console.log('Ball selection value:', data.ballSelection);
+        if (data.ballSelection === "snooker" || getStorageItem("gameType") === "game8") {
+            setStorageItem("ballSelection", "snooker");
+            setOverlayBallTrackerVisible(false);
+            return;
+        }
         updateBallImages(data.ballSelection);
     },
 
@@ -490,6 +509,314 @@ const handlers = {
     }
 };
 
+function escapeOverlayText(value) {
+    return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function buildOverlayH2HTable(stats) {
+    const racksWord = stats.racksLabel || ((stats.rackLabel || 'Rack') + 's');
+    const p1Name = stats.p1Name || 'Player 1';
+    const p2Name = stats.p2Name || 'Player 2';
+    const sideCh = Math.max(p1Name.length, p2Name.length, 4);
+    const p1Break = stats.p1HighestBreak || 0;
+    const p2Break = stats.p2HighestBreak || 0;
+    const p1Balls = stats.p1Balls || 0;
+    const p2Balls = stats.p2Balls || 0;
+    const rows = [
+        { label: 'Matches Won', left: stats.p1Games || 0, right: stats.p2Games || 0 },
+        { label: racksWord + ' Won', left: stats.p1Racks || 0, right: stats.p2Racks || 0 }
+    ];
+    // Omit zero-only optional stats on the overlay
+    if (stats.showHighestBreak && (p1Break > 0 || p2Break > 0)) {
+        rows.push({
+            label: stats.highestBreakLabel || 'Highest Break',
+            left: p1Break,
+            right: p2Break
+        });
+    }
+    if (stats.showBalls && (p1Balls > 0 || p2Balls > 0)) {
+        rows.push({
+            label: 'Balls Potted',
+            left: p1Balls,
+            right: p2Balls
+        });
+    }
+
+    let html = '<table class="overlay-stats-table overlay-stats-h2h-table">' +
+        '<colgroup>' +
+        '<col class="overlay-stats-h2h-side" style="width:' + sideCh + 'ch">' +
+        '<col class="overlay-stats-h2h-mid">' +
+        '<col class="overlay-stats-h2h-side" style="width:' + sideCh + 'ch">' +
+        '</colgroup>' +
+        '<thead><tr>' +
+        '<th class="overlay-stats-col-player">' + escapeOverlayText(p1Name) + '</th>' +
+        '<th class="overlay-stats-col-label"></th>' +
+        '<th class="overlay-stats-col-player">' + escapeOverlayText(p2Name) + '</th>' +
+        '</tr></thead><tbody>';
+    rows.forEach(function (row, index) {
+        html += '<tr class="' + (index % 2 === 0 ? 'overlay-stats-row-even' : 'overlay-stats-row-odd') + '">' +
+            '<td class="overlay-stats-col-value">' + row.left + '</td>' +
+            '<td class="overlay-stats-col-label">' + escapeOverlayText(row.label) + '</td>' +
+            '<td class="overlay-stats-col-value">' + row.right + '</td>' +
+            '</tr>';
+    });
+    html += '</tbody></table>';
+    return html;
+}
+
+function buildOverlayPlayerTable(stats) {
+    const rackLabel = stats.rackLabel || 'Rack';
+    const highestBreak = stats.highestBreak || 0;
+    const currentBreak = stats.currentBreak || 0;
+    const ballsPotted = stats.ballsPotted || 0;
+    const winStreak = stats.winStreak || 0;
+    const rows = [
+        { label: 'Games W/L', value: stats.gamesWL + ' (' + stats.winRate + '%)' },
+        {
+            label: rackLabel + ' W/L',
+            value: stats.racksWL + (stats.rackWinRate != null ? ' (' + stats.rackWinRate + '%)' : '')
+        }
+    ];
+    if (stats.showCurrentBreak && currentBreak > 0) {
+        rows.push({
+            label: stats.currentBreakLabel || 'Current Break',
+            value: currentBreak
+        });
+    }
+    if (stats.showPossibleBreak && (stats.possibleBreak || 0) > 0) {
+        rows.push({
+            label: stats.possibleBreakLabel || 'Possible Break',
+            value: stats.possibleBreak
+        });
+    }
+    if (stats.showScoreMargin) {
+        rows.push({
+            label: stats.scoreMarginLabel || 'Difference',
+            value: stats.scoreMargin || '0'
+        });
+    }
+    if (stats.showPointsRemaining) {
+        const tone = stats.pointsRemainingTone ||
+            (stats.scoreMarginCritical ? 'danger' : (stats.scoreMarginSafe ? 'safe' : ''));
+        rows.push({
+            label: stats.pointsRemainingLabel || 'Points Remaining',
+            value: stats.pointsRemaining != null ? stats.pointsRemaining : (stats.scoreMarginRemaining || 0),
+            valueClass: tone === 'danger' ? 'overlay-stats-danger' :
+                (tone === 'safe' ? 'overlay-stats-safe' : '')
+        });
+    }
+    if (stats.showHighestBreak && highestBreak > 0) {
+        rows.push({
+            label: stats.highestBreakLabel || 'Highest Break',
+            value: highestBreak
+        });
+    }
+    if (stats.showBalls && ballsPotted > 0) {
+        rows.push({ label: 'Balls Potted', value: ballsPotted });
+    }
+    if (winStreak > 0) {
+        rows.push({ label: 'Win Streak', value: winStreak });
+    }
+
+    let html = '<table class="overlay-stats-table overlay-stats-player-table">' +
+        '<thead><tr><th>Stat</th><th>Value</th></tr></thead><tbody>';
+    rows.forEach(function (row, index) {
+        html += '<tr class="' + (index % 2 === 0 ? 'overlay-stats-row-even' : 'overlay-stats-row-odd') + '">' +
+            '<td class="overlay-stats-col-label">' + escapeOverlayText(row.label) + '</td>' +
+            '<td class="overlay-stats-col-value' + (row.valueClass ? ' ' + row.valueClass : '') + '">' +
+            escapeOverlayText(row.value) + '</td>' +
+            '</tr>';
+    });
+    html += '</tbody></table>';
+    return html;
+}
+
+function balanceOverlayH2HColumns(table) {
+    if (!table || !table.classList.contains('overlay-stats-h2h-table')) {
+        return;
+    }
+    const nameCells = table.querySelectorAll('thead .overlay-stats-col-player');
+    if (nameCells.length !== 2) {
+        return;
+    }
+    nameCells.forEach(function (cell) {
+        cell.style.width = '';
+        cell.style.minWidth = '';
+    });
+    const sideWidth = Math.ceil(Math.max(
+        nameCells[0].getBoundingClientRect().width,
+        nameCells[1].getBoundingClientRect().width
+    ));
+    if (sideWidth <= 0) {
+        return;
+    }
+    nameCells.forEach(function (cell) {
+        cell.style.width = sideWidth + 'px';
+        cell.style.minWidth = sideWidth + 'px';
+    });
+    const cols = table.querySelectorAll('col.overlay-stats-h2h-side');
+    cols.forEach(function (col) {
+        col.style.width = sideWidth + 'px';
+    });
+}
+
+function getOverlayStatsPositionStorageKey(mode) {
+    if (mode === 'p1' || mode === 'p2' || mode === 'h2h') {
+        return 'elementPosition_overlayStatsPanel_' + mode;
+    }
+    return 'elementPosition_overlayStatsPanel';
+}
+
+function readOverlayStatsSavedPosition(mode) {
+    if (!mode) {
+        return null;
+    }
+    let raw = getStorageItem(getOverlayStatsPositionStorageKey(mode));
+    // Fall back to legacy shared position so existing layouts still load once
+    if (!raw) {
+        raw = getStorageItem('elementPosition_overlayStatsPanel');
+    }
+    if (!raw) {
+        return null;
+    }
+    try {
+        const position = JSON.parse(raw);
+        if (!position) {
+            return null;
+        }
+        // Preferred: bottom-center anchor
+        if (typeof position.anchorX === 'number' && typeof position.anchorY === 'number') {
+            return position;
+        }
+        // Legacy top-left
+        if (typeof position.left === 'number' && typeof position.top === 'number') {
+            return position;
+        }
+    } catch (e) {
+        console.warn('Failed to parse overlay stats position:', e);
+    }
+    return null;
+}
+
+/** Place panel so its bottom-center sits on the saved anchor (or migrate legacy top-left). */
+function placeOverlayStatsAtSavedAnchor(panel, position) {
+    if (!panel || !position) {
+        return;
+    }
+    panel.style.position = 'absolute';
+    panel.style.transform = 'none';
+    panel.classList.add('overlay-stats-positioned');
+
+    const rect = panel.getBoundingClientRect();
+    const width = rect.width || panel.offsetWidth || 280;
+    const height = rect.height || panel.offsetHeight || 1;
+
+    let anchorX;
+    let anchorY;
+    if (typeof position.anchorX === 'number' && typeof position.anchorY === 'number') {
+        anchorX = position.anchorX;
+        anchorY = position.anchorY;
+    } else {
+        // Legacy top-left → treat current box's bottom-center as the new anchor target
+        anchorX = position.left + width / 2;
+        anchorY = position.top + height;
+    }
+
+    panel.style.left = Math.round(anchorX - width / 2) + 'px';
+    panel.style.top = Math.round(anchorY - height) + 'px';
+}
+
+function applyOverlayStatsPanelPosition(panel, mode) {
+    if (!panel) {
+        return;
+    }
+    panel.setAttribute('data-overlay-stats-mode', mode || '');
+    const position = readOverlayStatsSavedPosition(mode);
+    if (position) {
+        placeOverlayStatsAtSavedAnchor(panel, position);
+        return;
+    }
+    // Default centered CSS placement for this mode
+    panel.style.position = '';
+    panel.style.left = '';
+    panel.style.top = '';
+    panel.style.transform = '';
+    panel.style.width = '';
+    panel.classList.remove('overlay-stats-positioned');
+}
+
+function captureOverlayStatsBottomCenter(panel) {
+    const rect = panel.getBoundingClientRect();
+    return {
+        anchor: 'bottom-center',
+        anchorX: Math.round(rect.left + window.scrollX + rect.width / 2),
+        anchorY: Math.round(rect.top + window.scrollY + rect.height),
+        width: Math.round(rect.width)
+    };
+}
+
+function saveOverlayStatsPanelPosition(panel) {
+    if (!panel) {
+        return;
+    }
+    const mode = panel.getAttribute('data-overlay-stats-mode') || '';
+    if (mode !== 'p1' && mode !== 'p2' && mode !== 'h2h') {
+        return;
+    }
+    const position = captureOverlayStatsBottomCenter(panel);
+    setStorageItem(getOverlayStatsPositionStorageKey(mode), JSON.stringify(position));
+}
+
+function syncOverlayStatsPanelWidth(panel) {
+    if (!panel) {
+        return;
+    }
+    // Drop any stale locked width so the panel can grow with the table
+    panel.style.width = '';
+    // Measure after layout; lock px width so OBS/CEF does not stretch to the viewport
+    requestAnimationFrame(function() {
+        const bodyEl = document.getElementById('overlayStatsBody');
+        const table = bodyEl && bodyEl.querySelector('.overlay-stats-table');
+        if (table) {
+            balanceOverlayH2HColumns(table);
+        }
+        const contentW = table
+            ? Math.ceil(table.getBoundingClientRect().width)
+            : Math.ceil((bodyEl || panel).scrollWidth);
+        const style = window.getComputedStyle(panel);
+        const padX = (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0);
+        const borderX = (parseFloat(style.borderLeftWidth) || 0) + (parseFloat(style.borderRightWidth) || 0);
+        const w = Math.max(280, contentW + padX + borderX);
+        if (w > 0) {
+            panel.style.width = w + 'px';
+        }
+        // Keep bottom-center fixed when width/height change with content
+        if (panel.classList.contains('overlay-stats-positioned')) {
+            try {
+                const mode = panel.getAttribute('data-overlay-stats-mode') || '';
+                const position = readOverlayStatsSavedPosition(mode);
+                if (position) {
+                    placeOverlayStatsAtSavedAnchor(panel, position);
+                    position.width = w;
+                    if (typeof position.anchorX !== 'number') {
+                        // Upgrade legacy save to bottom-center after first layout
+                        const upgraded = captureOverlayStatsBottomCenter(panel);
+                        setStorageItem(getOverlayStatsPositionStorageKey(mode), JSON.stringify(upgraded));
+                    } else {
+                        setStorageItem(getOverlayStatsPositionStorageKey(mode), JSON.stringify(position));
+                    }
+                }
+            } catch (e) {
+                /* ignore persistence errors */
+            }
+        }
+    });
+}
+
 function applyOverlayStats(stats) {
     const panel = document.getElementById('overlayStatsPanel');
     const titleEl = document.getElementById('overlayStatsTitle');
@@ -511,25 +838,16 @@ function applyOverlayStats(stats) {
         }
     }
     if (stats.emptyMessage) {
-        bodyEl.innerHTML = '<div class="overlay-stats-empty">' + stats.emptyMessage + '</div>';
+        bodyEl.innerHTML = '<div class="overlay-stats-empty">' + escapeOverlayText(stats.emptyMessage) + '</div>';
     } else if (stats.mode === 'h2h') {
-        bodyEl.innerHTML =
-            '<div class="overlay-stats-row">' +
-            '<span>' + (stats.p1Name || 'Player 1') + '</span>' +
-            '<span>' + (stats.p1Games || 0) + '-' + (stats.p2Games || 0) + '</span>' +
-            '<span>' + (stats.p2Name || 'Player 2') + '</span>' +
-            '</div>' +
-            '<div class="overlay-stats-sub">Rack W/L: ' + (stats.p1Racks || 0) + '-' + (stats.p2Racks || 0) + '</div>' +
-            (stats.showBalls ? '<div class="overlay-stats-sub">Balls Potted: ' + (stats.p1Balls || 0) + '-' + (stats.p2Balls || 0) + '</div>' : '');
+        bodyEl.innerHTML = buildOverlayH2HTable(stats);
     } else {
-        bodyEl.innerHTML =
-            '<div class="overlay-stats-line">Games W/L: ' + stats.gamesWL + ' (' + stats.winRate + '%)</div>' +
-            '<div class="overlay-stats-line">Rack W/L: ' + stats.racksWL + '</div>' +
-            (stats.showBalls ? '<div class="overlay-stats-line">Balls Potted: ' + (stats.ballsPotted || 0) + '</div>' : '') +
-            '<div class="overlay-stats-line">Win Streak: ' + (stats.winStreak || 0) + '</div>';
+        bodyEl.innerHTML = buildOverlayPlayerTable(stats);
     }
+    applyOverlayStatsPanelPosition(panel, stats.mode);
     panel.classList.remove('noShow', 'fadeOutElm');
     panel.classList.add('fadeInElm');
+    syncOverlayStatsPanelWidth(panel);
 }
 
 function restoreOverlayStatsFromStorage() {
@@ -590,26 +908,42 @@ $(document).ready(function () {
             return;
         }
 
-        const savedPosition = getStorageItem(`elementPosition_${elementId}`);
-        if (savedPosition) {
-            try {
-                const position = JSON.parse(savedPosition);
-                $element.css({
-                    position: 'absolute',
-                    left: position.left + 'px',
-                    top: position.top + 'px'
-                });
-                if (elementId === 'overlayStatsPanel') {
-                    $element.addClass('overlay-stats-positioned');
+        // Overlay stats positions are restored per mode (p1/p2/h2h) when shown
+        if (elementId !== 'overlayStatsPanel') {
+            const savedPosition = getStorageItem(`elementPosition_${elementId}`);
+            if (savedPosition) {
+                try {
+                    const position = JSON.parse(savedPosition);
+                    const restoreCss = {
+                        position: 'absolute',
+                        left: position.left + 'px',
+                        top: position.top + 'px'
+                    };
+                    if (position.width) {
+                        restoreCss.width = position.width + 'px';
+                    }
+                    $element.css(restoreCss);
+                    console.log(`Restored position for ${elementId}:`, position);
+                } catch (e) {
+                    console.warn(`Failed to restore position for ${elementId}:`, e);
                 }
-                console.log(`Restored position for ${elementId}:`, position);
-            } catch (e) {
-                console.warn(`Failed to restore position for ${elementId}:`, e);
             }
         }
 
         const dragOptions = {
             stop: function(event, ui) {
+                if (elementId === 'overlayStatsPanel') {
+                    const el = $element[0];
+                    const w = Math.round(el.getBoundingClientRect().width);
+                    if (w > 0) {
+                        $element.css('width', w + 'px');
+                    }
+                    saveOverlayStatsPanelPosition(el);
+                    console.log('Saved overlay stats position (bottom-center):',
+                        captureOverlayStatsBottomCenter(el),
+                        el.getAttribute('data-overlay-stats-mode'));
+                    return;
+                }
                 const position = {
                     left: ui.position.left,
                     top: ui.position.top
@@ -622,14 +956,19 @@ $(document).ready(function () {
         if (elementId === 'overlayStatsPanel') {
             dragOptions.start = function(event, ui) {
                 const el = $element[0];
+                // Lock pixel width so OBS/CEF does not stretch the panel while dragging
+                const lockedWidth = Math.round(el.getBoundingClientRect().width);
                 if (!$element.hasClass('overlay-stats-positioned')) {
                     const rect = el.getBoundingClientRect();
                     $element.css({
                         position: 'absolute',
                         left: rect.left + window.scrollX + 'px',
                         top: rect.top + window.scrollY + 'px',
-                        transform: 'none'
+                        transform: 'none',
+                        width: lockedWidth + 'px'
                     }).addClass('overlay-stats-positioned');
+                } else if (!$element[0].style.width) {
+                    $element.css('width', lockedWidth + 'px');
                 }
             };
         }
@@ -697,6 +1036,9 @@ document.getElementById("player1Score").innerHTML = getStorageItem("p1ScoreCtrlP
 document.getElementById("player2Score").innerHTML = getStorageItem("p2ScoreCtrlPanel") || getStorageItem("p2Score") || 0;
 document.getElementById("player1Balls").innerHTML = getStorageItem("p1BallsCtrlPanel") || getStorageItem("p1Balls") || 0;
 document.getElementById("player2Balls").innerHTML = getStorageItem("p2BallsCtrlPanel") || getStorageItem("p2Balls") || 0;
+if (typeof syncScoreBoxWidths === 'function') {
+    syncScoreBoxWidths();
+}
 
 // Code to assist with displaying active player image when only two players are enabled, on reload.
 const player1Enabled = getStorageItem("usePlayer1") === "yes";
@@ -764,12 +1106,12 @@ if (gameInfo && gameInfo.trim() !== "") {
 if (getStorageItem("raceInfo") != "" && getStorageItem("raceInfo") != null && bothPlayersEnabled && getStorageItem("scoreDisplay") === "yes") {
     document.getElementById("raceInfo").classList.remove("noShow");
     document.getElementById("raceInfo").classList.add("fadeInElm");
-    var racenNum = parseInt(getStorageItem("raceInfo"));
-    console.log(typeof racenNum);
-    if (typeof racenNum === "number") { //It is a number only value
-        document.getElementById("raceInfo").innerHTML = "" + getStorageItem("raceInfo");
-    } else { // It has Alphanumeric Charachers
-        document.getElementById("raceInfo").innerHTML = getStorageItem("raceInfo");
+    var raceStored = getStorageItem("raceInfo");
+    var racenNum = parseInt(raceStored, 10);
+    if (typeof racenNum === "number" && !Number.isNaN(racenNum)) {
+        document.getElementById("raceInfo").innerHTML = "" + raceStored;
+    } else {
+        document.getElementById("raceInfo").innerHTML = raceStored;
     }
 
     document.getElementById("customLogo1").classList.add("customLogoWide1");
@@ -815,28 +1157,20 @@ if (getStorageItem('p2colorSet') != "") {
     console.log("p2color: " + getStorageItem('p2colorSet'));
 }
 
-if (getStorageItem("enableBallTracker") === "no" || getStorageItem("enableBallTracker") === null) {
-    document.getElementById("ballTracker").classList.add("noShow");
-    console.log(`Ball tracker disabled on overlay`);
-} else {
-    document.getElementById("ballTracker").classList.remove("noShow");
-    console.log(`Ball tracker enabled on overlay`);
+if (getStorageItem("enableBallDisplay") === null) {
+    // Migrate: older builds used enableBallTracker for overlay visibility
+    const legacyShow = getStorageItem("enableBallTracker") === "yes" &&
+        getStorageItem("gameType") !== "game8" &&
+        getStorageItem("ballSelection") !== "snooker";
+    setStorageItem("enableBallDisplay", legacyShow ? "yes" : "no");
 }
-
-// On browser_source.html load, check stored direction and apply it
-const initializeBallTracker = () => {
-    const direction = getStorageItem("ballTrackerDirection") || "vertical";
-    const ballTracker = document.getElementById("ballTracker");
-
-    if (ballTracker) {
-        ballTracker.style.display = "flex";
-        ballTracker.style.flexDirection = direction === "vertical" ? "column" : "row";
-        console.log(`Ball tracker initialized from stored value: ${direction}`);
-    }
-};
-
-// Run initialization
-initializeBallTracker();
+if (getStorageItem("enableBallDisplay") === "no" || isOverlaySnookerMode()) {
+    setOverlayBallTrackerVisible(false);
+    console.log(`Ball display disabled on overlay`);
+} else {
+    setOverlayBallTrackerVisible(true);
+    console.log(`Ball display enabled on overlay`);
+}
 
 // Only handle changes via broadcast messages after initial setup
 if (getStorageItem("ballTrackerDirection") === null) {

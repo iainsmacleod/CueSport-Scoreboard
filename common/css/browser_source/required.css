@@ -212,7 +212,7 @@ body {
     color: white;
 }
 
-/* Dual-mode ball scores — spaced from rack scores, flanking race */
+/* Dual-mode ball/points scores — red; sits beside name when visible */
 .playerBalls {
     position: relative;
     display: inline-flex;
@@ -225,19 +225,22 @@ body {
     color: white;
     -webkit-text-stroke: 1px black;
     padding: 5px 10px;
-    border: 2px solid black;
+    border: solid black;
     box-sizing: border-box;
     min-width: 3.5ch;
     z-index: 2;
     box-shadow: 0 8px 16px 0 rgba(0, 0, 0, 0.6);
 }
 
+/* Joined to name (inner shared edge) — same chrome the rack box used to have here */
 #player1Balls {
-    margin: 0 5px 0 8px;
+    border-width: 2px 2px 2px 0;
+    margin: 0;
 }
 
 #player2Balls {
-    margin: 0 8px 0 5px;
+    border-width: 2px 0 2px 2px;
+    margin: 0;
 }
 
 /* Scoreboard layout */
@@ -340,7 +343,7 @@ body {
     z-index: 10;
 }
 
-/* Scores */
+/* Rack/frame scores — blue */
 #player1Score,
 #player2Score {
     position: relative;
@@ -360,18 +363,28 @@ body {
     z-index: 2;
 }
 
+/* Default (points hidden): racks sit beside name — joined edge chrome */
 #player1Score {
     border-width: 2px 2px 2px 0;
-    /* No left border */
     margin: 0 5px 0 0;
     box-shadow: 0 8px 16px 0 rgba(0, 0, 0, 0.6);
 }
 
 #player2Score {
     border-width: 2px 0 2px 2px;
-    /* No right border */
     margin: 0 0 0 5px;
     box-shadow: 0 8px 16px 0 rgba(0, 0, 0, 0.6);
+}
+
+/* Dual mode: racks move toward race — use the outer full-border division chrome */
+#scoreBoard.dual-score #player1Score {
+    border-width: 2px;
+    margin: 0 5px 0 8px;
+}
+
+#scoreBoard.dual-score #player2Score {
+    border-width: 2px;
+    margin: 0 8px 0 5px;
 }
 
 /* Custom logos */
@@ -535,15 +548,20 @@ body {
     left: 50%;
     transform: translate(-50%, -50%);
     z-index: 20;
-    background: rgba(0, 0, 0, 0.75);
+    background: rgba(0, 0, 0, 0.82);
     color: #fff;
-    padding: 14px 22px;
-    border: 2px solid rgba(255, 255, 255, 0.3);
+    padding: 12px 16px 14px;
+    border: 2px solid rgba(255, 255, 255, 0.28);
     border-radius: 6px;
     font-family: Arial, sans-serif;
-    min-width: 360px;
+    /* Fit content — do not use width:100% children against the viewport (OBS stretch bug) */
+    width: max-content;
+    max-width: 96vw;
+    min-width: 280px;
+    box-sizing: border-box;
     text-align: center;
     cursor: move;
+    overflow: visible;
 }
 
 #overlayStatsPanel.overlay-stats-positioned {
@@ -551,6 +569,9 @@ body {
 }
 
 .overlay-stats-title {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
     font-size: calc(var(--small-font-size) * var(--ui-scaling));
     text-transform: uppercase;
     letter-spacing: 1px;
@@ -566,25 +587,96 @@ body {
     opacity: 1;
 }
 
-.overlay-stats-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 16px;
-    font-size: calc(var(--standard-font-size) * var(--ui-scaling));
-    font-weight: bold;
+#overlayStatsBody {
+    display: block;
+    width: max-content;
+    max-width: none;
+    margin: 0 auto;
 }
 
-.overlay-stats-row span:nth-child(2) {
-    font-size: calc(var(--standard-font-size) * var(--ui-scaling));
+.overlay-stats-table {
+    width: auto;
+    max-width: none;
+    border-collapse: collapse;
+    table-layout: auto;
+    margin: 0 auto;
+}
+
+.overlay-stats-table th,
+.overlay-stats-table td {
+    padding: 8px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    vertical-align: middle;
     white-space: nowrap;
 }
 
-.overlay-stats-sub,
-.overlay-stats-line {
+.overlay-stats-table thead th {
+    background: rgba(40, 90, 140, 0.95);
+    color: #fff;
     font-size: calc(var(--small-font-size) * var(--ui-scaling));
-    margin-top: 6px;
-    opacity: 0.85;
+    font-weight: bold;
+}
+
+.overlay-stats-row-even td {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.overlay-stats-row-odd td {
+    background: rgba(0, 0, 0, 0.28);
+}
+
+.overlay-stats-h2h-table .overlay-stats-col-player {
+    width: auto;
+    text-align: center;
+    padding-left: 16px;
+    padding-right: 16px;
+    box-sizing: border-box;
+}
+
+.overlay-stats-h2h-table .overlay-stats-col-label {
+    width: auto;
+    text-align: center;
+    font-size: calc(var(--small-font-size) * var(--ui-scaling));
+    font-weight: 600;
+    opacity: 0.95;
+    padding-left: 18px;
+    padding-right: 18px;
+}
+
+.overlay-stats-h2h-table .overlay-stats-col-value {
+    width: auto;
+    text-align: center;
+    font-size: calc(var(--standard-font-size) * var(--ui-scaling));
+    font-weight: bold;
+    padding-left: 16px;
+    padding-right: 16px;
+    box-sizing: border-box;
+}
+
+.overlay-stats-player-table .overlay-stats-col-label {
+    width: auto;
+    text-align: left;
+    font-size: calc(var(--small-font-size) * var(--ui-scaling));
+    font-weight: 600;
+    padding-left: 14px;
+    padding-right: 18px;
+}
+
+.overlay-stats-player-table .overlay-stats-col-value {
+    width: auto;
+    text-align: center;
+    font-size: calc(var(--standard-font-size) * var(--ui-scaling));
+    font-weight: bold;
+    padding-left: 14px;
+    padding-right: 14px;
+}
+
+.overlay-stats-col-value.overlay-stats-danger {
+    color: #e53935;
+}
+
+.overlay-stats-col-value.overlay-stats-safe {
+    color: #43a047;
 }
 
 .overlay-stats-empty {

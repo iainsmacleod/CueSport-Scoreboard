@@ -162,6 +162,38 @@ window.onload = function () {
 	}
 	console.log("Ball type: " + getStorageItem("ballSelection"));
 
+	if (getStorageItem("snookerGoldEnabled") === null) {
+		setStorageItem("snookerGoldEnabled", "no");
+	}
+	const snookerGoldCheckbox = document.getElementById("snookerGoldCheckbox");
+	if (snookerGoldCheckbox) {
+		snookerGoldCheckbox.checked = getStorageItem("snookerGoldEnabled") === "yes";
+	}
+	if (getStorageItem("snookerRedsPotted") === null) {
+		setStorageItem("snookerRedsPotted", "0");
+	}
+	if (getStorageItem("snookerPhase") === null) {
+		setStorageItem("snookerPhase", "red");
+	}
+	if (getStorageItem("snookerAfterFreeball") === null) {
+		setStorageItem("snookerAfterFreeball", "no");
+	}
+	if (getStorageItem("snookerClearedColors") === null) {
+		setStorageItem("snookerClearedColors", "[]");
+	}
+	if (getStorageItem("snookerGoldenBallFouled") === null) {
+		setStorageItem("snookerGoldenBallFouled", "no");
+	}
+	if (getStorageItem("snookerCurrentBreak") === null) {
+		setStorageItem("snookerCurrentBreak", "0");
+	}
+	if (getStorageItem("snookerFrameHighBreakP1") === null) {
+		setStorageItem("snookerFrameHighBreakP1", "0");
+	}
+	if (getStorageItem("snookerFrameHighBreakP2") === null) {
+		setStorageItem("snookerFrameHighBreakP2", "0");
+	}
+
 	// Update label text based on initial ball type
 	const redLabel = document.querySelector('label[for="p1colorRed"]');
 	if (redLabel) {
@@ -213,18 +245,38 @@ window.onload = function () {
 		document.getElementById("ballTracker").classList.add("noShow");
 	}
 
-	if ((getStorageItem("enableBallTracker") === "yes") && (getStorageItem("gameType") === "game1")) {
+	// Migrate / init Display Balls (overlay). Cannot be on without Ball Tracker; never for snooker.
+	const snookerModeInit = getStorageItem("gameType") === "game8" || getStorageItem("ballSelection") === "snooker";
+	if (getStorageItem("enableBallDisplay") === null) {
+		// Preserve prior behavior: tracker on + non-snooker meant overlay was shown
+		const legacyShow = getStorageItem("enableBallTracker") === "yes" && !snookerModeInit;
+		setStorageItem("enableBallDisplay", legacyShow ? "yes" : "no");
+	}
+	if (snookerModeInit || getStorageItem("enableBallTracker") !== "yes") {
+		setStorageItem("enableBallDisplay", "no");
+	}
+	const ballDisplayCheckbox = document.getElementById("ballDisplayCheckbox");
+	if (ballDisplayCheckbox) {
+		ballDisplayCheckbox.checked = getStorageItem("enableBallDisplay") === "yes";
+	}
+
+	if ((getStorageItem("enableBallTracker") === "yes") && (getStorageItem("gameType") === "game1" || getStorageItem("gameType") === "game8" || getStorageItem("ballSelection") === "snooker")) {
 		document.getElementById("ballTrackerCheckbox").checked = true;
-		document.getElementById("ballTrackerDirectionDiv").classList.remove("noShow");
 		document.getElementById("ballTracker").classList.remove("noShow");
-		// document.getElementById("ballSelection").classList.remove("noShow");
 		document.getElementById("ballTypeDiv").classList.remove("noShow");
-		document.getElementById("ballSetDiv").classList.remove("noShow");
+		if (getStorageItem("gameType") === "game1") {
+			document.getElementById("ballSetDiv").classList.remove("noShow");
+		}
 		console.log(`Ball tracker enabled`);
-		bc.postMessage({ displayBallTracker: true });
+		bc.postMessage({ displayBallTracker: getStorageItem("enableBallDisplay") === "yes" && !snookerModeInit });
+	} else if (getStorageItem("enableBallTracker") === "yes") {
+		document.getElementById("ballTrackerCheckbox").checked = true;
+		document.getElementById("ballTracker").classList.remove("noShow");
+		bc.postMessage({ displayBallTracker: getStorageItem("enableBallDisplay") === "yes" && !snookerModeInit });
 	} else {
 		document.getElementById("ballTrackerCheckbox").checked = false;
 		setStorageItem("enableBallTracker", "no");
+		setStorageItem("enableBallDisplay", "no");
 		document.getElementById("ballTrackerDirectionDiv").classList.add("noShow");
 		document.getElementById("ballTracker").classList.add("noShow");
 
@@ -233,12 +285,14 @@ window.onload = function () {
 			document.getElementById("ballTypeDiv").classList.remove("noShow");
 			document.getElementById("ballSetDiv").classList.remove("noShow");
 		} else {
-			// document.getElementById("ballTypeDiv").classList.add("noShow");
 			document.getElementById("ballSetDiv").classList.add("noShow");
 		}
 
 		console.log(`Ball tracker disabled`);
 		bc.postMessage({ displayBallTracker: false });
+	}
+	if (typeof syncBallDisplayControls === "function") {
+		syncBallDisplayControls();
 	}
 
 	if (getStorageItem("ballTrackerDirection") === null) {
@@ -282,7 +336,8 @@ window.onload = function () {
 
 	// Check game type and initialize ball set toggle visibility
 	const currentGameType = getStorageItem("gameType") || "game1";
-	gameType(currentGameType);
+	// Restore UI without wiping live snooker visit/break state from localStorage
+	gameType(currentGameType, { restore: true });
 
 	// Properly initialize ball tracker visibility
 	useBallTracker();

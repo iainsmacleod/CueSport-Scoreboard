@@ -15,23 +15,23 @@ for more information about Salotto please visit https://salotto.app
 <html>
 
 <head>
-    <link rel="stylesheet" href="./common/css/control_panel/dark.css" />
-    <link rel="stylesheet" href="./common/css/control_panel/yami.css" />
-    <link rel="stylesheet" href="./common/css/control_panel/acri.css" />
-    <link rel="stylesheet" href="./common/css/control_panel/grey.css" />
-    <link rel="stylesheet" href="./common/css/control_panel/light.css" />
-    <link rel="stylesheet" href="./common/css/control_panel/rachni.css" />
-    <link rel="stylesheet" href="./common/css/control_panel/required.css" />
+    <link rel="stylesheet" href="./common/css/control_panel/dark.css?v=7.1.9" />
+    <link rel="stylesheet" href="./common/css/control_panel/yami.css?v=7.1.9" />
+    <link rel="stylesheet" href="./common/css/control_panel/acri.css?v=7.1.9" />
+    <link rel="stylesheet" href="./common/css/control_panel/grey.css?v=7.1.9" />
+    <link rel="stylesheet" href="./common/css/control_panel/light.css?v=7.1.9" />
+    <link rel="stylesheet" href="./common/css/control_panel/rachni.css?v=7.1.9" />
+    <link rel="stylesheet" href="./common/css/control_panel/required.css?v=7.1.9" />
     <script>
         //---------------------------------------------------------------------------------------------
-        var versionNum = "6.1.0";
+        var versionNum = "7.1.9";
         //---------------------------------------------------------------------------------------------
     </script>
-    <script src="./common/js/obs-websocket-js.js"></script>
-    <script src="./common/js/jquery.js"></script>
-    <script src="./common/js/stream_sharing.js"></script>
-    <script src="./common/js/player_stats.js"></script>
-    <script src="./common/js/control_panel.js"></script>
+    <script src="./common/js/obs-websocket-js.js?v=7.1.9"></script>
+    <script src="./common/js/jquery.js?v=7.1.9"></script>
+    <script src="./common/js/stream_sharing.js?v=7.1.9"></script>
+    <script src="./common/js/player_stats.js?v=7.1.9"></script>
+    <script src="./common/js/control_panel.js?v=7.1.9"></script>
     <script src="hotkeys.js"></script>
 
     <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
@@ -189,8 +189,14 @@ for more information about Salotto please visit https://salotto.app
                 </div>
             </div>
             <div class="column" id="scoreEditing">
-                <div class="hover obs28 button" id="resetScores" onclick="resetScores()">
-                    Reset Score/Next Rack
+                <div class="hover obs28 button danger-btn" id="resetScores" onclick="resetScores()">
+                    Reset Score
+                </div>
+                <div class="tooltip noShow" id="callGameWrap">
+                    <div class="hover obs28 button danger-btn" id="callGame" onclick="callGameScores()">
+                        Call Match Early
+                    </div>
+                    <span class="tooltiptext">End this match early and keep completed racks/frames in match history. Use when the race will not be finished.</span>
                 </div>
                 <div class="tooltip">
                     <div class="hover obs28 button" id="sendPScores" onclick="pushScores()">
@@ -210,7 +216,8 @@ for more information about Salotto please visit https://salotto.app
             <div class="section-header" id="playerToggleLabel">Player and Ball Controls</div>
             <div class="column" id="playerToggle">
                 <div class="column">
-                    <label style="padding: 0 10px 0 0">Breaking Player:</label>
+                    <label style="padding: 0 10px 0 0">Active Player:</label>
+                    <span id="activePlayerNameDisplay" style="padding: 0 10px 0 0"></span>
                     <label class="switch toggle">
                         <input type="checkbox" id="playerToggleCheckbox" onchange="togglePlayer(this.checked)" />
                         <span class="slider_round"></span>
@@ -240,35 +247,35 @@ for more information about Salotto please visit https://salotto.app
             <!-- Ball Tracker -->
             <div class="ballTracker" id="ballTrackerDiv">
                 <div id="ballTracker" class="noShow">
-                    <div class="ball" id="ball 1" onclick="togglePot(this)"><img src="./common/images/1ball_small.png">
+                    <div class="ball" id="ball 1" onclick="togglePot(this)" title="Ball 1"><img src="./common/images/1ball_small.png">
                     </div>
-                    <div class="ball" id="ball 2" onclick="togglePot(this)"><img src="./common/images/2ball_small.png">
+                    <div class="ball" id="ball 2" onclick="togglePot(this)" title="Ball 2"><img src="./common/images/2ball_small.png">
                     </div>
-                    <div class="ball" id="ball 3" onclick="togglePot(this)"><img src="./common/images/3ball_small.png">
+                    <div class="ball" id="ball 3" onclick="togglePot(this)" title="Ball 3"><img src="./common/images/3ball_small.png">
                     </div>
-                    <div class="ball" id="ball 4" onclick="togglePot(this)"><img src="./common/images/4ball_small.png">
+                    <div class="ball" id="ball 4" onclick="togglePot(this)" title="Ball 4"><img src="./common/images/4ball_small.png">
                     </div>
-                    <div class="ball" id="ball 5" onclick="togglePot(this)"><img src="./common/images/5ball_small.png">
+                    <div class="ball" id="ball 5" onclick="togglePot(this)" title="Ball 5"><img src="./common/images/5ball_small.png">
                     </div>
-                    <div class="ball" id="ball 6" onclick="togglePot(this)"><img src="./common/images/6ball_small.png">
+                    <div class="ball" id="ball 6" onclick="togglePot(this)" title="Ball 6"><img src="./common/images/6ball_small.png">
                     </div>
-                    <div class="ball" id="ball 7" onclick="togglePot(this)"><img src="./common/images/7ball_small.png">
+                    <div class="ball" id="ball 7" onclick="togglePot(this)" title="Ball 7"><img src="./common/images/7ball_small.png">
                     </div>
-                    <div class="ball" id="ball 8" onclick="togglePot(this)"><img src="./common/images/8ball_small.png">
+                    <div class="ball" id="ball 8" onclick="togglePot(this)" title="Ball 8"><img src="./common/images/8ball_small.png">
                     </div>
-                    <div class="ball" id="ball 9" onclick="togglePot(this)"><img src="./common/images/9ball_small.png">
+                    <div class="ball" id="ball 9" onclick="togglePot(this)" title="Ball 9"><img src="./common/images/9ball_small.png">
                     </div>
-                    <div class="ball" id="ball 10" onclick="togglePot(this)"><img
+                    <div class="ball" id="ball 10" onclick="togglePot(this)" title="Ball 10"><img
                             src="./common/images/10ball_small.png"></div>
-                    <div class="ball" id="ball 11" onclick="togglePot(this)"><img
+                    <div class="ball" id="ball 11" onclick="togglePot(this)" title="Ball 11"><img
                             src="./common/images/11ball_small.png"></div>
-                    <div class="ball" id="ball 12" onclick="togglePot(this)"><img
+                    <div class="ball" id="ball 12" onclick="togglePot(this)" title="Ball 12"><img
                             src="./common/images/12ball_small.png"></div>
-                    <div class="ball" id="ball 13" onclick="togglePot(this)"><img
+                    <div class="ball" id="ball 13" onclick="togglePot(this)" title="Ball 13"><img
                             src="./common/images/13ball_small.png"></div>
-                    <div class="ball" id="ball 14" onclick="togglePot(this)"><img
+                    <div class="ball" id="ball 14" onclick="togglePot(this)" title="Ball 14"><img
                             src="./common/images/14ball_small.png"></div>
-                    <div class="ball" id="ball 15" onclick="togglePot(this)"><img
+                    <div class="ball" id="ball 15" onclick="togglePot(this)" title="Ball 15"><img
                             src="./common/images/15ball_small.png"></div>
                 </div>
             </div>
@@ -524,7 +531,7 @@ for more information about Salotto please visit https://salotto.app
                         <div class="form-row">
                             <div class="field">
                                 <label for="obsAddressModal">OBS WebSocket Address *:</label>
-                                <input type="text" id="obsAddressModal" value="ws://127.0.0.1:4455" />
+                                <input type="text" id="obsAddressModal" value="ws://127.1.2.1:4455" />
                             </div>
                         </div>
                         <div class="form-row">
@@ -608,6 +615,7 @@ for more information about Salotto please visit https://salotto.app
                     <option value="game5">Bank</option>
                     <option value="game6">One Pocket</option>
                     <option value="game7">Custom</option>
+                    <option value="game8">Snooker</option>
                 </select>
                 <span></span>
                 <div class="noShow" id="pointBasedDiv">
@@ -645,7 +653,7 @@ for more information about Salotto please visit https://salotto.app
                     <input type="checkbox" class="smallSize" id="useClockSetting" onchange="clockSetting()" />
                 </div>
                 <div>
-                    <label for="useToggleSetting" id="labelForUseToggleSetting">Breaker Indicator</label>
+                    <label for="useToggleSetting" id="labelForUseToggleSetting">Active Player Indicator</label>
                     <input type="checkbox" class="smallSize" id="useToggleSetting" onchange="toggleSetting()" />
                 </div>
                 <div>
@@ -662,6 +670,10 @@ for more information about Salotto please visit https://salotto.app
                     <label for="ballTrackerCheckbox" id="labelForBallTrackerCheckbox">Ball Tracker</label>
                     <input type="checkbox" class="smallSize" id="ballTrackerCheckbox" onchange="useBallTracker()" />
                 </div>
+                <div style="align-items:center; height: 32px" id="ballDisplayDiv">
+                    <label for="ballDisplayCheckbox" id="labelForBallDisplayCheckbox">Display Balls</label>
+                    <input type="checkbox" class="smallSize" id="ballDisplayCheckbox" onchange="useBallDisplay()" />
+                </div>
                 <div class="hover obs28 button noShow" id="ballTrackerDirectionDiv"
                     onclick="toggleBallTrackerDirection()">
                     Vertical Ball Tracker
@@ -673,13 +685,18 @@ for more information about Salotto please visit https://salotto.app
                     <label for="ballSetCheckbox" id="labelForBallSetCheckbox">Ball Set Toggle</label>
                     <input type="checkbox" class="smallSize" id="ballSetCheckbox" onchange="useBallSetToggle()" />
                 </div>
-                <div>
+                <div id="snookerGoldDiv" class="noShow">
+                    <label for="snookerGoldCheckbox" id="labelForSnookerGoldCheckbox">Golden Ball</label>
+                    <input type="checkbox" class="smallSize" id="snookerGoldCheckbox" onchange="snookerGoldToggle()" />
+                </div>
+                <div id="ballSelectionWrap">
                     <span>
                         Ball Type
                         <select class="dropdown" id="ballSelection" onchange="toggleBallSelection()">
                             <option value="american">World (Small/Big,Lows/Highs,Solids/Stripes)</option>
                             <option value="international">International (Red/Yellow)</option>
                             <option value="unity">Unity Balls</option>
+                            <option value="snooker">Snooker</option>
                         </select>
                     </span>
                 </div>
@@ -728,7 +745,7 @@ for more information about Salotto please visit https://salotto.app
                                 <th>Name</th>
                                 <th>Games W/L</th>
                                 <th>Win%</th>
-                                <th>Racks W/L</th>
+                                <th id="statsBoardRacksHeader">Racks W/L</th>
                                 <th>Last</th>
                             </tr>
                         </thead>
@@ -808,7 +825,7 @@ for more information about Salotto please visit https://salotto.app
                 <div class="form-row">
                     <div class="field">
                         <label for="statsMatchGameType">Game type:</label>
-                        <select id="statsMatchGameType" onchange="updateMatchBallFieldsVisibility()">
+                        <select id="statsMatchGameType" onchange="onStatsMatchGameTypeChange()">
                             <option value="game1">8-Ball</option>
                             <option value="game2">9-Ball</option>
                             <option value="game3">10-Ball</option>
@@ -816,35 +833,26 @@ for more information about Salotto please visit https://salotto.app
                             <option value="game5">Bank</option>
                             <option value="game6">One Pocket</option>
                             <option value="game7">Custom</option>
+                            <option value="game8">Snooker</option>
                         </select>
                     </div>
                 </div>
-                <div class="form-row stats-match-form-row">
-                    <div class="field">
-                        <label for="statsMatchScoreP1" id="statsMatchP1Label">Player 1 score:</label>
-                        <input type="number" id="statsMatchScoreP1" min="0" max="999" value="0" />
+                <div class="stats-match-score-summary" id="statsMatchScoreSummary">Match: 0 – 0</div>
+                <div class="stats-match-racks-editor-wrap">
+                    <div class="stats-match-racks-editor-header">
+                        <span id="statsMatchRacksEditorLabel">Racks</span>
+                        <button type="button" class="stats-edit-btn hover obs28 button" id="statsMatchAddRackBtn"
+                            onclick="addMatchRackRow()">Add Rack</button>
                     </div>
-                    <div class="field">
-                        <label for="statsMatchScoreP2" id="statsMatchP2Label">Player 2 score:</label>
-                        <input type="number" id="statsMatchScoreP2" min="0" max="999" value="0" />
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="field">
-                        <label for="statsMatchStatus">Status:</label>
-                        <select id="statsMatchStatus">
-                            <option value="completed">Completed</option>
-                            <option value="active">Partial</option>
-                        </select>
-                    </div>
+                    <div id="statsMatchRacksEditor" class="stats-match-racks-editor"></div>
                 </div>
                 <div id="statsMatchBallsRow" class="form-row stats-match-form-row noShow">
                     <div class="field">
-                        <label for="statsMatchBallsP1">Balls potted (P1, optional):</label>
+                        <label for="statsMatchBallsP1" id="statsMatchBallsP1Label">Balls potted (P1, optional):</label>
                         <input type="number" id="statsMatchBallsP1" min="0" max="999" value="0" />
                     </div>
                     <div class="field">
-                        <label for="statsMatchBallsP2">Balls potted (P2, optional):</label>
+                        <label for="statsMatchBallsP2" id="statsMatchBallsP2Label">Balls potted (P2, optional):</label>
                         <input type="number" id="statsMatchBallsP2" min="0" max="999" value="0" />
                     </div>
                 </div>
@@ -879,6 +887,94 @@ for more information about Salotto please visit https://salotto.app
                 <div class="modal-footer-buttons">
                     <button type="button" class="modal-save-btn hover obs28 button" onclick="savePlayerRenameFromModal()">Save</button>
                     <button type="button" class="modal-cancel-btn hover obs28 button" onclick="closePlayerRenameModal()">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Snooker Foul Modal -->
+    <div id="snookerFoulModal" class="modal" onclick="snookerFoulModalBackdrop(event)">
+        <div class="modal-content snooker-foul-modal-content">
+            <div class="modal-header">
+                <h2>Select Fouled Ball</h2>
+                <span class="modal-close" onclick="cancelSnookerFoul()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="snooker-foul-targets" id="snookerFoulTargets">
+                    <div class="ball snooker-foul-target" data-foul="white"
+                        onclick="selectSnookerFoul(this)"
+                        onmouseenter="updateSnookerFoulHoverLabel(this)"
+                        onmouseleave="clearSnookerFoulHoverLabel()">
+                        <img src="./common/images/snooker-white-small.png" alt="White">
+                    </div>
+                    <div class="ball snooker-foul-target" data-foul="yellow"
+                        onclick="selectSnookerFoul(this)"
+                        onmouseenter="updateSnookerFoulHoverLabel(this)"
+                        onmouseleave="clearSnookerFoulHoverLabel()">
+                        <img src="./common/images/snooker-yellow-small.png" alt="Yellow">
+                    </div>
+                    <div class="ball snooker-foul-target" data-foul="green"
+                        onclick="selectSnookerFoul(this)"
+                        onmouseenter="updateSnookerFoulHoverLabel(this)"
+                        onmouseleave="clearSnookerFoulHoverLabel()">
+                        <img src="./common/images/snooker-green-small.png" alt="Green">
+                    </div>
+                    <div class="ball snooker-foul-target" data-foul="brown"
+                        onclick="selectSnookerFoul(this)"
+                        onmouseenter="updateSnookerFoulHoverLabel(this)"
+                        onmouseleave="clearSnookerFoulHoverLabel()">
+                        <img src="./common/images/snooker-brown-small.png" alt="Brown">
+                    </div>
+                    <div class="ball snooker-foul-target" data-foul="blue"
+                        onclick="selectSnookerFoul(this)"
+                        onmouseenter="updateSnookerFoulHoverLabel(this)"
+                        onmouseleave="clearSnookerFoulHoverLabel()">
+                        <img src="./common/images/snooker-blue-small.png" alt="Blue">
+                    </div>
+                    <div class="ball snooker-foul-target" data-foul="pink"
+                        onclick="selectSnookerFoul(this)"
+                        onmouseenter="updateSnookerFoulHoverLabel(this)"
+                        onmouseleave="clearSnookerFoulHoverLabel()">
+                        <img src="./common/images/snooker-pink-small.png" alt="Pink">
+                    </div>
+                    <div class="ball snooker-foul-target" data-foul="black"
+                        onclick="selectSnookerFoul(this)"
+                        onmouseenter="updateSnookerFoulHoverLabel(this)"
+                        onmouseleave="clearSnookerFoulHoverLabel()">
+                        <img src="./common/images/snooker-black-small.png" alt="Black">
+                    </div>
+                    <div class="ball snooker-foul-target" data-foul="gold" id="snookerFoulGold"
+                        onclick="selectSnookerFoul(this)"
+                        onmouseenter="updateSnookerFoulHoverLabel(this)"
+                        onmouseleave="clearSnookerFoulHoverLabel()">
+                        <img src="./common/images/snooker-gold-small.png" alt="Golden">
+                    </div>
+                </div>
+                <div id="snookerFoulHoverLabel" class="snooker-foul-hover-label" aria-live="polite"></div>
+            </div>
+            <div class="modal-footer">
+                <div class="modal-footer-buttons">
+                    <button type="button" class="modal-cancel-btn hover obs28 button" onclick="cancelSnookerFoul()">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reset Score / End Match / Call Match Early confirmation (in-page; native confirm() is unreliable in OBS docks) -->
+    <div id="resetScoresModal" class="modal" onclick="resetScoresModalBackdrop(event)">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="resetScoresModalTitle">Confirm</h2>
+                <span class="modal-close" onclick="cancelResetScores()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p id="resetScoresModalMessage" style="margin: 0; color: lightgrey;"></p>
+            </div>
+            <div class="modal-footer">
+                <div class="modal-footer-buttons">
+                    <button type="button" class="modal-save-btn hover obs28 button danger-btn" id="resetScoresModalConfirm"
+                        onclick="confirmResetScores()">Confirm</button>
+                    <button type="button" class="modal-cancel-btn hover obs28 button" onclick="cancelResetScores()">Cancel</button>
                 </div>
             </div>
         </div>
