@@ -51,6 +51,10 @@ function toggleReplayClipsVisibility() {
     replayClips.classList.toggle("noShow", !connected || !hasVisibleClip);
 }
 
+function getBallTrackerPanel() {
+    return document.getElementById("ballTrackerDiv");
+}
+
 function isBallTrackerControlsVisible() {
     if (!isScoreDisplayEnabled()) {
         return false;
@@ -60,39 +64,32 @@ function isBallTrackerControlsVisible() {
 }
 
 function syncPlayerTrackingSectionHeader() {
-    const label = document.getElementById("playerToggleLabel");
     const block = document.getElementById("playerTrackingBlock");
-    if (!label) {
-        return;
-    }
-    const tracked = [
-        document.getElementById("playerToggle"),
-        document.getElementById("ballSet"),
-        document.getElementById("ballTrackerDiv")
-    ];
-    const anythingVisible = tracked.some(function (el) {
-        return el && !el.classList.contains("noShow");
-    });
-    label.classList.toggle("noShow", !anythingVisible);
     if (block) {
-        block.classList.toggle("noShow", !anythingVisible);
+        block.classList.toggle("noShow", !isBallTrackerControlsVisible());
     }
 }
 
 function syncControlsTabLayout() {
     syncBallSetSettingsVisibility();
 
-    const ballTrackerDiv = document.getElementById("ballTrackerDiv");
-    const ballTracker = document.getElementById("ballTracker");
     const showTracker = isBallTrackerControlsVisible();
-    if (ballTrackerDiv) {
-        ballTrackerDiv.classList.toggle("noShow", !showTracker);
+    const panel = getBallTrackerPanel();
+    if (panel) {
+        panel.classList.toggle("noShow", !showTracker);
     }
-    if (ballTracker) {
-        ballTracker.classList.toggle("noShow", !showTracker);
+    syncPlayerTrackingSectionHeader();
+
+    if (showTracker) {
+        syncRackBreakerPlayerToggleVisibility();
+    } else {
+        const playerToggle = document.getElementById("playerToggle");
+        if (playerToggle) {
+            playerToggle.classList.add("noShow");
+        }
     }
 
-    syncRackBreakerPlayerToggleVisibility();
+    syncBallSetControlsVisibility();
 }
 
 function updatePlayerBallControlVisibility() {
@@ -209,14 +206,28 @@ function openTab(evt, tabName) {
     console.log(`Last Stored Tab- ${tabName}`);
 }
 
+const TAB_BUTTON_BY_CONTENT = {
+    GameInfo: "gameInfoTab",
+    Controls: "controlsTab",
+    Images: "imagesTab",
+    ReplaySettings: "replaySettingsTab",
+    StatsSettings: "statsTab",
+    GeneralSettings: "generalSettingsTab"
+};
+
+function getTabButtonId(tabContentId) {
+    if (TAB_BUTTON_BY_CONTENT[tabContentId]) {
+        return TAB_BUTTON_BY_CONTENT[tabContentId];
+    }
+    return tabContentId.charAt(0).toLowerCase() + tabContentId.slice(1) + "Tab";
+}
+
 document.addEventListener("DOMContentLoaded", function () {
     // Try to get the last selected tab from localStorage
     const lastSelectedTab = getStorageItem("lastSelectedTab");
 
     if (lastSelectedTab && document.getElementById(lastSelectedTab)) {
-        // Convert first letter to lowercase before adding "Tab"
-        const buttonId = lastSelectedTab.charAt(0).toLowerCase() + lastSelectedTab.slice(1) + "Tab";
-        const tabButton = document.getElementById(buttonId);
+        const tabButton = document.getElementById(getTabButtonId(lastSelectedTab));
 
         if (tabButton) {
             tabButton.click();
@@ -316,7 +327,7 @@ function updateRackBreakerPickerLabels() {
 }
 
 function updateRackBreakerBallLock() {
-    const tracker = document.getElementById("ballTracker");
+    const tracker = getBallTrackerPanel();
     if (!tracker) {
         return;
     }
@@ -411,11 +422,13 @@ function syncRackBreakerPlayerToggleVisibility() {
     if (!playerToggle || !useToggleSetting) {
         return;
     }
+    if (!isBallTrackerControlsVisible()) {
+        playerToggle.classList.add("noShow");
+        return;
+    }
     const showPicker = useToggleSetting.checked ||
-        isRackBreakerPromptEnabled() ||
-        isBallTrackerControlsVisible();
+        isRackBreakerPromptEnabled();
     playerToggle.classList.toggle("noShow", !showPicker);
-    syncPlayerTrackingSectionHeader();
 }
 
 function updateRackBreakerButtonState() {
@@ -1115,11 +1128,11 @@ function isGameScoringLocked() {
 
 function updateBallTrackerLockState() {
     const locked = isGameScoringLocked();
-    const tracker = document.getElementById("ballTracker");
+    const tracker = getBallTrackerPanel();
     if (tracker) {
         tracker.classList.toggle("ball-tracker-locked", locked);
     }
-    document.querySelectorAll("#ballTracker .ball").forEach(function (ball) {
+    document.querySelectorAll("#ballTrackerDiv .ball").forEach(function (ball) {
         if (locked) {
             ball.classList.add("snooker-ball-disabled");
             ball.setAttribute("aria-disabled", "true");
@@ -1461,11 +1474,6 @@ function enableActivePlayerTrackerAids() {
             toggleCheckbox.checked = true;
             toggleSetting();
         }
-    }
-    const trackerCheckbox = document.getElementById("ballTrackerCheckbox");
-    if (trackerCheckbox && !trackerCheckbox.checked) {
-        trackerCheckbox.checked = true;
-        setStorageItem("enableBallTracker", "yes");
     }
 }
 
@@ -1990,8 +1998,7 @@ function syncScoreDisplayDependentUI() {
 
     const ballTrackerCheckbox = document.getElementById("ballTrackerCheckbox");
     const ballDisplayCheckbox = document.getElementById("ballDisplayCheckbox");
-    const ballTrackerDiv = document.getElementById("ballTrackerDiv");
-    const ballTracker = document.getElementById("ballTracker");
+    const ballTrackerPanel = getBallTrackerPanel();
     const ballTrackerDirectionDiv = document.getElementById("ballTrackerDirectionDiv");
 
     if (!scoresOn) {
@@ -2003,11 +2010,8 @@ function syncScoreDisplayDependentUI() {
             ballDisplayCheckbox.disabled = true;
             ballDisplayCheckbox.checked = false;
         }
-        if (ballTrackerDiv) {
-            ballTrackerDiv.classList.add("noShow");
-        }
-        if (ballTracker) {
-            ballTracker.classList.add("noShow");
+        if (ballTrackerPanel) {
+            ballTrackerPanel.classList.add("noShow");
         }
         if (ballTrackerDirectionDiv) {
             ballTrackerDirectionDiv.classList.add("noShow");
@@ -2364,9 +2368,11 @@ function syncBallSetControlsVisibility() {
     if (!ballSet) {
         return;
     }
-    const enabled = isBallSetToggleApplicable() && getStorageItem("useBallSet") === "yes";
-    ballSet.classList.toggle("noShow", !enabled);
-    syncPlayerTrackingSectionHeader();
+    const show = isScoreDisplayEnabled() &&
+        isBallSetToggleApplicable() &&
+        getStorageItem("useBallSet") === "yes" &&
+        !isBallTrackerControlsVisible();
+    ballSet.classList.toggle("noShow", !show);
 }
 
 function useBallSetToggle() {
@@ -2494,8 +2500,7 @@ function useBallTracker() {
             displayCheckbox.checked = false;
             displayCheckbox.disabled = true;
         }
-        document.getElementById("ballTrackerDiv")?.classList.add("noShow");
-        document.getElementById("ballTracker")?.classList.add("noShow");
+        getBallTrackerPanel()?.classList.add("noShow");
         document.getElementById("ballTrackerDirectionDiv")?.classList.add("noShow");
         if (typeof bc !== "undefined") {
             bc.postMessage({ displayBallTracker: false });
@@ -2511,12 +2516,10 @@ function useBallTracker() {
     console.log('Both players enabled evaluation:', bothPlayersEnabled)
     setStorageItem("enableBallTracker", checked ? "yes" : "no");
     if (checked) {
-        document.getElementById("ballTrackerDiv").classList.remove("noShow");
-        document.getElementById("ballTracker").classList.remove("noShow");
+        getBallTrackerPanel()?.classList.remove("noShow");
     } else {
         // Hide tracker UI; Display Balls cannot stay on without the tracker
-        document.getElementById("ballTrackerDiv").classList.add("noShow");
-        document.getElementById("ballTracker").classList.add("noShow");
+        getBallTrackerPanel()?.classList.add("noShow");
         setStorageItem("enableBallDisplay", "no");
         const displayCheckbox = document.getElementById("ballDisplayCheckbox");
         if (displayCheckbox) {
@@ -2988,7 +2991,7 @@ function releaseTrackerRackWinBall(ballId) {
  */
 function resetBallTrackerKeepingBall(keepBallId, ownerPlayer) {
     const ballState = JSON.parse(getStorageItem("ballState") || "{}");
-    const ballElements = document.querySelectorAll("#ballTrackerBalls .ball");
+    const ballElements = document.querySelectorAll("#ballTrackerDiv .ball");
 
     ballElements.forEach(function (ball) {
         if (ball.id === keepBallId) {
@@ -3175,7 +3178,9 @@ function toggleSetting() {
     const checkbox = toggleCheckbox && toggleCheckbox.checked;
     console.log(`Display active player ${checkbox ? "enabled" : "disabled"}`);
     if (checkbox) {
-        document.getElementById("playerToggle").classList.remove("noShow");
+        if (isBallTrackerControlsVisible()) {
+            document.getElementById("playerToggle").classList.remove("noShow");
+        }
         setStorageItem("usePlayerToggle", "yes");
         const activePlayer = getActivePlayerSlot() === "1";
         bc.postMessage({ clockDisplay: 'showActivePlayer', player: activePlayer });
@@ -3404,9 +3409,9 @@ function playerSetting(player) {
         document.getElementById("clockControlLabel").classList.add("noShow");
         document.getElementById("playerToggle").classList.add("noShow");
         document.getElementById("playerToggleLabel").classList.add("noShow");
+        document.getElementById("playerTrackingBlock")?.classList.add("noShow");
         document.getElementById("ballTrackerDirectionDiv").classList.add("noShow");
-        document.getElementById("ballTrackerDiv").classList.add("noShow");
-        document.getElementById("ballTracker").classList.add("noShow");
+        getBallTrackerPanel()?.classList.add("noShow");
 
         // Send messages to hide these features
         bc.postMessage({ clockDisplay: 'noClock' });
@@ -4478,7 +4483,7 @@ function openResetScoresModal(action) {
         },
         callGame: {
             title: "Call Match Early",
-            message: "End this match early and keep completed racks/frames in match history? Scores will clear after saving.",
+            message: "End this match early and keep completed racks/frames in match history? Scores will clear after saving. Please note, this is not ending the frame, this is the entire match, to complete a frame score it for the appropriate player.",
             confirm: "Call Match Early",
             fallback: "Click OK to call the match early and save completed racks/frames"
         }
@@ -4645,7 +4650,7 @@ function resetBallTracker() {
     let ballState = JSON.parse(getStorageItem('ballState') || '{}');
 
     // Select ball elements in the tracker grid (not foul-modal targets)
-    const ballElements = document.querySelectorAll("#ballTrackerBalls .ball");
+    const ballElements = document.querySelectorAll("#ballTrackerDiv .ball");
 
     ballElements.forEach(function (ball) {
         // Remove the 'faded' class to reset the ball

@@ -66,7 +66,7 @@ for more information about Salotto please visit https://salotto.app
         </div>
         <!-- Player/Team/Game Information Tab -->
         <div id="GameInfo" class="tabcontent">
-            <div class="section-header" id="gameDetailLabel">Game Details</div>
+            <div class="section-header" id="gameDetailLabel">Game Selection</div>
             <div class="setup-variant-grid">
                 <div class="setup-variant-top">
                     <div class="setup-variant-field">
@@ -104,6 +104,7 @@ for more information about Salotto please visit https://salotto.app
                     </select>
                 </div>
             </div>
+            <div class="section-header" id="gameInformationLabel">Game Information</div>
             <div class="column setup-info-row">
                 <div class="setup-info-pair">
                     <text id="raceInfo">Race Info:</text>
@@ -210,6 +211,46 @@ for more information about Salotto please visit https://salotto.app
                 <input type="checkbox" id="playerToggleCheckbox" class="noShow" aria-hidden="true"
                     onchange="togglePlayer(this.checked)" />
             </div>
+            <!-- Ball Scoring -->
+            <div class="ballTracker noShow" id="ballTrackerDiv">
+                <div class="ball" id="ball 1" onclick="togglePot(this)" title="Ball 1"><img src="./common/images/1ball_small.png">
+                </div>
+                <div class="ball" id="ball 2" onclick="togglePot(this)" title="Ball 2"><img src="./common/images/2ball_small.png">
+                </div>
+                <div class="ball" id="ball 3" onclick="togglePot(this)" title="Ball 3"><img src="./common/images/3ball_small.png">
+                </div>
+                <div class="ball" id="ball 4" onclick="togglePot(this)" title="Ball 4"><img src="./common/images/4ball_small.png">
+                </div>
+                <div class="ball" id="ball 5" onclick="togglePot(this)" title="Ball 5"><img src="./common/images/5ball_small.png">
+                </div>
+                <div class="ball" id="ball 6" onclick="togglePot(this)" title="Ball 6"><img src="./common/images/6ball_small.png">
+                </div>
+                <div class="ball" id="ball 7" onclick="togglePot(this)" title="Ball 7"><img src="./common/images/7ball_small.png">
+                </div>
+                <div class="ball" id="ball 8" onclick="togglePot(this)" title="Ball 8"><img src="./common/images/8ball_small.png">
+                </div>
+                <div class="ball" id="ball 9" onclick="togglePot(this)" title="Ball 9"><img src="./common/images/9ball_small.png">
+                </div>
+                <div class="ball" id="ball 10" onclick="togglePot(this)" title="Ball 10"><img
+                        src="./common/images/10ball_small.png"></div>
+                <div class="ball" id="ball 11" onclick="togglePot(this)" title="Ball 11"><img
+                        src="./common/images/11ball_small.png"></div>
+                <div class="ball" id="ball 12" onclick="togglePot(this)" title="Ball 12"><img
+                        src="./common/images/12ball_small.png"></div>
+                <div class="ball" id="ball 13" onclick="togglePot(this)" title="Ball 13"><img
+                        src="./common/images/13ball_small.png"></div>
+                <div class="ball" id="ball 14" onclick="togglePot(this)" title="Ball 14"><img
+                        src="./common/images/14ball_small.png"></div>
+                <div class="ball" id="ball 15" onclick="togglePot(this)" title="Ball 15"><img
+                        src="./common/images/15ball_small.png"></div>
+                <div class="ball snooker-undo-ball noShow" id="snookerUndoBtn" onclick="undoLastSnookerAction()"
+                    title="Undo last pot or foul" aria-disabled="true">
+                    <img src="./common/images/undo-small.png" alt="Undo">
+                </div>
+            </div>
+            </div>
+            <!-- Manual Controls -->
+            <div class="section-header" id="scoreLabel">Manual Controls</div>
             <div class="ball-set-row noShow" id="ballSet">
                 <span class="ball-set-label">Player 1 Chosen Ball:</span>
                 <label class="ball-set-choice" for="p1colorRed">
@@ -228,50 +269,6 @@ for more information about Salotto please visit https://salotto.app
                     <span>Open Table</span>
                 </label>
             </div>
-            <!-- Ball Scoring -->
-            <div class="ballTracker noShow" id="ballTrackerDiv">
-                <div id="ballTracker" class="noShow">
-                    <div id="ballTrackerBalls" class="ball-tracker-balls">
-                    <div class="ball" id="ball 1" onclick="togglePot(this)" title="Ball 1"><img src="./common/images/1ball_small.png">
-                    </div>
-                    <div class="ball" id="ball 2" onclick="togglePot(this)" title="Ball 2"><img src="./common/images/2ball_small.png">
-                    </div>
-                    <div class="ball" id="ball 3" onclick="togglePot(this)" title="Ball 3"><img src="./common/images/3ball_small.png">
-                    </div>
-                    <div class="ball" id="ball 4" onclick="togglePot(this)" title="Ball 4"><img src="./common/images/4ball_small.png">
-                    </div>
-                    <div class="ball" id="ball 5" onclick="togglePot(this)" title="Ball 5"><img src="./common/images/5ball_small.png">
-                    </div>
-                    <div class="ball" id="ball 6" onclick="togglePot(this)" title="Ball 6"><img src="./common/images/6ball_small.png">
-                    </div>
-                    <div class="ball" id="ball 7" onclick="togglePot(this)" title="Ball 7"><img src="./common/images/7ball_small.png">
-                    </div>
-                    <div class="ball" id="ball 8" onclick="togglePot(this)" title="Ball 8"><img src="./common/images/8ball_small.png">
-                    </div>
-                    <div class="ball" id="ball 9" onclick="togglePot(this)" title="Ball 9"><img src="./common/images/9ball_small.png">
-                    </div>
-                    <div class="ball" id="ball 10" onclick="togglePot(this)" title="Ball 10"><img
-                            src="./common/images/10ball_small.png"></div>
-                    <div class="ball" id="ball 11" onclick="togglePot(this)" title="Ball 11"><img
-                            src="./common/images/11ball_small.png"></div>
-                    <div class="ball" id="ball 12" onclick="togglePot(this)" title="Ball 12"><img
-                            src="./common/images/12ball_small.png"></div>
-                    <div class="ball" id="ball 13" onclick="togglePot(this)" title="Ball 13"><img
-                            src="./common/images/13ball_small.png"></div>
-                    <div class="ball" id="ball 14" onclick="togglePot(this)" title="Ball 14"><img
-                            src="./common/images/14ball_small.png"></div>
-                    <div class="ball" id="ball 15" onclick="togglePot(this)" title="Ball 15"><img
-                            src="./common/images/15ball_small.png"></div>
-                    <div class="ball snooker-undo-ball noShow" id="snookerUndoBtn" onclick="undoLastSnookerAction()"
-                        title="Undo last pot or foul" aria-disabled="true">
-                        <img src="./common/images/undo-small.png" alt="Undo">
-                    </div>
-                    </div>
-                </div>
-            </div>
-            </div>
-            <!-- Manual Score Controls -->
-            <div class="section-header" id="scoreLabel">Manual Score Controls</div>
             <div class="column" id="scoreInfoP1">
                 <label id="p1ScoreLabel" for="sendP1ScoreSub">Player/Team 1 - Racks</label>
                 <div class="score-control">
@@ -351,7 +348,7 @@ for more information about Salotto please visit https://salotto.app
                         clip.<br><br>Note: X equals OBS defined Maximum Replay Time.</span>
                 </div>
             </div>
-            <div class="column button-row noShow" id="replayClips">
+            <div class="column noShow" id="replayClips">
                 <div class="clip-button-wrapper" id="clipWrapper1">
                     <button id="prvReplayClip1" class="prvReplayClip1 hover obs28 button clip-button"
                         onclick="playPreviousReplay(0)">
@@ -399,7 +396,7 @@ for more information about Salotto please visit https://salotto.app
                 </div>
             </div>
             <div class="column noShow" id="savedPathNote" style="margin-top: 15px;">
-                *NOTE: Remember to cleanup Replay video clip storage periodically. Delete clip only clears saved path, if does not remove file.
+                *NOTE: Delete clip only clears saved path/reference, if does not remove file - manual cleanup required.
             </div>
             
             <!-- Shot Clock -->
@@ -1115,13 +1112,27 @@ for more information about Salotto please visit https://salotto.app
         //////////////////// end of HotKey scripts
         refreshData();
 
-        // Zoom control functions
+        // Zoom control functions (persisted per instance via controlPanelZoom)
         let currentZoom = 100;
+        const savedZoom = typeof getStorageItem === "function" ? getStorageItem("controlPanelZoom") : null;
+        if (savedZoom !== null) {
+            const parsedZoom = parseInt(savedZoom, 10);
+            if (!isNaN(parsedZoom) && parsedZoom >= 50 && parsedZoom <= 200) {
+                currentZoom = parsedZoom;
+            }
+        }
+
+        function saveZoom() {
+            if (typeof setStorageItem === "function") {
+                setStorageItem("controlPanelZoom", String(currentZoom));
+            }
+        }
 
         function zoomIn() {
             if (currentZoom < 200) {
                 currentZoom += 10;
                 applyZoom();
+                saveZoom();
             }
         }
 
@@ -1129,19 +1140,20 @@ for more information about Salotto please visit https://salotto.app
             if (currentZoom > 50) {
                 currentZoom -= 10;
                 applyZoom();
+                saveZoom();
             }
         }
 
         function resetZoom() {
             currentZoom = 100;
             applyZoom();
+            saveZoom();
         }
 
         function applyZoom() {
             document.body.style.zoom = currentZoom + "%";
         }
 
-        // Initialize zoom level
         applyZoom();
 
     </script>

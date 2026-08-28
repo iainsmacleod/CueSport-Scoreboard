@@ -310,9 +310,55 @@
             assert('Core', 'Version 7.2.0', cp.versionNum === '7.2.0', cp.versionNum);
             assert('Core', 'Stats modal present', !!cp.document.getElementById('statsModal'));
             assert('Core', 'Stats tab present', !!cp.document.getElementById('StatsSettings'));
+            assert('Core', 'Stats tab restore uses statsTab button',
+                typeof cp.getTabButtonId === 'function' &&
+                cp.getTabButtonId('StatsSettings') === 'statsTab');
+            cp.setStorageItem('lastSelectedTab', 'StatsSettings');
+            cpFrame.src = '../control_panel.html?_=' + Date.now();
+            await frameLoaded(cpFrame);
+            await sleep(600);
+            cp = await getCP();
+            assert('Core', 'Stats tab restored after reload',
+                cp.document.getElementById('StatsSettings').style.display === 'block' &&
+                cp.document.getElementById('statsTab').classList.contains('active'));
+            const savedTrackerForRestore = cp.getStorageItem('enableBallTracker');
+            cp.setStorageItem('enableBallTracker', 'no');
+            cp.document.getElementById('ballTrackerCheckbox').checked = false;
+            await cp.gameType(cp.getStoredGameType(), { restore: true });
+            await sleep(50);
+            cp.useBallTracker();
+            assert('Core', 'Ball Scoring survives gameType restore',
+                cp.getStorageItem('enableBallTracker') === 'no' &&
+                !cp.document.getElementById('ballTrackerCheckbox').checked);
+            cp.setStorageItem('enableBallTracker', savedTrackerForRestore || 'no');
+            cp.document.getElementById('ballTrackerCheckbox').checked = savedTrackerForRestore === 'yes';
+            cp.useBallTracker();
+            cp.setStorageItem('enableBallTracker', 'no');
+            cp.document.getElementById('ballTrackerCheckbox').checked = false;
+            await cp.gameType('game1');
+            await sleep(50);
+            assert('Core', '8-Ball switch does not auto-enable Ball Scoring',
+                cp.getStorageItem('enableBallTracker') === 'no' &&
+                !cp.document.getElementById('ballTrackerCheckbox').checked);
+            cp.setStorageItem('enableBallTracker', savedTrackerForRestore || 'no');
+            cp.document.getElementById('ballTrackerCheckbox').checked = savedTrackerForRestore === 'yes';
+            cp.useBallTracker();
             assert('Core', 'Player/Team detail sections',
                 (cp.document.getElementById('player1DetailLabel').textContent || '').indexOf('Player/Team 1') !== -1 &&
                 (cp.document.getElementById('player2DetailLabel').textContent || '').indexOf('Player/Team 2') !== -1);
+            assert('Core', 'Setup Game Selection header',
+                (cp.document.getElementById('gameDetailLabel').textContent || '').trim() === 'Game Selection');
+            assert('Core', 'Setup Game Information header',
+                (cp.document.getElementById('gameInformationLabel').textContent || '').trim() === 'Game Information');
+            assert('Core', 'Game Information precedes race fields',
+                cp.document.getElementById('raceInfoTxt').closest('.setup-info-row')
+                    .previousElementSibling === cp.document.getElementById('gameInformationLabel'));
+            assert('Core', 'Ball tracker uses single panel div',
+                !!cp.document.getElementById('ballTrackerDiv') &&
+                !cp.document.getElementById('ballTracker') &&
+                !cp.document.getElementById('ballTrackerBalls'));
+            assert('Core', 'Replay clip delete note',
+                (cp.document.querySelector('#replayClips')?.textContent || '').indexOf('manual cleanup required') !== -1);
             assert('Core', 'Setup Name and Color labels',
                 (cp.document.getElementById('p1NameLabel').textContent || '').trim() === 'Name:' &&
                 (cp.document.getElementById('p1ColorLabel').textContent || '').trim() === 'Color:');
@@ -323,6 +369,21 @@
                 !!cp.document.getElementById('rackBreakerP2Btn'));
             assert('Core', 'Ball Scoring settings label',
                 (cp.document.getElementById('labelForBallTrackerCheckbox').textContent || '').trim() === 'Ball Scoring');
+            assert('Core', 'Manual Controls section label',
+                (cp.document.getElementById('scoreLabel').textContent || '').trim() === 'Manual Controls');
+            assert('Core', 'Chosen ball outside player tracking block',
+                !cp.document.getElementById('playerTrackingBlock').contains(cp.document.getElementById('ballSet')));
+            assert('Core', 'Chosen ball in manual controls section',
+                cp.document.getElementById('scoreInfoP1').previousElementSibling === cp.document.getElementById('ballSet'));
+            cp.zoomIn();
+            cp.zoomIn();
+            assert('Core', 'Header zoom persisted',
+                cp.getStorageItem('controlPanelZoom') === '120' &&
+                cp.document.body.style.zoom === '120%');
+            cp.resetZoom();
+            assert('Core', 'Header zoom reset persisted',
+                cp.getStorageItem('controlPanelZoom') === '100' &&
+                cp.document.body.style.zoom === '100%');
             assert('Core', 'Edit Player Stats not on Setup tab',
                 !cp.document.getElementById('GameInfo').contains(cp.document.getElementById('statsBtn')));
             assert('Core', 'Game Variant on Setup tab',
@@ -702,6 +763,8 @@
                 callModal && callModal.style.display === 'block');
             assert('Match History', 'Call Game modal title',
                 (cp.document.getElementById('resetScoresModalTitle').textContent || '') === 'Call Match Early');
+            assert('Match History', 'Call Game modal explains entire match',
+                (cp.document.getElementById('resetScoresModalMessage').textContent || '').indexOf('entire match') !== -1);
             cp.cancelResetScores();
             assert('Match History', 'Cancel Call Game leaves pending match',
                 cp.PlayerStats.canCallGame() === true &&
@@ -1436,8 +1499,11 @@
             await cp.gameType('game5');
             await sleep(200);
             assert('Pocket', 'Bank is pocket score game', cp.isPocketScoreGame() === true);
-            assert('Pocket', 'Bank enables ball scoring',
-                cp.document.getElementById('ballTrackerCheckbox').checked === true);
+            assert('Pocket', 'Bank does not auto-enable ball scoring',
+                cp.document.getElementById('ballTrackerCheckbox').checked === false);
+            cp.document.getElementById('ballTrackerCheckbox').checked = true;
+            cp.useBallTracker();
+            await sleep(50);
             assert('Pocket', 'Display Balls control visible for Bank',
                 !cp.document.getElementById('ballDisplayDiv').classList.contains('noShow'));
             const displayCb = cp.document.getElementById('ballDisplayCheckbox');
@@ -1566,8 +1632,11 @@
                 (cp.document.getElementById('playerToggleLabel').textContent || '').indexOf('Player Tracking and Ball Scoring') !== -1);
             assert('RackWin', '8-Ball is tracker rack-win game', cp.isTrackerRackWinGame() === true);
             assert('RackWin', '8-Ball winning ball is ball 8', cp.getGameWinningBallId() === 'ball 8');
-            assert('RackWin', '8-Ball enables ball scoring',
-                cp.document.getElementById('ballTrackerCheckbox').checked === true);
+            assert('RackWin', '8-Ball does not auto-enable ball scoring',
+                !cp.document.getElementById('ballTrackerCheckbox').checked);
+            cp.document.getElementById('ballTrackerCheckbox').checked = true;
+            cp.useBallTracker();
+            await sleep(50);
             cp.document.getElementById('raceInfoTxt').value = '5';
             cp.setStorageItem('raceInfo', '5');
             cp.setStorageItem('p1ScoreCtrlPanel', 0);
@@ -1586,18 +1655,17 @@
             cp.document.getElementById('ballTrackerCheckbox').checked = false;
             cp.useBallTracker();
             await sleep(50);
-            assert('RackWin', 'Breaker picker works without Ball Scoring',
-                (cp.document.getElementById('playerSlotQuestion').textContent || '').indexOf('Breaking Player') !== -1 &&
-                cp.document.getElementById('ballTracker').classList.contains('noShow'));
-            cp.selectRackBreaker('1');
-            await sleep(30);
+            assert('RackWin', 'Player tracking hidden when Ball Scoring off',
+                cp.document.getElementById('playerTrackingBlock').classList.contains('noShow') &&
+                cp.document.getElementById('ballTrackerDiv').classList.contains('noShow'));
             cp.document.getElementById('ballTrackerCheckbox').checked = true;
             cp.useBallTracker();
             await sleep(50);
+            cp.selectRackBreaker('1');
             cp.resetBallTracker();
             assert('RackWin', 'Balls visible but disabled until breaker chosen',
-                !cp.document.getElementById('ballTrackerBalls').classList.contains('noShow') &&
-                cp.document.getElementById('ballTracker').classList.contains('ball-tracker-awaiting-breaker'));
+                !cp.document.getElementById('ballTrackerDiv').classList.contains('noShow') &&
+                cp.document.getElementById('ballTrackerDiv').classList.contains('ball-tracker-awaiting-breaker'));
             cp.selectRackBreaker('1');
             await sleep(30);
             assert('RackWin', 'Active Player mode after breaker chosen',
@@ -1613,10 +1681,21 @@
             cp.onPlayerSlotButton('1');
             await sleep(30);
             assert('RackWin', 'Balls enabled after breaker chosen',
-                !cp.document.getElementById('ballTracker').classList.contains('ball-tracker-awaiting-breaker'));
+                !cp.document.getElementById('ballTrackerDiv').classList.contains('ball-tracker-awaiting-breaker'));
             cp.setStorageItem('useBallSet', 'yes');
             cp.document.getElementById('ballSetCheckbox').checked = true;
             cp.useBallSetToggle();
+            await sleep(30);
+            assert('RackWin', 'Chosen ball hidden when Ball Scoring on',
+                cp.document.getElementById('ballSet').classList.contains('noShow'));
+            cp.document.getElementById('ballTrackerCheckbox').checked = false;
+            cp.useBallTracker();
+            await sleep(30);
+            assert('RackWin', 'Chosen ball shown when Ball Scoring off',
+                !cp.document.getElementById('ballSet').classList.contains('noShow'));
+            cp.document.getElementById('ballTrackerCheckbox').checked = true;
+            cp.useBallTracker();
+            await sleep(30);
             cp.setStorageItem('playerBallSet', 'p1Open');
             cp.document.getElementById('p1colorOpen').checked = true;
             cp.document.getElementById('ballSelection').value = 'international';
@@ -1727,7 +1806,7 @@
             await sleep(100);
             assert('RackWin', 'End Match restores breaker prompt',
                 (cp.document.getElementById('playerSlotQuestion').textContent || '').indexOf('Breaking Player') !== -1 &&
-                cp.document.getElementById('ballTracker').classList.contains('ball-tracker-awaiting-breaker'));
+                cp.document.getElementById('ballTrackerDiv').classList.contains('ball-tracker-awaiting-breaker'));
             cp.selectRackBreaker('1');
             await sleep(30);
 
@@ -1767,8 +1846,11 @@
             await sleep(150);
             cp.document.getElementById('raceInfoTxt').value = '150';
             cp.setStorageItem('raceInfo', '150');
-            assert('Straight', 'Straight enables ball scoring',
-                cp.document.getElementById('ballTrackerCheckbox').checked === true);
+            assert('Straight', 'Straight does not auto-enable ball scoring',
+                !cp.document.getElementById('ballTrackerCheckbox').checked);
+            cp.document.getElementById('ballTrackerCheckbox').checked = true;
+            cp.useBallTracker();
+            await sleep(50);
             assert('Straight', 'Primary suffix Balls', cp.getPrimaryScoreSuffix() === 'Balls');
             cp.setStorageItem('p1ScoreCtrlPanel', 0);
             cp.setStorageItem('p2ScoreCtrlPanel', 0);
@@ -1853,6 +1935,9 @@
             cp.postNames();
             cp.postInfo();
             await sleep(250);
+            cp.document.getElementById('ballTrackerCheckbox').checked = true;
+            cp.useBallTracker();
+            await sleep(50);
 
             assert('Snooker', 'isSnooker true', cp.isSnooker() === true);
             assert('Snooker', 'Breaker prompt on Snooker',

@@ -68,7 +68,7 @@ var pColormsg;
 
 /** Stop OBS/browser dock from highlighting ball images on click-drag (clicks still work). */
 function initBallClickTargets() {
-	const selector = "#ballTracker .ball, .snooker-foul-targets .ball, #snookerUndoBtn";
+	const selector = "#ballTrackerDiv .ball, .snooker-foul-targets .ball, #snookerUndoBtn";
 	document.querySelectorAll(selector).forEach(function (ball) {
 		ball.addEventListener("mousedown", function (e) {
 			if (e.button === 0) {
@@ -252,15 +252,15 @@ window.onload = function () {
 	if (getStorageItem("enableBallTracker") === null) {
 		setStorageItem("enableBallTracker", "no");
 		document.getElementById("ballTrackerCheckbox").checked = false;
-		document.getElementById("ballTracker").classList.add("noShow");
+		document.getElementById("ballTrackerDiv").classList.add("noShow");
 	} else if ((getStorageItem("enableBallTracker") === "yes")) {
 		setStorageItem("enableBallTracker", "yes");
 		document.getElementById("ballTrackerCheckbox").checked = true;
-		document.getElementById("ballTracker").classList.remove("noShow");
+		document.getElementById("ballTrackerDiv").classList.remove("noShow");
 	} else {
 		setStorageItem("enableBallTracker", "no");
 		document.getElementById("ballTrackerCheckbox").checked = false;
-		document.getElementById("ballTracker").classList.add("noShow");
+		document.getElementById("ballTrackerDiv").classList.add("noShow");
 	}
 
 	// Migrate / init Display Balls (overlay). Cannot be on without Ball Tracker; never for snooker.
@@ -280,19 +280,19 @@ window.onload = function () {
 
 	if ((getStorageItem("enableBallTracker") === "yes") && (getStorageItem("gameType") === "game1" || getStorageItem("gameType") === "game8" || getStorageItem("ballSelection") === "snooker")) {
 		document.getElementById("ballTrackerCheckbox").checked = true;
-		document.getElementById("ballTracker").classList.remove("noShow");
+		document.getElementById("ballTrackerDiv").classList.remove("noShow");
 		console.log(`Ball tracker enabled`);
 		bc.postMessage({ displayBallTracker: getStorageItem("enableBallDisplay") === "yes" && !snookerModeInit });
 	} else if (getStorageItem("enableBallTracker") === "yes") {
 		document.getElementById("ballTrackerCheckbox").checked = true;
-		document.getElementById("ballTracker").classList.remove("noShow");
+		document.getElementById("ballTrackerDiv").classList.remove("noShow");
 		bc.postMessage({ displayBallTracker: getStorageItem("enableBallDisplay") === "yes" && !snookerModeInit });
 	} else {
 		document.getElementById("ballTrackerCheckbox").checked = false;
 		setStorageItem("enableBallTracker", "no");
 		setStorageItem("enableBallDisplay", "no");
 		document.getElementById("ballTrackerDirectionDiv").classList.add("noShow");
-		document.getElementById("ballTracker").classList.add("noShow");
+		document.getElementById("ballTrackerDiv").classList.add("noShow");
 
 		console.log(`Ball tracker disabled`);
 		bc.postMessage({ displayBallTracker: false });

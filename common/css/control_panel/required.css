@@ -175,7 +175,7 @@ input[type="number"]::-webkit-outer-spin-button {
 	height: 15px;
 }
 
-#ballTracker img {
+#ballTrackerDiv img {
 	display: block;
 	width: 41px;
 	height: 41px;
@@ -187,7 +187,7 @@ input[type="number"]::-webkit-outer-spin-button {
 	pointer-events: none;
 }
 
-#ballTracker .ball {
+#ballTrackerDiv .ball {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -215,7 +215,7 @@ input[type="number"]::-webkit-outer-spin-button {
 	pointer-events: none;
 }
 
-#ballTracker img:hover {
+#ballTrackerDiv img:hover {
 	filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.35)) drop-shadow(0 6px 12px rgba(0, 0, 0, 0.35));
 }
 
@@ -760,23 +760,11 @@ select.dropdown option,
 	width: 100%;
 }
 
-#ballSet + #ballTrackerDiv {
-	margin-top: 0;
-}
-
-#ballTrackerDiv {
-	padding: 0;
-}
-
-#ballTrackerDiv.noShow,
 #ballSet.noShow,
+#ballTrackerDiv.noShow,
 #playerToggle.noShow,
 #playerTrackingBlock.noShow,
 #playerToggleLabel.noShow {
-	display: none;
-}
-
-#ballTracker.noShow {
 	display: none;
 }
 
@@ -784,31 +772,20 @@ select.dropdown option,
 	padding: 4px var(--row-padding) 0;
 }
 
-#ballTrackerDiv,
-#ballTracker {
+#ballTrackerDiv {
 	display: flex;
-	flex-direction: column;
-	align-items: stretch;
+	flex-flow: row nowrap;
+	justify-content: center;
+	align-items: center;
+	gap: 0;
 	width: 100%;
+	max-width: 100%;
 	box-sizing: border-box;
-}
-
-#ballTracker {
 	padding: 2px 0;
 	clear: both;
 }
 
-.ball-tracker-balls {
-	display: flex;
-	flex-flow: row nowrap;
-	justify-content: space-between;
-	align-items: center;
-	gap: 0;
-	width: 100%;
-	box-sizing: border-box;
-}
-
-#ballTracker .ball:not(.noShow) {
+#ballTrackerDiv .ball:not(.noShow) {
 	flex: 0 0 auto;
 }
 
@@ -976,40 +953,40 @@ select.dropdown option,
 	opacity: 0.35;
 }
 
-#ballTracker .ball.snooker-spacer {
+#ballTrackerDiv .ball.snooker-spacer {
 	visibility: hidden;
 	pointer-events: none;
 	min-width: 40px;
 	min-height: 40px;
 }
 
-#ballTracker.ball-tracker-locked {
+#ballTrackerDiv.ball-tracker-locked {
 	cursor: not-allowed;
 }
 
-#ballTracker.ball-tracker-awaiting-breaker .ball {
+#ballTrackerDiv.ball-tracker-awaiting-breaker .ball {
 	opacity: 0.35;
 	pointer-events: none;
 	cursor: default;
 	filter: grayscale(0.4);
 }
 
-#ballTracker .ball.snooker-ball-disabled,
-#ballTracker .ball.ball-win-cooldown {
+#ballTrackerDiv .ball.snooker-ball-disabled,
+#ballTrackerDiv .ball.ball-win-cooldown {
 	opacity: 0.35;
 	pointer-events: none;
 	cursor: default;
 	filter: grayscale(0.4);
 }
 
-#ballTracker .ball.snooker-ball-clicked {
+#ballTrackerDiv .ball.snooker-ball-clicked {
 	opacity: 0.25;
 	pointer-events: none;
 	transform: scale(0.92);
 	transition: opacity 0.15s ease, transform 0.15s ease;
 }
 
-#ballTracker .ball.snooker-undo-ball {
+#ballTrackerDiv .ball.snooker-undo-ball {
 	cursor: pointer;
 }
 
