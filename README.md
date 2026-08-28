@@ -10,7 +10,7 @@ Display player names, race and game info, racks (and balls where needed), logos,
 
 *Best viewed as a **1920×1080** browser source*
 
-**Current version: 7.0.12**
+**Current version: 7.2.0**
 
 </div>
 
@@ -26,11 +26,12 @@ Display player names, race and game info, racks (and balls where needed), logos,
   - [Linux](#linux)
   - [Multiple instances](#multiple-instances)
 - [Control Panel Overview](#control-panel-overview)
-  - [Game Setup](#game-setup)
+  - [Setup](#setup)
+  - [Stats](#stats)
   - [Controls](#controls)
-  - [Image](#image)
+  - [Images](#images)
   - [Replay/Share](#replayshare)
-  - [General](#general)
+  - [Settings](#settings)
 - [OBS WebSocket Setup](#obs-websocket-setup)
 - [Instant Replay](#instant-replay)
 - [Stream Promotion](#stream-promotion)
@@ -126,37 +127,44 @@ browser_source.html?instance=table2
 
 Both pages must share the same `instance` value so they share the correct BroadcastChannel and localStorage prefix.
 
+Per `instance`: live scores, settings, overlay stats mode/payload, stats visibility toggles, and in-progress match sessions. **Shared across all instances:** the player roster and match history in IndexedDB (`cuesport_stats`), and OBS replay clip history (one stream buffer).
+
 ---
 
 ## Control Panel Overview
 
 Header: version (links to the wiki), dock zoom (− / RESET / +), and a support link.
 
-Tabs: **Game Setup**, **Controls**, **Image ⚙**, **Replay/Share ⚙**, **General ⚙**.
+Tabs: **Setup**, **Controls**, **Images**, **Replay/Share**, **Stats**, **Settings**.
 
-### Game Setup
+### Setup
 
 - **Race Info** — short numeric race-to (the last number in the field is used as the race target). Leave blank for no race lock.
 - **Game/Other Info** — free text (max 60 characters).
+- **Game Variant** — 8-Ball through Snooker (and Custom). Changing variant automatically finalizes the open match under the previous type (**End Match** if the race/Best Of is complete, **Call Match Early** if racks/frames exist mid-race, otherwise **Reset Score**), then applies the new variant with a cleared scoreline. **Ball Variant** (World / International / Unity / Snooker) sits on the same row; Snooker game variant forces Snooker balls. **Golden Ball** (Snooker only) and **Point Based** (Custom only) appear on that row when applicable.
 - **Update Info** — push race/game text to the overlay.
-- **Player/Team names** — max 20 characters each. Type to autocomplete from your stats roster, or **double-click** a name field to open the full scrollable player list (A–Z) without typing.
-- **Colors** — per-player color for the scoreboard bars.
-- **Update Names** / **Swap Colors** / **Clear Game**.
-- **Stats** — opens the Player Statistics modal (see [Player Statistics](#player-statistics)).
+- **Player/Team 1 Details** / **Player/Team 2 Details** — each section has **Name** (max 20 characters; autocomplete from your stats roster, or **double-click** to open the full scrollable player list) and **Color** for the scoreboard bar.
+- **Swap Colors** / **Clear Game** — **Clear Game** wipes player names, race/game info, and the on-screen scoreline, abandons any in-progress stats match (undoing recorded racks/frames/balls for that session), and resets the stats session. It does **not** delete players or completed match history from the database.
+
+### Stats
+
+- **Edit Player Stats** — opens the Player Statistics modal (leaderboard, player detail, H2H, import/export). See [Player Statistics](#player-statistics).
+- **Overlay Stats Display** — pick a **game type**, then toggle which stats appear on the **P1 / P2 / H2H** overlay panels for that type (Matches Won, Racks/Frames W/L, Win Streak, Break & Run, etc.). Defaults to the current game in play; changing this selector does **not** change the active game type. Settings persist across refresh.
 
 ### Controls
 
-- **Score** — increment, decrement, or type a value then **Push Entered Scores**. Primary score is labeled **Racks** for most games, or **Balls** in Straight Pool.
+- **Player Tracking and Ball Scoring** (top of Controls) — player buttons, optional **Chosen Ball** (when Ball Set Toggle is on), and the **Ball Scoring** grid.
+  - **Breaking Player?** / **Active Player** — one row of two equal-width player buttons (names from Setup). On **8 / 9 / 10** and **Snooker**, each rack or frame starts with **Breaking Player?**; pick the breaker (works with or without **Ball Scoring** enabled). The label then becomes **Active Player**: the current player’s button stays full strength; the other is greyed out but **click to switch**. When **Ball Scoring** is on, the ball grid stays visible but is disabled until a breaker is chosen. After **End Match**, **Call Match Early**, or **Reset Score**, the breaker prompt returns. When the race target is met, clicking a breaking-player button opens **End Match** to clear the scoreline.
+  - Prefer **Ball Scoring** for auto scoring when enabled. **Display Balls** mirrors the grid on the OBS overlay (not available for Snooker; requires Ball Scoring).
+- **Manual Score Controls** — increment, decrement, or type a value then **Push Entered Scores** (shown only after you type in a score field). Primary score is labeled **Racks** for most games, or **Balls** in Straight Pool.
 - **Balls** (Bank, One Pocket, or Custom with Point Based) — secondary ball counters (−999 to 999). Fouls can go below zero; that display foul does not undo recorded ball stats.
-- **Reset Score** — danger control that clears primary (and dual-score ball) scores after confirmation. When the race / Best Of target is met, the button becomes **End Match** (still danger, still confirmed) and ends the match without undoing recorded stats. While the race / Best Of target is met, primary scoring and the ball tracker are **locked** until **End Match** or **Reset Score** clears the scoreline.
-- **Call Match Early** — danger control (confirm) that appears after at least one rack/frame is recorded while the race is still incomplete. Ends the match early, saves completed racks/frames to match history, awards the game to the player ahead (tied scores save without a game W/L), then clears the scoreline.
-- Changing **Game Type** automatically runs the same finalize path under the previous type: **End Match** if the race/Best Of is complete, **Call Match Early** if racks/frames exist mid-race, otherwise **Reset Score** — then applies the new game type with a cleared scoreline.
+- **Reset Score** — danger control that clears primary (and dual-score ball) scores after confirmation. When the race / Best Of target is met, the button becomes **End Match** (still danger, still confirmed) and ends the match without undoing recorded stats. While the race / Best Of target is met, primary scoring and **Ball Scoring** are **locked** until **End Match** or **Reset Score** clears the scoreline.
+- **Call Match Early** — danger control (confirm) that appears after at least one rack/frame is recorded while the race is still incomplete. Ends the match early, waits for pending rack writes, reconciles rack history to the live scoreboard, saves completed racks/frames to match history, awards the game to the player ahead (tied scores save without a game W/L), then clears the scoreline.
 - **Stats Overlay** — **P1 Stats**, **P2 Stats**, **H2H Stats**. Toggle the same button again to hide. Off by default.
-- **Active Player** (toggle shows the current player’s name beside the label), **Chosen Ball** (when Ball Set Toggle is on), and the **Ball Tracker** grid (when enabled). **Display Balls** shows that grid on the OBS overlay (not available for Snooker; requires Ball Tracker).
 - **Replay Controls** — appear for use once OBS WebSocket is connected (see [Instant Replay](#instant-replay)).
 - **Shot Clock** and **Extensions** — see [Shot Clock](#shot-clock).
 
-### Image
+### Images
 
 - **Custom/Sponsor Slideshow** — enable cycling of L1 / L2 / L3 (about every 20 seconds).
 - **Player 1 / Player 2 logos** — upload, toggle visibility, click the label to rename.
@@ -170,12 +178,12 @@ Tabs: **Game Setup**, **Controls**, **Image ⚙**, **Replay/Share ⚙**, **Gener
 
 Details: [OBS WebSocket Setup](#obs-websocket-setup), [Instant Replay](#instant-replay), [Stream Promotion](#stream-promotion).
 
-### General
+### Settings
 
 - **OBS Theme** for the dock: Default, Classic (default), Acri, Grey, Light, Rachni.
-- **Overlay Scaling** (40–100%), **Overlay Opacity**, **Game Type**, and for Custom only **Point Based**.
-- Feature toggles: Player 1 / Player 2, Show Scores, Shot Clock, Active Player Indicator, Win Animation.
-- Ball Tracker, Display Balls (overlay; hidden for Snooker; requires Ball Tracker), Vertical/Horizontal orientation, Ball Set Toggle, Ball Type (World / International / Unity). While Ball Tracker is on, Active Player Indicator is forced on and locked.
+- **Overlay Scaling** (40–100%), **Overlay Opacity**.
+- Feature toggles: Player 1 / Player 2, **Show Scores** (when off, rack/frame and ball counters are hidden on the overlay and Manual Score Controls and **Ball Scoring** are disabled in the dock), Shot Clock, **Active Player Indicator** (also shown automatically for **8 / 9 / 10-Ball** breaker and active-player tracking — see Controls), Win Animation.
+- Ball Scoring, Display Balls (overlay; hidden for Snooker; requires Ball Scoring), Vertical/Horizontal orientation, Ball Set Toggle. While Ball Scoring is on, Active Player Indicator is forced on and locked.
 - **Check for Update** (compares to the latest GitHub release).
 - **Clear Instance Data** / **Clear All Data** — clears scoreboard settings only; does not affect player statistics (use Stats → Clear All Stats for that). See [Data, Clearing & Privacy](#data-clearing--privacy).
 
@@ -194,7 +202,7 @@ WebSocket is required for **instant replay** and for **stream promotion** (so th
 
 ### Connect from CueSport
 
-1. Open the **Replay/Share ⚙** tab.
+1. Open the **Replay/Share** tab.
 2. Click the WebSocket **⚙** button.
 3. **OBS WebSocket Address** (required), default: `ws://127.0.0.1:4455`  
    Use your machine’s LAN IP instead of `127.0.0.1` only if the dock runs somewhere else.
@@ -223,7 +231,7 @@ Instant replay uses OBS’s **Replay Buffer**, driven over WebSocket. CueSport d
 
 ### CueSport source settings
 
-In **Replay/Share ⚙**:
+In **Replay/Share**:
 
 | Field | Required | Purpose |
 |--------|----------|---------|
@@ -256,13 +264,13 @@ Optional listing on **[https://cuesports.macleod.systems](https://cuesports.macl
 ### Setup
 
 1. Connect **OBS WebSocket** (promotion uses it to detect streaming).
-2. In **Replay/Share ⚙**, open Stream Promotion **⚙** and set your **Stream URL** (must be `http://` or `https://`, e.g. `https://www.twitch.tv/yourchannel`). You can also let OBS-related auto-detection fill a URL when possible.
+2. In **Replay/Share**, open Stream Promotion **⚙** and set your **Stream URL** (must be `http://` or `https://`, e.g. `https://www.twitch.tv/yourchannel`). You can also let OBS-related auto-detection fill a URL when possible.
 3. Enable the **Stream Promotion** toggle.
 4. **Start streaming in OBS.** Promotion only stays connected while OBS reports an active stream.
 
 ### What is shared
 
-Match metadata only, for example: player names, scores, ball scores (when used), game type, race/game info, whether players/scores/tracker/clock are enabled, ball style, and your stream URL. **No video or audio** is uploaded.
+Match metadata only, for example: player names, scores, ball scores (when used), game type, race/game info, whether players/scores/Ball Scoring/clock are enabled, ball style, and your stream URL. **No video or audio** is uploaded.
 
 Each install gets a local API key. You can turn promotion off anytime. If a key is blocked server-side, the dock disables sharing and alerts you.
 
@@ -282,35 +290,39 @@ Local history for a shared roster of players (not tied to a single OBS `instance
 
 - Start typing in **Player/Team 1** or **Player/Team 2** to filter the roster and pick a match (or create a new player).
 - **Double-click** either name field to browse the full saved roster in a scrollable list, then click a name to select it.
-- Click **Update Names** after selecting so the active match and stats session use those players.
+- Selecting a name (or tabbing out of the field after typing) updates the overlay and stats session automatically.
 
 ### Recording during play
 
-1. Enter distinct player names and click **Update Names** (same name on both sides disables recording for that pairing).
+1. Enter distinct player names on both sides (same name on both sides disables recording for that pairing).
 2. Score **+** records a rack (or Straight Pool primary point) and checks race completion.
 3. In dual-score games, ball **+** records balls potted; ball **−** from a positive value undoes the last pot. Going from `0` to `-1` is a foul display and does not change stats.
 4. Completing a race marks the match completed and updates games won/lost.
-5. Use **Reset Score** (danger) to clear the on-screen scoreline mid-match — an in-page confirmation modal appears (native browser `confirm()` is unreliable in OBS docks). When the race / Best Of target is met, the button becomes **End Match** and the same modal confirms closing the match while keeping recorded stats. **Call Match Early** (danger, confirms) appears once racks/frames exist and the race is not finished — use it to end early and keep those results in **match history**. History lists completed games only; racks and frames during an in-progress match are held in memory until the race is won or the game is called.
+5. Use **Reset Score** (danger) to clear the on-screen scoreline mid-match — an in-page confirmation modal appears (native browser `confirm()` is unreliable in OBS docks). When the race / Best Of target is met, the button becomes **End Match** and the same modal confirms closing the match while keeping recorded stats. **Call Match Early** (danger, confirms) appears once racks/frames exist and the race is not finished — use it to end early and keep those results in **match history**.
+6. **In-progress matches** are kept in a per-instance pending session (IndexedDB meta). Finished racks/frames update **H2H** and overlay totals **as they happen** (match wins still wait until the match is completed). Refreshing the control panel restores the pending session for that `instance` so **Balls Potted** and match-scoped **Highest Break** / **Longest Run** do not reset.
+7. In the Stats window **H2H** / **Player** match history, the live match appears as **In progress** and can be **edited** (racks/frames/balls/breaks) or **discarded** (undoes that match’s rack/ball career deltas and recomputes both players from completed matches only).
 
-### Stats modal (Game Setup → Stats)
+### Stats modal (Stats tab → Edit Player Stats)
 
 | Tab | Use |
 |-----|-----|
-| **Board** | Leaderboard: Name, Games W/L, Win%, Racks/Frames W/L (with win %), Last played. Click a row for detail. |
-| **Player** | Per-player breakdown (Games W/L with win %, Racks/Frames W/L with win %, Balls Potted when dual-score games apply), win streak, opponent H2H, match history (completed matches only; each lists every rack/frame; Snooker frames include frame points and highest breaks), rename/delete, add match. |
-| **H2H** | Pick two players for head-to-head summary and history. |
+| **Board** | Leaderboard: Name, Matches Won, Win%, Racks/Frames W/L (with win %), Last played. Click a row for detail. |
+| **Player** | Per-player breakdown (Matches Won with win %, Racks/Frames W/L with win %, Balls Potted when dual-score games apply), win streak, opponent H2H, match history (includes the **in-progress** match when these players are live; completed matches list every rack/frame; Snooker frames include frame points and highest breaks), rename/delete, add match. |
+| **H2H** | Pick two players for head-to-head summary and history (live racks/frames from the current match are included before the match is completed). |
 | **Data** | **Export JSON** backup; **Import JSON** replaces all current statistics (warning + confirmation); **Clear All Stats** permanently deletes the roster (double confirmation). |
 
-### Overlay stats (Controls tab)
+### Overlay stats (Controls tab + Stats tab)
 
-- **P1 Stats** / **P2 Stats** / **H2H Stats** — one mode at a time; click again to hide. Off by default. Overlay figures are **scoped to the current game type** (e.g. Snooker H2H ignores 8-Ball history).
-- Individual panels: **Games W/L** (with win %), **Rack W/L** / **Frame W/L** (with win %), optional **Highest Break** (Snooker) or **Longest Run** (Straight Pool), optional **Balls Potted** (Bank, One Pocket, Custom point-based, Snooker), **Win Streak**.
-- H2H: comparison table with player names in the header, stat labels centered in the middle (**Matches Won**, **Racks/Frames Won**, etc.), and each player's value centered under their name. Optional **Highest Break** / **Longest Run** and **Balls Potted** rows when relevant for the active game type.
+- **P1 Stats** / **P2 Stats** / **H2H Stats** (Controls tab) — one mode at a time; click again to hide. Off by default. Overlay figures are **scoped to the current game type** (e.g. Snooker H2H ignores 8-Ball history).
+- **Overlay Stats Display** (Stats tab) — pick a **game type**, then choose which rows appear on those overlay panels. Available toggles include **Matches Won**, **Racks / Frames W/L**, **Win Streak**, **Current Break / Run**, **Possible Break**, **Difference**, **Points Remaining**, **Highest Break / Longest Run**, **Balls Potted**, **Break & Run**, and **Table Run** (only options that apply to the selected game type are shown). Defaults to the game type in play; changing this selector does not change scoring. Unchecked stats are **hidden on the overlay** but still recorded in match history. Toggles persist across refresh.
+- Individual panels: **Matches Won** (with win %), **Rack W/L** / **Frame W/L** (with win %), optional **Highest Break** (Snooker) or **Longest Run** (Straight Pool), optional **Balls Potted** (Bank, One Pocket, Custom point-based, Snooker), **Break & Run** / **Table Run** (8 / 9 / 10), **Win Streak**, and live Snooker fields (**Current Break**, **Possible Break**, **Difference**, **Points Remaining**) when enabled.
+- **Highest Break** / **Longest Run** and **Balls Potted** on P1/P2 overlays are **match-scoped** for the current pending match (not career totals). They survive a control-panel refresh via the pending session.
+- H2H: comparison table with player names in the header, stat labels centered in the middle (**Matches Won**, **Racks/Frames Won**, etc.), and each player's value centered under their name. Optional **Highest Break** / **Longest Run** and **Balls Potted** rows when relevant for the active game type. Live unfinished racks/frames count toward H2H rack/frame totals; **Matches Won** still requires a completed match.
 - **Balls Potted** appears only in dual-score game types (see below). It is a **count**, not a win/loss record.
 
 ### Manual matches
 
-From Player or H2H you can **Add Match** (date, game type, and per-rack/frame results). Match score and Games W/L are **calculated from those frames/racks** — they are not edited directly. Snooker frames can include points and highest breaks. Optional balls-potted fields appear for Bank, One Pocket, Custom, and Snooker.
+From Player or H2H you can **Add Match** (date, game type, and per-rack/frame results). Match score and Matches Won are **calculated from those frames/racks** — they are not edited directly. Snooker frames can include points and highest breaks. Optional balls-potted fields appear for Bank, One Pocket, Custom, and Snooker. The same editor opens for the **in-progress** live match (**Edit In-Progress Match** / **Discard Match**).
 
 ---
 
@@ -318,44 +330,59 @@ From Player or H2H you can **Add Match** (date, game type, and per-rack/frame re
 
 | Game type | Primary score | Extra ball scores | Balls Potted in stats/overlay |
 |-----------|---------------|-------------------|-------------------------------|
-| 8-Ball, 9-Ball, 10-Ball | Racks | No | No |
-| Straight | Labeled **Balls** (still the primary counter) | No | No (tracks **Longest Run** instead) |
+| 8-Ball, 9-Ball, 10-Ball | Racks (Ball Scoring: pot game ball) | No | No |
+| Straight | Labeled **Balls** (Ball Scoring pots +1 each) | No | No (tracks **Longest Run** instead) |
 | Bank | Racks | Yes (first to **8** wins the rack) | Yes |
 | One Pocket | Racks | Yes (first to **8** wins the rack) | Yes |
 | Custom | Racks | Only if **Point Based** is checked | Only if **Point Based** is checked |
-| Snooker | Labeled **Frames** | **Points** (in-frame; via ball tracker and +/-) | Yes (each pot) |
+| Snooker | Labeled **Frames** | **Points** (in-frame; via ball scoring and +/-) | Yes (each pot) |
 
-Consecutive Straight Pool score **+** by the same player builds a run; the best run is stored as **Longest Run** (shown on the overlay when Straight is selected). Scoring for the other player or a decrement resets the current run.
+Consecutive Straight Pool score **+** by the same player builds a run; the best run is stored as **Longest Run** (shown on the overlay when Straight is selected). Each scored ball also stores that player’s current run on the rack entry (and **0** for the opponent) so match history can show and edit **Run** per player. Scoring for the other player or a decrement rebuilds the current run from the trailing streak.
+
+### Ball Scoring auto-scoring (Player Tracking and Ball Scoring)
+
+Selecting **8-Ball**, **9-Ball**, **10-Ball**, **Straight**, **Bank**, or **One Pocket** turns on **Ball Scoring** and the **Active Player Indicator** when both players are enabled. Unclicking a scored ball (unfade) **deducts** what that pot awarded from the player who received it (mistake correction).
+
+- **8-Ball / 9-Ball / 10-Ball** — Potting the **8**, **9**, or **10** (respectively) awards the Active Player **+1 rack**. Other balls are visual only. The game ball is briefly disabled (~0.5s), then clears so it can be potted again for the next rack (prevents a double-click from awarding twice). Undo a mistaken rack with Racks **−**.
+- **8 / 9 / 10 — Breaking player** — Each rack starts with **Breaking Player?** (two player buttons; works with or without **Ball Scoring**). With Ball Scoring on, the grid is visible but disabled until you pick the breaker. The label then becomes **Active Player** (breaker selected); click the greyed opponent button to switch visits (**Table Run** stats count a switch as an opponent visit). The breaker prompt returns after **End Match**, **Call Match Early**, or **Reset Score**. When the race target is met, clicking a breaking-player button opens **End Match**. Career stats track **Break & Run (B&R)** when the breaker runs out without the opponent visiting, and **Table Run (TR)** when the opponent has visited and the winner clears the rack.
+- **Snooker — Breaking player** — Each frame starts with **Breaking Player?** the same way (works with or without **Ball Scoring**). After you pick the breaker, the label becomes **Active Player** for visit switching. The prompt returns after each frame is awarded, **End Match**, **Call Match Early**, or **Reset Score**. When the Best Of target is met, clicking a breaking-player button opens **End Match**.
+- **Straight** — Each pot adds **1** to primary **Balls** for the Active Player (balls are not reset between pots). Unclick subtracts **1**. When only **one** ball remains unfaded, the pocketed balls are re-enabled (14.1 re-rack) with **no** score change. Continue until the race target locks scoring.
+- **Bank / One Pocket** — See below.
 
 ### Bank & One Pocket
 
 - Dual scores: **Racks** (match) and **Balls** (current rack).
-- Selecting Bank or One Pocket turns on the **ball tracker** and **Active Player** toggle when both players are enabled.
-- Clicking a ball on the tracker fades it (overlay) and adds **1** to the **Active Player** ball score. Clicking again unfades and subtracts **1** from the player who originally received that ball (even if Active Player has changed).
-- First player to **8** balls automatically wins the rack (Racks **+1**), clears both ball scores, and resets the tracker for the next rack.
+- Selecting Bank or One Pocket turns on **Ball Scoring** and the **Active Player Indicator** when both players are enabled.
+- Clicking a ball on the grid fades it (overlay) and adds **1** to the **Active Player** ball score. Clicking again unfades and subtracts **1** from the player who originally received that ball (even if Active Player has changed).
+- First player to **8** balls automatically wins the rack (Racks **+1**), clears both ball scores, and resets the balls for the next rack.
 - Manual ball **+/-** also awards the rack when a player reaches 8.
 
 ### Snooker
 
-- Selecting **Snooker** forces snooker ball imagery on the **control panel** tracker (not shown on the OBS overlay).
+- Selecting **Snooker** forces snooker ball imagery on the **control panel** Ball Scoring grid (not shown on the OBS overlay). Ball Scoring assets include shared icons such as `foul-small.png` and `undo-small.png` (usable by other game types later).
 - **Custom** is the only other game type that can choose **Snooker** as Ball Type.
-- Dual scores: **Frames** (match score) and **Points** (current frame). Ball-tracker pots/fouls change **Points**.
+- Dual scores: **Frames** (match score) and **Points** (current frame). Ball Scoring pots/fouls change **Points**.
 - **Best Of** (replaces Race Info for Snooker): enter the maximum frames in the match (e.g. **35**). Locking / match win is first to **floor(N/2)+1** (so best of 35 → first to **18**). The overlay shows the entered value as-is (not rewritten as “Best of N”).
-- Click color balls / Freeball to add points to the **Active Player** (P1/P2 toggle). **Golden Ball** is an optional rule (checkbox off by default). When enabled, the Golden Ball only becomes pottable after the **final black** of a clearance when the Active Player has **147** points (worth 20). If the Golden Ball is **fouled**, it is removed from the frame and cannot be potted or fouled again until the next frame.
-- Scoring follows red → color → red → color: after a red (or freeball), red is disabled until a color is potted or the active player is changed. After a color, colors are briefly disabled for feedback, then red is available again (until 15 reds are potted).
-- Once **15 reds** are scored, red stays disabled and remaining colors are cleared one by one (each potted color stays disabled for the frame). **Free Ball** remains available during this colors-only phase.
-- Continuous points in a visit are tracked as a **break**. **Highest break** per player is stored for each frame and as a career/Snooker high. Fouls end the break (foul points are not break points). Switching the active player also ends the break.
-- Each successful **pot** (red, color, freeball, golden) increments **Balls Potted** for the Active Player. Fouls do not count as pots.
+- Click color balls / Free Ball to add points to the **Active Player** (player buttons under **Active Player**). **Golden Ball** is an optional rule (checkbox off by default). When enabled, the Golden Ball only becomes pottable after the **final black** of a clearance when the Active Player has **147** points (worth 20). If the Golden Ball is **fouled**, it is a **20-point** foul to the opponent and the ball is **removed from the frame** (hidden on the grid and unavailable as a foul target) until the next frame.
+- Scoring follows red → color → red → color: after a red (or Free Ball), red is disabled until a color is potted or the visit ends. After a color, colors briefly show feedback, then red is available again (until 15 reds are potted).
+- Once **15 reds** are scored, red stays disabled and remaining colors are cleared one by one (each potted color stays disabled for the frame).
+- Click **Foul** to open a modal, then choose the fouled ball (White–Black; Golden while the Golden Ball is still in play; Free Ball is not a foul target). Hover shows **X-point foul**. Foul points go to the **opponent**. A foul **ends the break** and **automatically switches Active Player** to the incoming player.
+- **Free Ball** is offered only on that incoming visit after a foul (not during a normal reds/clearance turn). It is worth **1** and plays like a red; while reds remain, a color is then required. Potting a normal red instead clears the Free Ball offer.
+- Continuous points in a visit are tracked as a **break**. **Highest break** per player is stored for each frame and as a career/Snooker high. Manual Active Player switches (clicking the inactive player button) also end the break (without awarding foul points).
+- **Undo** (grid icon beside Free Ball / Foul, `undo-small.png`) steps back through pots and fouls for the current frame:
+  - Restores points, sequence phase, Free Ball / foul-offer flags, reds & clearance state, break / frame highs, Active Player, and balls-potted stats.
+  - Shared history across both players (up to **40** steps).
+  - Survives control-panel **refresh** and **Active Player** changes; clears on a new frame / leaving Snooker / End Match–style sequence reset.
+- Each successful **pot** (red, color, Free Ball, golden) increments **Balls Potted** for the Active Player. Fouls do not count as pots.
 - Award a **Frame** with the Frames **+** control (records highest breaks for that frame, then clears **Points** for the next frame). Race / **Best Of** locking uses frame wins.
-- Use **Reset Score** mid-match (danger, confirms) to clear **Frames** and **Points**. When the Best Of frame target is met, the button becomes **End Match** and keeps already-recorded frame stats. **Call Match Early** ends early while frames are unfinished and still saves completed frames. While the frame target is met, all ball-tracker selections and point scoring are locked until the scoreline is cleared.
+- Use **Reset Score** mid-match (danger, confirms) to clear **Frames** and **Points**. When the Best Of frame target is met, the button becomes **End Match** and keeps already-recorded frame stats. **Call Match Early** ends early while frames are unfinished and still saves completed frames. While the frame target is met, all Ball Scoring selections and point scoring are locked until the scoreline is cleared.
 - Snooker UI uses **Frame** instead of **Rack** in stats/overlay labels.
-- Click **Foul** to open a modal, then choose the fouled ball (White–Black; Golden while the Golden Ball is still in play; Freeball is not offered). Hover shows **X-point foul**. Foul points go to the **opponent**.
-- Foul values: White/Yellow/Green/Brown/Golden = 4; Blue = 5; Pink = 6; Black = 7. Pot values: Red 1 … Black 7, Golden 20, Freeball 1.
+- Foul values: White/Yellow/Green/Brown = 4; Blue = 5; Pink = 6; Black = 7; **Golden = 20**. Pot values: Red 1 … Black 7, Golden 20, Free Ball 1.
 - Manual **+/-** and **Push Entered Scores** still work for Frames and Points.
 
 Dual-score UI also requires **both** Player 1 and Player 2 enabled in General settings.
 
-Ball Tracker is the control-panel scoring grid. **Display Balls** is a separate option that mirrors that grid on the browser source. Display Balls is hidden for Snooker (overlay never shows the snooker grid) and is disabled unless Ball Tracker is on. **Active Player Indicator** is required whenever Ball Tracker is on (locked on; scoring credits the Active Player). Which balls appear follows the game type (e.g. fewer for 9-Ball / 10-Ball; snooker uses balls 1–11 with a spacer on the control panel only). Ball Set Toggle applies mainly to 8-Ball and Custom (not Snooker).
+Ball Scoring is the control-panel scoring grid. **Display Balls** is a separate option that mirrors that grid on the browser source. Display Balls is hidden for Snooker (overlay never shows the snooker grid) and is disabled unless Ball Scoring is on. **Active Player Indicator** is required whenever Ball Scoring is on (locked on; scoring credits the Active Player). Which balls appear follows the game type (e.g. fewer for 9-Ball / 10-Ball; snooker uses balls 1–11 with a spacer on the control panel only). Ball Set Toggle applies mainly to 8-Ball and Custom (not Snooker).
 
 ---
 
@@ -392,7 +419,7 @@ The script writes a small `hotkeys.js` helper next to the HTML files; keep the s
 
 ## Logos & Slideshow
 
-1. Open **Image ⚙**.
+1. Open **Images**.
 2. Upload **Player 1 Logo** / **Player 2 Logo** and toggle them on.
 3. Upload **L1 / L2 / L3** and enable **Custom/Sponsor Slideshow** to cycle sponsors.
 
@@ -404,9 +431,9 @@ Player logos look best square. Clear a logo with the clear control after upload 
 
 | Action | Effect |
 |--------|--------|
-| **Clear Game** | Clears current match names/info (and ends the active stats session appropriately). |
+| **Clear Game** | Clears player names, race/game info, and the on-screen scoreline; abandons the in-progress stats session (undoes racks/frames/balls recorded this match). Does **not** delete players or completed match history. |
 | **Clear Instance Data** | Clears scoreboard settings for this `instance` only. Does **not** affect player statistics. |
-| **Clear All Data** | Clears scoreboard settings/layout localStorage (all instances). Keeps overlay stats mode/payload keys. Does **not** clear IndexedDB statistics. |
+| **Clear All Data** | Clears scoreboard settings/layout localStorage (all instances). Keeps per-instance overlay stats mode/payload keys and stats visibility settings. Does **not** clear IndexedDB statistics. |
 | **Stats → Import JSON** | **Replaces** all current players and matches with the file. Requires warning + confirmation. Export a backup first if you need to keep existing data. |
 | **Stats → Clear All Stats** | Permanently deletes all players and matches in `cuesport_stats` (double confirmation). Does not change live scoreboard settings. |
 
@@ -422,7 +449,7 @@ From the project root:
 python -m http.server 8765
 ```
 
-Open `http://localhost:8765/tests/smoke_test.html` and click **Run all tests**. This checks core wiring, overlay toggles, stats APIs, scoring edge cases, Snooker (frames/points, Golden Ball, fouls, scoring lock), Bank/One Pocket tracker scoring, Balls Potted visibility/labels, and related UI copy.
+Open `http://localhost:8765/tests/smoke_test.html` and click **Run all tests**. Coverage includes core wiring and version, Setup player-detail sections, Stats tab (Edit Player Stats, per-game overlay visibility toggles), **OverlayVisibility** (stats toggles respected through initial build, broadcast rebuild, and Snooker live publish — including browser-source rendering), overlay mode toggles and payload sync, stats APIs and match history, live H2H / in-progress match editing, **Breaking Player?** / **Active Player** button row (8/9/10 with and without Ball Scoring, race-complete disabled state, player switching), Snooker (frames/points, Golden Ball, fouls with auto player change, Free Ball offer, undo + persisted undo stack, scoring lock), Ball Scoring auto-scoring (8/9/10-ball, Straight 14.1 re-rack, Bank/One Pocket), Balls Potted visibility/labels, and related UI copy.
 
 ---
 

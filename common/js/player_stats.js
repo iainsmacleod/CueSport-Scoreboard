@@ -19,6 +19,173 @@
         game8: 'Snooker'
     };
 
+    const STAT_VISIBILITY_CATALOG = [
+        { id: 'gamesWL', label: 'Matches Won', gameTypes: ['game1', 'game2', 'game3', 'game4', 'game5', 'game6', 'game7', 'game8'] },
+        { id: 'racksWL', label: 'Racks / Frames W/L', gameTypes: ['game1', 'game2', 'game3', 'game4', 'game5', 'game6', 'game7', 'game8'] },
+        { id: 'winStreak', label: 'Win Streak', gameTypes: ['game1', 'game2', 'game3', 'game4', 'game5', 'game6', 'game7', 'game8'] },
+        { id: 'currentBreak', label: 'Current Break / Run', gameTypes: ['game4', 'game8'] },
+        { id: 'possibleBreak', label: 'Possible Break', gameTypes: ['game8'] },
+        { id: 'scoreMargin', label: 'Difference', gameTypes: ['game8'] },
+        { id: 'pointsRemaining', label: 'Points Remaining', gameTypes: ['game8'] },
+        { id: 'highestBreak', label: 'Highest Break / Longest Run', gameTypes: ['game4', 'game8'] },
+        { id: 'ballsPotted', label: 'Balls Potted', gameTypes: ['game5', 'game6', 'game7', 'game8'] },
+        { id: 'breakAndRun', label: 'Break & Run', gameTypes: ['game1', 'game2', 'game3'] },
+        { id: 'tableRun', label: 'Table Run', gameTypes: ['game1', 'game2', 'game3'] }
+    ];
+
+    const STATS_VISIBILITY_STORAGE_KEY = 'statsVisibility';
+    const STATS_VISIBILITY_GAME_TYPE_KEY = 'statsVisibilityGameType';
+
+    function readStatsVisibilityConfig() {
+        if (typeof getStorageItem === 'function') {
+            try {
+                const raw = getStorageItem(STATS_VISIBILITY_STORAGE_KEY);
+                return raw ? JSON.parse(raw) : {};
+            } catch (err) {
+                console.warn('Failed to parse stats visibility config:', err);
+            }
+        }
+        return {};
+    }
+
+    function writeStatsVisibilityConfig(config) {
+        if (typeof setStorageItem === 'function') {
+            setStorageItem(STATS_VISIBILITY_STORAGE_KEY, JSON.stringify(config || {}));
+        }
+    }
+
+    function readStatsVisibilityGameType() {
+        if (typeof getStorageItem === 'function') {
+            const stored = getStorageItem(STATS_VISIBILITY_GAME_TYPE_KEY);
+            if (stored && GAME_TYPE_LABELS[stored]) {
+                return stored;
+            }
+        }
+        const active = getActiveGameType();
+        writeStatsVisibilityGameType(active);
+        return active;
+    }
+
+    function writeStatsVisibilityGameType(gameType) {
+        if (!GAME_TYPE_LABELS[gameType] || typeof setStorageItem !== 'function') {
+            return;
+        }
+        setStorageItem(STATS_VISIBILITY_GAME_TYPE_KEY, gameType);
+    }
+
+    function syncStatsVisibilityGameTypeSelect() {
+        const select = document.getElementById('statsVisibilityGameType');
+        if (!select) {
+            return;
+        }
+        if (!select.options.length) {
+            Object.keys(GAME_TYPE_LABELS).forEach(function (gt) {
+                const opt = document.createElement('option');
+                opt.value = gt;
+                opt.textContent = GAME_TYPE_LABELS[gt];
+                select.appendChild(opt);
+            });
+        }
+        const gt = readStatsVisibilityGameType();
+        if (select.value !== gt) {
+            select.value = gt;
+        }
+    }
+
+    function onStatsVisibilityGameTypeChange(gameType) {
+        if (!GAME_TYPE_LABELS[gameType]) {
+            return;
+        }
+        writeStatsVisibilityGameType(gameType);
+        renderStatsVisibilityPanel();
+    }
+
+    function isStatApplicable(statId, gameType) {
+        const entry = STAT_VISIBILITY_CATALOG.find(function (s) {
+            return s.id === statId;
+        });
+        if (!entry || entry.gameTypes.indexOf(gameType) === -1) {
+            return false;
+        }
+        if (statId === 'ballsPotted' && gameType === 'game7') {
+            return typeof isDualScoreMode === 'function' && isDualScoreMode();
+        }
+        return true;
+    }
+
+    function isStatVisible(gameType, statId) {
+        if (!isStatApplicable(statId, gameType)) {
+            return false;
+        }
+        const config = readStatsVisibilityConfig();
+        const gt = config[gameType];
+        if (gt && gt[statId] === false) {
+            return false;
+        }
+        return true;
+    }
+
+    function setStatVisibility(gameType, statId, enabled) {
+        const config = readStatsVisibilityConfig();
+        if (!config[gameType]) {
+            config[gameType] = {};
+        }
+        config[gameType][statId] = !!enabled;
+        writeStatsVisibilityConfig(config);
+    }
+
+    function renderStatsVisibilityPanel() {
+        const panel = document.getElementById('statsVisibilityPanel');
+        if (!panel) {
+            return;
+        }
+        syncStatsVisibilityGameTypeSelect();
+        const gt = readStatsVisibilityGameType();
+        const stats = STAT_VISIBILITY_CATALOG.filter(function (s) {
+            return s.gameTypes.indexOf(gt) !== -1 && isStatApplicable(s.id, gt);
+        });
+        let html = '';
+        if (!stats.length) {
+            panel.innerHTML = '<p class="stats-tab-help">No overlay stats apply to this game type.</p>';
+            return;
+        }
+        html += '<div class="stats-visibility-stat-list">';
+        stats.forEach(function (stat) {
+            const inputId = 'statVis_' + gt + '_' + stat.id;
+            const checked = isStatVisible(gt, stat.id) ? ' checked' : '';
+            html += '<label class="stats-visibility-item" for="' + inputId + '">';
+            html += '<span class="stats-visibility-label">' + stat.label + '</span>';
+            html += '<input type="checkbox" class="smallSize stats-visibility-toggle" id="' + inputId + '" data-game-type="' + gt + '" data-stat-id="' + stat.id + '"' + checked + ' onchange="onStatVisibilityToggle(this)">';
+            html += '</label>';
+        });
+        html += '</div>';
+        panel.innerHTML = html;
+    }
+
+    function onStatVisibilityToggle(input) {
+        if (!input || !input.dataset) {
+            return;
+        }
+        setStatVisibility(input.dataset.gameType, input.dataset.statId, input.checked);
+        broadcastOverlayStatsIfEnabled();
+    }
+
+    function overlayStatEnabled(gameType, statId) {
+        if (!isStatVisible(gameType, statId)) {
+            return false;
+        }
+        if (statId === 'ballsPotted') {
+            return showsBallStats(gameType);
+        }
+        if (statId === 'highestBreak' || statId === 'currentBreak') {
+            return showsHighestBreakStats(gameType);
+        }
+        if (statId === 'possibleBreak' || statId === 'scoreMargin' || statId === 'pointsRemaining') {
+            return isSnookerGameType(gameType);
+        }
+        return true;
+    }
+
     function gameTypeHasBallScoring(gameType) {
         return gameType === 'game5' || gameType === 'game6' || gameType === 'game7' || gameType === 'game8';
     }
@@ -152,7 +319,9 @@
             gamesLost: typed.gamesLost || 0,
             ballsWon: typed.ballsWon || 0,
             ballsLost: typed.ballsLost || 0,
-            highestBreak: typed.highestBreak || 0
+            highestBreak: typed.highestBreak || 0,
+            breakAndRuns: typed.breakAndRuns || 0,
+            tableRuns: typed.tableRuns || 0
         };
     }
 
@@ -172,6 +341,7 @@
 
     let db = null;
     let initPromise = null;
+    let playerStatsReady = false;
 
     const activeMatchSession = {
         matchId: null,
@@ -233,7 +403,9 @@
             gamesLost: 0,
             ballsWon: 0,
             ballsLost: 0,
-            highestBreak: 0
+            highestBreak: 0,
+            breakAndRuns: 0,
+            tableRuns: 0
         };
     }
 
@@ -246,6 +418,8 @@
             ballsWon: 0,
             ballsLost: 0,
             highestBreak: 0,
+            breakAndRuns: 0,
+            tableRuns: 0,
             byGameType: {}
         };
     }
@@ -325,6 +499,8 @@
         stats.ballsWon = stats.ballsWon || 0;
         stats.ballsLost = stats.ballsLost || 0;
         stats.highestBreak = stats.highestBreak || 0;
+        stats.breakAndRuns = stats.breakAndRuns || 0;
+        stats.tableRuns = stats.tableRuns || 0;
 
         return {
             id: player.id || generateId(),
@@ -434,6 +610,145 @@
         await openDatabase();
         const store = tx(['meta'], 'readwrite').objectStore('meta');
         return promisifyRequest(store.put({ key: key, value: value }));
+    }
+
+    async function deleteMeta(key) {
+        await openDatabase();
+        const store = tx(['meta'], 'readwrite').objectStore('meta');
+        return promisifyRequest(store.delete(key));
+    }
+
+    const OVERLAY_STATS_MODE_KEY = 'overlayStatsMode';
+    const OVERLAY_STATS_PAYLOAD_KEY = 'overlayStatsPayload';
+
+    function getInstanceId() {
+        if (typeof INSTANCE_ID !== 'undefined') {
+            return INSTANCE_ID || '';
+        }
+        try {
+            return new URLSearchParams(window.location.search).get('instance') || '';
+        } catch (err) {
+            return '';
+        }
+    }
+
+    /** Per-instance pending match (global roster; session state isolated by OBS instance). */
+    function getPendingSessionMetaKey() {
+        const id = getInstanceId();
+        return id ? ('activePendingSession_' + id) : 'activePendingSession';
+    }
+
+    let pendingSessionGeneration = 0;
+
+    function cloneJson(value) {
+        return JSON.parse(JSON.stringify(value));
+    }
+
+    function serializePendingSession() {
+        if (!activeMatchSession.matchId || !activeMatchSession.pendingMatch) {
+            return null;
+        }
+        return {
+            version: 1,
+            matchId: activeMatchSession.matchId,
+            pendingMatch: cloneJson(activeMatchSession.pendingMatch),
+            player1Id: activeMatchSession.player1Id,
+            player2Id: activeMatchSession.player2Id,
+            player1Name: activeMatchSession.player1Name,
+            player2Name: activeMatchSession.player2Name,
+            gameType: activeMatchSession.gameType,
+            raceTo: activeMatchSession.raceTo,
+            gameInfo: activeMatchSession.gameInfo,
+            status: activeMatchSession.status,
+            matchCompletedRecorded: !!activeMatchSession.matchCompletedRecorded,
+            lastRackWinnerSlot: activeMatchSession.lastRackWinnerSlot,
+            lastBallWinnerSlot: activeMatchSession.lastBallWinnerSlot,
+            duplicateNames: !!activeMatchSession.duplicateNames,
+            straightPoolRunSlot: activeMatchSession.straightPoolRunSlot,
+            straightPoolRunLength: activeMatchSession.straightPoolRunLength || 0
+        };
+    }
+
+    async function clearPendingSessionMeta() {
+        await deleteMeta(getPendingSessionMetaKey());
+    }
+
+    async function clearAllPendingSessionMeta() {
+        await openDatabase();
+        const store = tx(['meta'], 'readonly').objectStore('meta');
+        const all = await promisifyRequest(store.getAll());
+        const rows = all || [];
+        for (let i = 0; i < rows.length; i++) {
+            const key = rows[i] && rows[i].key;
+            if (key === 'activePendingSession' ||
+                (typeof key === 'string' && key.indexOf('activePendingSession_') === 0)) {
+                await deleteMeta(key);
+            }
+        }
+    }
+
+    async function persistPendingSession() {
+        const gen = pendingSessionGeneration;
+        const snap = serializePendingSession();
+        if (!snap) {
+            if (gen === pendingSessionGeneration) {
+                await clearPendingSessionMeta();
+            }
+            return;
+        }
+        if (gen !== pendingSessionGeneration) {
+            return;
+        }
+        await setMeta(getPendingSessionMetaKey(), snap);
+    }
+
+    function queuePersistPendingSession() {
+        persistPendingSession().catch(function (err) {
+            console.error('Persist pending session error:', err);
+        });
+    }
+
+    async function restorePendingSession() {
+        const row = await getMeta(getPendingSessionMetaKey());
+        const snap = row && row.value;
+        if (!snap || !snap.matchId || !snap.pendingMatch) {
+            return false;
+        }
+        activeMatchSession.pendingMatch = snap.pendingMatch;
+        activeMatchSession.matchId = snap.matchId;
+        activeMatchSession.player1Id = snap.player1Id || null;
+        activeMatchSession.player2Id = snap.player2Id || null;
+        activeMatchSession.player1Name = snap.player1Name || '';
+        activeMatchSession.player2Name = snap.player2Name || '';
+        activeMatchSession.gameType = snap.gameType || 'game1';
+        activeMatchSession.raceTo = snap.raceTo != null ? snap.raceTo : null;
+        activeMatchSession.gameInfo = snap.gameInfo || '';
+        activeMatchSession.status = snap.status || 'active';
+        activeMatchSession.matchCompletedRecorded = !!snap.matchCompletedRecorded;
+        activeMatchSession.lastRackWinnerSlot = snap.lastRackWinnerSlot || null;
+        activeMatchSession.lastBallWinnerSlot = snap.lastBallWinnerSlot || null;
+        activeMatchSession.duplicateNames = !!snap.duplicateNames;
+        activeMatchSession.straightPoolRunSlot = snap.straightPoolRunSlot || null;
+        activeMatchSession.straightPoolRunLength = snap.straightPoolRunLength || 0;
+
+        if (activeMatchSession.player1Id) {
+            setPlayerIdOnInput('1', activeMatchSession.player1Id);
+        }
+        if (activeMatchSession.player2Id) {
+            setPlayerIdOnInput('2', activeMatchSession.player2Id);
+        }
+
+        // Drop stale sessions without undoing career stats (already applied when events occurred).
+        const p1Name = (document.getElementById('p1Name')?.value || '').trim();
+        const p2Name = (document.getElementById('p2Name')?.value || '').trim();
+        if (p1Name && p2Name) {
+            const context = getCurrentContext();
+            if (sessionNeedsReset(p1Name, p2Name, context)) {
+                await resetSessionState();
+                return false;
+            }
+        }
+        return true;
     }
 
     async function getPlayer(id) {
@@ -607,9 +922,16 @@
         }
         if (activeMatchSession.player1Name !== truncateName(p1Name) ||
             activeMatchSession.player2Name !== truncateName(p2Name) ||
-            activeMatchSession.gameType !== context.gameType ||
-            activeMatchSession.raceTo !== context.raceTo) {
+            activeMatchSession.gameType !== context.gameType) {
             return true;
+        }
+        // Race-to alone must not discard an in-progress match (e.g. control panel refresh).
+        if (activeMatchSession.raceTo !== context.raceTo) {
+            activeMatchSession.raceTo = context.raceTo;
+            if (activeMatchSession.pendingMatch) {
+                activeMatchSession.pendingMatch.raceTo = context.raceTo;
+            }
+            queuePersistPendingSession();
         }
         return false;
     }
@@ -658,6 +980,7 @@
         activeMatchSession.duplicateNames = duplicateNames;
         activeMatchSession.straightPoolRunSlot = null;
         activeMatchSession.straightPoolRunLength = 0;
+        await persistPendingSession();
         return true;
     }
 
@@ -673,7 +996,7 @@
         const context = getCurrentContext();
         if (sessionNeedsReset(p1Name, p2Name, context)) {
             await abandonActivePendingMatch();
-            resetSessionState();
+            await resetSessionState();
             return createNewMatchSession(p1Name, p2Name, context);
         }
         return true;
@@ -685,6 +1008,42 @@
             return;
         }
         await putMatch(match);
+    }
+
+    function isTrackerRackWinGameType(gameType) {
+        return gameType === 'game1' || gameType === 'game2' || gameType === 'game3';
+    }
+
+    function readRackRunClassificationFromStorage(winnerSlot) {
+        const breaker = getStorageItem('rackBreakerSlot');
+        const opponentVisited = getStorageItem('rackOpponentVisited') === 'yes';
+        if (breaker !== '1' && breaker !== '2') {
+            return { breakAndRun: false, tableRun: false, breakerSlot: null };
+        }
+        if (winnerSlot === breaker && !opponentVisited) {
+            return { breakAndRun: true, tableRun: false, breakerSlot: breaker };
+        }
+        if (opponentVisited) {
+            return { breakAndRun: false, tableRun: true, breakerSlot: breaker };
+        }
+        return { breakAndRun: false, tableRun: false, breakerSlot: breaker };
+    }
+
+    async function applyRunOutDelta(winnerId, gameType, delta, kind) {
+        const field = kind === 'tableRun' ? 'tableRuns' : 'breakAndRuns';
+        const winner = await getPlayer(winnerId);
+        if (!winner) {
+            return;
+        }
+        const now = new Date().toISOString();
+        winner.stats[field] = (winner.stats[field] || 0) + delta;
+        const typeStats = ensureTypeStats(winner.stats, gameType);
+        typeStats[field] = (typeStats[field] || 0) + delta;
+        if (delta > 0) {
+            winner.lastPlayedAt = now;
+        }
+        winner.updatedAt = now;
+        await putPlayer(winner);
     }
 
     async function applyRackDelta(winnerId, loserId, gameType, delta) {
@@ -772,6 +1131,10 @@
 
     let rackRecordQueue = Promise.resolve();
 
+    async function flushRackRecordQueue() {
+        await rackRecordQueue;
+    }
+
     async function recordRackWin(playerSlot) {
         const run = () => recordRackWinInternal(playerSlot);
         const queued = rackRecordQueue.then(run, run);
@@ -792,11 +1155,40 @@
             return;
         }
 
+        let straightRunLength = 0;
+        if (context.gameType === 'game4') {
+            if (activeMatchSession.straightPoolRunSlot === playerSlot) {
+                activeMatchSession.straightPoolRunLength += 1;
+            } else {
+                activeMatchSession.straightPoolRunSlot = playerSlot;
+                activeMatchSession.straightPoolRunLength = 1;
+            }
+            straightRunLength = activeMatchSession.straightPoolRunLength;
+        }
+
         const rackEntry = {
             rackNumber: match.racks.length + 1,
             winnerId: ids.winnerId,
             timestamp: new Date().toISOString()
         };
+        if (context.gameType === 'game4') {
+            // Store current run length for the scorer (editable in match history).
+            rackEntry.highestBreakP1 = playerSlot === '1' ? straightRunLength : 0;
+            rackEntry.highestBreakP2 = playerSlot === '2' ? straightRunLength : 0;
+        }
+        if (isTrackerRackWinGameType(context.gameType)) {
+            const runClass = readRackRunClassificationFromStorage(playerSlot);
+            if (runClass.breakerSlot) {
+                rackEntry.breakerSlot = runClass.breakerSlot;
+            }
+            rackEntry.breakAndRun = !!runClass.breakAndRun;
+            rackEntry.tableRun = !!runClass.tableRun;
+            if (runClass.breakAndRun) {
+                await applyRunOutDelta(ids.winnerId, context.gameType, 1, 'breakAndRun');
+            } else if (runClass.tableRun) {
+                await applyRunOutDelta(ids.winnerId, context.gameType, 1, 'tableRun');
+            }
+        }
         match.racks.push(rackEntry);
 
         const p1Score = parseInt(getStorageItem('p1ScoreCtrlPanel'), 10) || 0;
@@ -807,16 +1199,12 @@
         activeMatchSession.lastRackWinnerSlot = playerSlot;
 
         if (context.gameType === 'game4') {
-            if (activeMatchSession.straightPoolRunSlot === playerSlot) {
-                activeMatchSession.straightPoolRunLength += 1;
-            } else {
-                activeMatchSession.straightPoolRunSlot = playerSlot;
-                activeMatchSession.straightPoolRunLength = 1;
-            }
-            await applyHighestBreakIfBetter(ids.winnerId, activeMatchSession.straightPoolRunLength, 'game4');
+            await applyHighestBreakIfBetter(ids.winnerId, straightRunLength, 'game4');
         }
 
         await checkMatchCompletion();
+        await persistPendingSession();
+        broadcastOverlayStatsIfEnabled();
     }
 
     async function applyHighestBreakIfBetter(playerId, breakValue, gameType) {
@@ -857,6 +1245,7 @@
         }
         if (v > (match.matchHighestBreak[playerId] || 0)) {
             match.matchHighestBreak[playerId] = v;
+            queuePersistPendingSession();
         }
     }
 
@@ -969,6 +1358,7 @@
         await applyHighestBreakIfBetter(activeMatchSession.player2Id, highBreakP2, 'game8');
 
         await checkSnookerMatchCompletion(p1Frames, p2Frames);
+        await persistPendingSession();
         broadcastOverlayStatsIfEnabled();
     }
 
@@ -990,6 +1380,13 @@
     }
 
     async function undoLastRack(playerSlot) {
+        const run = () => undoLastRackInternal(playerSlot);
+        const queued = rackRecordQueue.then(run, run);
+        rackRecordQueue = queued.catch(function () { /* keep queue alive */ });
+        return queued;
+    }
+
+    async function undoLastRackInternal(playerSlot) {
         if (!activeMatchSession.matchId || activeMatchSession.lastRackWinnerSlot !== playerSlot) {
             return;
         }
@@ -1016,13 +1413,45 @@
         }
 
         await applyRackDelta(winnerId, loserId, context.gameType, -1);
+        if (isTrackerRackWinGameType(context.gameType) && lastRack.winnerId === winnerId) {
+            if (lastRack.breakAndRun) {
+                await applyRunOutDelta(winnerId, context.gameType, -1, 'breakAndRun');
+            } else if (lastRack.tableRun) {
+                await applyRunOutDelta(winnerId, context.gameType, -1, 'tableRun');
+            }
+        }
         activeMatchSession.lastRackWinnerSlot = match.racks.length > 0
             ? (match.racks[match.racks.length - 1].winnerId === activeMatchSession.player1Id ? '1' : '2')
             : null;
         if (context.gameType === 'game4') {
+            // Rebuild current run from trailing consecutive racks for the same player.
+            recomputeStraightPoolRunFromRacks();
+        }
+        await persistPendingSession();
+        broadcastOverlayStatsIfEnabled();
+    }
+
+    /** Straight Pool: current run = trailing streak of primary-score racks for one player. */
+    function recomputeStraightPoolRunFromRacks() {
+        const match = getActivePendingMatch();
+        if (!match || !match.racks || match.racks.length === 0) {
             activeMatchSession.straightPoolRunSlot = null;
             activeMatchSession.straightPoolRunLength = 0;
+            return;
         }
+        const lastWinnerId = match.racks[match.racks.length - 1].winnerId;
+        let length = 0;
+        for (let i = match.racks.length - 1; i >= 0; i--) {
+            if (match.racks[i].winnerId !== lastWinnerId) {
+                break;
+            }
+            length += 1;
+        }
+        const slot = lastWinnerId === activeMatchSession.player1Id
+            ? '1'
+            : (lastWinnerId === activeMatchSession.player2Id ? '2' : null);
+        activeMatchSession.straightPoolRunSlot = slot;
+        activeMatchSession.straightPoolRunLength = slot ? length : 0;
     }
 
     async function recordBallWin(playerSlot) {
@@ -1051,6 +1480,7 @@
         });
         await applyBallDelta(ids.winnerId, ids.loserId, context.gameType, 1);
         activeMatchSession.lastBallWinnerSlot = playerSlot;
+        await persistPendingSession();
         // Snooker overlay is refreshed from control_panel after sequence state is committed.
         if (context.gameType !== 'game8') {
             broadcastOverlayStatsIfEnabled();
@@ -1107,6 +1537,7 @@
         activeMatchSession.lastBallWinnerSlot = match.balls.length > 0
             ? (match.balls[match.balls.length - 1].winnerId === activeMatchSession.player1Id ? '1' : '2')
             : null;
+        await persistPendingSession();
     }
 
     function getCurrentScores() {
@@ -1147,6 +1578,64 @@
         await finalizeMatchCompletion(winnerSlot, scores);
     }
 
+    /**
+     * Append any missing rack rows so match.racks counts match the live scoreboard.
+     * Used before Call Match Early / End Match so async recordRackWin cannot under-count.
+     */
+    async function reconcileMatchRacksWithScores(match, scores) {
+        if (!match || !scores) {
+            return;
+        }
+        if (!match.racks) {
+            match.racks = [];
+        }
+        const p1Id = match.player1Id;
+        const p2Id = match.player2Id;
+        const wantP1 = clampScore(scores.p1);
+        const wantP2 = clampScore(scores.p2);
+        let p1Have = match.racks.filter(function (r) { return r.winnerId === p1Id; }).length;
+        let p2Have = match.racks.filter(function (r) { return r.winnerId === p2Id; }).length;
+        const gameType = match.gameType || activeMatchSession.gameType || 'game1';
+        const now = new Date().toISOString();
+
+        while (p1Have < wantP1) {
+            const entry = {
+                rackNumber: match.racks.length + 1,
+                winnerId: p1Id,
+                timestamp: now
+            };
+            if (isStraightPoolGameType(gameType)) {
+                entry.highestBreakP1 = 0;
+                entry.highestBreakP2 = 0;
+            }
+            match.racks.push(entry);
+            await applyRackDelta(p1Id, p2Id, gameType, 1);
+            p1Have += 1;
+        }
+        while (p2Have < wantP2) {
+            const entry = {
+                rackNumber: match.racks.length + 1,
+                winnerId: p2Id,
+                timestamp: now
+            };
+            if (isStraightPoolGameType(gameType)) {
+                entry.highestBreakP1 = 0;
+                entry.highestBreakP2 = 0;
+            }
+            match.racks.push(entry);
+            await applyRackDelta(p2Id, p1Id, gameType, 1);
+            p2Have += 1;
+        }
+
+        match.finalScore = { p1: wantP1, p2: wantP2 };
+        if (match.racks.length > 0) {
+            const last = match.racks[match.racks.length - 1];
+            activeMatchSession.lastRackWinnerSlot = last.winnerId === p1Id
+                ? '1'
+                : (last.winnerId === p2Id ? '2' : activeMatchSession.lastRackWinnerSlot);
+        }
+    }
+
     async function finalizeMatchCompletion(winnerSlot, scores) {
         if (activeMatchSession.matchCompletedRecorded || activeMatchSession.duplicateNames) {
             return;
@@ -1156,6 +1645,9 @@
         if (!match) {
             return;
         }
+
+        // Do not flushRackRecordQueue here — this may run inside the queue (deadlock).
+        await reconcileMatchRacksWithScores(match, scores);
 
         const ids = getSlotPlayerIds(winnerSlot);
         const now = new Date().toISOString();
@@ -1168,6 +1660,7 @@
         await applyGameDelta(ids.winnerId, ids.loserId, activeMatchSession.gameType, 1);
         activeMatchSession.status = 'completed';
         activeMatchSession.matchCompletedRecorded = true;
+        await persistPendingSession();
         broadcastOverlayStatsIfEnabled();
     }
 
@@ -1185,12 +1678,18 @@
      * @returns {Promise<boolean>} true if a match was saved
      */
     async function callGame() {
-        if (!canCallGame()) {
-            return false;
-        }
+        await flushRackRecordQueue();
 
         const match = getActivePendingMatch();
         const scores = getCurrentScores();
+        if (!match || activeMatchSession.matchCompletedRecorded || activeMatchSession.duplicateNames) {
+            return false;
+        }
+        // After flush, require either recorded racks or a non-zero scoreboard to reconcile.
+        if ((!match.racks || match.racks.length === 0) && (scores.p1 + scores.p2) <= 0) {
+            return false;
+        }
+
         match.finalScore = { p1: scores.p1, p2: scores.p2 };
 
         // Keep storage in sync with the board so finalize + history use the same scoreline.
@@ -1198,6 +1697,8 @@
             setStorageItem('p1ScoreCtrlPanel', scores.p1);
             setStorageItem('p2ScoreCtrlPanel', scores.p2);
         }
+
+        await reconcileMatchRacksWithScores(match, scores);
 
         let winnerSlot = null;
         if (scores.p1 > scores.p2) {
@@ -1216,6 +1717,7 @@
             await putMatch(match);
             activeMatchSession.status = 'completed';
             activeMatchSession.matchCompletedRecorded = true;
+            await persistPendingSession();
             broadcastOverlayStatsIfEnabled();
         }
         return true;
@@ -1237,6 +1739,7 @@
         await deleteMatchFromStore(match.id);
         activeMatchSession.status = 'active';
         activeMatchSession.matchCompletedRecorded = false;
+        await persistPendingSession();
         broadcastOverlayStatsIfEnabled();
     }
 
@@ -1279,6 +1782,11 @@
     }
 
     async function onNamesUpdated() {
+        // Boot postNames() runs before IndexedDB restore — ignore until init finishes.
+        if (!playerStatsReady) {
+            return;
+        }
+
         const p1Name = (document.getElementById('p1Name')?.value || '').trim();
         const p2Name = (document.getElementById('p2Name')?.value || '').trim();
 
@@ -1303,7 +1811,7 @@
             const context = getCurrentContext();
             if (sessionNeedsReset(p1Name, p2Name, context)) {
                 await abandonActivePendingMatch();
-                resetSessionState();
+                await resetSessionState();
             }
         }
         broadcastOverlayStatsIfEnabled();
@@ -1311,7 +1819,7 @@
 
     async function onClearGame() {
         await abandonActivePendingMatch();
-        resetSessionState();
+        await resetSessionState();
     }
 
     async function onResetScores(options) {
@@ -1320,14 +1828,14 @@
         if (endMatch) {
             // End Match: rack/frame stats are already stored on the match row. The scoreboard
             // is cleared before this runs, so do not persist finalScore from live storage.
-            resetSessionState();
+            await resetSessionState();
             await ensureActiveSession();
             broadcastOverlayStatsIfEnabled();
             return;
         }
 
         if (activeMatchSession.matchId && activeMatchSession.matchCompletedRecorded) {
-            resetSessionState();
+            await resetSessionState();
             await ensureActiveSession();
         } else if (activeMatchSession.matchId) {
             const match = getActivePendingMatch();
@@ -1341,31 +1849,86 @@
             activeMatchSession.status = 'active';
             activeMatchSession.lastRackWinnerSlot = null;
             activeMatchSession.lastBallWinnerSlot = null;
+            activeMatchSession.straightPoolRunSlot = null;
+            activeMatchSession.straightPoolRunLength = 0;
+            await persistPendingSession();
         }
         broadcastOverlayStatsIfEnabled();
     }
 
     async function undoAllRacksInMatch(match) {
-        const context = getCurrentContext();
-        for (let i = match.racks.length - 1; i >= 0; i--) {
-            const rack = match.racks[i];
-            const loserId = rack.winnerId === activeMatchSession.player1Id
-                ? activeMatchSession.player2Id
-                : activeMatchSession.player1Id;
-            await applyRackDelta(rack.winnerId, loserId, context.gameType, -1);
+        if (!match) {
+            return;
         }
-        if (match.balls) {
-            for (let j = match.balls.length - 1; j >= 0; j--) {
-                const ball = match.balls[j];
-                const loserId = ball.winnerId === activeMatchSession.player1Id
-                    ? activeMatchSession.player2Id
-                    : activeMatchSession.player1Id;
-                await applyBallDelta(ball.winnerId, loserId, context.gameType, -1);
+        const gameType = match.gameType || activeMatchSession.gameType ||
+            (typeof getCurrentContext === 'function' ? getCurrentContext().gameType : 'game1');
+        const p1Id = match.player1Id || activeMatchSession.player1Id;
+        const p2Id = match.player2Id || activeMatchSession.player2Id;
+        const racks = match.racks || [];
+        for (let i = racks.length - 1; i >= 0; i--) {
+            const rack = racks[i];
+            if (!rack || !rack.winnerId) {
+                continue;
             }
+            const loserId = rack.winnerId === p1Id ? p2Id : (rack.winnerId === p2Id ? p1Id : null);
+            if (!loserId) {
+                continue;
+            }
+            await applyRackDelta(rack.winnerId, loserId, gameType, -1);
+        }
+        const balls = match.balls || [];
+        for (let j = balls.length - 1; j >= 0; j--) {
+            const ball = balls[j];
+            if (!ball || !ball.winnerId) {
+                continue;
+            }
+            const loserId = ball.winnerId === p1Id ? p2Id : (ball.winnerId === p2Id ? p1Id : null);
+            if (!loserId) {
+                continue;
+            }
+            await applyBallDelta(ball.winnerId, loserId, gameType, -1);
         }
     }
 
-    function resetSessionState() {
+    function clearLiveMatchScoreboardState() {
+        if (typeof setStorageItem === 'function') {
+            setStorageItem('p1ScoreCtrlPanel', 0);
+            setStorageItem('p2ScoreCtrlPanel', 0);
+            setStorageItem('p1Score', 0);
+            setStorageItem('p2Score', 0);
+            setStorageItem('p1BallsCtrlPanel', 0);
+            setStorageItem('p2BallsCtrlPanel', 0);
+            setStorageItem('p1Balls', 0);
+            setStorageItem('p2Balls', 0);
+            setStorageItem('snookerCurrentBreak', '0');
+            setStorageItem('snookerFrameHighBreakP1', '0');
+            setStorageItem('snookerFrameHighBreakP2', '0');
+        }
+        ['p1Score', 'p2Score', 'p1Balls', 'p2Balls'].forEach(function (id) {
+            const el = document.getElementById(id);
+            if (el) {
+                el.value = 0;
+            }
+        });
+        if (typeof bc !== 'undefined') {
+            bc.postMessage({ player: '1', score: 0 });
+            bc.postMessage({ player: '2', score: 0 });
+            bc.postMessage({ player: '1', balls: 0 });
+            bc.postMessage({ player: '2', balls: 0 });
+        }
+        if (typeof updateScoreControlAvailability === 'function') {
+            updateScoreControlAvailability();
+        }
+        if (typeof updateCallGameButton === 'function') {
+            updateCallGameButton();
+        }
+    }
+
+    async function resetSessionState() {
+        // Only clear persisted meta when we actually had a session. Early postNames()
+        // before init must not wipe IndexedDB pending match (balls / match HB).
+        const shouldClearMeta = !!(activeMatchSession.matchId || activeMatchSession.pendingMatch);
+        pendingSessionGeneration += 1;
         activeMatchSession.pendingMatch = null;
         activeMatchSession.matchId = null;
         activeMatchSession.player1Id = null;
@@ -1382,6 +1945,13 @@
         activeMatchSession.duplicateNames = false;
         activeMatchSession.straightPoolRunSlot = null;
         activeMatchSession.straightPoolRunLength = 0;
+        if (shouldClearMeta) {
+            try {
+                await clearPendingSessionMeta();
+            } catch (err) {
+                console.error('Clear pending session error:', err);
+            }
+        }
     }
 
     function pairKey(idA, idB) {
@@ -1422,6 +1992,9 @@
                 best = frameBreak;
             }
         });
+        if (match.matchHighestBreak && match.matchHighestBreak[playerId]) {
+            best = Math.max(best, match.matchHighestBreak[playerId] || 0);
+        }
         if (isStraightPoolGameType(match.gameType)) {
             const run = longestConsecutiveRackWins(match, playerId);
             if (run > best) {
@@ -1429,6 +2002,64 @@
             }
         }
         return best;
+    }
+
+    function accumulateMatchIntoH2HSummary(summary, match, playerId1, playerId2) {
+        if (!summary || !match) {
+            return;
+        }
+        (match.racks || []).forEach(function (r) {
+            if (r.winnerId) {
+                summary.racksWon[r.winnerId] = (summary.racksWon[r.winnerId] || 0) + 1;
+            }
+        });
+        if (match.balls) {
+            match.balls.forEach(function (b) {
+                if (b.winnerId) {
+                    summary.ballsWon[b.winnerId] = (summary.ballsWon[b.winnerId] || 0) + 1;
+                }
+            });
+        }
+        if (match.status === 'completed' && match.winnerId) {
+            summary.gamesWon[match.winnerId] = (summary.gamesWon[match.winnerId] || 0) + 1;
+        }
+        const hb1 = highestBreakFromMatchForPlayer(match, playerId1);
+        const hb2 = highestBreakFromMatchForPlayer(match, playerId2);
+        if (hb1 > summary.highestBreak[playerId1]) {
+            summary.highestBreak[playerId1] = hb1;
+        }
+        if (hb2 > summary.highestBreak[playerId2]) {
+            summary.highestBreak[playerId2] = hb2;
+        }
+        const date = match.completedAt || match.startedAt;
+        if (date && (!summary.lastPlayedAt || date > summary.lastPlayedAt)) {
+            summary.lastPlayedAt = date;
+        }
+    }
+
+    function pendingMatchBelongsToPair(match, playerId1, playerId2) {
+        if (!match || !playerId1 || !playerId2) {
+            return false;
+        }
+        return (match.player1Id === playerId1 && match.player2Id === playerId2) ||
+            (match.player1Id === playerId2 && match.player2Id === playerId1);
+    }
+
+    /** In-progress match eligible for H2H / stats editing (not yet written as completed). */
+    function getEditablePendingMatch() {
+        const match = getActivePendingMatch();
+        if (!match || !match.id || activeMatchSession.matchCompletedRecorded) {
+            return null;
+        }
+        if (match.status === 'completed') {
+            return null;
+        }
+        return match;
+    }
+
+    function isEditablePendingMatchId(matchId) {
+        const pending = getEditablePendingMatch();
+        return !!(matchId && pending && pending.id === matchId);
     }
 
     async function getHeadToHead(playerId1, playerId2, options) {
@@ -1442,8 +2073,7 @@
         const allMatches = await promisifyRequest(store.getAll());
 
         const relevant = allMatches.filter(function (m) {
-            return (m.player1Id === playerId1 && m.player2Id === playerId2) ||
-                (m.player1Id === playerId2 && m.player2Id === playerId1);
+            return pendingMatchBelongsToPair(m, playerId1, playerId2);
         }).filter(function (m) {
             return m.status === 'completed';
         }).filter(function (m) {
@@ -1470,32 +2100,18 @@
         };
 
         relevant.forEach(function (m) {
-            (m.racks || []).forEach(function (r) {
-                if (r.winnerId) {
-                    summary.racksWon[r.winnerId] = (summary.racksWon[r.winnerId] || 0) + 1;
-                }
-            });
-            if (m.balls) {
-                m.balls.forEach(function (b) {
-                    summary.ballsWon[b.winnerId] = (summary.ballsWon[b.winnerId] || 0) + 1;
-                });
-            }
-            if (m.status === 'completed' && m.winnerId) {
-                summary.gamesWon[m.winnerId] = (summary.gamesWon[m.winnerId] || 0) + 1;
-            }
-            const hb1 = highestBreakFromMatchForPlayer(m, playerId1);
-            const hb2 = highestBreakFromMatchForPlayer(m, playerId2);
-            if (hb1 > summary.highestBreak[playerId1]) {
-                summary.highestBreak[playerId1] = hb1;
-            }
-            if (hb2 > summary.highestBreak[playerId2]) {
-                summary.highestBreak[playerId2] = hb2;
-            }
-            const date = m.completedAt || m.startedAt;
-            if (!summary.lastPlayedAt || date > summary.lastPlayedAt) {
-                summary.lastPlayedAt = date;
-            }
+            accumulateMatchIntoH2HSummary(summary, m, playerId1, playerId2);
         });
+
+        // Live match: fold finished racks/frames/balls into H2H before the match is completed.
+        const pending = getEditablePendingMatch();
+        if (pending &&
+            pendingMatchBelongsToPair(pending, playerId1, playerId2) &&
+            (!gameTypeFilter || pending.gameType === gameTypeFilter) &&
+            !relevant.some(function (m) { return m.id === pending.id; })) {
+            accumulateMatchIntoH2HSummary(summary, pending, playerId1, playerId2);
+            summary.matches = [pending].concat(relevant);
+        }
 
         return summary;
     }
@@ -1513,15 +2129,26 @@
         });
     }
 
-    async function getMatchesForPlayer(playerId) {
+    async function getMatchesForPlayer(playerId, options) {
+        const opts = options || {};
         const all = await getStoredMatchesForPlayer(playerId);
-        return all.filter(function (m) {
+        let matches = all.filter(function (m) {
             return m.status === 'completed';
         }).sort(function (a, b) {
             const dateA = a.completedAt || a.startedAt || '';
             const dateB = b.completedAt || b.startedAt || '';
             return dateB.localeCompare(dateA);
         });
+
+        if (opts.includePending) {
+            const pending = getEditablePendingMatch();
+            if (pending &&
+                (pending.player1Id === playerId || pending.player2Id === playerId) &&
+                !matches.some(function (m) { return m.id === pending.id; })) {
+                matches = [pending].concat(matches);
+            }
+        }
+        return matches;
     }
 
     async function deleteMatchFromStore(matchId) {
@@ -1618,7 +2245,27 @@
                         typeStats.highestBreak = frameBreak;
                     }
                 }
+                if (r.breakAndRun && r.winnerId === playerId) {
+                    player.stats.breakAndRuns++;
+                    ensureTypeStats(player.stats, gameType).breakAndRuns++;
+                }
+                if (r.tableRun && r.winnerId === playerId) {
+                    player.stats.tableRuns++;
+                    ensureTypeStats(player.stats, gameType).tableRuns++;
+                }
             });
+
+            // Straight Pool legacy matches may lack per-ball run fields — derive from streaks.
+            if (isStraightPoolGameType(gameType)) {
+                const derivedRun = longestConsecutiveRackWins(m, playerId);
+                if (derivedRun > (player.stats.highestBreak || 0)) {
+                    player.stats.highestBreak = derivedRun;
+                }
+                const typeStats = ensureTypeStats(player.stats, gameType);
+                if (derivedRun > (typeStats.highestBreak || 0)) {
+                    typeStats.highestBreak = derivedRun;
+                }
+            }
 
             (m.balls || []).forEach(function (b) {
                 if (b.winnerId === playerId) {
@@ -1750,16 +2397,215 @@
         await putMatch(match);
 
         if (activeMatchSession.matchId === match.id) {
-            resetSessionState();
+            await resetSessionState();
         }
 
         await recomputePlayersForMatch(match);
         return match;
     }
 
+    function refreshMatchHighestBreakFromRacks(match) {
+        if (!match) {
+            return;
+        }
+        const map = {};
+        (match.racks || []).forEach(function (r) {
+            const hb1 = clampScore(r.highestBreakP1);
+            const hb2 = clampScore(r.highestBreakP2);
+            if (hb1 > 0 && hb1 > (map[match.player1Id] || 0)) {
+                map[match.player1Id] = hb1;
+            }
+            if (hb2 > 0 && hb2 > (map[match.player2Id] || 0)) {
+                map[match.player2Id] = hb2;
+            }
+        });
+        match.matchHighestBreak = map;
+    }
+
+    function syncLiveScoreboardFromMatch(match) {
+        if (!match || typeof setStorageItem !== 'function') {
+            return;
+        }
+        const p1 = clampScore(match.finalScore && match.finalScore.p1);
+        const p2 = clampScore(match.finalScore && match.finalScore.p2);
+        setStorageItem('p1ScoreCtrlPanel', p1);
+        setStorageItem('p2ScoreCtrlPanel', p2);
+        setStorageItem('p1Score', p1);
+        setStorageItem('p2Score', p2);
+        const p1ScoreEl = document.getElementById('p1Score');
+        const p2ScoreEl = document.getElementById('p2Score');
+        if (p1ScoreEl) {
+            p1ScoreEl.value = p1;
+        }
+        if (p2ScoreEl) {
+            p2ScoreEl.value = p2;
+        }
+        if (typeof bc !== 'undefined') {
+            bc.postMessage({ player: '1', score: p1 });
+            bc.postMessage({ player: '2', score: p2 });
+        }
+
+        if (gameTypeHasBallScoring(match.gameType)) {
+            const b1 = countBallsForPlayer(match, match.player1Id);
+            const b2 = countBallsForPlayer(match, match.player2Id);
+            setStorageItem('p1BallsCtrlPanel', b1);
+            setStorageItem('p2BallsCtrlPanel', b2);
+            setStorageItem('p1Balls', b1);
+            setStorageItem('p2Balls', b2);
+            const p1BallsEl = document.getElementById('p1Balls');
+            const p2BallsEl = document.getElementById('p2Balls');
+            if (p1BallsEl) {
+                p1BallsEl.value = b1;
+            }
+            if (p2BallsEl) {
+                p2BallsEl.value = b2;
+            }
+            if (typeof bc !== 'undefined') {
+                bc.postMessage({ player: '1', balls: b1 });
+                bc.postMessage({ player: '2', balls: b2 });
+            }
+        }
+
+        if (typeof updateScoreControlAvailability === 'function') {
+            updateScoreControlAvailability();
+        }
+        if (typeof updateCallGameButton === 'function') {
+            updateCallGameButton();
+        }
+    }
+
+    /**
+     * Apply stats-window edits to the live in-progress match (racks/frames/balls/breaks).
+     * Keeps the match active; career rack/ball deltas are rewritten from the new rows.
+     */
+    async function savePendingMatchEdit(matchPayload) {
+        const match = getEditablePendingMatch();
+        if (!match || !matchPayload || matchPayload.id !== match.id) {
+            throw new Error('No in-progress match to edit.');
+        }
+        if (matchPayload.player1Id !== match.player1Id || matchPayload.player2Id !== match.player2Id) {
+            throw new Error('Cannot change players on an in-progress match.');
+        }
+
+        const gameType = match.gameType || activeMatchSession.gameType || 'game1';
+        const includeBalls = gameTypeHasBallScoring(gameType);
+        const ballsP1 = includeBalls ? clampScore(matchPayload.ballsP1) : 0;
+        const ballsP2 = includeBalls ? clampScore(matchPayload.ballsP2) : 0;
+
+        await undoAllRacksInMatch(match);
+
+        const racks = normalizeRacksPayload(
+            matchPayload.racks || [],
+            match.player1Id,
+            match.player2Id,
+            gameType
+        );
+        const scoreP1 = racks.filter(function (r) { return r.winnerId === match.player1Id; }).length;
+        const scoreP2 = racks.filter(function (r) { return r.winnerId === match.player2Id; }).length;
+
+        match.racks = racks;
+        match.balls = includeBalls ? synthesizeBallsFromCounts(match, ballsP1, ballsP2) : [];
+        match.finalScore = { p1: scoreP1, p2: scoreP2 };
+        match.status = 'active';
+        match.winnerId = null;
+        match.completedAt = null;
+        refreshMatchHighestBreakFromRacks(match);
+
+        for (let i = 0; i < racks.length; i++) {
+            const rack = racks[i];
+            if (!rack.winnerId) {
+                continue;
+            }
+            const loserId = rack.winnerId === match.player1Id ? match.player2Id : match.player1Id;
+            await applyRackDelta(rack.winnerId, loserId, gameType, 1);
+            const hb = rack.winnerId === match.player1Id
+                ? clampScore(rack.highestBreakP1)
+                : clampScore(rack.highestBreakP2);
+            if (hb > 0) {
+                await applyHighestBreakIfBetter(rack.winnerId, hb, gameType);
+            }
+            if (isSnookerGameType(gameType)) {
+                const otherHb = rack.winnerId === match.player1Id
+                    ? clampScore(rack.highestBreakP2)
+                    : clampScore(rack.highestBreakP1);
+                const otherId = rack.winnerId === match.player1Id ? match.player2Id : match.player1Id;
+                if (otherHb > 0) {
+                    await applyHighestBreakIfBetter(otherId, otherHb, gameType);
+                }
+            }
+        }
+
+        if (includeBalls && match.balls) {
+            for (let j = 0; j < match.balls.length; j++) {
+                const ball = match.balls[j];
+                const loserId = ball.winnerId === match.player1Id ? match.player2Id : match.player1Id;
+                await applyBallDelta(ball.winnerId, loserId, gameType, 1);
+            }
+        }
+
+        activeMatchSession.status = 'active';
+        activeMatchSession.matchCompletedRecorded = false;
+        activeMatchSession.lastRackWinnerSlot = racks.length > 0
+            ? (racks[racks.length - 1].winnerId === match.player1Id ? '1' : '2')
+            : null;
+        activeMatchSession.lastBallWinnerSlot = match.balls && match.balls.length > 0
+            ? (match.balls[match.balls.length - 1].winnerId === match.player1Id ? '1' : '2')
+            : null;
+
+        if (isStraightPoolGameType(gameType)) {
+            recomputeStraightPoolRunFromRacks();
+            if (activeMatchSession.straightPoolRunSlot && activeMatchSession.straightPoolRunLength > 0) {
+                const runIds = getSlotPlayerIds(activeMatchSession.straightPoolRunSlot);
+                await applyHighestBreakIfBetter(
+                    runIds.winnerId,
+                    activeMatchSession.straightPoolRunLength,
+                    'game4'
+                );
+            }
+        } else {
+            activeMatchSession.straightPoolRunSlot = null;
+            activeMatchSession.straightPoolRunLength = 0;
+        }
+
+        syncLiveScoreboardFromMatch(match);
+        await persistPendingSession();
+
+        if (isSnookerGameType(gameType)) {
+            await checkSnookerMatchCompletion(scoreP1, scoreP2);
+        } else {
+            await checkMatchCompletion();
+        }
+        broadcastOverlayStatsIfEnabled();
+        return match;
+    }
+
+    async function discardPendingMatch() {
+        const match = getEditablePendingMatch();
+        if (!match) {
+            return;
+        }
+        const p1Id = match.player1Id;
+        const p2Id = match.player2Id;
+
+        // Reverse live rack/ball deltas, then rebuild career stats from completed matches only
+        // so highest breaks and any residual frame counts from this match are fully cleared.
+        await abandonActivePendingMatch();
+        await resetSessionState();
+        clearLiveMatchScoreboardState();
+
+        if (p1Id) {
+            await recomputePlayerStats(p1Id);
+        }
+        if (p2Id && p2Id !== p1Id) {
+            await recomputePlayerStats(p2Id);
+        }
+        broadcastOverlayStatsIfEnabled();
+    }
+
     function normalizeRacksPayload(rawRacks, player1Id, player2Id, gameType) {
         const timestamp = new Date().toISOString();
         const isSnooker = isSnookerGameType(gameType);
+        const isStraight = isStraightPoolGameType(gameType);
         const racks = [];
         (rawRacks || []).forEach(function (raw, index) {
             if (!raw) {
@@ -1785,6 +2631,9 @@
                 entry.frameScore = { p1: p1Pts, p2: p2Pts };
                 entry.highestBreakP1 = clampScore(raw.highestBreakP1);
                 entry.highestBreakP2 = clampScore(raw.highestBreakP2);
+            } else if (isStraight) {
+                entry.highestBreakP1 = clampScore(raw.highestBreakP1);
+                entry.highestBreakP2 = clampScore(raw.highestBreakP2);
             }
             racks.push(entry);
         });
@@ -1798,7 +2647,7 @@
         }
 
         if (activeMatchSession.matchId === matchId) {
-            resetSessionState();
+            await resetSessionState();
         }
 
         await deleteMatchFromStore(matchId);
@@ -1860,7 +2709,7 @@
         for (let i = 0; i < matches.length; i++) {
             const m = matches[i];
             if (activeMatchSession.matchId === m.id) {
-                resetSessionState();
+                await resetSessionState();
             }
             opponentIds[m.player1Id === playerId ? m.player2Id : m.player1Id] = true;
             await deleteMatchFromStore(m.id);
@@ -1965,15 +2814,12 @@
         const dbTx = tx(['players', 'matches'], 'readwrite');
         await promisifyRequest(dbTx.objectStore('players').clear());
         await promisifyRequest(dbTx.objectStore('matches').clear());
-        resetSessionState();
-    }
-
-    function getOverlayStatsMode() {
-        return localStorage.getItem('overlayStatsMode') || '';
-    }
-
-    function setOverlayStatsMode(mode) {
-        localStorage.setItem('overlayStatsMode', mode || '');
+        await resetSessionState();
+        try {
+            await clearAllPendingSessionMeta();
+        } catch (err) {
+            console.error('Clear pending session error:', err);
+        }
     }
 
     function migrateOverlayStorage() {
@@ -1981,6 +2827,45 @@
         if (localStorage.getItem('h2hOverlayEnabled')) {
             localStorage.removeItem('h2hOverlayEnabled');
         }
+        const instanceId = getInstanceId();
+        if (!instanceId || typeof setStorageItem !== 'function') {
+            return;
+        }
+        const prefix = instanceId + '_';
+        [OVERLAY_STATS_MODE_KEY, OVERLAY_STATS_PAYLOAD_KEY].forEach(function (key) {
+            if (localStorage.getItem(prefix + key) != null) {
+                return;
+            }
+            const legacy = localStorage.getItem(key);
+            if (legacy != null) {
+                localStorage.setItem(prefix + key, legacy);
+                localStorage.removeItem(key);
+            }
+        });
+    }
+
+    function getOverlayStatsMode() {
+        migrateOverlayStorage();
+        if (typeof getStorageItem === 'function') {
+            return getStorageItem(OVERLAY_STATS_MODE_KEY, '') || '';
+        }
+        return localStorage.getItem(OVERLAY_STATS_MODE_KEY) || '';
+    }
+
+    function setOverlayStatsMode(mode) {
+        if (typeof setStorageItem === 'function') {
+            setStorageItem(OVERLAY_STATS_MODE_KEY, mode || '');
+        } else {
+            localStorage.setItem(OVERLAY_STATS_MODE_KEY, mode || '');
+        }
+    }
+
+    function readOverlayStatsPayloadRaw() {
+        migrateOverlayStorage();
+        if (typeof getStorageItem === 'function') {
+            return getStorageItem(OVERLAY_STATS_PAYLOAD_KEY);
+        }
+        return localStorage.getItem(OVERLAY_STATS_PAYLOAD_KEY);
     }
 
     function updateOverlayButtonStyles(activeMode) {
@@ -2070,26 +2955,31 @@
             title: player.name,
             gameType: gameType,
             gameTypeLabel: GAME_TYPE_LABELS[gameType] || gameType,
-            showBalls: showsBallStats(gameType),
-            showHighestBreak: showsHighestBreakStats(gameType),
+            showGamesWL: overlayStatEnabled(gameType, 'gamesWL'),
+            showRacksWL: overlayStatEnabled(gameType, 'racksWL'),
+            showWinStreak: overlayStatEnabled(gameType, 'winStreak'),
+            showBalls: overlayStatEnabled(gameType, 'ballsPotted'),
+            showHighestBreak: overlayStatEnabled(gameType, 'highestBreak'),
             highestBreakLabel: highestBreakLabel(gameType),
-            showCurrentBreak: showsHighestBreakStats(gameType),
+            showCurrentBreak: overlayStatEnabled(gameType, 'currentBreak'),
             currentBreakLabel: currentBreakLabel(gameType),
             currentBreak: currentBreak,
-            showPossibleBreak: isSnookerGameType(gameType),
+            showPossibleBreak: overlayStatEnabled(gameType, 'possibleBreak'),
             possibleBreakLabel: 'Possible Break',
             possibleBreak: possibleBreak,
-            showScoreMargin: isSnookerGameType(gameType) && !!scoreMargin.showMargin,
+            showScoreMargin: overlayStatEnabled(gameType, 'scoreMargin') && !!scoreMargin.showMargin,
             scoreMarginLabel: 'Difference',
             scoreMargin: scoreMargin.display,
             scoreMarginDiff: scoreMargin.diff,
             scoreMarginRemaining: scoreMargin.remaining,
             scoreMarginCritical: !!scoreMargin.critical,
             scoreMarginSafe: !!scoreMargin.safe,
-            showPointsRemaining: isSnookerGameType(gameType) && !!scoreMargin.showMargin,
+            showPointsRemaining: overlayStatEnabled(gameType, 'pointsRemaining') && !!scoreMargin.showMargin,
             pointsRemainingLabel: 'Points Remaining',
             pointsRemaining: scoreMargin.remaining,
             pointsRemainingTone: scoreMargin.pointsRemainingTone || '',
+            showBreakAndRun: overlayStatEnabled(gameType, 'breakAndRun'),
+            showTableRun: overlayStatEnabled(gameType, 'tableRun'),
             rackLabel: rackOrFrameLabel(false, gameType),
             racksLabel: rackOrFrameLabel(true, gameType),
             gamesWL: formatWL(typeStats.gamesWon, typeStats.gamesLost),
@@ -2097,6 +2987,8 @@
             // Match-scoped only — cleared when End Match / Clear Game starts a new session
             ballsPotted: matchStats.ballsPotted || 0,
             highestBreak: matchStats.highestBreak || 0,
+            breakAndRuns: typeStats.breakAndRuns || 0,
+            tableRuns: typeStats.tableRuns || 0,
             winRate: getWinPct(typeStats.gamesWon, typeStats.gamesLost),
             rackWinRate: getWinPct(typeStats.racksWon, typeStats.racksLost),
             winStreak: getCurrentWinStreak(playerId, matches)
@@ -2137,15 +3029,22 @@
             };
         }
 
+        const p1TypeStats = readTypeStats(h2h.player1, gameType);
+        const p2TypeStats = readTypeStats(h2h.player2, gameType);
+
         return {
             visible: visible,
             mode: 'h2h',
             title: 'Head to Head',
             gameType: gameType,
             gameTypeLabel: GAME_TYPE_LABELS[gameType] || gameType,
-            showBalls: showsBallStats(gameType),
-            showHighestBreak: showsHighestBreakStats(gameType),
+            showGamesWL: overlayStatEnabled(gameType, 'gamesWL'),
+            showRacksWL: overlayStatEnabled(gameType, 'racksWL'),
+            showBalls: overlayStatEnabled(gameType, 'ballsPotted'),
+            showHighestBreak: overlayStatEnabled(gameType, 'highestBreak'),
             highestBreakLabel: highestBreakLabel(gameType),
+            showBreakAndRun: overlayStatEnabled(gameType, 'breakAndRun'),
+            showTableRun: overlayStatEnabled(gameType, 'tableRun'),
             rackLabel: rackOrFrameLabel(false, gameType),
             racksLabel: rackOrFrameLabel(true, gameType),
             p1Name: h2h.player1.name,
@@ -2157,7 +3056,11 @@
             p1Balls: h2h.ballsWon[p1Id] || 0,
             p2Balls: h2h.ballsWon[p2Id] || 0,
             p1HighestBreak: h2h.highestBreak[p1Id] || 0,
-            p2HighestBreak: h2h.highestBreak[p2Id] || 0
+            p2HighestBreak: h2h.highestBreak[p2Id] || 0,
+            p1BreakAndRuns: p1TypeStats.breakAndRuns || 0,
+            p2BreakAndRuns: p2TypeStats.breakAndRuns || 0,
+            p1TableRuns: p1TypeStats.tableRuns || 0,
+            p2TableRuns: p2TypeStats.tableRuns || 0
         };
     }
 
@@ -2180,6 +3083,7 @@
 
     function onScoreModeChanged() {
         broadcastOverlayStatsIfEnabled();
+        renderStatsVisibilityPanel();
         const modal = document.getElementById('statsModal');
         if (modal && modal.style.display === 'block') {
             refreshStatsUI();
@@ -2188,7 +3092,12 @@
 
     function persistOverlayStatsPayload(payload) {
         try {
-            localStorage.setItem('overlayStatsPayload', JSON.stringify(payload || { visible: false }));
+            const json = JSON.stringify(payload || { visible: false });
+            if (typeof setStorageItem === 'function') {
+                setStorageItem(OVERLAY_STATS_PAYLOAD_KEY, json);
+            } else {
+                localStorage.setItem(OVERLAY_STATS_PAYLOAD_KEY, json);
+            }
         } catch (err) {
             console.warn('Failed to persist overlay stats payload:', err);
         }
@@ -2210,14 +3119,14 @@
         if (isSnookerGameType(gameType)) {
             payload.possibleBreak = readLivePossibleBreakForSlot(slot);
             const scoreMargin = readLiveScoreMarginForSlot(slot);
-            payload.showScoreMargin = !!scoreMargin.showMargin;
+            payload.showScoreMargin = overlayStatEnabled(gameType, 'scoreMargin') && !!scoreMargin.showMargin;
             payload.scoreMarginLabel = 'Difference';
             payload.scoreMargin = scoreMargin.display;
             payload.scoreMarginDiff = scoreMargin.diff;
             payload.scoreMarginRemaining = scoreMargin.remaining;
             payload.scoreMarginCritical = !!scoreMargin.critical;
             payload.scoreMarginSafe = !!scoreMargin.safe;
-            payload.showPointsRemaining = !!scoreMargin.showMargin;
+            payload.showPointsRemaining = overlayStatEnabled(gameType, 'pointsRemaining') && !!scoreMargin.showMargin;
             payload.pointsRemainingLabel = 'Points Remaining';
             payload.pointsRemaining = scoreMargin.remaining;
             payload.pointsRemainingTone = scoreMargin.pointsRemainingTone || '';
@@ -2239,7 +3148,7 @@
         }
         let payload;
         try {
-            const raw = localStorage.getItem('overlayStatsPayload');
+            const raw = readOverlayStatsPayloadRaw();
             payload = raw ? JSON.parse(raw) : null;
         } catch (err) {
             return false;
@@ -2343,6 +3252,14 @@
 
         input.addEventListener('focus', function () {
             refreshAutocomplete(slot, input, list);
+        });
+
+        input.addEventListener('blur', function () {
+            setTimeout(function () {
+                if (typeof postNames === 'function') {
+                    postNames();
+                }
+            }, 0);
         });
 
         input.addEventListener('dblclick', function (e) {
@@ -2575,6 +3492,7 @@
         const opts = options || {};
         const viewerId = opts.viewerPlayerId || null;
         const isSnooker = isSnookerGameType(match.gameType);
+        const isStraight = isStraightPoolGameType(match.gameType);
         const p1Name = escapeHtml(match.player1Name || 'Player 1');
         const p2Name = escapeHtml(match.player2Name || 'Player 2');
 
@@ -2600,6 +3518,32 @@
                     result = r.winnerId === viewerId ? 'Won' : 'Lost';
                 }
                 return '<tr><td>' + num + '</td><td>' + pts + '</td><td>' + hb + '</td><td>' + result + '</td></tr>';
+            }).join('');
+            return '<div class="stats-match-racks-wrap">' +
+                '<table class="stats-table stats-rack-detail-table"><thead>' + header + '</thead><tbody>' +
+                rows + '</tbody></table></div>';
+        }
+
+        if (isStraight) {
+            const neutral = !viewerId;
+            const header = neutral
+                ? '<tr><th>#</th><th>Run ' + p1Name + '</th><th>Run ' + p2Name + '</th><th>Winner</th></tr>'
+                : '<tr><th>#</th><th>Run</th><th>Result</th></tr>';
+            const rows = racks.map(function (r) {
+                const num = r.rackNumber || '';
+                const hb1 = parseInt(r.highestBreakP1, 10) || 0;
+                const hb2 = parseInt(r.highestBreakP2, 10) || 0;
+                if (neutral) {
+                    return '<tr><td>' + num + '</td><td>' + hb1 + '</td><td>' + hb2 + '</td><td>' +
+                        escapeHtml(winnerDisplayName(match, r.winnerId)) + '</td></tr>';
+                }
+                const viewerIsP1 = match.player1Id === viewerId;
+                const run = viewerIsP1 ? (hb1 + '\u2013' + hb2) : (hb2 + '\u2013' + hb1);
+                let result = '\u2014';
+                if (r.winnerId) {
+                    result = r.winnerId === viewerId ? 'Won' : 'Lost';
+                }
+                return '<tr><td>' + num + '</td><td>' + run + '</td><td>' + result + '</td></tr>';
             }).join('');
             return '<div class="stats-match-racks-wrap">' +
                 '<table class="stats-table stats-rack-detail-table"><thead>' + header + '</thead><tbody>' +
@@ -2636,20 +3580,25 @@
         }
 
         return matches.map(function (m) {
+            const inProgress = m.status !== 'completed';
+            const score = m.finalScore || { p1: 0, p2: 0 };
+            const dateLabel = inProgress
+                ? 'In progress'
+                : formatDate(m.completedAt || m.startedAt);
             let mainRow;
             if (h2h) {
                 const id1 = h2h.id1;
-                const p1Score = m.player1Id === id1 ? m.finalScore.p1 : m.finalScore.p2;
-                const p2Score = m.player1Id === id1 ? m.finalScore.p2 : m.finalScore.p1;
-                mainRow = '<tr class="stats-match-row"><td>' + formatDate(m.completedAt || m.startedAt) + '</td>' +
+                const p1Score = m.player1Id === id1 ? score.p1 : score.p2;
+                const p2Score = m.player1Id === id1 ? score.p2 : score.p1;
+                mainRow = '<tr class="stats-match-row"><td>' + dateLabel + '</td>' +
                     '<td>' + (GAME_TYPE_LABELS[m.gameType] || m.gameType) + '</td>' +
                     '<td>' + escapeHtml(h2h.name1) + ' ' + p1Score + ' - ' + p2Score + ' ' + escapeHtml(h2h.name2) + '</td>' +
                     renderMatchActionButtons(m.id) + '</tr>';
             } else {
                 const opponent = m.player1Id === viewerId ? m.player2Name : m.player1Name;
-                const viewerScore = m.player1Id === viewerId ? m.finalScore.p1 : m.finalScore.p2;
-                const oppScore = m.player1Id === viewerId ? m.finalScore.p2 : m.finalScore.p1;
-                mainRow = '<tr class="stats-match-row"><td>' + formatDate(m.completedAt || m.startedAt) + '</td>' +
+                const viewerScore = m.player1Id === viewerId ? score.p1 : score.p2;
+                const oppScore = m.player1Id === viewerId ? score.p2 : score.p1;
+                mainRow = '<tr class="stats-match-row"><td>' + dateLabel + '</td>' +
                     '<td>' + escapeHtml(opponent) + '</td>' +
                     '<td>' + (GAME_TYPE_LABELS[m.gameType] || m.gameType) + '</td>' +
                     '<td>' + viewerScore + ' - ' + oppScore + '</td>' +
@@ -2674,6 +3623,46 @@
 
     let matchEditPlayerNames = { p1: 'Player 1', p2: 'Player 2' };
 
+    function setMatchEditGameTypeLocked(locked) {
+        const select = document.getElementById('statsMatchGameType');
+        if (select) {
+            select.disabled = !!locked;
+        }
+    }
+
+    function populateMatchEditForm(match, options) {
+        const opts = options || {};
+        const inProgress = !!opts.inProgress;
+        const modal = document.getElementById('statsMatchEditModal');
+        const title = document.getElementById('statsMatchEditTitle');
+        const deleteBtn = document.getElementById('statsMatchDeleteBtn');
+        if (!modal || !match) {
+            return;
+        }
+
+        modal.dataset.matchId = match.id || '';
+        modal.dataset.player1Id = match.player1Id || '';
+        modal.dataset.player2Id = match.player2Id || '';
+        modal.dataset.inProgress = inProgress ? '1' : '';
+
+        if (title) {
+            title.textContent = inProgress ? 'Edit In-Progress Match' : 'Edit Match';
+        }
+        if (deleteBtn) {
+            deleteBtn.classList.remove('noShow');
+            deleteBtn.textContent = inProgress ? 'Discard Match' : 'Delete Match';
+        }
+        setMatchEditGameTypeLocked(inProgress);
+        document.getElementById('statsMatchDate').value = dateInputFromIso(match.completedAt || match.startedAt);
+        document.getElementById('statsMatchGameType').value = match.gameType || 'game1';
+        document.getElementById('statsMatchBallsP1').value = countBallsForPlayer(match, match.player1Id);
+        document.getElementById('statsMatchBallsP2').value = countBallsForPlayer(match, match.player2Id);
+        renderMatchRacksEditor(match.racks || []);
+        updateMatchBallFieldsVisibility();
+        updateMatchScoreSummary();
+        modal.style.display = 'block';
+    }
+
     function openMatchEditModal(matchId, player1Id, player2Id) {
         const modal = document.getElementById('statsMatchEditModal');
         if (!modal) {
@@ -2686,36 +3675,27 @@
         modal.dataset.matchId = matchId || '';
         modal.dataset.player1Id = player1Id || '';
         modal.dataset.player2Id = player2Id || '';
+        modal.dataset.inProgress = '';
 
         if (matchId) {
-            getMatch(matchId).then(function (match) {
+            const pending = isEditablePendingMatchId(matchId) ? getEditablePendingMatch() : null;
+            const loadPromise = pending
+                ? Promise.resolve(pending)
+                : getMatch(matchId);
+
+            loadPromise.then(function (match) {
                 if (!match) {
+                    alert('Match not found.');
                     return;
                 }
-                modal.dataset.player1Id = match.player1Id;
-                modal.dataset.player2Id = match.player2Id;
-
-                getPlayer(match.player1Id).then(function (p1) {
-                    getPlayer(match.player2Id).then(function (p2) {
-                        matchEditPlayerNames = {
-                            p1: (p1 && p1.name) || match.player1Name || 'Player 1',
-                            p2: (p2 && p2.name) || match.player2Name || 'Player 2'
-                        };
-                        if (title) {
-                            title.textContent = 'Edit Match';
-                        }
-                        if (deleteBtn) {
-                            deleteBtn.classList.remove('noShow');
-                        }
-                        document.getElementById('statsMatchDate').value = dateInputFromIso(match.completedAt || match.startedAt);
-                        document.getElementById('statsMatchGameType').value = match.gameType || 'game1';
-                        document.getElementById('statsMatchBallsP1').value = countBallsForPlayer(match, match.player1Id);
-                        document.getElementById('statsMatchBallsP2').value = countBallsForPlayer(match, match.player2Id);
-                        renderMatchRacksEditor(match.racks || []);
-                        updateMatchBallFieldsVisibility();
-                        updateMatchScoreSummary();
-                        modal.style.display = 'block';
-                    });
+                return Promise.all([getPlayer(match.player1Id), getPlayer(match.player2Id)]).then(function (results) {
+                    const p1 = results[0];
+                    const p2 = results[1];
+                    matchEditPlayerNames = {
+                        p1: (p1 && p1.name) || match.player1Name || 'Player 1',
+                        p2: (p2 && p2.name) || match.player2Name || 'Player 2'
+                    };
+                    populateMatchEditForm(match, { inProgress: !!pending });
                 });
             }).catch(function (err) {
                 alert('Failed to load match: ' + err.message);
@@ -2733,7 +3713,9 @@
                 }
                 if (deleteBtn) {
                     deleteBtn.classList.add('noShow');
+                    deleteBtn.textContent = 'Delete Match';
                 }
+                setMatchEditGameTypeLocked(false);
                 document.getElementById('statsMatchDate').value = dateInputFromIso(new Date().toISOString());
                 document.getElementById('statsMatchGameType').value = 'game1';
                 document.getElementById('statsMatchBallsP1').value = 0;
@@ -2810,6 +3792,7 @@
         }
         const gameType = (select && select.value) || 'game1';
         const isSnooker = isSnookerGameType(gameType);
+        const isStraight = isStraightPoolGameType(gameType);
         const word = rackFrameWord(gameType, false);
         const words = rackFrameWord(gameType, true);
         if (label) {
@@ -2833,6 +3816,9 @@
                 '<th>Pts ' + escapeHtml(matchEditPlayerNames.p2) + '</th>' +
                 '<th>HB ' + escapeHtml(matchEditPlayerNames.p1) + '</th>' +
                 '<th>HB ' + escapeHtml(matchEditPlayerNames.p2) + '</th>';
+        } else if (isStraight) {
+            html += '<th>Run ' + escapeHtml(matchEditPlayerNames.p1) + '</th>' +
+                '<th>Run ' + escapeHtml(matchEditPlayerNames.p2) + '</th>';
         }
         html += '<th></th></tr></thead><tbody>';
 
@@ -2867,6 +3853,11 @@
                     clampScore(r.highestBreakP1) + '" /></td>' +
                     '<td><input type="number" class="stats-rack-hb-p2" min="0" max="999" value="' +
                     clampScore(r.highestBreakP2) + '" /></td>';
+            } else if (isStraight) {
+                html += '<td><input type="number" class="stats-rack-hb-p1" min="0" max="999" value="' +
+                    clampScore(r.highestBreakP1) + '" /></td>' +
+                    '<td><input type="number" class="stats-rack-hb-p2" min="0" max="999" value="' +
+                    clampScore(r.highestBreakP2) + '" /></td>';
             }
             html += '<td><button type="button" class="stats-delete-btn hover obs28 button" onclick="removeMatchRackRow(this)">Del</button></td>' +
                 '</tr>';
@@ -2874,6 +3865,23 @@
         html += '</tbody></table>';
         editor.innerHTML = html;
         updateMatchScoreSummary();
+    }
+
+    function readRackExtraFieldsFromRow(row) {
+        const entry = {};
+        const pts1 = row.querySelector('.stats-rack-pts-p1');
+        const hb1 = row.querySelector('.stats-rack-hb-p1');
+        if (pts1) {
+            entry.frameScore = {
+                p1: clampScore(pts1.value),
+                p2: clampScore((row.querySelector('.stats-rack-pts-p2') || {}).value)
+            };
+        }
+        if (hb1) {
+            entry.highestBreakP1 = clampScore(hb1.value);
+            entry.highestBreakP2 = clampScore((row.querySelector('.stats-rack-hb-p2') || {}).value);
+        }
+        return entry;
     }
 
     function collectMatchRacksFromEditor() {
@@ -2890,15 +3898,7 @@
                 return;
             }
             const entry = { winnerId: winnerId };
-            const pts1 = row.querySelector('.stats-rack-pts-p1');
-            if (pts1) {
-                entry.frameScore = {
-                    p1: clampScore(pts1.value),
-                    p2: clampScore((row.querySelector('.stats-rack-pts-p2') || {}).value)
-                };
-                entry.highestBreakP1 = clampScore((row.querySelector('.stats-rack-hb-p1') || {}).value);
-                entry.highestBreakP2 = clampScore((row.querySelector('.stats-rack-hb-p2') || {}).value);
-            }
+            Object.assign(entry, readRackExtraFieldsFromRow(row));
             racks.push(entry);
         });
         return racks;
@@ -2913,15 +3913,7 @@
         allRows.forEach(function (row) {
             const winnerSel = row.querySelector('.stats-rack-winner');
             const entry = { winnerId: winnerSel ? winnerSel.value : '' };
-            const pts1 = row.querySelector('.stats-rack-pts-p1');
-            if (pts1) {
-                entry.frameScore = {
-                    p1: clampScore(pts1.value),
-                    p2: clampScore((row.querySelector('.stats-rack-pts-p2') || {}).value)
-                };
-                entry.highestBreakP1 = clampScore((row.querySelector('.stats-rack-hb-p1') || {}).value);
-                entry.highestBreakP2 = clampScore((row.querySelector('.stats-rack-hb-p2') || {}).value);
-            }
+            Object.assign(entry, readRackExtraFieldsFromRow(row));
             preserved.push(entry);
         });
         if (preserved.length === 0 && existing.length > 0) {
@@ -2948,15 +3940,7 @@
         allRows.forEach(function (r) {
             const winnerSel = r.querySelector('.stats-rack-winner');
             const entry = { winnerId: winnerSel ? winnerSel.value : '' };
-            const pts1 = r.querySelector('.stats-rack-pts-p1');
-            if (pts1) {
-                entry.frameScore = {
-                    p1: clampScore(pts1.value),
-                    p2: clampScore((r.querySelector('.stats-rack-pts-p2') || {}).value)
-                };
-                entry.highestBreakP1 = clampScore((r.querySelector('.stats-rack-hb-p1') || {}).value);
-                entry.highestBreakP2 = clampScore((r.querySelector('.stats-rack-hb-p2') || {}).value);
-            }
+            Object.assign(entry, readRackExtraFieldsFromRow(r));
             preserved.push(entry);
         });
         renderMatchRacksEditor(preserved);
@@ -2969,6 +3953,12 @@
             modal.dataset.matchId = '';
             modal.dataset.player1Id = '';
             modal.dataset.player2Id = '';
+            modal.dataset.inProgress = '';
+        }
+        setMatchEditGameTypeLocked(false);
+        const deleteBtn = document.getElementById('statsMatchDeleteBtn');
+        if (deleteBtn) {
+            deleteBtn.textContent = 'Delete Match';
         }
     }
 
@@ -2981,6 +3971,7 @@
         const matchId = modal.dataset.matchId || null;
         const player1Id = modal.dataset.player1Id;
         const player2Id = modal.dataset.player2Id;
+        const inProgress = modal.dataset.inProgress === '1' || isEditablePendingMatchId(matchId);
 
         if (!player1Id || !player2Id) {
             alert('Both players must be selected.');
@@ -2988,7 +3979,7 @@
         }
 
         try {
-            await saveMatch({
+            const payload = {
                 id: matchId || undefined,
                 player1Id: player1Id,
                 player2Id: player2Id,
@@ -2997,7 +3988,12 @@
                 racks: collectMatchRacksFromEditor(),
                 ballsP1: document.getElementById('statsMatchBallsP1').value,
                 ballsP2: document.getElementById('statsMatchBallsP2').value
-            });
+            };
+            if (inProgress) {
+                await savePendingMatchEdit(payload);
+            } else {
+                await saveMatch(payload);
+            }
             closeMatchEditModal();
             await refreshStatsUI();
         } catch (err) {
@@ -3009,11 +4005,19 @@
         if (!matchId) {
             return;
         }
-        if (!confirm('Delete this match? Player stats will be recalculated.')) {
+        const inProgress = isEditablePendingMatchId(matchId);
+        const message = inProgress
+            ? 'Discard this in-progress match? Rack/frame and ball stats from it will be undone, and the scoreboard will reset to 0–0.'
+            : 'Delete this match? Player stats will be recalculated.';
+        if (!confirm(message)) {
             return;
         }
         try {
-            await deleteMatch(matchId);
+            if (inProgress) {
+                await discardPendingMatch();
+            } else {
+                await deleteMatch(matchId);
+            }
             closeMatchEditModal();
             await refreshStatsUI();
         } catch (err) {
@@ -3211,6 +4215,37 @@
         });
     }
 
+    function racksWlHeaderForGameType(gameType) {
+        return usesFrameTerminology(gameType) ? 'Frames W/L' : 'Racks W/L';
+    }
+
+    function breakHeaderForGameType(gameType) {
+        if (isStraightPoolGameType(gameType)) {
+            return 'Longest Run';
+        }
+        if (isSnookerGameType(gameType)) {
+            return 'Highest Break';
+        }
+        return 'HB / Run';
+    }
+
+    function buildPlayerStatsDataTable(headers, cells, rowClass) {
+        let html = '<table class="stats-table stats-player-stats-table"><thead><tr>';
+        headers.forEach(function (header) {
+            html += '<th>' + header + '</th>';
+        });
+        html += '</tr></thead><tbody><tr';
+        if (rowClass) {
+            html += ' class="' + rowClass + '"';
+        }
+        html += '>';
+        cells.forEach(function (cell) {
+            html += '<td>' + cell + '</td>';
+        });
+        html += '</tr></tbody></table>';
+        return html;
+    }
+
     function renderPlayerStatsTable(player, winStreak) {
         const showBalls = (player.stats.ballsWon || 0) > 0 ||
             Object.keys(player.stats.byGameType || {}).some(function (gt) {
@@ -3221,8 +4256,28 @@
                 (player.stats.byGameType.game8 && player.stats.byGameType.game8.highestBreak) ||
                 (player.stats.byGameType.game4 && player.stats.byGameType.game4.highestBreak)
             ));
-        const racksHeader = usesFrameTerminology() ? 'Frames W/L' : 'Racks W/L';
-        let typeRows = '';
+
+        const overallHeaders = ['Matches Won', racksWlHeaderForGameType()];
+        const overallCells = [
+            formatWLWithPct(player.stats.gamesWon, player.stats.gamesLost),
+            formatWLWithPct(player.stats.racksWon, player.stats.racksLost)
+        ];
+        if (showBreak) {
+            overallHeaders.push('HB / Run');
+            overallCells.push(String(player.stats.highestBreak || 0));
+        }
+        if (showBalls) {
+            overallHeaders.push('Balls Potted');
+            overallCells.push(String(player.stats.ballsWon || 0));
+        }
+        overallHeaders.push('Last');
+        overallCells.push(formatDate(player.lastPlayedAt));
+
+        let html = '<div class="stats-player-game-block">' +
+            '<h4 class="stats-section-title">Overall</h4>' +
+            buildPlayerStatsDataTable(overallHeaders, overallCells, 'stats-overall-row') +
+            '</div>';
+
         Object.keys(GAME_TYPE_LABELS).forEach(function (gt) {
             const ts = player.stats.byGameType[gt];
             const typeBalls = ts ? (ts.ballsWon || 0) : 0;
@@ -3230,29 +4285,29 @@
             if (!ts || (ts.gamesWon + ts.gamesLost + ts.racksWon + typeBalls + typeBreak) === 0) {
                 return;
             }
-            typeRows += '<tr><td>' + GAME_TYPE_LABELS[gt] + '</td>' +
-                '<td>' + formatWLWithPct(ts.gamesWon, ts.gamesLost) + '</td>' +
-                '<td>' + formatWLWithPct(ts.racksWon, ts.racksLost) + '</td>' +
-                (showBreak ? '<td>' + ((gt === 'game8' || gt === 'game4' || typeBreak) ? typeBreak : '\u2014') + '</td>' : '') +
-                (showBalls ? '<td>' + (gameTypeHasBallScoring(gt) ? typeBalls : '\u2014') + '</td>' : '') +
-                '<td></td></tr>';
+            const gameHeaders = ['Matches Won', racksWlHeaderForGameType(gt)];
+            const gameCells = [
+                formatWLWithPct(ts.gamesWon, ts.gamesLost),
+                formatWLWithPct(ts.racksWon, ts.racksLost)
+            ];
+            const showGameBreak = showBreak && (gt === 'game8' || gt === 'game4' || typeBreak > 0);
+            if (showGameBreak) {
+                gameHeaders.push(breakHeaderForGameType(gt));
+                gameCells.push((gt === 'game8' || gt === 'game4' || typeBreak) ? String(typeBreak) : '\u2014');
+            }
+            if (showBalls) {
+                gameHeaders.push('Balls Potted');
+                gameCells.push(gameTypeHasBallScoring(gt) ? String(typeBalls) : '\u2014');
+            }
+            html += '<div class="stats-player-game-block">' +
+                '<h4 class="stats-section-title">' + GAME_TYPE_LABELS[gt] + '</h4>' +
+                buildPlayerStatsDataTable(gameHeaders, gameCells) +
+                '</div>';
         });
 
-        const overallRow = '<tr class="stats-overall-row"><td><strong>Overall</strong></td>' +
-            '<td>' + formatWLWithPct(player.stats.gamesWon, player.stats.gamesLost) + '</td>' +
-            '<td>' + formatWLWithPct(player.stats.racksWon, player.stats.racksLost) + '</td>' +
-            (showBreak ? '<td>' + (player.stats.highestBreak || 0) + '</td>' : '') +
-            (showBalls ? '<td>' + (player.stats.ballsWon || 0) + '</td>' : '') +
-            '<td>' + formatDate(player.lastPlayedAt) + '</td></tr>';
-
         const streak = typeof winStreak === 'number' ? winStreak : 0;
-        return '<table class="stats-table stats-player-stats-table"><thead><tr>' +
-            '<th>Category</th><th>Games W/L</th><th>' + racksHeader + '</th>' +
-            (showBreak ? '<th>HB / Run</th>' : '') +
-            (showBalls ? '<th>Balls Potted</th>' : '') +
-            '<th>Last</th>' +
-            '</tr></thead><tbody>' + overallRow + typeRows + '</tbody></table>' +
-            '<p class="stats-win-streak">Win Streak: ' + streak + '</p>';
+        html += '<p class="stats-win-streak">Win Streak: ' + streak + '</p>';
+        return html;
     }
 
     function renderH2HComparisonTable(viewerId, opponentId, h2h) {
@@ -3384,7 +4439,8 @@
         const prevOpponentSelect = document.getElementById('statsPlayerOpponentSelect');
         const prevOpponentId = prevOpponentSelect ? prevOpponentSelect.value : '';
 
-        const matches = await getMatchesForPlayer(playerId);
+        const matches = await getMatchesForPlayer(playerId, { includePending: true });
+        const completedMatches = matches.filter(function (m) { return m.status === 'completed'; });
         const allPlayers = await getAllPlayers();
         const opponentOptions = allPlayers
             .filter(function (p) { return p.id !== playerId; })
@@ -3394,7 +4450,7 @@
             }).join('');
 
         const matchRows = renderPlayerMatchHistoryRows(playerId, matches);
-        const winStreak = getCurrentWinStreak(playerId, matches);
+        const winStreak = getCurrentWinStreak(playerId, completedMatches);
 
         detailPanel.innerHTML =
             '<div class="stats-player-header">' +
@@ -3592,6 +4648,8 @@
     async function initPlayerStats() {
         await openDatabase();
         await repairPlayerRecords();
+        await restorePendingSession();
+        playerStatsReady = true;
         return db;
     }
 
@@ -3612,6 +4670,7 @@
         checkMatchCompletion: checkMatchCompletion,
         canCallGame: canCallGame,
         callGame: callGame,
+        flushRackRecordQueue: flushRackRecordQueue,
         onNamesUpdated: onNamesUpdated,
         onClearGame: onClearGame,
         onResetScores: onResetScores,
@@ -3632,12 +4691,17 @@
         initPlayerAutocomplete: initPlayerAutocomplete,
         buildOverlayStatsPayload: buildOverlayStatsPayload,
         renderMatchRackBreakdown: renderMatchRackBreakdown,
-        getActivePendingMatch: getActivePendingMatch
+        getActivePendingMatch: getActivePendingMatch,
+        renderStatsVisibilityPanel: renderStatsVisibilityPanel,
+        isStatVisible: isStatVisible,
+        readStatsVisibilityGameType: readStatsVisibilityGameType
     };
 
     window.openStatsModal = openStatsModal;
     window.closeStatsModal = closeStatsModal;
     window.switchStatsTab = switchStatsTab;
+    window.onStatVisibilityToggle = onStatVisibilityToggle;
+    window.onStatsVisibilityGameTypeChange = onStatsVisibilityGameTypeChange;
     window.refreshH2HView = refreshH2HView;
     window.refreshPlayerOpponentH2H = refreshPlayerOpponentH2H;
     window.exportStatsJson = exportStatsJson;

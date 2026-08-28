@@ -526,10 +526,13 @@ function buildOverlayH2HTable(stats) {
     const p2Break = stats.p2HighestBreak || 0;
     const p1Balls = stats.p1Balls || 0;
     const p2Balls = stats.p2Balls || 0;
-    const rows = [
-        { label: 'Matches Won', left: stats.p1Games || 0, right: stats.p2Games || 0 },
-        { label: racksWord + ' Won', left: stats.p1Racks || 0, right: stats.p2Racks || 0 }
-    ];
+    const rows = [];
+    if (stats.showGamesWL !== false) {
+        rows.push({ label: 'Matches Won', left: stats.p1Games || 0, right: stats.p2Games || 0 });
+    }
+    if (stats.showRacksWL !== false) {
+        rows.push({ label: racksWord + ' Won', left: stats.p1Racks || 0, right: stats.p2Racks || 0 });
+    }
     // Omit zero-only optional stats on the overlay
     if (stats.showHighestBreak && (p1Break > 0 || p2Break > 0)) {
         rows.push({
@@ -544,6 +547,20 @@ function buildOverlayH2HTable(stats) {
             left: p1Balls,
             right: p2Balls
         });
+    }
+    const p1Br = stats.p1BreakAndRuns || 0;
+    const p2Br = stats.p2BreakAndRuns || 0;
+    const p1Tr = stats.p1TableRuns || 0;
+    const p2Tr = stats.p2TableRuns || 0;
+    if (stats.showBreakAndRun && (p1Br > 0 || p2Br > 0)) {
+        rows.push({ label: 'Break & Run', left: p1Br, right: p2Br });
+    }
+    if (stats.showTableRun && (p1Tr > 0 || p2Tr > 0)) {
+        rows.push({ label: 'Table Run', left: p1Tr, right: p2Tr });
+    }
+
+    if (!rows.length) {
+        return '<div class="overlay-stats-empty">No stats enabled for this game type.</div>';
     }
 
     let html = '<table class="overlay-stats-table overlay-stats-h2h-table">' +
@@ -574,13 +591,16 @@ function buildOverlayPlayerTable(stats) {
     const currentBreak = stats.currentBreak || 0;
     const ballsPotted = stats.ballsPotted || 0;
     const winStreak = stats.winStreak || 0;
-    const rows = [
-        { label: 'Games W/L', value: stats.gamesWL + ' (' + stats.winRate + '%)' },
-        {
+    const rows = [];
+    if (stats.showGamesWL !== false) {
+        rows.push({ label: 'Matches Won', value: stats.gamesWL + ' (' + stats.winRate + '%)' });
+    }
+    if (stats.showRacksWL !== false) {
+        rows.push({
             label: rackLabel + ' W/L',
             value: stats.racksWL + (stats.rackWinRate != null ? ' (' + stats.rackWinRate + '%)' : '')
-        }
-    ];
+        });
+    }
     if (stats.showCurrentBreak && currentBreak > 0) {
         rows.push({
             label: stats.currentBreakLabel || 'Current Break',
@@ -618,8 +638,18 @@ function buildOverlayPlayerTable(stats) {
     if (stats.showBalls && ballsPotted > 0) {
         rows.push({ label: 'Balls Potted', value: ballsPotted });
     }
-    if (winStreak > 0) {
+    if (stats.showBreakAndRun && (stats.breakAndRuns || 0) > 0) {
+        rows.push({ label: 'Break & Run', value: stats.breakAndRuns });
+    }
+    if (stats.showTableRun && (stats.tableRuns || 0) > 0) {
+        rows.push({ label: 'Table Run', value: stats.tableRuns });
+    }
+    if (stats.showWinStreak !== false && winStreak > 0) {
         rows.push({ label: 'Win Streak', value: winStreak });
+    }
+
+    if (!rows.length) {
+        return '<div class="overlay-stats-empty">No stats enabled for this game type.</div>';
     }
 
     let html = '<table class="overlay-stats-table overlay-stats-player-table">' +
@@ -980,6 +1010,7 @@ $(document).ready(function () {
 });
 
 // Setting defaults in storage so functions execute correctly, in the event values are not being retrieved from storage successfully due to initialization or similar
+ensureDefaultGameType();
 if (getStorageItem("usePlayer1") === null) {
     setStorageItem("usePlayer1", "yes");
 }
@@ -996,14 +1027,15 @@ if (getStorageItem("activePlayer") === null) {
 setCustomLogo("customLogo1", "useCustomLogo", "usePlayer1");
 setCustomLogo("customLogo2", "useCustomLogo2", "usePlayer2");
 
-if (getStorageItem("gameType") === "game2") {
+const overlayGameType = ensureDefaultGameType();
+if (overlayGameType === "game2") {
     document.getElementById("ball 10").classList.add("noShow");
     document.getElementById("ball 11").classList.add("noShow");
     document.getElementById("ball 12").classList.add("noShow");
     document.getElementById("ball 13").classList.add("noShow");
     document.getElementById("ball 14").classList.add("noShow");
     document.getElementById("ball 15").classList.add("noShow");
-} else if (getStorageItem("gameType") === "game3") {
+} else if (overlayGameType === "game3") {
     document.getElementById("ball 10").classList.remove("noShow");
     document.getElementById("ball 11").classList.add("noShow");
     document.getElementById("ball 12").classList.add("noShow");
@@ -1119,6 +1151,12 @@ if (getStorageItem("raceInfo") != "" && getStorageItem("raceInfo") != null && bo
 }
 
 syncBallsVisibility();
+
+if (bothPlayersEnabled && getStorageItem("scoreDisplay") === "yes") {
+    showScores();
+} else {
+    hideScores();
+}
 
 
 

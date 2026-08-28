@@ -111,6 +111,15 @@
         return new Promise(function (resolve) { setTimeout(resolve, ms); });
     }
 
+    function scopedStorageKey(win, key) {
+        const id = (win.INSTANCE_ID || '');
+        return id ? (id + '_' + key) : key;
+    }
+
+    function clearScopedStorage(win, key) {
+        win.localStorage.removeItem(scopedStorageKey(win, key));
+    }
+
     function frameLoaded(frame) {
         return new Promise(function (resolve) {
             if (frame.contentDocument && frame.contentDocument.readyState === 'complete') {
@@ -193,6 +202,90 @@
             .replace(/>/g, '&gt;');
     }
 
+    /** Ball Scoring / manual balls need Show Scores on and both players enabled. */
+    function ensureScoresVisible(cp) {
+        cp.setStorageItem('usePlayer1', 'yes');
+        cp.setStorageItem('usePlayer2', 'yes');
+        const useP1 = cp.document.getElementById('usePlayer1Setting');
+        const useP2 = cp.document.getElementById('usePlayer2Setting');
+        if (useP1) { useP1.checked = true; }
+        if (useP2) { useP2.checked = true; }
+        const scoreDisplayCheckbox = cp.document.getElementById('scoreDisplay');
+        if (scoreDisplayCheckbox && (!scoreDisplayCheckbox.checked || cp.getStorageItem('scoreDisplay') !== 'yes')) {
+            scoreDisplayCheckbox.checked = true;
+            cp.scoreDisplaySetting();
+        }
+    }
+
+    async function ensurePlayableScoringState(cp) {
+        ensureScoresVisible(cp);
+        cp.document.getElementById('gameTypeSelect').value = 'game1';
+        await cp.gameType('game1');
+        cp.document.getElementById('raceInfoTxt').value = '';
+        cp.setStorageItem('raceInfo', '');
+        cp.performResetScores({ endMatch: false });
+        await sleep(100);
+    }
+
+    /** Map Stats-tab stat ids to overlay payload show* keys. */
+    const OVERLAY_VISIBILITY_PAYLOAD_KEYS = {
+        gamesWL: 'showGamesWL',
+        racksWL: 'showRacksWL',
+        winStreak: 'showWinStreak',
+        currentBreak: 'showCurrentBreak',
+        possibleBreak: 'showPossibleBreak',
+        scoreMargin: 'showScoreMargin',
+        pointsRemaining: 'showPointsRemaining',
+        highestBreak: 'showHighestBreak',
+        ballsPotted: 'showBalls',
+        breakAndRun: 'showBreakAndRun',
+        tableRun: 'showTableRun'
+    };
+
+    const SNOOKER_OVERLAY_VIS_STAT_IDS = [
+        'gamesWL', 'racksWL', 'winStreak', 'currentBreak', 'possibleBreak',
+        'scoreMargin', 'pointsRemaining', 'highestBreak', 'ballsPotted'
+    ];
+
+    function setOverlayStatVisible(cp, gameType, statId, enabled) {
+        cp.onStatsVisibilityGameTypeChange(gameType);
+        const el = cp.document.getElementById('statVis_' + gameType + '_' + statId);
+        if (!el) {
+            return null;
+        }
+        el.checked = !!enabled;
+        cp.onStatVisibilityToggle(el);
+        return el;
+    }
+
+    function readStoredOverlayPayload(cp) {
+        try {
+            return JSON.parse(cp.getStorageItem('overlayStatsPayload') || '{}');
+        } catch (err) {
+            return {};
+        }
+    }
+
+    async function publishOverlayAndReadPayload(cp, publishFn) {
+        if (typeof publishFn === 'function') {
+            publishFn();
+        }
+        await sleep(220);
+        return readStoredOverlayPayload(cp);
+    }
+
+    async function assertOverlayVisibilityFlags(cp, assert, suite, label, payload, statIds, expected) {
+        statIds.forEach(function (statId) {
+            const payloadKey = OVERLAY_VISIBILITY_PAYLOAD_KEYS[statId];
+            if (!payloadKey) {
+                return;
+            }
+            assert(suite, label + ': ' + statId + ' ' + (expected ? 'on' : 'off'),
+                payload[payloadKey] === expected,
+                JSON.stringify({ key: payloadKey, value: payload[payloadKey] }));
+        });
+    }
+
     async function runAllTests() {
         runBtn.disabled = true;
         reloadBtn.disabled = true;
@@ -214,46 +307,117 @@
 
             // --- Core ---
             assert('Core', 'PlayerStats loaded', !!cp.PlayerStats);
-            assert('Core', 'Version 7.1.2', cp.versionNum === '7.1.2', cp.versionNum);
+            assert('Core', 'Version 7.2.0', cp.versionNum === '7.2.0', cp.versionNum);
             assert('Core', 'Stats modal present', !!cp.document.getElementById('statsModal'));
+            assert('Core', 'Stats tab present', !!cp.document.getElementById('StatsSettings'));
+            assert('Core', 'Player/Team detail sections',
+                (cp.document.getElementById('player1DetailLabel').textContent || '').indexOf('Player/Team 1') !== -1 &&
+                (cp.document.getElementById('player2DetailLabel').textContent || '').indexOf('Player/Team 2') !== -1);
+            assert('Core', 'Setup Name and Color labels',
+                (cp.document.getElementById('p1NameLabel').textContent || '').trim() === 'Name:' &&
+                (cp.document.getElementById('p1ColorLabel').textContent || '').trim() === 'Color:');
+            assert('Core', 'Player slot picker row',
+                !!cp.document.getElementById('playerSlotPicker') &&
+                !!cp.document.getElementById('playerSlotQuestion') &&
+                !!cp.document.getElementById('rackBreakerP1Btn') &&
+                !!cp.document.getElementById('rackBreakerP2Btn'));
+            assert('Core', 'Ball Scoring settings label',
+                (cp.document.getElementById('labelForBallTrackerCheckbox').textContent || '').trim() === 'Ball Scoring');
+            assert('Core', 'Edit Player Stats not on Setup tab',
+                !cp.document.getElementById('GameInfo').contains(cp.document.getElementById('statsBtn')));
+            assert('Core', 'Game Variant on Setup tab',
+                !!cp.document.getElementById('GameInfo').querySelector('#gameTypeSelect') &&
+                !cp.document.getElementById('GeneralSettings').querySelector('#gameTypeSelect'));
+            assert('Core', '8-Ball option value is game1',
+                cp.document.querySelector('#gameTypeSelect option').value === 'game1');
+            cp.document.getElementById('p1colorDiv').value = 'grey';
+            cp.playerColorChange(1);
+            assert('Core', 'P1 color change does not corrupt 8-Ball option value',
+                cp.document.querySelector('#gameTypeSelect option').value === 'game1' &&
+                cp.document.getElementById('gameTypeSelect').value === 'game1');
+            assert('Core', 'Ball Variant on Setup tab',
+                !!cp.document.getElementById('GameInfo').querySelector('#ballSelection') &&
+                !cp.document.getElementById('GeneralSettings').querySelector('#ballSelection'));
+            assert('Core', 'Game Variant label',
+                (cp.document.getElementById('gameTypeLabel').textContent || '').trim() === 'Game Variant');
+            assert('Core', 'Ball Variant label',
+                (cp.document.getElementById('ballVariantLabel').textContent || '').trim() === 'Ball Variant');
+            assert('Core', 'Golden Ball on Setup tab',
+                !!cp.document.getElementById('GameInfo').querySelector('#snookerGoldDiv') &&
+                !cp.document.getElementById('GeneralSettings').querySelector('#snookerGoldDiv'));
             assert('Core', 'Overlay panel in browser source', !!bs.document.getElementById('overlayStatsPanel'));
 
+            const scoreDisplayCheckbox = cp.document.getElementById('scoreDisplay');
+            const savedScoreDisplay = cp.getStorageItem('scoreDisplay');
+            const savedBallTracker = cp.getStorageItem('enableBallTracker');
+            cp.setStorageItem('enableBallTracker', 'yes');
+            cp.document.getElementById('ballTrackerCheckbox').checked = true;
+            scoreDisplayCheckbox.checked = false;
+            cp.scoreDisplaySetting();
+            await sleep(100);
+            assert('Core', 'Show Scores off hides manual score controls',
+                cp.document.getElementById('scoreLabel').classList.contains('noShow'));
+            assert('Core', 'Show Scores off disables Ball Scoring UI',
+                cp.document.getElementById('ballTrackerCheckbox').disabled &&
+                !cp.document.getElementById('ballTrackerCheckbox').checked);
+            assert('Core', 'Show Scores off preserves Ball Scoring preference',
+                cp.getStorageItem('enableBallTracker') === 'yes');
+            bs = await reloadBSFrame();
+            assert('Core', 'Show Scores off hides overlay scores',
+                bs.document.getElementById('player1Score').classList.contains('fadeOutElm'));
+            scoreDisplayCheckbox.checked = true;
+            cp.scoreDisplaySetting();
+            await sleep(100);
+            assert('Core', 'Show Scores on restores Ball Scoring',
+                !cp.document.getElementById('ballTrackerCheckbox').disabled &&
+                cp.document.getElementById('ballTrackerCheckbox').checked === true);
+            if (savedBallTracker !== 'yes') {
+                cp.setStorageItem('enableBallTracker', savedBallTracker || 'no');
+                cp.document.getElementById('ballTrackerCheckbox').checked = savedBallTracker === 'yes';
+                cp.useBallTracker();
+            }
+            if (savedScoreDisplay === 'no') {
+                scoreDisplayCheckbox.checked = false;
+                cp.scoreDisplaySetting();
+            }
+            await sleep(50);
+
             // --- Overlay ---
-            cp.localStorage.removeItem('overlayStatsMode');
+            clearScopedStorage(cp, 'overlayStatsMode');
             cp.localStorage.setItem('h2hOverlayEnabled', 'yes');
             cp.PlayerStats.syncOverlayButtonsFromStorage();
             assert('Overlay', 'Legacy h2h flag does not enable mode',
-                (cp.localStorage.getItem('overlayStatsMode') || '') === '');
+                (cp.getStorageItem('overlayStatsMode') || '') === '');
             assert('Overlay', 'Legacy h2h flag cleared',
                 cp.localStorage.getItem('h2hOverlayEnabled') === null);
 
             const h2hBtn = cp.document.getElementById('overlayH2HBtn');
             cp.toggleOverlayStats('h2h');
-            assert('Overlay', 'H2H toggle on', cp.localStorage.getItem('overlayStatsMode') === 'h2h');
+            assert('Overlay', 'H2H toggle on', cp.getStorageItem('overlayStatsMode') === 'h2h');
             cp.toggleOverlayStats('h2h');
             await sleep(150);
             const offPayload = await cp.PlayerStats.buildOverlayStatsPayload();
-            assert('Overlay', 'H2H toggle off', (cp.localStorage.getItem('overlayStatsMode') || '') === '');
+            assert('Overlay', 'H2H toggle off', (cp.getStorageItem('overlayStatsMode') || '') === '');
             assert('Overlay', 'Payload hidden when off', offPayload.visible === false);
             assert('Overlay', 'No overlay button active after off',
                 h2hBtn && !h2hBtn.classList.contains('active'));
 
             bs = await reloadBSFrame();
-            bs.localStorage.removeItem('overlayStatsMode');
-            bs.localStorage.removeItem('overlayStatsPayload');
-            bs.localStorage.setItem('overlayStatsPayload', JSON.stringify({
+            clearScopedStorage(bs, 'overlayStatsMode');
+            clearScopedStorage(bs, 'overlayStatsPayload');
+            bs.setStorageItem('overlayStatsPayload', JSON.stringify({
                 visible: true, mode: 'h2h', p1Name: 'A', p2Name: 'B', p1Games: 1, p2Games: 0
             }));
             bs.restoreOverlayStatsFromStorage();
             await sleep(150);
             assert('Overlay', 'Browser source hides stale payload without mode', overlayHidden(bs));
 
-            bs.localStorage.setItem('overlayStatsMode', 'h2h');
+            bs.setStorageItem('overlayStatsMode', 'h2h');
             bs.restoreOverlayStatsFromStorage();
             await sleep(150);
             assert('Overlay', 'Browser source restores with mode + payload', !overlayHidden(bs));
-            bs.localStorage.removeItem('overlayStatsMode');
-            bs.localStorage.setItem('overlayStatsPayload', JSON.stringify({ visible: false }));
+            clearScopedStorage(bs, 'overlayStatsMode');
+            bs.setStorageItem('overlayStatsPayload', JSON.stringify({ visible: false }));
             bs.restoreOverlayStatsFromStorage();
 
             // Per-mode overlay positions (p1 / p2 / h2h) — bottom-center anchors
@@ -288,6 +452,16 @@
                 Math.abs(h2hCx - 700) <= 2 && Math.abs(h2hBottom - 600) <= 2,
                 posPanel && (h2hCx + ',' + h2hBottom + ',' + posPanel.getAttribute('data-overlay-stats-mode')));
             bs.applyOverlayStats({ visible: false });
+
+            cp.setStorageItem('overlayStatsMode', 'p1');
+            cp.localStorage.setItem('table2_overlayStatsMode', 'h2h');
+            assert('Instance', 'Default overlay mode scoped',
+                cp.getStorageItem('overlayStatsMode') === 'p1');
+            assert('Instance', 'Other instance overlay key separate',
+                cp.localStorage.getItem('table2_overlayStatsMode') === 'h2h' &&
+                cp.getStorageItem('overlayStatsMode') !== 'h2h');
+            cp.localStorage.removeItem('table2_overlayStatsMode');
+            clearScopedStorage(cp, 'overlayStatsMode');
 
             // --- PlayerStats API ---
             const player = await cp.PlayerStats.ensurePlayer(tag + '_P1');
@@ -387,7 +561,7 @@
             cp.document.getElementById('p2Name').value = histP2.name;
             cp.document.getElementById('p1Name').setAttribute('data-player-id', histP1.id);
             cp.document.getElementById('p2Name').setAttribute('data-player-id', histP2.id);
-            cp.document.getElementById('gameType').value = 'game1';
+            cp.document.getElementById('gameTypeSelect').value = 'game1';
             await cp.gameType('game1');
             await sleep(150);
             cp.document.getElementById('raceInfoTxt').value = '2';
@@ -404,7 +578,30 @@
                 pendingMidMatch && pendingMidMatch.racks && pendingMidMatch.racks.length === 1 &&
                 !matchesMidMatch.some(function (m) { return m.id === pendingMidMatch.id; }));
 
-            cp.localStorage.setItem('overlayStatsMode', 'p2');
+            const liveH2H = await cp.PlayerStats.getHeadToHead(histP1.id, histP2.id, { gameType: 'game1' });
+            assert('Match History', 'H2H includes finished rack before match ends',
+                liveH2H && (liveH2H.racksWon[histP1.id] || 0) >= 1,
+                liveH2H && JSON.stringify(liveH2H.racksWon));
+            assert('Match History', 'H2H does not count match win mid-race',
+                liveH2H && (liveH2H.gamesWon[histP1.id] || 0) === 0,
+                liveH2H && JSON.stringify(liveH2H.gamesWon));
+            cp.setStorageItem('overlayStatsMode', 'h2h');
+            const liveH2HOverlay = await cp.PlayerStats.buildOverlayStatsPayload();
+            assert('Match History', 'H2H overlay shows live rack totals mid-match',
+                liveH2HOverlay && !liveH2HOverlay.emptyMessage &&
+                (liveH2HOverlay.p1Racks || 0) >= 1,
+                liveH2HOverlay && JSON.stringify({
+                    p1Racks: liveH2HOverlay.p1Racks,
+                    p2Racks: liveH2HOverlay.p2Racks,
+                    empty: liveH2HOverlay.emptyMessage
+                }));
+            assert('Match History', 'H2H history lists in-progress match first',
+                liveH2H && liveH2H.matches && liveH2H.matches[0] &&
+                liveH2H.matches[0].id === pendingMidMatch.id,
+                liveH2H && liveH2H.matches && liveH2H.matches[0] && liveH2H.matches[0].id);
+            clearScopedStorage(cp, 'overlayStatsMode');
+
+            cp.setStorageItem('overlayStatsMode', 'p2');
             const p2LoserOverlay = await cp.PlayerStats.buildOverlayStatsPayload();
             assert('Match History', 'P2 overlay shows stats after frame loss',
                 p2LoserOverlay && !p2LoserOverlay.emptyMessage && p2LoserOverlay.racksWL,
@@ -412,7 +609,79 @@
             assert('Match History', 'P2 overlay racks reflect loss',
                 p2LoserOverlay && String(p2LoserOverlay.racksWL).indexOf('0/1') !== -1,
                 p2LoserOverlay && String(p2LoserOverlay.racksWL));
-            cp.localStorage.removeItem('overlayStatsMode');
+            clearScopedStorage(cp, 'overlayStatsMode');
+
+            // Edit / discard in-progress match from Stats window
+            cp.openMatchEditModal(pendingMidMatch.id);
+            await sleep(250);
+            const pendingEditModal = cp.document.getElementById('statsMatchEditModal');
+            assert('Match History', 'In-progress edit modal opens',
+                pendingEditModal && pendingEditModal.style.display === 'block' &&
+                pendingEditModal.dataset.inProgress === '1');
+            assert('Match History', 'In-progress edit title',
+                ((cp.document.getElementById('statsMatchEditTitle') || {}).textContent || '') ===
+                'Edit In-Progress Match');
+            assert('Match History', 'In-progress discard button label',
+                ((cp.document.getElementById('statsMatchDeleteBtn') || {}).textContent || '') ===
+                'Discard Match');
+            cp.addMatchRackRow();
+            await sleep(50);
+            const pendingEditRows = cp.document.querySelectorAll('#statsMatchRacksEditor tr.stats-rack-edit-row');
+            assert('Match History', 'In-progress editor can add rack row',
+                pendingEditRows && pendingEditRows.length >= 2,
+                pendingEditRows && String(pendingEditRows.length));
+            const secondWinner = pendingEditRows[1] && pendingEditRows[1].querySelector('.stats-rack-winner');
+            if (secondWinner) {
+                secondWinner.value = '2';
+            }
+            await cp.saveMatchFromModal();
+            await sleep(300);
+            const pendingAfterEdit = cp.PlayerStats.getActivePendingMatch();
+            assert('Match History', 'In-progress edit updates pending racks',
+                pendingAfterEdit && pendingAfterEdit.racks && pendingAfterEdit.racks.length === 2,
+                pendingAfterEdit && pendingAfterEdit.racks && String(pendingAfterEdit.racks.length));
+            assert('Match History', 'In-progress edit syncs scoreboard',
+                parseInt(cp.getStorageItem('p1ScoreCtrlPanel'), 10) === 1 &&
+                parseInt(cp.getStorageItem('p2ScoreCtrlPanel'), 10) === 1,
+                cp.getStorageItem('p1ScoreCtrlPanel') + '-' + cp.getStorageItem('p2ScoreCtrlPanel'));
+
+            const histP1BeforeDiscard = await cp.PlayerStats.getPlayer(histP1.id);
+            const racksBeforeDiscard = histP1BeforeDiscard && histP1BeforeDiscard.stats &&
+                histP1BeforeDiscard.stats.byGameType && histP1BeforeDiscard.stats.byGameType.game1
+                ? (histP1BeforeDiscard.stats.byGameType.game1.racksWon || 0)
+                : 0;
+            const prevConfirm = cp.confirm;
+            cp.confirm = function () { return true; };
+            try {
+                await cp.confirmDeleteMatch(pendingAfterEdit.id);
+            } finally {
+                cp.confirm = prevConfirm;
+            }
+            await sleep(300);
+            assert('Match History', 'Discard clears pending match',
+                !cp.PlayerStats.getActivePendingMatch());
+            assert('Match History', 'Discard resets scoreboard',
+                parseInt(cp.getStorageItem('p1ScoreCtrlPanel'), 10) === 0 &&
+                parseInt(cp.getStorageItem('p2ScoreCtrlPanel'), 10) === 0);
+            const histP1AfterDiscard = await cp.PlayerStats.getPlayer(histP1.id);
+            const racksAfterDiscard = histP1AfterDiscard && histP1AfterDiscard.stats &&
+                histP1AfterDiscard.stats.byGameType && histP1AfterDiscard.stats.byGameType.game1
+                ? (histP1AfterDiscard.stats.byGameType.game1.racksWon || 0)
+                : 0;
+            assert('Match History', 'Discard recomputes racks without live match',
+                racksAfterDiscard <= racksBeforeDiscard,
+                racksBeforeDiscard + ' → ' + racksAfterDiscard);
+
+            // Re-arm a live rack so Call Match Early tests below still apply
+            cp.postNames();
+            await sleep(300);
+            cp.performResetScores({ endMatch: false });
+            await sleep(200);
+            cp.postScore('add', '1');
+            await sleep(400);
+            assert('Match History', 'Re-armed mid-match rack after discard',
+                parseInt(cp.getStorageItem('p1ScoreCtrlPanel'), 10) === 1 &&
+                cp.PlayerStats.canCallGame() === true);
 
             assert('Match History', 'Call Game available mid-race',
                 cp.PlayerStats.canCallGame() === true);
@@ -445,7 +714,7 @@
             cp.document.getElementById('p2Name').value = callP2.name;
             cp.document.getElementById('p1Name').setAttribute('data-player-id', callP1.id);
             cp.document.getElementById('p2Name').setAttribute('data-player-id', callP2.id);
-            cp.document.getElementById('gameType').value = 'game1';
+            cp.document.getElementById('gameTypeSelect').value = 'game1';
             await cp.gameType('game1');
             await sleep(100);
             cp.document.getElementById('raceInfoTxt').value = '5';
@@ -484,7 +753,7 @@
             cp.document.getElementById('p2Name').value = switchP2.name;
             cp.document.getElementById('p1Name').setAttribute('data-player-id', switchP1.id);
             cp.document.getElementById('p2Name').setAttribute('data-player-id', switchP2.id);
-            cp.document.getElementById('gameType').value = 'game1';
+            cp.document.getElementById('gameTypeSelect').value = 'game1';
             await cp.gameType('game1');
             cp.document.getElementById('raceInfoTxt').value = '5';
             cp.setStorageItem('raceInfo', '5');
@@ -499,7 +768,7 @@
             assert('Match History', 'Game-type switch can Call Game mid-race',
                 cp.PlayerStats.canCallGame() === true);
             const switchMatchesBefore = (await cp.PlayerStats.getMatchesForPlayer(switchP1.id)).length;
-            cp.document.getElementById('gameType').value = 'game8';
+            cp.document.getElementById('gameTypeSelect').value = 'game8';
             await cp.gameType('game8');
             await sleep(200);
             assert('Match History', 'Game-type switch clears rack score',
@@ -525,7 +794,11 @@
             assert('Match History', 'Call Game logs H2H frame/rack win',
                 callH2H && (callH2H.racksWon[callP1.id] || 0) >= 1,
                 callH2H && JSON.stringify(callH2H.racksWon));
-            cp.localStorage.setItem('overlayStatsMode', 'h2h');
+            // Overlay H2H is scoped to the active game type — return to 8-Ball for this pair.
+            cp.document.getElementById('gameTypeSelect').value = 'game1';
+            await cp.gameType('game1');
+            await sleep(100);
+            cp.setStorageItem('overlayStatsMode', 'h2h');
             cp.document.getElementById('p1Name').value = callP1.name;
             cp.document.getElementById('p2Name').value = callP2.name;
             cp.document.getElementById('p1Name').setAttribute('data-player-id', callP1.id);
@@ -543,14 +816,14 @@
                 callH2HText.replace(/\n/g, ' | '));
             assert('Match History', 'H2H overlay renders comparison table',
                 bs.document.querySelector('#overlayStatsBody .overlay-stats-h2h-table') !== null);
-            cp.localStorage.removeItem('overlayStatsMode');
+            clearScopedStorage(cp, 'overlayStatsMode');
             bs.applyOverlayStats({ visible: false });
 
             // Career highest break must not leak into H2H when the pair has never played
             const hbSolo = await cp.PlayerStats.ensurePlayer(tag + '_HBSolo');
             const hbOther = await cp.PlayerStats.ensurePlayer(tag + '_HBOther');
             const hbOpp = await cp.PlayerStats.ensurePlayer(tag + '_HBOpp');
-            cp.document.getElementById('gameType').value = 'game8';
+            cp.document.getElementById('gameTypeSelect').value = 'game8';
             await cp.gameType('game8');
             cp.document.getElementById('p1Name').value = hbSolo.name;
             cp.document.getElementById('p2Name').value = hbOther.name;
@@ -586,12 +859,12 @@
             cp.document.getElementById('p2Name').value = hbOpp.name;
             cp.document.getElementById('p1Name').setAttribute('data-player-id', hbSolo.id);
             cp.document.getElementById('p2Name').setAttribute('data-player-id', hbOpp.id);
-            cp.localStorage.setItem('overlayStatsMode', 'h2h');
+            cp.setStorageItem('overlayStatsMode', 'h2h');
             const hbOverlay = await cp.PlayerStats.buildOverlayStatsPayload();
             assert('Match History', 'H2H overlay empty when only career break exists',
                 !!hbOverlay.emptyMessage && !(hbOverlay.p1HighestBreak > 0),
                 JSON.stringify(hbOverlay));
-            cp.localStorage.removeItem('overlayStatsMode');
+            clearScopedStorage(cp, 'overlayStatsMode');
             bs.applyOverlayStats({ visible: false });
 
             // Resume original race-complete / End Match coverage with hist players.
@@ -633,6 +906,32 @@
             assert('Match History', 'End Match clears live scoreboard',
                 parseInt(cp.getStorageItem('p1ScoreCtrlPanel'), 10) === 0);
 
+            // Call Match Early must flush async rack writes and match finalScore to racks[]
+            cp.document.getElementById('raceInfoTxt').value = '5';
+            cp.setStorageItem('raceInfo', '5');
+            cp.performResetScores({ endMatch: false });
+            await sleep(200);
+            cp.postScore('add', '1');
+            cp.postScore('add', '2');
+            cp.postScore('add', '1');
+            cp.postScore('add', '2');
+            cp.postScore('add', '1');
+            // No sleep — reproduce race that previously saved 3–2 with one rack
+            const earlySaved = await cp.PlayerStats.callGame();
+            assert('Match History', 'Call Match Early saves with pending racks', earlySaved === true);
+            const earlyMatches = await cp.PlayerStats.getMatchesForPlayer(histP1.id);
+            const earlyMatch = earlyMatches.find(function (m) {
+                return m.status === 'completed' && m.finalScore &&
+                    m.finalScore.p1 === 3 && m.finalScore.p2 === 2;
+            });
+            assert('Match History', 'Call Match Early finalScore is 3-2',
+                !!earlyMatch, earlyMatch && JSON.stringify(earlyMatch.finalScore));
+            assert('Match History', 'Call Match Early racks length matches score',
+                earlyMatch && earlyMatch.racks && earlyMatch.racks.length === 5,
+                earlyMatch && earlyMatch.racks && earlyMatch.racks.length);
+            cp.performResetScores({ endMatch: true });
+            await sleep(200);
+
             await cp.PlayerStats.saveMatch({
                 player1Id: histP1.id,
                 player2Id: histP2.id,
@@ -655,6 +954,59 @@
             assert('Match History', 'Pool rack breakdown shows Won/Lost',
                 poolBreakdown && poolBreakdown.indexOf('Won') !== -1 && poolBreakdown.indexOf('Lost') !== -1,
                 poolBreakdown);
+
+            assert('StatsTab', 'Stats tab button present', !!cp.document.getElementById('statsTab'));
+            assert('StatsTab', 'Edit Player Stats on Stats tab',
+                !!cp.document.getElementById('StatsSettings') &&
+                cp.document.getElementById('StatsSettings').contains(cp.document.getElementById('statsBtn')));
+            assert('StatsTab', 'Stats game type selector present',
+                !!cp.document.getElementById('statsVisibilityGameType'));
+            cp.onStatsVisibilityGameTypeChange('game1');
+            cp.PlayerStats.renderStatsVisibilityPanel();
+            assert('StatsTab', 'Visibility panel shows selected game type only',
+                !!cp.document.getElementById('statVis_game1_breakAndRun') &&
+                !cp.document.querySelector('.stats-visibility-game[data-game-type="game2"]'));
+            assert('StatsTab', 'Break & Run toggle for 8-Ball',
+                !!cp.document.getElementById('statVis_game1_breakAndRun'));
+            const brToggle = cp.document.getElementById('statVis_game1_breakAndRun');
+            if (brToggle) {
+                brToggle.checked = false;
+                cp.onStatVisibilityToggle(brToggle);
+            }
+            assert('StatsTab', 'Can disable Break & Run visibility',
+                cp.PlayerStats.isStatVisible('game1', 'breakAndRun') === false);
+            assert('StatsTab', 'Visibility settings persist in storage',
+                (cp.getStorageItem('statsVisibility') || '').indexOf('"breakAndRun":false') !== -1 ||
+                cp.PlayerStats.isStatVisible('game1', 'breakAndRun') === false);
+            cp.document.getElementById('gameTypeSelect').value = 'game1';
+            await cp.gameType('game1');
+            cp.PlayerStats.renderStatsVisibilityPanel();
+            cp.document.getElementById('p1Name').value = histP1.name;
+            cp.document.getElementById('p1Name').setAttribute('data-player-id', histP1.id);
+            cp.toggleOverlayStats('p1');
+            const visPayload = await cp.PlayerStats.buildOverlayStatsPayload();
+            assert('StatsTab', 'Disabled stat omitted from overlay payload',
+                visPayload.visible === true && visPayload.showBreakAndRun === false,
+                visPayload && JSON.stringify({ visible: visPayload.visible, showBreakAndRun: visPayload.showBreakAndRun }));
+            const liveBrPayload = await publishOverlayAndReadPayload(cp, function () {
+                cp.PlayerStats.broadcastOverlayStatsIfEnabled();
+            });
+            assert('OverlayVisibility', '8-Ball B&R off survives broadcast rebuild',
+                liveBrPayload.showBreakAndRun === false,
+                JSON.stringify({ showBreakAndRun: liveBrPayload.showBreakAndRun }));
+            cp.toggleOverlayStats('p1');
+            if (brToggle) {
+                brToggle.checked = true;
+                cp.onStatVisibilityToggle(brToggle);
+            }
+            const playGameTypeBefore = cp.getStorageItem('gameType');
+            cp.onStatsVisibilityGameTypeChange('game8');
+            assert('StatsTab', 'Stats game type selector independent of play',
+                cp.PlayerStats.readStatsVisibilityGameType() === 'game8' &&
+                cp.getStorageItem('gameType') === playGameTypeBefore);
+            assert('StatsTab', 'Snooker visibility toggles shown when selected',
+                !!cp.document.getElementById('statVis_game8_possibleBreak'));
+            cp.onStatsVisibilityGameTypeChange('game1');
 
             cp.openStatsModal();
             await sleep(200);
@@ -703,6 +1055,19 @@
             cp.closeMatchEditModal();
             cp.closeStatsModal();
 
+            await ensurePlayableScoringState(cp);
+
+            const pushWrap = cp.document.getElementById('pushScoresWrap');
+            assert('Scoring', 'Push Entered Scores hidden before manual entry',
+                pushWrap && pushWrap.classList.contains('noShow'));
+            cp.document.getElementById('p1Score').value = '7';
+            cp.document.getElementById('p1Score').dispatchEvent(new cp.Event('input', { bubbles: true }));
+            assert('Scoring', 'Push Entered Scores shown after typing',
+                pushWrap && !pushWrap.classList.contains('noShow'));
+            cp.pushScores();
+            assert('Scoring', 'Push Entered Scores hidden after push',
+                pushWrap && pushWrap.classList.contains('noShow'));
+
             cp.setStorageItem('p1BallsCtrlPanel', 0);
             cp.setStorageItem('p1Balls', 0);
             const p1BallsInput = cp.document.getElementById('p1Balls');
@@ -720,15 +1085,15 @@
                     (ballsEl.textContent || ballsEl.innerHTML) === '-3');
             }
 
-            cp.localStorage.setItem('overlayStatsMode', 'p1');
-            cp.localStorage.setItem('overlayStatsPayload', '{"visible":true}');
+            cp.setStorageItem('overlayStatsMode', 'p1');
+            cp.setStorageItem('overlayStatsPayload', '{"visible":true}');
             if (typeof cp.removeInstanceData === 'function') {
                 cp.removeInstanceData(null);
             }
             assert('Scoring', 'Overlay mode survives data clear',
-                cp.localStorage.getItem('overlayStatsMode') === 'p1');
-            cp.localStorage.removeItem('overlayStatsMode');
-            cp.localStorage.removeItem('overlayStatsPayload');
+                cp.getStorageItem('overlayStatsMode') === 'p1');
+            clearScopedStorage(cp, 'overlayStatsMode');
+            clearScopedStorage(cp, 'overlayStatsPayload');
 
             // --- Stats modal UI ---
             cp.openStatsModal();
@@ -778,15 +1143,18 @@
             const prevPointBased = cp.getStorageItem('pointBased') || 'no';
             const prevSnookerGold = cp.getStorageItem('snookerGoldEnabled') || 'no';
 
-            cp.document.getElementById('gameType').value = 'game1';
+            cp.document.getElementById('gameTypeSelect').value = 'game1';
             await cp.gameType('game1');
             await sleep(150);
             const boardHeaders = Array.from(cp.document.querySelectorAll('#statsTab-leaderboard th'))
                 .map(function (th) { return th.textContent.trim(); });
-            assert('Ball Stats', 'Board header Games W/L', boardHeaders.indexOf('Games W/L') !== -1, boardHeaders.join('|'));
+            assert('Ball Stats', 'Board header Matches Won', boardHeaders.indexOf('Matches Won') !== -1, boardHeaders.join('|'));
             assert('Ball Stats', 'Board header Racks W/L', boardHeaders.indexOf('Racks W/L') !== -1, boardHeaders.join('|'));
             assert('Ball Stats', 'Board has no Balls Potted column', boardHeaders.indexOf('Balls Potted') === -1);
             assert('Ball Stats', '8-Ball is not dual score', cp.isDualScoreMode() === false);
+            assert('Ball Stats', '8-Ball manual ball rows collapsed',
+                cp.document.getElementById('scoreInfoP1Balls').classList.contains('noShow') &&
+                cp.window.getComputedStyle(cp.document.getElementById('scoreInfoP1Balls')).display === 'none');
 
             const bankPlayer = await cp.PlayerStats.ensurePlayer(tag + '_BallA');
             const bankOpp = await cp.PlayerStats.ensurePlayer(tag + '_BallB');
@@ -807,12 +1175,12 @@
             cp.document.getElementById('p1Name').setAttribute('data-player-id', bankPlayer.id);
             cp.document.getElementById('p2Name').setAttribute('data-player-id', bankOpp.id);
 
-            cp.localStorage.setItem('overlayStatsMode', 'p1');
+            cp.setStorageItem('overlayStatsMode', 'p1');
             let overlayPayload = await cp.PlayerStats.buildOverlayStatsPayload();
             assert('Ball Stats', 'P1 overlay hides balls in 8-Ball', overlayPayload.showBalls !== true,
                 JSON.stringify({ showBalls: overlayPayload.showBalls, ballsPotted: overlayPayload.ballsPotted }));
 
-            cp.document.getElementById('gameType').value = 'game5';
+            cp.document.getElementById('gameTypeSelect').value = 'game5';
             await cp.gameType('game5');
             cp.document.getElementById('raceInfoTxt').value = 'Race to 5';
             if (typeof cp.postNames === 'function') { cp.postNames(); }
@@ -838,7 +1206,7 @@
             if (typeof cp.postNames === 'function') { cp.postNames(); }
             await sleep(200);
 
-            cp.localStorage.setItem('overlayStatsMode', 'h2h');
+            cp.setStorageItem('overlayStatsMode', 'h2h');
             const h2hPayload = await cp.PlayerStats.buildOverlayStatsPayload();
             assert('Ball Stats', 'H2H overlay shows balls in Bank', h2hPayload.showBalls === true);
             assert('Ball Stats', 'H2H overlay has per-player totals',
@@ -847,7 +1215,7 @@
                 h2hPayload.gameType === 'game5');
 
             // Straight Pool longest run
-            cp.document.getElementById('gameType').value = 'game4';
+            cp.document.getElementById('gameTypeSelect').value = 'game4';
             await cp.gameType('game4');
             await sleep(150);
             const straightP1 = await cp.PlayerStats.ensurePlayer(tag + '_RunA');
@@ -865,11 +1233,17 @@
             await cp.PlayerStats.recordRackWin('1');
             await cp.PlayerStats.recordRackWin('1');
             await cp.PlayerStats.recordRackWin('1');
+            const straightPending = cp.PlayerStats.getActivePendingMatch();
+            assert('Ball Stats', 'Straight racks store run on scorer',
+                straightPending && straightPending.racks && straightPending.racks.length === 3 &&
+                straightPending.racks[2].highestBreakP1 === 3 &&
+                straightPending.racks[2].highestBreakP2 === 0,
+                straightPending && JSON.stringify(straightPending.racks && straightPending.racks[2]));
             const straightStats = (await cp.PlayerStats.getPlayer(straightP1.id)).stats.byGameType.game4;
             assert('Ball Stats', 'Straight Pool tracks Longest Run',
                 straightStats && (straightStats.highestBreak || 0) >= 3,
                 straightStats && String(straightStats.highestBreak));
-            cp.localStorage.setItem('overlayStatsMode', 'p1');
+            cp.setStorageItem('overlayStatsMode', 'p1');
             const straightOverlay = await cp.PlayerStats.buildOverlayStatsPayload();
             assert('Ball Stats', 'Straight overlay uses Longest Run label',
                 straightOverlay.showHighestBreak === true &&
@@ -884,7 +1258,34 @@
             const straightAfterEnd = await cp.PlayerStats.buildOverlayStatsPayload();
             assert('Ball Stats', 'End Match clears overlay Longest Run',
                 (straightAfterEnd.highestBreak || 0) === 0, String(straightAfterEnd.highestBreak));
-            cp.localStorage.removeItem('overlayStatsMode');
+
+            // Straight match history editor exposes Run columns
+            await cp.PlayerStats.saveMatch({
+                player1Id: straightP1.id,
+                player2Id: straightP2.id,
+                gameType: 'game4',
+                dateIso: new Date().toISOString(),
+                racks: [
+                    { winnerId: '1', highestBreakP1: 5, highestBreakP2: 0 },
+                    { winnerId: '1', highestBreakP1: 6, highestBreakP2: 0 },
+                    { winnerId: '2', highestBreakP1: 0, highestBreakP2: 2 }
+                ]
+            });
+            const straightSaved = (await cp.PlayerStats.getMatchesForPlayer(straightP1.id))
+                .find(function (m) {
+                    return m.status === 'completed' && m.gameType === 'game4' &&
+                        m.racks && m.racks.length === 3 && m.racks[1].highestBreakP1 === 6;
+                });
+            assert('Ball Stats', 'Straight match save keeps per-rack runs', !!straightSaved);
+            if (straightSaved) {
+                await cp.openMatchEditModal(straightSaved.id);
+                await sleep(100);
+                assert('Ball Stats', 'Straight editor shows Run columns',
+                    !!cp.document.querySelector('#statsMatchRacksEditor .stats-rack-hb-p1') &&
+                    (cp.document.getElementById('statsMatchRacksEditor').textContent || '').indexOf('Run') !== -1);
+                cp.closeMatchEditModal();
+            }
+            clearScopedStorage(cp, 'overlayStatsMode');
 
             cp.openStatsModal();
             await sleep(200);
@@ -897,12 +1298,17 @@
             const detailHeaders = Array.from(cp.document.querySelectorAll('#statsTab-detail .stats-player-stats-table th'))
                 .map(function (th) { return th.textContent.trim(); });
             assert('Ball Stats', 'Player detail has Balls Potted', detailHeaders.indexOf('Balls Potted') !== -1, detailHeaders.join('|'));
-            assert('Ball Stats', 'Player detail Games W/L label', detailHeaders.indexOf('Games W/L') !== -1);
+            assert('Ball Stats', 'Player detail Matches Won label', detailHeaders.indexOf('Matches Won') !== -1);
+            assert('Ball Stats', 'Every player stats table uses Matches Won',
+                detailHeaders.length > 0 &&
+                detailHeaders.filter(function (h) { return h === 'Matches Won'; }).length >= 1 &&
+                detailHeaders.indexOf('Games W/L') === -1,
+                detailHeaders.join('|'));
             assert('Ball Stats', 'Player detail Racks W/L label', detailHeaders.indexOf('Racks W/L') !== -1);
             const overallCells = Array.from(cp.document.querySelectorAll('#statsTab-detail .stats-overall-row td'))
                 .map(function (td) { return td.textContent.trim(); });
             assert('Ball Stats', 'Player detail Balls Potted is numeric total',
-                overallCells.length >= 4 && /^\d+$/.test(overallCells[3]), overallCells.join('|'));
+                overallCells.length >= 3 && /^\d+$/.test(overallCells[2]), overallCells.join('|'));
             cp.closeStatsModal();
 
             cp.document.getElementById('statsMatchGameType').value = 'game1';
@@ -928,8 +1334,8 @@
             });
             await sleep(50);
             const overlayText = (bs.document.getElementById('overlayStatsBody').innerText || '');
-            assert('Ball Stats', 'Browser source labels Games W/L',
-                overlayText.indexOf('Games W/L') !== -1 && overlayText.indexOf('1/0') !== -1,
+            assert('Ball Stats', 'Browser source labels Matches Won',
+                overlayText.indexOf('Matches Won') !== -1 && overlayText.indexOf('1/0') !== -1,
                 overlayText.replace(/\n/g, ' | '));
             assert('Ball Stats', 'Browser source labels Rack W/L with percentage',
                 overlayText.indexOf('Rack W/L') !== -1 && overlayText.indexOf('2/1') !== -1 &&
@@ -938,7 +1344,7 @@
                 overlayText.indexOf('Balls Potted') !== -1 && overlayText.indexOf('9') !== -1,
                 overlayText.replace(/\n/g, ' | '));
             assert('Ball Stats', 'Browser source omits trailing colons on labels',
-                overlayText.indexOf('Games W/L:') === -1 &&
+                overlayText.indexOf('Matches Won:') === -1 &&
                 overlayText.indexOf('Rack W/L:') === -1 &&
                 overlayText.indexOf('Balls Potted:') === -1,
                 overlayText.replace(/\n/g, ' | '));
@@ -1004,7 +1410,7 @@
                 assert('Ball Stats', 'H2H overlay balances player column widths', false, 'missing name cells');
             }
 
-            cp.document.getElementById('gameType').value = 'game7';
+            cp.document.getElementById('gameTypeSelect').value = 'game7';
             await cp.gameType('game7');
             const pointBased = cp.document.getElementById('pointBased');
             if (pointBased) {
@@ -1021,17 +1427,16 @@
             }
 
             // --- Bank / One Pocket tracker scoring ---
-            cp.setStorageItem('usePlayer1', 'yes');
-            cp.setStorageItem('usePlayer2', 'yes');
+            ensureScoresVisible(cp);
             const pocketUseP1 = cp.document.getElementById('usePlayer1Setting');
             const pocketUseP2 = cp.document.getElementById('usePlayer2Setting');
             if (pocketUseP1) { pocketUseP1.checked = true; }
             if (pocketUseP2) { pocketUseP2.checked = true; }
-            cp.document.getElementById('gameType').value = 'game5';
+            cp.document.getElementById('gameTypeSelect').value = 'game5';
             await cp.gameType('game5');
             await sleep(200);
             assert('Pocket', 'Bank is pocket score game', cp.isPocketScoreGame() === true);
-            assert('Pocket', 'Bank enables ball tracker',
+            assert('Pocket', 'Bank enables ball scoring',
                 cp.document.getElementById('ballTrackerCheckbox').checked === true);
             assert('Pocket', 'Display Balls control visible for Bank',
                 !cp.document.getElementById('ballDisplayDiv').classList.contains('noShow'));
@@ -1058,14 +1463,14 @@
                     !cp.document.getElementById('playerToggle').classList.contains('noShow')),
                 'usePlayerToggle=' + cp.getStorageItem('usePlayerToggle') +
                 ' checked=' + (pocketToggleSetting && pocketToggleSetting.checked));
-            assert('Pocket', 'Active Player Indicator locked while Ball Tracker on',
+            assert('Pocket', 'Active Player Indicator locked while Ball Scoring on',
                 pocketToggleSetting && pocketToggleSetting.disabled === true &&
                 pocketToggleSetting.checked === true);
             // Attempting to disable Active Player while tracker is on must be refused
             pocketToggleSetting.disabled = false;
             pocketToggleSetting.checked = false;
             cp.toggleSetting();
-            assert('Pocket', 'Cannot disable Active Player while Ball Tracker on',
+            assert('Pocket', 'Cannot disable Active Player while Ball Scoring on',
                 pocketToggleSetting.checked === true &&
                 cp.getStorageItem('usePlayerToggle') === 'yes');
             assert('Pocket', 'Active Player Indicator re-locked after refuse',
@@ -1144,30 +1549,285 @@
                 parseInt(cp.getStorageItem('p2ScoreCtrlPanel'), 10) === 1,
                 cp.getStorageItem('p2ScoreCtrlPanel'));
 
-            cp.document.getElementById('gameType').value = 'game6';
+            cp.document.getElementById('gameTypeSelect').value = 'game6';
             await cp.gameType('game6');
             await sleep(100);
             assert('Pocket', 'One Pocket is pocket score game', cp.isPocketScoreGame() === true);
 
+            // --- 8 / 9 / 10-Ball tracker rack wins ---
+            ensureScoresVisible(cp);
+            if (pocketUseP1) { pocketUseP1.checked = true; }
+            if (pocketUseP2) { pocketUseP2.checked = true; }
+
+            cp.document.getElementById('gameTypeSelect').value = 'game1';
+            await cp.gameType('game1');
+            await sleep(150);
+            assert('RackWin', 'Section label is Player Tracking and Ball Scoring',
+                (cp.document.getElementById('playerToggleLabel').textContent || '').indexOf('Player Tracking and Ball Scoring') !== -1);
+            assert('RackWin', '8-Ball is tracker rack-win game', cp.isTrackerRackWinGame() === true);
+            assert('RackWin', '8-Ball winning ball is ball 8', cp.getGameWinningBallId() === 'ball 8');
+            assert('RackWin', '8-Ball enables ball scoring',
+                cp.document.getElementById('ballTrackerCheckbox').checked === true);
+            cp.document.getElementById('raceInfoTxt').value = '5';
+            cp.setStorageItem('raceInfo', '5');
+            cp.setStorageItem('p1ScoreCtrlPanel', 0);
+            cp.setStorageItem('p2ScoreCtrlPanel', 0);
+            cp.document.getElementById('p1Score').value = '0';
+            cp.document.getElementById('p2Score').value = '0';
+            cp.resetBallTracker();
+            if (pocketToggle) {
+                pocketToggle.checked = true;
+                cp.togglePlayer(true);
+            }
+            assert('RackWin', 'Breaker prompt shown before breaker chosen',
+                (cp.document.getElementById('playerSlotQuestion').textContent || '').indexOf('Breaking Player') !== -1 &&
+                !cp.document.getElementById('rackBreakerP1Btn').disabled &&
+                !cp.document.getElementById('rackBreakerP2Btn').disabled);
+            cp.document.getElementById('ballTrackerCheckbox').checked = false;
+            cp.useBallTracker();
+            await sleep(50);
+            assert('RackWin', 'Breaker picker works without Ball Scoring',
+                (cp.document.getElementById('playerSlotQuestion').textContent || '').indexOf('Breaking Player') !== -1 &&
+                cp.document.getElementById('ballTracker').classList.contains('noShow'));
+            cp.selectRackBreaker('1');
+            await sleep(30);
+            cp.document.getElementById('ballTrackerCheckbox').checked = true;
+            cp.useBallTracker();
+            await sleep(50);
+            cp.resetBallTracker();
+            assert('RackWin', 'Balls visible but disabled until breaker chosen',
+                !cp.document.getElementById('ballTrackerBalls').classList.contains('noShow') &&
+                cp.document.getElementById('ballTracker').classList.contains('ball-tracker-awaiting-breaker'));
+            cp.selectRackBreaker('1');
+            await sleep(30);
+            assert('RackWin', 'Active Player mode after breaker chosen',
+                (cp.document.getElementById('playerSlotQuestion').textContent || '').indexOf('Active Player') !== -1 &&
+                !cp.document.getElementById('rackBreakerP1Btn').classList.contains('rack-breaker-inactive') &&
+                cp.document.getElementById('rackBreakerP2Btn').classList.contains('rack-breaker-inactive'));
+            cp.onPlayerSlotButton('2');
+            await sleep(30);
+            assert('RackWin', 'Switch active player via button',
+                cp.getActivePlayerSlot() === '2' &&
+                !cp.document.getElementById('rackBreakerP2Btn').classList.contains('rack-breaker-inactive') &&
+                cp.document.getElementById('rackBreakerP1Btn').classList.contains('rack-breaker-inactive'));
+            cp.onPlayerSlotButton('1');
+            await sleep(30);
+            assert('RackWin', 'Balls enabled after breaker chosen',
+                !cp.document.getElementById('ballTracker').classList.contains('ball-tracker-awaiting-breaker'));
+            cp.setStorageItem('useBallSet', 'yes');
+            cp.document.getElementById('ballSetCheckbox').checked = true;
+            cp.useBallSetToggle();
+            cp.setStorageItem('playerBallSet', 'p1Open');
+            cp.document.getElementById('p1colorOpen').checked = true;
+            cp.document.getElementById('ballSelection').value = 'international';
+            cp.toggleBallSelection();
+            await sleep(50);
+            cp.selectRackBreaker('1');
+            await sleep(30);
+            cp.maybeAssignBallSetFromPot('ball 3');
+            assert('RackWin', 'International P1 pots yellow group (ball 3)',
+                cp.getStorageItem('playerBallSet') === 'p1yellow/bigs');
+            cp.setStorageItem('playerBallSet', 'p1Open');
+            cp.document.getElementById('p1colorOpen').checked = true;
+            cp.maybeAssignBallSetFromPot('ball 10');
+            assert('RackWin', 'International P1 pots red group (ball 10)',
+                cp.getStorageItem('playerBallSet') === 'p1red/smalls');
+            cp.setStorageItem('playerBallSet', 'p1Open');
+            cp.document.getElementById('p1colorOpen').checked = true;
+            cp.document.getElementById('ballSelection').value = 'american';
+            cp.toggleBallSelection();
+            await sleep(30);
+            cp.maybeAssignBallSetFromPot('ball 3');
+            assert('RackWin', 'American P1 pots solids (ball 3)',
+                cp.getStorageItem('playerBallSet') === 'p1red/smalls');
+            cp.setStorageItem('playerBallSet', 'p1Open');
+            cp.document.getElementById('p1colorOpen').checked = true;
+            cp.togglePot(cp.document.getElementById('ball 1'));
+            await sleep(50);
+            assert('RackWin', '8-Ball object ball does not award rack',
+                parseInt(cp.getStorageItem('p1ScoreCtrlPanel'), 10) === 0);
+            cp.togglePot(cp.document.getElementById('ball 8'));
+            await sleep(100);
+            assert('RackWin', 'Potting 8 awards a rack',
+                parseInt(cp.getStorageItem('p1ScoreCtrlPanel'), 10) === 1,
+                cp.getStorageItem('p1ScoreCtrlPanel'));
+            cp.document.getElementById('raceInfoTxt').value = '1';
+            cp.setStorageItem('raceInfo', '1');
+            cp.updateScoreControlAvailability();
+            assert('RackWin', 'Race complete locks breaker buttons',
+                (cp.document.getElementById('playerSlotQuestion').textContent || '').indexOf('End Match') !== -1 &&
+                cp.document.getElementById('rackBreakerP1Btn').classList.contains('rack-breaker-match-locked') &&
+                cp.document.getElementById('rackBreakerP2Btn').classList.contains('rack-breaker-match-locked'));
+            cp.selectRackBreaker('2');
+            await sleep(30);
+            assert('RackWin', 'Breaker choice blocked when race complete',
+                String(cp.getStorageItem('rackBreakerSlot')) !== '2');
+            cp.document.getElementById('raceInfoTxt').value = '5';
+            cp.setStorageItem('raceInfo', '5');
+            cp.updateScoreControlAvailability();
+            assert('RackWin', 'Game ball on cooldown after rack win',
+                cp.document.getElementById('ball 8').classList.contains('ball-win-cooldown'));
+            assert('RackWin', 'Other balls cleared after rack win',
+                !cp.document.getElementById('ball 1').classList.contains('faded'));
+            const scoreAfterWin = parseInt(cp.getStorageItem('p1ScoreCtrlPanel'), 10);
+            cp.togglePot(cp.document.getElementById('ball 8'));
+            await sleep(50);
+            assert('RackWin', 'Click during cooldown does not change score',
+                parseInt(cp.getStorageItem('p1ScoreCtrlPanel'), 10) === scoreAfterWin);
+            await sleep(550);
+            assert('RackWin', 'Game ball selectable again after cooldown',
+                !cp.document.getElementById('ball 8').classList.contains('faded') &&
+                !cp.document.getElementById('ball 8').classList.contains('ball-win-cooldown'));
+            assert('RackWin', 'Cooldown release does not debit rack',
+                parseInt(cp.getStorageItem('p1ScoreCtrlPanel'), 10) === 1);
+
+            cp.selectRackBreaker('1');
+            await sleep(30);
+            cp.togglePot(cp.document.getElementById('ball 8'));
+            await sleep(100);
+            assert('RackWin', 'Pot 8 again awards next rack',
+                parseInt(cp.getStorageItem('p1ScoreCtrlPanel'), 10) === 2);
+
+            // Break and run vs table run
+            const brP1 = await cp.PlayerStats.ensurePlayer(tag + '_BR_A');
+            const brP2 = await cp.PlayerStats.ensurePlayer(tag + '_BR_B');
+            cp.document.getElementById('p1Name').value = brP1.name;
+            cp.document.getElementById('p2Name').value = brP2.name;
+            cp.document.getElementById('p1Name').setAttribute('data-player-id', brP1.id);
+            cp.document.getElementById('p2Name').setAttribute('data-player-id', brP2.id);
+            cp.postNames();
+            await sleep(200);
+            cp.setStorageItem('p1ScoreCtrlPanel', 0);
+            cp.setStorageItem('p2ScoreCtrlPanel', 0);
+            cp.document.getElementById('p1Score').value = '0';
+            cp.document.getElementById('p2Score').value = '0';
+            cp.resetBallTracker();
+            cp.selectRackBreaker('1');
+            await sleep(30);
+            cp.togglePot(cp.document.getElementById('ball 8'));
+            await sleep(600);
+            let brStats = await cp.PlayerStats.getPlayer(brP1.id);
+            assert('RackWin', 'Break and run recorded when breaker runs out',
+                brStats && (brStats.stats.byGameType.game1.breakAndRuns || 0) >= 1,
+                brStats && JSON.stringify(brStats.stats.byGameType.game1));
+            cp.selectRackBreaker('1');
+            await sleep(30);
+            cp.togglePlayer(false);
+            await sleep(30);
+            cp.togglePlayer(true);
+            await sleep(30);
+            cp.togglePot(cp.document.getElementById('ball 8'));
+            await sleep(200);
+            brStats = await cp.PlayerStats.getPlayer(brP1.id);
+            assert('RackWin', 'Table run recorded after opponent visit',
+                brStats && (brStats.stats.byGameType.game1.tableRuns || 0) >= 1,
+                brStats && JSON.stringify(brStats.stats.byGameType.game1));
+
+            cp.performResetScores({ endMatch: true });
+            await sleep(100);
+            assert('RackWin', 'End Match restores breaker prompt',
+                (cp.document.getElementById('playerSlotQuestion').textContent || '').indexOf('Breaking Player') !== -1 &&
+                cp.document.getElementById('ballTracker').classList.contains('ball-tracker-awaiting-breaker'));
+            cp.selectRackBreaker('1');
+            await sleep(30);
+
+            cp.document.getElementById('gameTypeSelect').value = 'game2';
+            await cp.gameType('game2');
+            await sleep(100);
+            cp.setStorageItem('p1ScoreCtrlPanel', 0);
+            cp.document.getElementById('p1Score').value = '0';
+            cp.resetBallTracker();
+            assert('RackWin', '9-Ball winning ball is ball 9', cp.getGameWinningBallId() === 'ball 9');
+            cp.selectRackBreaker('1');
+            await sleep(30);
+            cp.togglePot(cp.document.getElementById('ball 9'));
+            await sleep(100);
+            assert('RackWin', 'Potting 9 awards a rack',
+                parseInt(cp.getStorageItem('p1ScoreCtrlPanel'), 10) === 1);
+
+            cp.document.getElementById('gameTypeSelect').value = 'game3';
+            await cp.gameType('game3');
+            await sleep(100);
+            cp.setStorageItem('p1ScoreCtrlPanel', 0);
+            cp.document.getElementById('p1Score').value = '0';
+            cp.resetBallTracker();
+            assert('RackWin', '10-Ball winning ball is ball 10', cp.getGameWinningBallId() === 'ball 10');
+            assert('RackWin', '10-Ball shows ball 10',
+                !cp.document.getElementById('ball 10').classList.contains('noShow'));
+            cp.selectRackBreaker('1');
+            await sleep(30);
+            cp.togglePot(cp.document.getElementById('ball 10'));
+            await sleep(100);
+            assert('RackWin', 'Potting 10 awards a rack',
+                parseInt(cp.getStorageItem('p1ScoreCtrlPanel'), 10) === 1);
+
+            // --- Straight Pool tracker scoring + 14.1 re-rack ---
+            cp.document.getElementById('gameTypeSelect').value = 'game4';
+            await cp.gameType('game4');
+            await sleep(150);
+            cp.document.getElementById('raceInfoTxt').value = '150';
+            cp.setStorageItem('raceInfo', '150');
+            assert('Straight', 'Straight enables ball scoring',
+                cp.document.getElementById('ballTrackerCheckbox').checked === true);
+            assert('Straight', 'Primary suffix Balls', cp.getPrimaryScoreSuffix() === 'Balls');
+            cp.setStorageItem('p1ScoreCtrlPanel', 0);
+            cp.setStorageItem('p2ScoreCtrlPanel', 0);
+            cp.document.getElementById('p1Score').value = '0';
+            cp.document.getElementById('p2Score').value = '0';
+            cp.resetBallTracker();
+            if (pocketToggle) {
+                pocketToggle.checked = true;
+                cp.togglePlayer(true);
+            }
+            const straightBall1 = cp.document.getElementById('ball 1');
+            cp.togglePot(straightBall1);
+            await sleep(50);
+            assert('Straight', 'Tracker pot adds 1 Ball',
+                parseInt(cp.getStorageItem('p1ScoreCtrlPanel'), 10) === 1,
+                cp.getStorageItem('p1ScoreCtrlPanel'));
+            assert('Straight', 'Tracker pot keeps ball faded (no full reset)',
+                straightBall1.classList.contains('faded'));
+            cp.togglePot(straightBall1);
+            await sleep(50);
+            assert('Straight', 'Unclick deducts 1 Ball',
+                parseInt(cp.getStorageItem('p1ScoreCtrlPanel'), 10) === 0);
+            assert('Straight', 'Unclick clears fade', !straightBall1.classList.contains('faded'));
+
+            // Pot 14 balls, leave ball 15 — expect re-rack of the 14
+            for (let i = 1; i <= 14; i++) {
+                cp.togglePot(cp.document.getElementById('ball ' + i));
+            }
+            await sleep(150);
+            assert('Straight', 'Fourteen pots score 14 Balls',
+                parseInt(cp.getStorageItem('p1ScoreCtrlPanel'), 10) === 14,
+                cp.getStorageItem('p1ScoreCtrlPanel'));
+            assert('Straight', 'Re-rack restores pocketed balls',
+                !cp.document.getElementById('ball 1').classList.contains('faded') &&
+                !cp.document.getElementById('ball 14').classList.contains('faded'));
+            assert('Straight', 'Remaining ball still up after re-rack',
+                !cp.document.getElementById('ball 15').classList.contains('faded'));
+            assert('Straight', 'Re-rack does not change score',
+                parseInt(cp.getStorageItem('p1ScoreCtrlPanel'), 10) === 14);
+
             // --- Snooker (game8) ---
             assert('Snooker', 'Game type option present',
-                !!cp.document.querySelector('#gameType option[value="game8"]'));
+                !!cp.document.querySelector('#gameTypeSelect option[value="game8"]'));
             assert('Snooker', 'Active Player label',
-                !!Array.from(cp.document.querySelectorAll('#playerToggle label'))
-                    .find(function (l) { return (l.textContent || '').indexOf('Active Player') !== -1; }));
-            assert('Snooker', 'Active player name display present',
-                !!cp.document.getElementById('activePlayerNameDisplay'));
+                (cp.document.getElementById('playerSlotQuestion').textContent || '').indexOf('Active Player') !== -1);
+            assert('Snooker', 'Active player buttons present',
+                !!cp.document.getElementById('rackBreakerP1Btn') &&
+                !!cp.document.getElementById('rackBreakerP2Btn'));
             assert('Snooker', 'Active Player Indicator setting label',
                 (cp.document.getElementById('labelForUseToggleSetting') || {}).textContent === 'Active Player Indicator');
 
-            cp.document.getElementById('gameType').value = 'game7';
+            cp.document.getElementById('gameTypeSelect').value = 'game7';
             await cp.gameType('game7');
             await sleep(100);
             const snookerOptInCustom = cp.document.querySelector('#ballSelection option[value="snooker"]');
             assert('Snooker', 'Custom can select snooker balls',
                 snookerOptInCustom && !snookerOptInCustom.disabled && !snookerOptInCustom.hidden);
 
-            cp.document.getElementById('gameType').value = 'game1';
+            cp.document.getElementById('gameTypeSelect').value = 'game1';
             await cp.gameType('game1');
             await sleep(100);
             assert('Snooker', '8-Ball hides snooker ball option',
@@ -1187,7 +1847,7 @@
             if (useP1) { useP1.checked = true; }
             if (useP2) { useP2.checked = true; }
 
-            cp.document.getElementById('gameType').value = 'game8';
+            cp.document.getElementById('gameTypeSelect').value = 'game8';
             await cp.gameType('game8');
             await sleep(250);
             cp.postNames();
@@ -1195,6 +1855,8 @@
             await sleep(250);
 
             assert('Snooker', 'isSnooker true', cp.isSnooker() === true);
+            assert('Snooker', 'Breaker prompt on Snooker',
+                (cp.document.getElementById('playerSlotQuestion').textContent || '').indexOf('Breaking Player') !== -1);
             assert('Snooker', 'Snooker is dual score', cp.isDualScoreMode() === true);
             assert('Snooker', 'Forces snooker ball selection',
                 cp.getStorageItem('ballSelection') === 'snooker');
@@ -1271,14 +1933,13 @@
             const p2BeforeGoldFoul = parseInt(cp.getStorageItem('p2BallsCtrlPanel'), 10) || 0;
             cp.selectSnookerFoul(foulGold);
             await sleep(50);
-            assert('Snooker', 'Golden Ball foul awards 4 before pot unlock',
-                parseInt(cp.getStorageItem('p2BallsCtrlPanel'), 10) === p2BeforeGoldFoul + 4,
+            assert('Snooker', 'Golden Ball foul awards 20 before pot unlock',
+                parseInt(cp.getStorageItem('p2BallsCtrlPanel'), 10) === p2BeforeGoldFoul + 20,
                 cp.getStorageItem('p2BallsCtrlPanel'));
             assert('Snooker', 'Golden Ball foul marks ball fouled off',
                 cp.isSnookerGoldenBallFouled() === true);
-            assert('Snooker', 'Golden Ball stays disabled after foul',
-                goldBall.classList.contains('snooker-ball-disabled') ||
-                goldBall.getAttribute('aria-disabled') === 'true');
+            assert('Snooker', 'Golden Ball hidden on tracker after foul',
+                goldBall.classList.contains('noShow'));
             cp.openSnookerFoulPicker();
             assert('Snooker', 'Golden Ball foul target hidden after fouled off',
                 foulGold && foulGold.classList.contains('noShow'));
@@ -1296,9 +1957,8 @@
             cp.updateSnookerBallAvailability();
             assert('Snooker', 'Fouled Golden Ball not available after unlock conditions',
                 cp.isSnookerGoldenBallAvailable() === false);
-            assert('Snooker', 'Fouled Golden Ball stays disabled after unlock conditions',
-                goldBall.classList.contains('snooker-ball-disabled') ||
-                goldBall.getAttribute('aria-disabled') === 'true');
+            assert('Snooker', 'Fouled Golden Ball stays hidden after unlock conditions',
+                goldBall.classList.contains('noShow'));
             const p1BeforeFouledPot = parseInt(cp.getStorageItem('p1BallsCtrlPanel'), 10);
             cp.handleSnookerBallClick(goldBall);
             await sleep(50);
@@ -1339,22 +1999,33 @@
             await sleep(50);
 
             const toggle = cp.document.getElementById('playerToggleCheckbox');
+            cp.selectRackBreaker('1');
+            await sleep(50);
             if (toggle) {
                 toggle.checked = true;
                 cp.togglePlayer(true);
                 await sleep(50);
             }
             assert('Snooker', 'Active name shows P1',
-                (cp.document.getElementById('activePlayerNameDisplay').textContent || '') === snP1.name,
-                cp.document.getElementById('activePlayerNameDisplay').textContent);
+                !cp.document.getElementById('rackBreakerP1Btn').classList.contains('rack-breaker-inactive') &&
+                cp.document.getElementById('rackBreakerP2Btn').classList.contains('rack-breaker-inactive') &&
+                (cp.document.getElementById('rackBreakerP1Btn').textContent || '') === snP1.name,
+                cp.document.getElementById('rackBreakerP1Btn').textContent);
             if (toggle) {
                 toggle.checked = false;
                 cp.togglePlayer(false);
                 await sleep(50);
             }
             assert('Snooker', 'Active name shows P2',
-                (cp.document.getElementById('activePlayerNameDisplay').textContent || '') === snP2.name,
-                cp.document.getElementById('activePlayerNameDisplay').textContent);
+                !cp.document.getElementById('rackBreakerP2Btn').classList.contains('rack-breaker-inactive') &&
+                cp.document.getElementById('rackBreakerP1Btn').classList.contains('rack-breaker-inactive') &&
+                (cp.document.getElementById('rackBreakerP2Btn').textContent || '') === snP2.name,
+                cp.document.getElementById('rackBreakerP2Btn').textContent);
+            cp.onPlayerSlotButton('1');
+            await sleep(50);
+            assert('Snooker', 'onPlayerSlotButton switches to P1',
+                cp.getActivePlayerSlot() === '1' &&
+                !cp.document.getElementById('rackBreakerP1Btn').classList.contains('rack-breaker-inactive'));
             if (toggle) {
                 toggle.checked = true;
                 cp.togglePlayer(true);
@@ -1402,6 +2073,8 @@
             assert('Snooker', 'Inactive still 139 when reds counter lags',
                 cp.getSnookerPossibleBreak('2') === 139,
                 String(cp.getSnookerPossibleBreak('2')));
+            // Restore the real reds count before completing the color so remaining-table math is consistent.
+            cp.setStorageItem('snookerRedsPotted', '1');
             cp.handleSnookerBallClick(blackBall);
             await sleep(50);
             assert('Snooker', 'Color pot awards 7',
@@ -1430,16 +2103,118 @@
             assert('Snooker', 'Illegal color ignored in red phase',
                 parseInt(cp.getStorageItem('p1BallsCtrlPanel'), 10) === pointsBeforeIllegal);
 
-            // Foul → opponent
+            // Tracker asset names (shared icons)
+            const undoBtn = cp.document.getElementById('snookerUndoBtn');
+            const undoImgSrc = ((undoBtn && undoBtn.querySelector('img')) || {}).src || '';
+            const foulImgSrc = ((cp.document.getElementById('ball 11') || {}).querySelector('img') || {}).src || '';
+            assert('Snooker', 'Undo control uses undo-small.png',
+                undoImgSrc.indexOf('undo-small.png') !== -1, undoImgSrc);
+            assert('Snooker', 'Foul control uses foul-small.png',
+                foulImgSrc.indexOf('foul-small.png') !== -1, foulImgSrc);
+
+            // Foul → opponent + auto Active Player switch + Free Ball offer
+            cp.document.getElementById('playerToggleCheckbox').checked = true;
+            cp.setStorageItem('activePlayer', '1');
+            cp.clearSnookerFreeBallOfferState();
             cp.openSnookerFoulPicker();
             const foulModal = cp.document.getElementById('snookerFoulModal');
             assert('Snooker', 'Foul modal opens',
                 foulModal && cp.getComputedStyle(foulModal).display !== 'none');
             const foulBlack = cp.document.querySelector('#snookerFoulTargets [data-foul="black"]');
             const p2BeforeFoul = parseInt(cp.getStorageItem('p2BallsCtrlPanel'), 10) || 0;
+            const p1BeforeFoul = parseInt(cp.getStorageItem('p1BallsCtrlPanel'), 10) || 0;
             cp.selectSnookerFoul(foulBlack);
             await sleep(50);
             assert('Snooker', 'Foul awards 7 to opponent',
+                parseInt(cp.getStorageItem('p2BallsCtrlPanel'), 10) === p2BeforeFoul + 7,
+                cp.getStorageItem('p2BallsCtrlPanel'));
+            assert('Snooker', 'Foul auto-switches active player to opponent',
+                String(cp.getStorageItem('activePlayer')) === '2',
+                String(cp.getStorageItem('activePlayer')));
+            assert('Snooker', 'Free Ball offered after foul',
+                cp.isSnookerFreeBallOffered() === true);
+
+            assert('Snooker', 'Undo control visible after foul',
+                undoBtn && !undoBtn.classList.contains('noShow') &&
+                !undoBtn.classList.contains('snooker-ball-disabled'));
+            let undoStackRaw = cp.getStorageItem('snookerUndoStack');
+            let undoStackParsed = [];
+            try { undoStackParsed = JSON.parse(undoStackRaw || '[]'); } catch (e) { undoStackParsed = []; }
+            assert('Snooker', 'Undo stack persisted after foul',
+                Array.isArray(undoStackParsed) && undoStackParsed.length >= 1,
+                String(undoStackParsed.length));
+
+            // Simulate refresh: clear in-memory stack, reload from storage
+            const savedUndoStack = undoStackRaw;
+            cp.clearSnookerUndoStack();
+            assert('Snooker', 'Clear undo disables control',
+                undoBtn && undoBtn.classList.contains('snooker-ball-disabled'));
+            cp.setStorageItem('snookerUndoStack', savedUndoStack);
+            cp.loadSnookerUndoStackFromStorage();
+            cp.updateSnookerUndoButton();
+            assert('Snooker', 'Undo stack reloads from storage',
+                undoBtn && !undoBtn.classList.contains('snooker-ball-disabled'));
+
+            await cp.undoLastSnookerAction();
+            await sleep(80);
+            assert('Snooker', 'Undo reverses foul points',
+                parseInt(cp.getStorageItem('p2BallsCtrlPanel'), 10) === p2BeforeFoul,
+                cp.getStorageItem('p2BallsCtrlPanel'));
+            assert('Snooker', 'Undo restores active player after foul',
+                String(cp.getStorageItem('activePlayer')) === '1',
+                String(cp.getStorageItem('activePlayer')));
+            assert('Snooker', 'Undo clears Free Ball offer',
+                cp.isSnookerFreeBallOffered() !== true);
+            assert('Snooker', 'Undo keeps scorer points intact',
+                parseInt(cp.getStorageItem('p1BallsCtrlPanel'), 10) === p1BeforeFoul,
+                cp.getStorageItem('p1BallsCtrlPanel'));
+
+            // Cross-player undo: foul switches to P2, pot as P2, undo pot then foul
+            cp.openSnookerFoulPicker();
+            cp.selectSnookerFoul(foulBlack);
+            await sleep(50);
+            assert('Snooker', 'Re-foul leaves P2 active',
+                String(cp.getStorageItem('activePlayer')) === '2');
+            const p2AfterReFoul = parseInt(cp.getStorageItem('p2BallsCtrlPanel'), 10) || 0;
+            const freeBallEl = cp.document.getElementById('ball 10');
+            cp.handleSnookerBallClick(freeBallEl);
+            await sleep(50);
+            assert('Snooker', 'Incoming player can pot Free Ball after foul',
+                parseInt(cp.getStorageItem('p2BallsCtrlPanel'), 10) === p2AfterReFoul + 1,
+                cp.getStorageItem('p2BallsCtrlPanel'));
+            await cp.undoLastSnookerAction();
+            await sleep(80);
+            assert('Snooker', 'Undo Free Ball restores P2 foul score',
+                parseInt(cp.getStorageItem('p2BallsCtrlPanel'), 10) === p2AfterReFoul,
+                cp.getStorageItem('p2BallsCtrlPanel'));
+            assert('Snooker', 'Undo Free Ball keeps P2 active',
+                String(cp.getStorageItem('activePlayer')) === '2',
+                String(cp.getStorageItem('activePlayer')));
+
+            // Player change keeps undo history
+            const stackBeforeToggleRaw = cp.getStorageItem('snookerUndoStack');
+            let stackBeforeToggleLen = 0;
+            try { stackBeforeToggleLen = JSON.parse(stackBeforeToggleRaw || '[]').length; } catch (e) { stackBeforeToggleLen = 0; }
+            // togglePlayer(true) → P1; foul left P2 active, so switch away and back keeps stack
+            cp.togglePlayer(true);
+            await sleep(30);
+            let stackAfterToggleLen = 0;
+            try { stackAfterToggleLen = JSON.parse(cp.getStorageItem('snookerUndoStack') || '[]').length; } catch (e) { stackAfterToggleLen = 0; }
+            assert('Snooker', 'Active player change keeps undo stack',
+                stackAfterToggleLen === stackBeforeToggleLen && stackAfterToggleLen > 0,
+                stackBeforeToggleLen + ' → ' + stackAfterToggleLen);
+
+            // Re-apply a single foul so later frame-award assertions stay valid
+            cp.clearSnookerFreeBallOfferState();
+            cp.setStorageItem('activePlayer', '1');
+            cp.setStorageItem('p2BallsCtrlPanel', String(p2BeforeFoul));
+            cp.setStorageItem('p2Balls', String(p2BeforeFoul));
+            const p2BallsInput = cp.document.getElementById('p2Balls');
+            if (p2BallsInput) { p2BallsInput.value = String(p2BeforeFoul); }
+            cp.openSnookerFoulPicker();
+            cp.selectSnookerFoul(foulBlack);
+            await sleep(50);
+            assert('Snooker', 'Foul re-applied for frame award path',
                 parseInt(cp.getStorageItem('p2BallsCtrlPanel'), 10) === p2BeforeFoul + 7,
                 cp.getStorageItem('p2BallsCtrlPanel'));
 
@@ -1490,7 +2265,7 @@
             assert('Snooker', 'Match form shows balls for Snooker',
                 !cp.document.getElementById('statsMatchBallsRow').classList.contains('noShow'));
 
-            cp.localStorage.setItem('overlayStatsMode', 'p1');
+            cp.setStorageItem('overlayStatsMode', 'p1');
             cp.setStorageItem('activePlayer', '1');
             cp.setStorageItem('snookerCurrentBreak', '24');
             const snookerOverlay = await cp.PlayerStats.buildOverlayStatsPayload();
@@ -1570,6 +2345,48 @@
             assert('Snooker', 'Leading overlay Points Remaining is green when opponent cannot come back',
                 !!safeCell && (safeCell.textContent || '').indexOf('27') !== -1,
                 safeCell ? safeCell.textContent : 'missing safe class');
+
+            // --- OverlayVisibility (Snooker): toggles must survive live overlay publish ---
+            cp.onStatsVisibilityGameTypeChange('game8');
+            SNOOKER_OVERLAY_VIS_STAT_IDS.forEach(function (statId) {
+                setOverlayStatVisible(cp, 'game8', statId, false);
+            });
+            let builtHidden = await cp.PlayerStats.buildOverlayStatsPayload();
+            builtHidden = builtHidden || {};
+            await assertOverlayVisibilityFlags(cp, assert, 'OverlayVisibility',
+                'Snooker build', builtHidden, SNOOKER_OVERLAY_VIS_STAT_IDS, false);
+            const liveHidden = await publishOverlayAndReadPayload(cp, cp.PlayerStats.publishSnookerOverlayLiveStats);
+            await assertOverlayVisibilityFlags(cp, assert, 'OverlayVisibility',
+                'Snooker live publish', liveHidden, SNOOKER_OVERLAY_VIS_STAT_IDS, false);
+            bs.applyOverlayStats(liveHidden);
+            await sleep(50);
+            const hiddenVisText = (bs.document.getElementById('overlayStatsBody').innerText || '');
+            assert('OverlayVisibility', 'Snooker live publish hides Difference in browser source',
+                hiddenVisText.indexOf('Difference') === -1,
+                hiddenVisText.replace(/\n/g, ' | '));
+            assert('OverlayVisibility', 'Snooker live publish hides Points Remaining in browser source',
+                hiddenVisText.indexOf('Points Remaining') === -1,
+                hiddenVisText.replace(/\n/g, ' | '));
+            SNOOKER_OVERLAY_VIS_STAT_IDS.forEach(function (statId) {
+                setOverlayStatVisible(cp, 'game8', statId, true);
+            });
+            const liveShown = await publishOverlayAndReadPayload(cp, cp.PlayerStats.publishSnookerOverlayLiveStats);
+            assert('OverlayVisibility', 'Snooker live publish restores Difference flag',
+                liveShown.showScoreMargin === true,
+                JSON.stringify({ showScoreMargin: liveShown.showScoreMargin }));
+            assert('OverlayVisibility', 'Snooker live publish restores Points Remaining flag',
+                liveShown.showPointsRemaining === true,
+                JSON.stringify({ showPointsRemaining: liveShown.showPointsRemaining }));
+            bs.applyOverlayStats(liveShown);
+            await sleep(50);
+            const shownVisText = (bs.document.getElementById('overlayStatsBody').innerText || '');
+            assert('OverlayVisibility', 'Snooker live publish shows Difference in browser source',
+                shownVisText.indexOf('Difference') !== -1,
+                shownVisText.replace(/\n/g, ' | '));
+            assert('OverlayVisibility', 'Snooker live publish shows Points Remaining in browser source',
+                shownVisText.indexOf('Points Remaining') !== -1,
+                shownVisText.replace(/\n/g, ' | '));
+
             cp.setStorageItem('snookerCurrentBreak', '0');
             cp.setSnookerRedsPotted(0);
             cp.setSnookerClearedColors([]);
@@ -1669,6 +2486,27 @@
                 freeBall && freeBall.classList.contains('snooker-ball-disabled'));
             assert('Snooker', 'Foul ball disabled when all colors cleared',
                 foulBall && foulBall.classList.contains('snooker-ball-disabled'));
+
+            // Free Ball requires foul (Active Player switches automatically)
+            cp.setSnookerClearedColors([]);
+            cp.setSnookerRedsPotted(0);
+            cp.setSnookerPhase('red');
+            cp.clearSnookerFreeBallOfferState();
+            cp.document.getElementById('playerToggleCheckbox').checked = true;
+            cp.setStorageItem('activePlayer', '1');
+            cp.updateSnookerBallAvailability();
+            assert('Snooker', 'Free ball disabled before foul',
+                freeBall && freeBall.classList.contains('snooker-ball-disabled'));
+            cp.openSnookerFoulPicker();
+            cp.selectSnookerFoul(cp.document.querySelector('#snookerFoulTargets [data-foul="blue"]'));
+            await sleep(50);
+            assert('Snooker', 'Foul auto-switches active player to opponent',
+                String(cp.getStorageItem('activePlayer')) === '2',
+                String(cp.getStorageItem('activePlayer')));
+            assert('Snooker', 'Free ball offered after foul auto player change',
+                freeBall && !freeBall.classList.contains('snooker-ball-disabled') &&
+                cp.isSnookerFreeBallOffered() === true);
+            cp.clearSnookerFreeBallOfferState();
             cp.setSnookerClearedColors([]);
             cp.setSnookerRedsPotted(15);
             cp.setSnookerPhase('red');
@@ -1682,6 +2520,8 @@
                 green && green.classList.contains('snooker-ball-disabled'));
             assert('Snooker', 'Clearance disables black before earlier colors',
                 black && black.classList.contains('snooker-ball-disabled'));
+            assert('Snooker', 'Free ball still disabled in clearance without foul offer',
+                freeBall && freeBall.classList.contains('snooker-ball-disabled'));
             cp.setSnookerClearedColors([2]);
             cp.updateSnookerBallAvailability();
             assert('Snooker', 'Clearance enables green after yellow',
@@ -1738,9 +2578,9 @@
             if (bs.handlers && bs.handlers.gameType) {
                 bs.handlers.gameType({ gameType: 'game8', ballSelection: 'snooker' });
                 await sleep(50);
-                assert('Snooker', 'Browser source hides ball tracker in snooker',
+                assert('Snooker', 'Browser source hides ball scoring in snooker',
                     bs.document.getElementById('ballTracker').classList.contains('noShow'));
-                // Regression: Ball Tracker can stay on for CP scoring — Display Balls / overlay must still hide
+                // Regression: Ball Scoring can stay on for CP scoring — Display Balls / overlay must still hide
                 bs.localStorage.setItem('enableBallTracker', 'yes');
                 bs.localStorage.setItem('enableBallDisplay', 'yes');
                 if (typeof bs.setOverlayBallTrackerVisible === 'function') {
@@ -1751,7 +2591,7 @@
                     bs.document.getElementById('ballTracker').style.display === 'none');
                 assert('Snooker', 'Display Balls control hidden for Snooker',
                     cp.document.getElementById('ballDisplayDiv').classList.contains('noShow'));
-                assert('Snooker', 'Ball Tracker can remain enabled for scoring',
+                assert('Snooker', 'Ball Scoring can remain enabled for scoring',
                     cp.document.getElementById('ballTrackerCheckbox').checked === true);
                 if (typeof bs.applyOverlayBallTrackerLayout === 'function') {
                     bs.applyOverlayBallTrackerLayout();
@@ -1802,7 +2642,7 @@
             if (goldCheckbox) {
                 goldCheckbox.checked = prevSnookerGold === 'yes';
             }
-            cp.document.getElementById('gameType').value = 'game1';
+            cp.document.getElementById('gameTypeSelect').value = 'game1';
             await cp.gameType('game1');
             await sleep(150);
             cp.document.getElementById('raceInfoTxt').value = '5';
@@ -1854,13 +2694,13 @@
                 ball8After && !ball8After.classList.contains('noShow'));
 
             if (prevGameType !== 'game1') {
-                cp.document.getElementById('gameType').value = prevGameType;
+                cp.document.getElementById('gameTypeSelect').value = prevGameType;
                 await cp.gameType(prevGameType);
                 await sleep(100);
             }
 
-            cp.localStorage.removeItem('overlayStatsMode');
-            cp.localStorage.removeItem('overlayStatsPayload');
+            clearScopedStorage(cp, 'overlayStatsMode');
+            clearScopedStorage(cp, 'overlayStatsPayload');
             bs.applyOverlayStats({ visible: false });
 
             try { await cp.PlayerStats.deletePlayer(bankPlayer.id); } catch (e) { /* ignore */ }

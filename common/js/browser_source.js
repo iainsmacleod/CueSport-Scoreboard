@@ -622,3 +622,19 @@ function getStorageItem(key, defaultValue = null) {
     const value = localStorage.getItem(`${prefix}${key}`);
     return value !== null ? value : defaultValue;
 }
+
+const DEFAULT_GAME_TYPE = "game1";
+const VALID_GAME_TYPES = ["game1", "game2", "game3", "game4", "game5", "game6", "game7", "game8"];
+
+function normalizeGameType(value) {
+    return VALID_GAME_TYPES.includes(value) ? value : DEFAULT_GAME_TYPE;
+}
+
+function ensureDefaultGameType() {
+    const stored = getStorageItem("gameType");
+    const normalized = normalizeGameType(stored || "");
+    if (stored !== normalized) {
+        setStorageItem("gameType", normalized);
+    }
+    return normalized;
+}

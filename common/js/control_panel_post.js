@@ -66,6 +66,18 @@ var c1value;
 var c2value;
 var pColormsg;
 
+/** Stop OBS/browser dock from highlighting ball images on click-drag (clicks still work). */
+function initBallClickTargets() {
+	const selector = "#ballTracker .ball, .snooker-foul-targets .ball, #snookerUndoBtn";
+	document.querySelectorAll(selector).forEach(function (ball) {
+		ball.addEventListener("mousedown", function (e) {
+			if (e.button === 0) {
+				e.preventDefault();
+			}
+		});
+	});
+}
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // onload stuff
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -91,16 +103,6 @@ window.onload = function () {
 		document.getElementById("useToggleSetting").checked = false;
 		setStorageItem("usePlayerToggle", "no");
 		toggleSetting();
-	}
-
-	if (getStorageItem("useBallSet") === "yes") {
-		document.getElementById("ballSetCheckbox").checked = true;
-		document.getElementById("ballSet").classList.remove("noShow");
-		// setStorageItem("useBallSet", "yes");
-	} else {
-		document.getElementById("ballSetCheckbox").checked = false;
-		setStorageItem("useBallSet", "no");
-		document.getElementById("ballSet").classList.add("noShow");
 	}
 
 	if (getStorageItem("autoResumeReplayBuffer") === "yes") {
@@ -149,10 +151,8 @@ window.onload = function () {
 		setStorageItem("pointBased", "no");
 	}
 
-	if (getStorageItem("gameType") === null) {
-		setStorageItem("gameType", "game1");
-		document.getElementById("gameType").value = getStorageItem("gameType");
-	}
+	const defaultGameType = ensureDefaultGameType();
+	syncGameTypeSelect(defaultGameType);
 
 	if (getStorageItem("ballSelection") === null) {
 		setStorageItem("ballSelection", "american");
@@ -178,6 +178,24 @@ window.onload = function () {
 	if (getStorageItem("snookerAfterFreeball") === null) {
 		setStorageItem("snookerAfterFreeball", "no");
 	}
+	if (getStorageItem("snookerFoulAwaitingPlayerChange") === null) {
+		setStorageItem("snookerFoulAwaitingPlayerChange", "no");
+	}
+	if (getStorageItem("snookerFreeBallOffered") === null) {
+		setStorageItem("snookerFreeBallOffered", "no");
+	}
+	if (getStorageItem("snookerUndoStack") === null) {
+		setStorageItem("snookerUndoStack", "[]");
+	}
+	if (getStorageItem("rackBreakerSlot") === null) {
+		setStorageItem("rackBreakerSlot", "");
+	}
+	if (getStorageItem("rackOpponentVisited") === null) {
+		setStorageItem("rackOpponentVisited", "no");
+	}
+	if (typeof loadSnookerUndoStackFromStorage === "function") {
+		loadSnookerUndoStackFromStorage();
+	}
 	if (getStorageItem("snookerClearedColors") === null) {
 		setStorageItem("snookerClearedColors", "[]");
 	}
@@ -195,7 +213,7 @@ window.onload = function () {
 	}
 
 	// Update label text based on initial ball type
-	const redLabel = document.querySelector('label[for="p1colorRed"]');
+	const redLabel = document.querySelector('label[for="p1colorRed"] span');
 	if (redLabel) {
 		const currentBallType = getStorageItem("ballSelection");
 		if (currentBallType === "american") {
@@ -207,7 +225,7 @@ window.onload = function () {
 		}
 	}
 
-	const yellowLabel = document.querySelector('label[for="p1colorYellow"]');
+	const yellowLabel = document.querySelector('label[for="p1colorYellow"] span');
 	if (yellowLabel) {
 		const currentBallType = getStorageItem("ballSelection");
 		if (currentBallType === "american") {
@@ -263,10 +281,6 @@ window.onload = function () {
 	if ((getStorageItem("enableBallTracker") === "yes") && (getStorageItem("gameType") === "game1" || getStorageItem("gameType") === "game8" || getStorageItem("ballSelection") === "snooker")) {
 		document.getElementById("ballTrackerCheckbox").checked = true;
 		document.getElementById("ballTracker").classList.remove("noShow");
-		document.getElementById("ballTypeDiv").classList.remove("noShow");
-		if (getStorageItem("gameType") === "game1") {
-			document.getElementById("ballSetDiv").classList.remove("noShow");
-		}
 		console.log(`Ball tracker enabled`);
 		bc.postMessage({ displayBallTracker: getStorageItem("enableBallDisplay") === "yes" && !snookerModeInit });
 	} else if (getStorageItem("enableBallTracker") === "yes") {
@@ -280,14 +294,6 @@ window.onload = function () {
 		document.getElementById("ballTrackerDirectionDiv").classList.add("noShow");
 		document.getElementById("ballTracker").classList.add("noShow");
 
-		// Keep ball type and ball set visible for 8-ball even when tracker is off
-		if (getStorageItem("gameType") !== "game2" && getStorageItem("gameType") !== "game3") {
-			document.getElementById("ballTypeDiv").classList.remove("noShow");
-			document.getElementById("ballSetDiv").classList.remove("noShow");
-		} else {
-			document.getElementById("ballSetDiv").classList.add("noShow");
-		}
-
 		console.log(`Ball tracker disabled`);
 		bc.postMessage({ displayBallTracker: false });
 	}
@@ -299,7 +305,7 @@ window.onload = function () {
 		// Initialize with default value if not set
 		setStorageItem("ballTrackerDirection", "vertical");
 		setStorageItem("ballSelection", "american");
-		document.getElementById("ballTrackerDirectionDiv").innerHTML = "Vertical Ball Tracker";
+		document.getElementById("ballTrackerDirectionDiv").innerHTML = "Vertical Ball Display";
 		bc.postMessage({ ballTracker: "vertical" });
 		bc.postMessage({ ballSelection: "american" });
 		console.log(`Ball tracker initialized vertical`);
@@ -307,7 +313,7 @@ window.onload = function () {
 	} else {
 		// Use existing stored value
 		const direction = getStorageItem("ballTrackerDirection");
-		document.getElementById("ballTrackerDirectionDiv").innerHTML = direction === "vertical" ? "Vertical Ball Tracker" : "Horizontal Ball Tracker";
+		document.getElementById("ballTrackerDirectionDiv").innerHTML = direction === "vertical" ? "Vertical Ball Display" : "Horizontal Ball Display";
 		const selection = getStorageItem("ballSelection");
 		bc.postMessage({ ballSelection: selection });
 		bc.postMessage({ ballTracker: direction });
@@ -335,12 +341,33 @@ window.onload = function () {
 	updateControlPanelBallImages(ballSelection);
 
 	// Check game type and initialize ball set toggle visibility
-	const currentGameType = getStorageItem("gameType") || "game1";
+	const currentGameType = getStoredGameType();
 	// Restore UI without wiping live snooker visit/break state from localStorage
 	gameType(currentGameType, { restore: true });
 
 	// Properly initialize ball tracker visibility
 	useBallTracker();
+	if (getStorageItem("useBallSet") === null) {
+		setStorageItem("useBallSet", "no");
+	}
+	if (typeof syncControlsTabLayout === "function") {
+		syncControlsTabLayout();
+	} else if (typeof syncBallSetControlsVisibility === "function") {
+		syncBallSetControlsVisibility();
+	}
+	initBallClickTargets();
+	if (typeof syncRackBreakerPickerVisibility === "function") {
+		syncRackBreakerPickerVisibility();
+	}
+	if (typeof syncPlayerSlotPickerUI === "function") {
+		syncPlayerSlotPickerUI();
+	}
+	if (window.PlayerStats && typeof window.PlayerStats.renderStatsVisibilityPanel === "function") {
+		window.PlayerStats.renderStatsVisibilityPanel();
+	}
+	if (typeof initPushScoresFieldListeners === "function") {
+		initPushScoresFieldListeners();
+	}
 	// Initialize the logo and extension status for each logo (players + slideshow logos) and player
 	initializeLogoStatus();
 	initializeExtensionButtonStatus();
@@ -531,7 +558,6 @@ if (getStorageItem('p1colorSet') !== null) {
 	}
 	document.getElementById('p1colorDiv').style.background = getStorageItem('p1colorSet');
 	document.getElementById('p1Name').style.background = `linear-gradient(to right, ${getStorageItem('p1colorSet')}, white)`;
-	document.getElementsByTagName("select")[0].options[0].value = cvalue;
 	if (cvalue == "white" || cvalue == "") {
 		document.getElementById("p1colorDiv").style.color = "black"; document.getElementById("p1colorDiv").style.textShadow = "none";
 	} else { document.getElementById("p1colorDiv").style.color = "white"; };
@@ -561,6 +587,8 @@ else {
 	document.getElementById("p2colorDiv").style.color = "black";
 	document.getElementById("p2colorDiv").style.textShadow = "none";
 }
+
+ensureDefaultGameType();
 
 if (getStorageItem('p1ScoreCtrlPanel') > 0 || getStorageItem('p1ScoreCtrlPanel') == "") {
 	p1ScoreValue = getStorageItem('p1ScoreCtrlPanel');
@@ -659,15 +687,15 @@ if (p2BallsInput) {
 	p2BallsInput.value = getStorageItem("p2BallsCtrlPanel") || "0";
 }
 document.getElementById("pointBased").checked = getStorageItem("pointBased") === "yes";
-document.getElementById("gameType").value = getStorageItem("gameType");
-if (getStorageItem("gameType") === "game3") {
+syncGameTypeSelect(getStoredGameType());
+if (getStoredGameType() === "game3") {
 	document.getElementById("ball 10").classList.add("noShow");
 	document.getElementById("ball 11").classList.add("noShow");
 	document.getElementById("ball 12").classList.add("noShow");
 	document.getElementById("ball 13").classList.add("noShow");
 	document.getElementById("ball 14").classList.add("noShow");
 	document.getElementById("ball 15").classList.add("noShow");
-} else if (getStorageItem("gameType") === "game4") {
+} else if (getStoredGameType() === "game4") {
 	document.getElementById("ball 10").classList.remove("noShow");
 	document.getElementById("ball 11").classList.add("noShow");
 	document.getElementById("ball 12").classList.add("noShow");
@@ -719,10 +747,9 @@ if (window.PlayerStats) {
     window.PlayerStats.init().then(function () {
         window.PlayerStats.initPlayerAutocomplete();
         window.PlayerStats.syncOverlayButtonsFromStorage();
+        return window.PlayerStats.onNamesUpdated();
+    }).then(function () {
         window.PlayerStats.broadcastOverlayStatsIfEnabled();
-        window.PlayerStats.onNamesUpdated().catch(function (err) {
-            console.error('PlayerStats init onNamesUpdated error:', err);
-        });
     }).catch(function (err) {
         console.error('PlayerStats init error:', err);
     });

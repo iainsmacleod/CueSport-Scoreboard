@@ -9,17 +9,6 @@
 	color:white;
 }
 
-#swapBtn {
-	cursor:pointer;
-	position:relative;
-	border: 1px solid steelblue;
-	padding-bottom:2px;
-	width:10%;
-	min-width:30px;
-	min-height:15px;
-	font-size:7pt;
-}
-
 #mainDiv {
 	background: #2f2f2f;
 }

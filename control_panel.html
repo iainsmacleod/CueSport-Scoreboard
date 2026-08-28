@@ -15,24 +15,24 @@ for more information about Salotto please visit https://salotto.app
 <html>
 
 <head>
-    <link rel="stylesheet" href="./common/css/control_panel/dark.css?v=7.1.9" />
-    <link rel="stylesheet" href="./common/css/control_panel/yami.css?v=7.1.9" />
-    <link rel="stylesheet" href="./common/css/control_panel/acri.css?v=7.1.9" />
-    <link rel="stylesheet" href="./common/css/control_panel/grey.css?v=7.1.9" />
-    <link rel="stylesheet" href="./common/css/control_panel/light.css?v=7.1.9" />
-    <link rel="stylesheet" href="./common/css/control_panel/rachni.css?v=7.1.9" />
-    <link rel="stylesheet" href="./common/css/control_panel/required.css?v=7.1.9" />
+    <link rel="stylesheet" href="./common/css/control_panel/dark.css?v=7.2.0" />
+    <link rel="stylesheet" href="./common/css/control_panel/yami.css?v=7.2.0" />
+    <link rel="stylesheet" href="./common/css/control_panel/acri.css?v=7.2.0" />
+    <link rel="stylesheet" href="./common/css/control_panel/grey.css?v=7.2.0" />
+    <link rel="stylesheet" href="./common/css/control_panel/light.css?v=7.2.0" />
+    <link rel="stylesheet" href="./common/css/control_panel/rachni.css?v=7.2.0" />
+    <link rel="stylesheet" href="./common/css/control_panel/required.css?v=7.2.0" />
     <script>
         //---------------------------------------------------------------------------------------------
-        var versionNum = "7.1.9";
+        var versionNum = "7.2.0";
         //---------------------------------------------------------------------------------------------
     </script>
-    <script src="./common/js/obs-websocket-js.js?v=7.1.9"></script>
-    <script src="./common/js/jquery.js?v=7.1.9"></script>
-    <script src="./common/js/stream_sharing.js?v=7.1.9"></script>
-    <script src="./common/js/player_stats.js?v=7.1.9"></script>
-    <script src="./common/js/control_panel.js?v=7.1.9"></script>
-    <script src="hotkeys.js"></script>
+    <script src="./common/js/obs-websocket-js.js?v=7.2.0"></script>
+    <script src="./common/js/jquery.js?v=7.2.0"></script>
+    <script src="./common/js/stream_sharing.js?v=7.2.0"></script>
+    <script src="./common/js/player_stats.js?v=7.2.0"></script>
+    <script src="./common/js/control_panel.js?v=7.2.0"></script>
+    <script src="hotkeys.js?v=7.2.0"></script>
 
     <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
 </head>
@@ -57,47 +57,82 @@ for more information about Salotto please visit https://salotto.app
         </div> <!-- Header-->
         <!-- Tab navigation inside the main division -->
         <div class="tab">
-            <button id="gameInfoTab" class="tablinks" onclick="openTab(event, 'GameInfo')">Game Setup</button>
+            <button id="gameInfoTab" class="tablinks" onclick="openTab(event, 'GameInfo')">Setup</button>
             <button id="controlsTab" class="tablinks" onclick="openTab(event, 'Controls')">Controls</button>
-            <button id="imagesTab" class="tablinks" onclick="openTab(event, 'Images')">Image &#x2699;</button>
-            <button id="replaySettingsTab" class="tablinks" onclick="openTab(event, 'ReplaySettings')">Replay/Share
-                &#x2699;</button>
-            <button id="generalSettingsTab" class="tablinks" onclick="openTab(event, 'GeneralSettings')">General
-                &#x2699;</button>
+            <button id="imagesTab" class="tablinks" onclick="openTab(event, 'Images')">Images</button>
+            <button id="replaySettingsTab" class="tablinks" onclick="openTab(event, 'ReplaySettings')">Replay/Share</button>
+            <button id="statsTab" class="tablinks" onclick="openTab(event, 'StatsSettings')">Stats</button>
+            <button id="generalSettingsTab" class="tablinks" onclick="openTab(event, 'GeneralSettings')">Settings</button>
         </div>
         <!-- Player/Team/Game Information Tab -->
         <div id="GameInfo" class="tabcontent">
             <div class="section-header" id="gameDetailLabel">Game Details</div>
-            <div class="column">
-                <text id="raceInfo">Race Info:</text>
-                <input style="width: 100px" type="text" id="raceInfoTxt" maxlength="3" pattern="\d*" inputmode="numeric" />
-                <text>Game/Other Info:</text>
-                <input style="width: 350px" type="text" id="gameInfoTxt" placeholder="" maxlength="60" />
+            <div class="setup-variant-grid">
+                <div class="setup-variant-top">
+                    <div class="setup-variant-field">
+                        <label for="gameTypeSelect" id="gameTypeLabel">Game Variant</label>
+                        <select class="dropdown" id="gameTypeSelect" onchange="gameType(this.value)">
+                            <option value="game1">8-Ball</option>
+                            <option value="game2">9-Ball</option>
+                            <option value="game3">10-Ball</option>
+                            <option value="game4">Straight</option>
+                            <option value="game5">Bank</option>
+                            <option value="game6">One Pocket</option>
+                            <option value="game7">Custom</option>
+                            <option value="game8">Snooker</option>
+                        </select>
+                    </div>
+                    <div class="setup-variant-field setup-variant-option noShow" id="setupVariantOptionSlot">
+                        <div class="setup-variant-option-panel noShow" id="snookerGoldDiv">
+                            <label for="snookerGoldCheckbox" id="labelForSnookerGoldCheckbox">Golden Ball</label>
+                            <input type="checkbox" class="smallSize" id="snookerGoldCheckbox" onchange="snookerGoldToggle()" />
+                        </div>
+                        <div class="setup-variant-option-panel noShow" id="pointBasedDiv">
+                            <label for="pointBased">Point Based</label>
+                            <input type="checkbox" class="smallSize" id="pointBased"
+                                onchange="pointBasedSetting()" />
+                        </div>
+                    </div>
+                </div>
+                <div class="setup-variant-field setup-variant-field--wide" id="ballSelectionWrap">
+                    <label for="ballSelection" id="ballVariantLabel">Ball Variant</label>
+                    <select class="dropdown" id="ballSelection" onchange="toggleBallSelection()">
+                        <option value="american">World (Small/Big,Lows/Highs,Solids/Stripes)</option>
+                        <option value="international">International (Red/Yellow)</option>
+                        <option value="unity">Unity Balls</option>
+                        <option value="snooker">Snooker</option>
+                    </select>
+                </div>
             </div>
-            <div class="column">
-                <span></span>
+            <div class="column setup-info-row">
+                <div class="setup-info-pair">
+                    <text id="raceInfo">Race Info:</text>
+                    <input type="text" id="raceInfoTxt" maxlength="3" pattern="\d*" inputmode="numeric" />
+                </div>
+                <div class="setup-info-pair setup-info-pair--grow">
+                    <text>Game/Other Info:</text>
+                    <input type="text" id="gameInfoTxt" placeholder="" maxlength="60" />
+                </div>
+            </div>
+            <div class="column actions-row">
                 <div class="hover obs28 button" id="sendPInfo" onclick="postInfo()">
                     Update Info
                 </div>
             </div>
-            <div class="section-header" id="playerDetailLabel">
-                Player/Team Details
+            <div class="section-header" id="player1DetailLabel">
+                Player/Team 1 Details
             </div>
-            <div class="column" id="teamInfo">
-                <label id="p1NameLabel" for="p1Name">Player/Team 1 Name:</label>
-                <div class="autocomplete-wrapper">
-                    <input type="text" id="p1Name" placeholder="Player 1" maxlength="20" autocomplete="off" />
-                    <div id="p1Autocomplete" class="autocomplete-list noShow"></div>
+            <div class="column" id="player1Details">
+                <div class="player-detail-pair">
+                    <label id="p1NameLabel" for="p1Name">Name:</label>
+                    <div class="autocomplete-wrapper">
+                        <input type="text" id="p1Name" placeholder="Player 1" maxlength="20" autocomplete="off" />
+                        <div id="p1Autocomplete" class="autocomplete-list noShow"></div>
+                    </div>
                 </div>
-                <label id="p2NameLabel" for="p2Name">Player/Team 2 Name:</label>
-                <div class="autocomplete-wrapper">
-                    <input type="text" id="p2Name" placeholder="Player 2" maxlength="20" autocomplete="off" />
-                    <div id="p2Autocomplete" class="autocomplete-list noShow"></div>
-                </div>
-            </div>
-            <div class="column" id="gameInfo">
-                <label id="p1ColorLabel" for="p1colorDiv">Player/Team 1 Color:</label>
-                <select name="p1Colors" id="p1colorDiv" onchange="playerColorChange(1)">
+                <div class="player-detail-pair">
+                    <label id="p1ColorLabel" for="p1colorDiv">Color:</label>
+                    <select name="p1Colors" id="p1colorDiv" onchange="playerColorChange(1)">
                     <option value="" default>--Choose--</option>
                     <option value="grey">Grey</option>
                     <option value="steelblue">Steel Blue</option>
@@ -114,8 +149,22 @@ for more information about Salotto please visit https://salotto.app
                     <option value="purple">Purple</option>
                     <option value="white">White</option>
                 </select>
-                <label id="p2ColorLabel" for="p2colorDiv">Player/Team 2 Color:</label>
-                <select name="p2Colors" id="p2colorDiv" onchange="playerColorChange(2)">
+                </div>
+            </div>
+            <div class="section-header" id="player2DetailLabel">
+                Player/Team 2 Details
+            </div>
+            <div class="column" id="player2Details">
+                <div class="player-detail-pair">
+                    <label id="p2NameLabel" for="p2Name">Name:</label>
+                    <div class="autocomplete-wrapper">
+                        <input type="text" id="p2Name" placeholder="Player 2" maxlength="20" autocomplete="off" />
+                        <div id="p2Autocomplete" class="autocomplete-list noShow"></div>
+                    </div>
+                </div>
+                <div class="player-detail-pair">
+                    <label id="p2ColorLabel" for="p2colorDiv">Color:</label>
+                    <select name="p2Colors" id="p2colorDiv" onchange="playerColorChange(2)">
                     <option value="" default>--Choose--</option>
                     <option value="grey">Grey</option>
                     <option value="steelblue">Steel Blue</option>
@@ -132,26 +181,97 @@ for more information about Salotto please visit https://salotto.app
                     <option value="purple">Purple</option>
                     <option value="white">White</option>
                 </select>
+                </div>
             </div>
-            <div class="column" id="colorSwap">
-                <div class="hover obs28 button" id="clearButton" onclick="clearGame()">
+            <div class="column button-row" id="colorSwap">
+                <div class="hover obs28 button danger-btn" id="clearButton" onclick="clearGame()">
                     Clear Game
                 </div>
                 <div class="hover obs28 button" id="swapBtn" onclick="swapColors()">
                     Swap Colors
                 </div>
-                <div class="hover obs28 button" id="sendPNames" onclick="postNames()">
-                    Update Names
-                </div>
-                <div class="hover obs28 button" id="statsBtn" onclick="openStatsModal()">
-                    Stats
-                </div>
             </div>
         </div> <!-- Game Info Tab-->
         <!-- Controls Tab -->
         <div id="Controls" class="tabcontent">
-            <!-- Score Control -->
-            <div class="section-header" id="scoreLabel">Score Controls</div>
+            <div id="playerTrackingBlock">
+            <!-- Player Tracking and Ball Scoring -->
+            <div class="section-header" id="playerToggleLabel">Player Tracking and Ball Scoring</div>
+            <div class="column" id="playerToggle">
+                <div id="playerSlotPicker" class="rack-breaker-picker">
+                    <span class="rack-breaker-question" id="playerSlotQuestion">Active Player</span>
+                    <div class="rack-breaker-buttons">
+                        <button type="button" id="rackBreakerP1Btn" class="rack-breaker-btn hover obs28 button"
+                            onclick="onPlayerSlotButton('1')">Player 1</button>
+                        <button type="button" id="rackBreakerP2Btn" class="rack-breaker-btn hover obs28 button"
+                            onclick="onPlayerSlotButton('2')">Player 2</button>
+                    </div>
+                </div>
+                <input type="checkbox" id="playerToggleCheckbox" class="noShow" aria-hidden="true"
+                    onchange="togglePlayer(this.checked)" />
+            </div>
+            <div class="ball-set-row noShow" id="ballSet">
+                <span class="ball-set-label">Player 1 Chosen Ball:</span>
+                <label class="ball-set-choice" for="p1colorRed">
+                    <input type="radio" id="p1colorRed" name="p1BallSetSelect" value="p1red/smalls"
+                        onchange="ballSetChange()" />
+                    <span>Red/Lows/Solids</span>
+                </label>
+                <label class="ball-set-choice" for="p1colorYellow">
+                    <input type="radio" id="p1colorYellow" name="p1BallSetSelect" value="p1yellow/bigs"
+                        onchange="ballSetChange()" />
+                    <span>Yellow/Highs/Stripes</span>
+                </label>
+                <label class="ball-set-choice" for="p1colorOpen">
+                    <input type="radio" id="p1colorOpen" name="p1BallSetSelect" value="p1Open" checked
+                        onchange="ballSetChange()" />
+                    <span>Open Table</span>
+                </label>
+            </div>
+            <!-- Ball Scoring -->
+            <div class="ballTracker noShow" id="ballTrackerDiv">
+                <div id="ballTracker" class="noShow">
+                    <div id="ballTrackerBalls" class="ball-tracker-balls">
+                    <div class="ball" id="ball 1" onclick="togglePot(this)" title="Ball 1"><img src="./common/images/1ball_small.png">
+                    </div>
+                    <div class="ball" id="ball 2" onclick="togglePot(this)" title="Ball 2"><img src="./common/images/2ball_small.png">
+                    </div>
+                    <div class="ball" id="ball 3" onclick="togglePot(this)" title="Ball 3"><img src="./common/images/3ball_small.png">
+                    </div>
+                    <div class="ball" id="ball 4" onclick="togglePot(this)" title="Ball 4"><img src="./common/images/4ball_small.png">
+                    </div>
+                    <div class="ball" id="ball 5" onclick="togglePot(this)" title="Ball 5"><img src="./common/images/5ball_small.png">
+                    </div>
+                    <div class="ball" id="ball 6" onclick="togglePot(this)" title="Ball 6"><img src="./common/images/6ball_small.png">
+                    </div>
+                    <div class="ball" id="ball 7" onclick="togglePot(this)" title="Ball 7"><img src="./common/images/7ball_small.png">
+                    </div>
+                    <div class="ball" id="ball 8" onclick="togglePot(this)" title="Ball 8"><img src="./common/images/8ball_small.png">
+                    </div>
+                    <div class="ball" id="ball 9" onclick="togglePot(this)" title="Ball 9"><img src="./common/images/9ball_small.png">
+                    </div>
+                    <div class="ball" id="ball 10" onclick="togglePot(this)" title="Ball 10"><img
+                            src="./common/images/10ball_small.png"></div>
+                    <div class="ball" id="ball 11" onclick="togglePot(this)" title="Ball 11"><img
+                            src="./common/images/11ball_small.png"></div>
+                    <div class="ball" id="ball 12" onclick="togglePot(this)" title="Ball 12"><img
+                            src="./common/images/12ball_small.png"></div>
+                    <div class="ball" id="ball 13" onclick="togglePot(this)" title="Ball 13"><img
+                            src="./common/images/13ball_small.png"></div>
+                    <div class="ball" id="ball 14" onclick="togglePot(this)" title="Ball 14"><img
+                            src="./common/images/14ball_small.png"></div>
+                    <div class="ball" id="ball 15" onclick="togglePot(this)" title="Ball 15"><img
+                            src="./common/images/15ball_small.png"></div>
+                    <div class="ball snooker-undo-ball noShow" id="snookerUndoBtn" onclick="undoLastSnookerAction()"
+                        title="Undo last pot or foul" aria-disabled="true">
+                        <img src="./common/images/undo-small.png" alt="Undo">
+                    </div>
+                    </div>
+                </div>
+            </div>
+            </div>
+            <!-- Manual Score Controls -->
+            <div class="section-header" id="scoreLabel">Manual Score Controls</div>
             <div class="column" id="scoreInfoP1">
                 <label id="p1ScoreLabel" for="sendP1ScoreSub">Player/Team 1 - Racks</label>
                 <div class="score-control">
@@ -188,7 +308,7 @@ for more information about Salotto please visit https://salotto.app
                     <button id="sendP2Balls" onclick="postBalls('add','2')">+</button>
                 </div>
             </div>
-            <div class="column" id="scoreEditing">
+            <div class="column button-row" id="scoreEditing">
                 <div class="hover obs28 button danger-btn" id="resetScores" onclick="resetScores()">
                     Reset Score
                 </div>
@@ -198,7 +318,7 @@ for more information about Salotto please visit https://salotto.app
                     </div>
                     <span class="tooltiptext">End this match early and keep completed racks/frames in match history. Use when the race will not be finished.</span>
                 </div>
-                <div class="tooltip">
+                <div class="tooltip noShow" id="pushScoresWrap">
                     <div class="hover obs28 button" id="sendPScores" onclick="pushScores()">
                         Push Entered Scores
                     </div>
@@ -207,81 +327,14 @@ for more information about Salotto please visit https://salotto.app
                 </div>
             </div>
             <div class="section-header">Stats Overlay</div>
-            <div class="column" id="statsOverlayControls">
+            <div class="column button-row" id="statsOverlayControls">
                 <div class="hover obs28 button" id="overlayP1StatsBtn" onclick="toggleOverlayStats('p1')">P1 Stats</div>
                 <div class="hover obs28 button" id="overlayP2StatsBtn" onclick="toggleOverlayStats('p2')">P2 Stats</div>
                 <div class="hover obs28 button" id="overlayH2HBtn" onclick="toggleOverlayStats('h2h')">H2H Stats</div>
             </div>
-            <!-- Player Toggle -->
-            <div class="section-header" id="playerToggleLabel">Player and Ball Controls</div>
-            <div class="column" id="playerToggle">
-                <div class="column">
-                    <label style="padding: 0 10px 0 0">Active Player:</label>
-                    <span id="activePlayerNameDisplay" style="padding: 0 10px 0 0"></span>
-                    <label class="switch toggle">
-                        <input type="checkbox" id="playerToggleCheckbox" onchange="togglePlayer(this.checked)" />
-                        <span class="slider_round"></span>
-                        <span class="player1 toggle">P1</span>
-                        <span class="player2 toggle">P2</span>
-                    </label>
-                </div>
-            </div>
-            <div class="column" id="ballSet">
-                <div style="gap: 20px">Player 1 Chosen Ball:</div>
-                <div>
-                    <input type="radio" id="p1colorRed" name="p1BallSetSelect" value="p1red/smalls"
-                        onchange="ballSetChange()" />
-                    <label for="p1colorRed">Red/Lows/Solids</label>
-                </div>
-                <div>
-                    <input type="radio" id="p1colorYellow" name="p1BallSetSelect" value="p1yellow/bigs"
-                        onchange="ballSetChange()" />
-                    <label for="p1colorYellow">Yellow/Highs/Stripes</label>
-                </div>
-                <div>
-                    <input type="radio" id="p1colorOpen" name="p1BallSetSelect" value="p1Open" checked
-                        onchange="ballSetChange()" />
-                    <label for="p1colorOpen">Open Table</label>
-                </div>
-            </div>
-            <!-- Ball Tracker -->
-            <div class="ballTracker" id="ballTrackerDiv">
-                <div id="ballTracker" class="noShow">
-                    <div class="ball" id="ball 1" onclick="togglePot(this)" title="Ball 1"><img src="./common/images/1ball_small.png">
-                    </div>
-                    <div class="ball" id="ball 2" onclick="togglePot(this)" title="Ball 2"><img src="./common/images/2ball_small.png">
-                    </div>
-                    <div class="ball" id="ball 3" onclick="togglePot(this)" title="Ball 3"><img src="./common/images/3ball_small.png">
-                    </div>
-                    <div class="ball" id="ball 4" onclick="togglePot(this)" title="Ball 4"><img src="./common/images/4ball_small.png">
-                    </div>
-                    <div class="ball" id="ball 5" onclick="togglePot(this)" title="Ball 5"><img src="./common/images/5ball_small.png">
-                    </div>
-                    <div class="ball" id="ball 6" onclick="togglePot(this)" title="Ball 6"><img src="./common/images/6ball_small.png">
-                    </div>
-                    <div class="ball" id="ball 7" onclick="togglePot(this)" title="Ball 7"><img src="./common/images/7ball_small.png">
-                    </div>
-                    <div class="ball" id="ball 8" onclick="togglePot(this)" title="Ball 8"><img src="./common/images/8ball_small.png">
-                    </div>
-                    <div class="ball" id="ball 9" onclick="togglePot(this)" title="Ball 9"><img src="./common/images/9ball_small.png">
-                    </div>
-                    <div class="ball" id="ball 10" onclick="togglePot(this)" title="Ball 10"><img
-                            src="./common/images/10ball_small.png"></div>
-                    <div class="ball" id="ball 11" onclick="togglePot(this)" title="Ball 11"><img
-                            src="./common/images/11ball_small.png"></div>
-                    <div class="ball" id="ball 12" onclick="togglePot(this)" title="Ball 12"><img
-                            src="./common/images/12ball_small.png"></div>
-                    <div class="ball" id="ball 13" onclick="togglePot(this)" title="Ball 13"><img
-                            src="./common/images/13ball_small.png"></div>
-                    <div class="ball" id="ball 14" onclick="togglePot(this)" title="Ball 14"><img
-                            src="./common/images/14ball_small.png"></div>
-                    <div class="ball" id="ball 15" onclick="togglePot(this)" title="Ball 15"><img
-                            src="./common/images/15ball_small.png"></div>
-                </div>
-            </div>
             <!-- OBS Replay Controls -->
             <div class="section-header noShow" id="replayLabel">Replay Controls</div>
-            <div class="column noShow" id="replay-controls">
+            <div class="column button-row noShow" id="replay-controls">
                 <div class="tooltip">
                     <button id="btnMonitorGame" class="hover obs28 button" style="background-color:green;"
                         onclick="toggleReplayMonitoring()">
@@ -298,7 +351,7 @@ for more information about Salotto please visit https://salotto.app
                         clip.<br><br>Note: X equals OBS defined Maximum Replay Time.</span>
                 </div>
             </div>
-            <div class="column" id="replayClips" style=" justify-content: flex-start; align-items: center; gap: 12.8px;">
+            <div class="column button-row noShow" id="replayClips">
                 <div class="clip-button-wrapper" id="clipWrapper1">
                     <button id="prvReplayClip1" class="prvReplayClip1 hover obs28 button clip-button"
                         onclick="playPreviousReplay(0)">
@@ -345,13 +398,13 @@ for more information about Salotto please visit https://salotto.app
                     </button>
                 </div>
             </div>
-            <div class="column" id="savedPathNote" style="margin-top: 15px;">
+            <div class="column noShow" id="savedPathNote" style="margin-top: 15px;">
                 *NOTE: Remember to cleanup Replay video clip storage periodically. Delete clip only clears saved path, if does not remove file.
             </div>
             
             <!-- Shot Clock -->
-            <div class="section-header" id="clockControlLabel">Clock Controls</div>
-            <div class="column" id="clockInfo">
+            <div class="section-header noShow" id="clockControlLabel">Clock Controls</div>
+            <div class="column button-row noShow" id="clockInfo">
                 <!-- <label id="useClockSettingLabel">Clock Controls:&nbsp;</label> -->
                 <div class="hover obs28 button" id="shotClock30" onclick="shotClock(30000)">
                     30s Shot Clock
@@ -367,7 +420,7 @@ for more information about Salotto please visit https://salotto.app
                     Show Clock
                 </div>
             </div>
-            <div class="column" id="extensionControls">
+            <div class="column extension-controls-row noShow" id="extensionControls">
                 <label id="extensionSettingsLabel">Extension Controls:&nbsp;</label>
                 <div class="hover obs28 button" id="p1extensionBtn" onclick="add30('p1')">
                     P1's Extension
@@ -584,121 +637,113 @@ for more information about Salotto please visit https://salotto.app
                 </div>
             </div>
         </div> <!-- Replay Settings Tab-->
+        <!-- Stats Tab -->
+        <div id="StatsSettings" class="tabcontent">
+            <div class="section-header">Player Statistics</div>
+            <div class="column">
+                <div class="hover obs28 button" id="statsBtn" onclick="openStatsModal()">
+                    Edit Player Stats
+                </div>
+            </div>
+            <div class="section-header">Overlay Stats Display</div>
+            <p class="stats-tab-help">Choose which stats appear on the P1 / P2 / H2H overlay panels for the selected game type.</p>
+            <div class="stats-visibility-toolbar">
+                <label for="statsVisibilityGameType">Game variant</label>
+                <select class="dropdown" id="statsVisibilityGameType" onchange="onStatsVisibilityGameTypeChange(this.value)"></select>
+            </div>
+            <div id="statsVisibilityPanel" class="stats-visibility-panel"></div>
+        </div>
         <!-- General Settings Tab -->
         <div id="GeneralSettings" class="tabcontent">
             <div class="section-header" id="uiSettingLabel">UI Setting</div>
-            <div class="column">
-                OBS Theme
-                <select class="dropdown" id="obsTheme" onchange="obsThemeChange()">
-                    <option value="28">Default</option>
-                    <option value="27" selected>Classic</option>
-                    <option value="acri">Acri</option>
-                    <option value="grey">Grey</option>
-                    <option value="light">Light</option>
-                    <option value="rachni">Rachni</option>
-                </select>
-                <span></span>
-                Overlay Scaling
-                <span></span>
-                <input type="range" min="40" max="100" value="100" class="uiScalingSlider" id="uiScaling"
-                    onchange="saveScaling()" />
-                <span></span>
-                <span id="sliderUiScalingValue">100%</span>
-            </div>
-            <div class="column">
-                Game Type
-                <select class="dropdown" id="gameType" onchange="gameType(this.value)">
-                    <option value="game1">8-Ball</option>
-                    <option value="game2">9-Ball</option>
-                    <option value="game3">10-Ball</option>
-                    <option value="game4">Straight</option>
-                    <option value="game5">Bank</option>
-                    <option value="game6">One Pocket</option>
-                    <option value="game7">Custom</option>
-                    <option value="game8">Snooker</option>
-                </select>
-                <span></span>
-                <div class="noShow" id="pointBasedDiv">
-                    Point Based<input type="checkbox" class="smallSize" id="pointBased"
-                        onchange="pointBasedSetting()" />
+            <div class="panel-stack">
+                <div class="panel-row">
+                    <label for="obsTheme">OBS Theme</label>
+                    <select class="dropdown" id="obsTheme" onchange="obsThemeChange()">
+                        <option value="28">Default</option>
+                        <option value="27" selected>Classic</option>
+                        <option value="acri">Acri</option>
+                        <option value="grey">Grey</option>
+                        <option value="light">Light</option>
+                        <option value="rachni">Rachni</option>
+                    </select>
+                    <span></span>
                 </div>
-                <span></span>
-                <label class="slidecontainer" id="opacityLabel" for="scoreOpacity">Overlay Opacity</label>
-                <span></span>
-                <input type="range" min="0" max="100" value="100" class="slider" id="scoreOpacity"
-                    onchange="saveOpacity()" />
-                <span></span>
-                <span id="sliderValue">100%</span>
+                <div class="panel-row">
+                    <label for="uiScaling">Overlay Scaling</label>
+                    <input type="range" min="40" max="100" value="100" class="uiScalingSlider" id="uiScaling"
+                        onchange="saveScaling()" />
+                    <span id="sliderUiScalingValue">100%</span>
+                </div>
+                <div class="panel-row">
+                    <label class="slidecontainer" id="opacityLabel" for="scoreOpacity">Overlay Opacity</label>
+                    <input type="range" min="0" max="100" value="100" class="slider" id="scoreOpacity"
+                        onchange="saveOpacity()" />
+                    <span id="sliderValue">100%</span>
+                </div>
             </div>
             <div class="section-header" id="feaureSettingLabel">
                 Feature Settings
             </div>
-            <div class="column">
-                <div>
-                    Player 1<input type="checkbox" class="smallSize" id="usePlayer1Setting" onchange="playerSetting(1)"
-                        checked />
+            <div class="feature-settings-grid">
+                <div class="feature-settings-column">
+                    <div class="field-inline">
+                        <label for="usePlayer1Setting">Player 1</label>
+                        <input type="checkbox" class="smallSize" id="usePlayer1Setting" onchange="playerSetting(1)"
+                            checked />
+                    </div>
+                    <div class="field-inline">
+                        <label for="usePlayer2Setting">Player 2</label>
+                        <input type="checkbox" class="smallSize" id="usePlayer2Setting" onchange="playerSetting(2)"
+                            checked />
+                    </div>
                 </div>
-                <div>
-                    Player 2<input type="checkbox" class="smallSize" id="usePlayer2Setting" onchange="playerSetting(2)"
-                        checked />
+                <div class="feature-settings-column">
+                    <div class="field-inline">
+                        <label for="scoreDisplay">Show Scores</label>
+                        <input type="checkbox" class="smallSize" id="scoreDisplay"
+                            onchange="scoreDisplaySetting()" checked />
+                    </div>
+                    <div class="field-inline">
+                        <label for="useToggleSetting" id="labelForUseToggleSetting">Active Player Indicator</label>
+                        <input type="checkbox" class="smallSize" id="useToggleSetting" onchange="toggleSetting()" />
+                    </div>
                 </div>
-                <div>
-                    Show Scores<input type="checkbox" class="smallSize" id="scoreDisplay"
-                        onchange="scoreDisplaySetting()" checked />
-                </div>
-            </div>
-            <div class="column">
-                <div>
-                    <label for="useClockSetting" id="labelForUseClockSetting">Shot Clock</label>
-                    <input type="checkbox" class="smallSize" id="useClockSetting" onchange="clockSetting()" />
-                </div>
-                <div>
-                    <label for="useToggleSetting" id="labelForUseToggleSetting">Active Player Indicator</label>
-                    <input type="checkbox" class="smallSize" id="useToggleSetting" onchange="toggleSetting()" />
-                </div>
-                <div>
-                    Win Animation<input type="checkbox" class="smallSize" id="winAnimation"
-                        onchange="toggleAnimationSetting()" />
+                <div class="feature-settings-column">
+                    <div class="field-inline">
+                        <label for="useClockSetting" id="labelForUseClockSetting">Shot Clock</label>
+                        <input type="checkbox" class="smallSize" id="useClockSetting" onchange="clockSetting()" />
+                    </div>
+                    <div class="field-inline">
+                        <label for="winAnimation">Win Animation</label>
+                        <input type="checkbox" class="smallSize" id="winAnimation"
+                            onchange="toggleAnimationSetting()" />
+                    </div>
                 </div>
             </div>
             <div class="section-header" id="ballSettingLabel">
                 Ball Settings
             </div>
-            <div class="column">
-                <!-- Row One -->
-                <div style="align-items:center; height: 32px">
-                    <label for="ballTrackerCheckbox" id="labelForBallTrackerCheckbox">Ball Tracker</label>
-                    <input type="checkbox" class="smallSize" id="ballTrackerCheckbox" onchange="useBallTracker()" />
+            <div class="panel-stack settings-ball-column">
+                <div class="settings-ball-row">
+                    <div class="settings-ball-option">
+                        <label for="ballTrackerCheckbox" id="labelForBallTrackerCheckbox">Ball Scoring</label>
+                        <input type="checkbox" class="smallSize" id="ballTrackerCheckbox" onchange="useBallTracker()" />
+                    </div>
+                    <div class="settings-ball-option" id="ballDisplayDiv">
+                        <label for="ballDisplayCheckbox" id="labelForBallDisplayCheckbox">Display Balls</label>
+                        <input type="checkbox" class="smallSize" id="ballDisplayCheckbox" onchange="useBallDisplay()" />
+                    </div>
+                    <div class="settings-ball-option" id="ballSetDiv">
+                        <label for="ballSetCheckbox" id="labelForBallSetCheckbox">Ball Set Toggle</label>
+                        <input type="checkbox" class="smallSize" id="ballSetCheckbox" onchange="useBallSetToggle()" />
+                    </div>
                 </div>
-                <div style="align-items:center; height: 32px" id="ballDisplayDiv">
-                    <label for="ballDisplayCheckbox" id="labelForBallDisplayCheckbox">Display Balls</label>
-                    <input type="checkbox" class="smallSize" id="ballDisplayCheckbox" onchange="useBallDisplay()" />
-                </div>
-                <div class="hover obs28 button noShow" id="ballTrackerDirectionDiv"
-                    onclick="toggleBallTrackerDirection()">
-                    Vertical Ball Tracker
-                </div>
-            </div>
-            <!-- Row Two -->
-            <div class="column" id="ballTypeDiv">
-                <div id="ballSetDiv">
-                    <label for="ballSetCheckbox" id="labelForBallSetCheckbox">Ball Set Toggle</label>
-                    <input type="checkbox" class="smallSize" id="ballSetCheckbox" onchange="useBallSetToggle()" />
-                </div>
-                <div id="snookerGoldDiv" class="noShow">
-                    <label for="snookerGoldCheckbox" id="labelForSnookerGoldCheckbox">Golden Ball</label>
-                    <input type="checkbox" class="smallSize" id="snookerGoldCheckbox" onchange="snookerGoldToggle()" />
-                </div>
-                <div id="ballSelectionWrap">
-                    <span>
-                        Ball Type
-                        <select class="dropdown" id="ballSelection" onchange="toggleBallSelection()">
-                            <option value="american">World (Small/Big,Lows/Highs,Solids/Stripes)</option>
-                            <option value="international">International (Red/Yellow)</option>
-                            <option value="unity">Unity Balls</option>
-                            <option value="snooker">Snooker</option>
-                        </select>
-                    </span>
+                <div class="settings-ball-direction-row">
+                    <div class="hover obs28 button noShow" id="ballTrackerDirectionDiv"
+                        onclick="toggleBallTrackerDirection()">
+                        Vertical Ball Display
+                    </div>
                 </div>
             </div>
             <div class="section-header" id="updateCheckLabel">Version Check</div>
@@ -706,12 +751,12 @@ for more information about Salotto please visit https://salotto.app
                 <div class="hover obs28 button" id="updateCheck" onclick="checkForUpdate()">
                     Check for Update
                 </div>
-                <div id="updateStatus">Press "Check for Update".</div>
+                <div id="updateStatus"></div>
             </div>
             <div class="section-header" id="localDataSettingLabel">
                 Local Data Settings
             </div>
-            <div class="column">
+            <div class="column button-row">
                 <div class="hover obs28 button" onclick="resetInstance()" id="resetDataBtn" style="color: white">
                     Clear Instance Data
                 </div>
@@ -743,7 +788,7 @@ for more information about Salotto please visit https://salotto.app
                         <thead>
                             <tr>
                                 <th>Name</th>
-                                <th>Games W/L</th>
+                                <th>Matches Won</th>
                                 <th>Win%</th>
                                 <th id="statsBoardRacksHeader">Racks W/L</th>
                                 <th>Last</th>
@@ -980,7 +1025,7 @@ for more information about Salotto please visit https://salotto.app
         </div>
     </div>
 
-    <script src="./common/js/control_panel_post.js"></script>
+    <script src="./common/js/control_panel_post.js?v=7.2.0"></script>
     <script>
         //////////////////// HotKey scripts
 

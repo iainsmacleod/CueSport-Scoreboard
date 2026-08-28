@@ -62,17 +62,19 @@ body {
 	margin-top: 0px;
 }
 
+:root {
+	--panel-width: 674px;
+	--content-width: 650px;
+	--field-gap: 12px;
+	--pair-gap: 8px;
+	--row-padding: 7px 0;
+}
 
+/* Base div styling only — layout is opt-in via utilities below */
 div {
 	color: white;
-	min-height: 24px;
 	border: 0px solid #000;
 	border-radius: 5px;
-	display: flex;
-	justify-content: center;
-	/* align horizontal */
-	align-items: center;
-	/* align vertical */
 	font-size: 10pt;
 }
 
@@ -83,12 +85,14 @@ div {
 	margin-bottom: 0px;
 	display: flex;
 	flex-direction: column;
-	/* or row, depending on your layout */
 	border: 0px solid #000;
 	border-radius: 0px;
 	justify-content: center;
 	font-size: 10pt;
-	padding: 2px;
+	padding: 2px 0;
+	width: var(--panel-width);
+	max-width: 100%;
+	box-sizing: border-box;
 }
 
 #p1Score,
@@ -172,8 +176,43 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 #ballTracker img {
+	display: block;
+	width: 41px;
+	height: 41px;
+	box-sizing: border-box;
 	padding: 1px;
 	transition: box-shadow 0.2s;
+	-webkit-user-drag: none;
+	user-drag: none;
+	pointer-events: none;
+}
+
+#ballTracker .ball {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 auto;
+	line-height: 0;
+	cursor: pointer;
+	user-select: none;
+	-webkit-user-select: none;
+	-webkit-touch-callout: none;
+}
+
+.snooker-foul-targets .ball {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	user-select: none;
+	-webkit-user-select: none;
+	-webkit-touch-callout: none;
+}
+
+.snooker-foul-targets .ball img {
+	-webkit-user-drag: none;
+	user-drag: none;
+	pointer-events: none;
 }
 
 #ballTracker img:hover {
@@ -189,7 +228,7 @@ input[type="number"]::-webkit-outer-spin-button {
 #p1Name,
 #p2Name {
 	cursor: pointer;
-	width: 150px;
+	width: 260px;
 	font-size: 16pt;
 	font-weight: bold;
 	text-shadow: 1px 1px 2px black, 0 0 25px black, 0 0 5px black;
@@ -223,6 +262,9 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
 	font-size: 10pt;
 	cursor: pointer;
 	width: auto;
@@ -236,7 +278,7 @@ input[type="number"]::-webkit-outer-spin-button {
 
 .noShow {
 	visibility: hidden;
-	display: none;
+	display: none !important;
 }
 
 #FileUploadL1,
@@ -337,13 +379,460 @@ input {
 }
 
 
-.column {
-	/* display: flex; */ /* removed to help real-estate management */
-	justify-content: space-between;
-	padding: 7px 0 7px 0;
+/* Panel layout: vertical stacks, label+field rows, horizontal rows, button rows */
+.panel-stack {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	justify-content: flex-start;
+	width: 100%;
+	max-width: 100%;
 	clear: both;
-	width: 650px;
-	/* height: fit-content; */
+	padding: var(--row-padding);
+	gap: 4px;
+	box-sizing: border-box;
+}
+
+.panel-stack > * {
+	flex: 0 0 auto;
+	align-self: stretch;
+	min-height: 0;
+}
+
+.panel-row {
+	display: grid;
+	grid-template-columns: var(--label-col, 7.5em) minmax(120px, 280px) auto;
+	align-items: center;
+	justify-content: start;
+	gap: var(--pair-gap) var(--field-gap);
+	padding: 4px 0;
+	width: 100%;
+	box-sizing: border-box;
+}
+
+.panel-row label {
+	font-weight: bold;
+	text-align: left;
+	justify-self: start;
+	white-space: nowrap;
+}
+
+.panel-row .dropdown,
+.panel-row .slider,
+.panel-row .uiScalingSlider {
+	width: 100%;
+	max-width: 280px;
+}
+
+/* Native selects ignore tab white text; force readable contrast on all themes */
+select.dropdown,
+.setup-variant-field select,
+.panel-row select,
+#player1Details select,
+#player2Details select,
+#obsTheme {
+	color: #111;
+	background-color: #f3f3f3;
+	border: 1px solid #666;
+}
+
+select.dropdown option,
+.setup-variant-field select option,
+.panel-row select option {
+	color: #111;
+	background-color: #fff;
+}
+
+.setup-variant-grid {
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	gap: 10px;
+	padding: var(--row-padding);
+	clear: both;
+	width: 100%;
+	max-width: 100%;
+	box-sizing: border-box;
+}
+
+.setup-variant-top {
+	display: flex;
+	flex-direction: row;
+	justify-content: space-between;
+	align-items: center;
+	gap: 18px;
+	width: 100%;
+}
+
+.setup-variant-top > .setup-variant-field,
+.setup-variant-top > .setup-variant-option {
+	width: auto;
+	flex: 0 0 auto;
+	min-width: 0;
+}
+
+.setup-variant-field {
+	display: grid;
+	grid-template-columns: 7.5em minmax(0, 1fr);
+	align-items: center;
+	gap: var(--pair-gap) var(--field-gap);
+	min-width: 0;
+	box-sizing: border-box;
+}
+
+.setup-variant-option {
+	display: grid;
+	grid-template-columns: auto auto;
+	align-items: center;
+	justify-items: start;
+	gap: var(--pair-gap);
+}
+
+.setup-variant-field--wide {
+	width: 100%;
+	display: grid;
+	grid-template-columns: 7.5em minmax(0, 1fr);
+}
+
+.setup-variant-field--wide .dropdown {
+	max-width: none;
+	width: 100%;
+}
+
+.setup-variant-field label {
+	font-weight: bold;
+	text-align: left;
+	justify-self: start;
+	white-space: nowrap;
+}
+
+.setup-variant-field .dropdown {
+	width: 100%;
+	max-width: 280px;
+}
+
+.setup-variant-option-panel {
+	display: contents;
+}
+
+.setup-variant-option-panel.noShow {
+	display: none;
+}
+
+.setup-variant-option-panel label {
+	font-weight: bold;
+	text-align: left;
+	justify-self: start;
+	white-space: nowrap;
+}
+
+.setup-info-row {
+	margin-top: 0;
+	flex-wrap: nowrap;
+	gap: 16px 24px;
+	align-items: center;
+}
+
+.setup-info-pair {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--pair-gap);
+	flex: 0 0 auto;
+	min-width: 0;
+}
+
+.setup-info-pair--grow {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.setup-info-pair--grow input {
+	flex: 1 1 auto;
+	min-width: 0;
+	width: auto;
+	max-width: 100%;
+}
+
+#raceInfoTxt {
+	width: 4.5em;
+	flex: 0 0 auto;
+}
+
+.player-detail-pair {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--pair-gap);
+	flex: 0 1 auto;
+	min-width: 0;
+}
+
+#player1Details .player-detail-pair:first-child,
+#player2Details .player-detail-pair:first-child {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+#player1Details .player-detail-pair:first-child .autocomplete-wrapper,
+#player2Details .player-detail-pair:first-child .autocomplete-wrapper {
+	flex: 1 1 auto;
+	min-width: 0;
+	width: auto;
+	max-width: 260px;
+}
+
+#player1Details .player-detail-pair select,
+#player2Details .player-detail-pair select {
+	flex: 0 1 auto;
+	min-width: 7em;
+	max-width: 160px;
+}
+
+.field-inline {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--pair-gap);
+	min-height: 28px;
+}
+
+.feature-settings-grid {
+	display: flex;
+	flex-flow: row nowrap;
+	justify-content: space-between;
+	align-items: flex-start;
+	gap: var(--field-gap);
+	width: 100%;
+	max-width: 100%;
+	padding: var(--row-padding);
+	clear: both;
+	box-sizing: border-box;
+}
+
+.feature-settings-column {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	flex: 0 0 auto;
+}
+
+.settings-ball-column {
+	padding-bottom: 0;
+}
+
+.settings-ball-row {
+	display: flex;
+	flex-flow: row wrap;
+	justify-content: space-between;
+	align-items: center;
+	gap: var(--field-gap);
+	width: 100%;
+}
+
+.settings-ball-row .settings-ball-option {
+	flex: 0 0 auto;
+}
+
+.settings-ball-direction-row {
+	display: flex;
+	justify-content: flex-start;
+	align-items: center;
+	width: 100%;
+	padding-top: 4px;
+}
+
+.settings-ball-option {
+	display: flex;
+	align-items: center;
+	gap: var(--pair-gap);
+	min-height: 32px;
+}
+
+/* Horizontal control row — label/field pairs use gap; not space-between */
+.column {
+	display: flex;
+	flex-direction: row;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: flex-start;
+	gap: var(--field-gap);
+	padding: var(--row-padding);
+	clear: both;
+	width: 100%;
+	max-width: 100%;
+	box-sizing: border-box;
+}
+
+/* Button groups: space between at natural button width (no flex stretch) */
+.button-row {
+	justify-content: space-between;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: var(--pair-gap);
+}
+
+.button-row > .tooltip {
+	display: flex;
+	flex: 0 0 auto;
+}
+
+.actions-row {
+	justify-content: flex-end;
+}
+
+#player1Details,
+#player2Details {
+	flex-wrap: nowrap;
+	gap: 16px 24px;
+	align-items: center;
+}
+
+#scoreInfoP1,
+#scoreInfoP1Balls,
+#scoreInfoP2,
+#scoreInfoP2Balls {
+	flex-wrap: nowrap;
+	justify-content: space-between;
+	align-items: center;
+	gap: 16px;
+}
+
+#scoreInfoP1 label,
+#scoreInfoP1Balls label,
+#scoreInfoP2 label,
+#scoreInfoP2Balls label {
+	flex: 0 1 auto;
+	min-width: 0;
+	text-align: left;
+}
+
+#scoreInfoP1 .score-control,
+#scoreInfoP1Balls .score-control,
+#scoreInfoP2 .score-control,
+#scoreInfoP2Balls .score-control {
+	flex: 0 0 auto;
+}
+
+.ball-set-row {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+	align-items: center;
+	gap: var(--field-gap);
+	width: 100%;
+	box-sizing: border-box;
+	padding: 4px var(--row-padding) 0;
+}
+
+#playerTrackingBlock > .section-header {
+	margin-bottom: 0;
+}
+
+#playerTrackingBlock > *:last-child {
+	padding-bottom: 0;
+}
+
+.ball-set-label {
+	font-weight: bold;
+	white-space: nowrap;
+	justify-self: start;
+}
+
+.ball-set-choice {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	min-width: 0;
+	justify-self: start;
+	cursor: pointer;
+}
+
+.ball-set-choice span {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+#playerToggle {
+	flex-direction: column;
+	align-items: stretch;
+	padding-bottom: 0;
+}
+
+#playerToggle .rack-breaker-picker {
+	width: 100%;
+}
+
+#ballSet + #ballTrackerDiv {
+	margin-top: 0;
+}
+
+#ballTrackerDiv {
+	padding: 0;
+}
+
+#ballTrackerDiv.noShow,
+#ballSet.noShow,
+#playerToggle.noShow,
+#playerTrackingBlock.noShow,
+#playerToggleLabel.noShow {
+	display: none;
+}
+
+#ballTracker.noShow {
+	display: none;
+}
+
+#ballTrackerDiv:not(.noShow) {
+	padding: 4px var(--row-padding) 0;
+}
+
+#ballTrackerDiv,
+#ballTracker {
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	width: 100%;
+	box-sizing: border-box;
+}
+
+#ballTracker {
+	padding: 2px 0;
+	clear: both;
+}
+
+.ball-tracker-balls {
+	display: flex;
+	flex-flow: row nowrap;
+	justify-content: space-between;
+	align-items: center;
+	gap: 0;
+	width: 100%;
+	box-sizing: border-box;
+}
+
+#ballTracker .ball:not(.noShow) {
+	flex: 0 0 auto;
+}
+
+.extension-controls-row {
+	justify-content: space-between;
+	flex-wrap: nowrap;
+}
+
+.extension-controls-row > label {
+	flex: 0 0 auto;
+	margin-right: var(--field-gap);
+	white-space: nowrap;
+}
+
+.extension-controls-row > .hover.button,
+.extension-controls-row > .button {
+	flex: 1 1 0;
+	min-width: 0;
+}
+
+#slideshowImages > span {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--pair-gap);
 }
 
 .form-rows {
@@ -374,12 +863,12 @@ input {
 	justify-content: space-between;
 	padding: 6px 12px;
 	clear: both;
-	width: 650px;
+	width: 100%;
+	box-sizing: border-box;
 }
 
 .section-header {
-	/* display: flex; */ /*removed to assist with real estate management */
-	justify-content: start;
+	display: block;
 	padding: 15px 0 0 0;
 	clear: both;
 	text-decoration: underline;
@@ -431,12 +920,60 @@ input {
 	background-color: rgba(255, 255, 255, 0.1);
 }
 
-#ballTracker {
+.rack-breaker-picker {
 	display: flex;
-	justify-content: center;
-	padding: 10px 0 10px 0;
-	clear: both;
-	width: 650px;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	width: 100%;
+	min-height: 40px;
+	padding: 4px 0;
+}
+
+#playerToggle .rack-breaker-picker,
+#playerToggle #playerSlotPicker {
+	max-width: 100%;
+}
+
+.rack-breaker-question {
+	flex: 0 0 auto;
+	font-weight: bold;
+	white-space: nowrap;
+	padding-right: 8px;
+}
+
+.rack-breaker-buttons {
+	display: flex;
+	flex: 1 1 auto;
+	gap: 8px;
+	min-width: 0;
+}
+
+.rack-breaker-btn {
+	flex: 1 1 0;
+	min-width: 0;
+	min-height: 40px;
+	margin: 0;
+	text-align: center;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.rack-breaker-btn:disabled,
+.rack-breaker-btn.rack-breaker-disabled {
+	opacity: 0.35;
+	pointer-events: none;
+	cursor: default;
+}
+
+.rack-breaker-btn.rack-breaker-match-locked {
+	opacity: 0.55;
+	cursor: pointer;
+}
+
+.rack-breaker-btn.rack-breaker-inactive {
+	opacity: 0.35;
 }
 
 #ballTracker .ball.snooker-spacer {
@@ -450,7 +987,15 @@ input {
 	cursor: not-allowed;
 }
 
-#ballTracker .ball.snooker-ball-disabled {
+#ballTracker.ball-tracker-awaiting-breaker .ball {
+	opacity: 0.35;
+	pointer-events: none;
+	cursor: default;
+	filter: grayscale(0.4);
+}
+
+#ballTracker .ball.snooker-ball-disabled,
+#ballTracker .ball.ball-win-cooldown {
 	opacity: 0.35;
 	pointer-events: none;
 	cursor: default;
@@ -462,6 +1007,10 @@ input {
 	pointer-events: none;
 	transform: scale(0.92);
 	transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+#ballTracker .ball.snooker-undo-ball {
+	cursor: pointer;
 }
 
 .snooker-foul-modal-content {
@@ -597,12 +1146,12 @@ input:checked+.slider_round:before {
 
 /* Add styles for tabs */
 .tab {
-	/* overflow: hidden; */
 	color: white;
 	display: flex;
 	justify-content: stretch;
-	width: 674px;
+	width: 100%;
 	height: 55px;
+	box-sizing: border-box;
 }
 
 .tab button {
@@ -641,15 +1190,16 @@ input:checked+.slider_round:before {
 .tabcontent {
 	display: flex;
 	flex-direction: column;
+	align-items: stretch;
+	width: 100%;
+	box-sizing: border-box;
 	padding: 0px 12px 6px 12px;
 	color: white;
-	/* Match the font color */
 	transition: box-shadow 0.2s;
 	box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
 	border-radius: 0px 0px 10px 0px;
 	corner-shape: bevel;
 	margin-top: -1px;
-	/* Add this to compensate for the transparent border */
 }
 
 .tablinks {
@@ -812,55 +1362,55 @@ input:checked+.slider_round:before {
 
 #websocketSettingsModal .modal-body .form-row,
 #streamPromotionSettingsModal .modal-body .form-row {
-	display: flex !important;
-	flex-direction: column !important;
-	align-items: stretch !important;
-	justify-content: flex-start !important;
-	gap: 8px !important;
-	margin-bottom: 15px !important;
-	column-gap: 0 !important;
-	width: 100% !important;
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	justify-content: flex-start;
+	gap: 8px;
+	margin-bottom: 15px;
+	column-gap: 0;
+	width: 100%;
 }
 
 #websocketSettingsModal .modal-body .form-row .field,
 #streamPromotionSettingsModal .modal-body .form-row .field {
-	display: flex !important;
-	flex-direction: column !important;
-	align-items: flex-start !important;
-	justify-content: flex-start !important;
-	gap: 5px !important;
-	width: 100% !important;
-	flex-wrap: nowrap !important;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	justify-content: flex-start;
+	gap: 5px;
+	width: 100%;
+	flex-wrap: nowrap;
 }
 
 #websocketSettingsModal .modal-body .form-row .field label,
 #streamPromotionSettingsModal .modal-body .form-row .field label {
-	display: block !important;
-	margin-bottom: 5px !important;
-	width: 100% !important;
-	flex-shrink: 0 !important;
-	text-align: left !important;
+	display: block;
+	margin-bottom: 5px;
+	width: 100%;
+	flex-shrink: 0;
+	text-align: left;
 }
 
 #websocketSettingsModal .modal-body .form-row .field input,
 #streamPromotionSettingsModal .modal-body .form-row .field input {
-	width: 100% !important;
-	box-sizing: border-box !important;
-	flex-shrink: 0 !important;
+	width: 100%;
+	box-sizing: border-box;
+	flex-shrink: 0;
 }
 
 #websocketSettingsModal .password-input-wrapper,
 #streamPromotionSettingsModal .password-input-wrapper {
-	display: flex !important;
-	align-items: center !important;
-	gap: 8px !important;
-	width: 100% !important;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
 }
 
 #websocketSettingsModal .password-input-wrapper input,
 #streamPromotionSettingsModal .password-input-wrapper input {
-	flex: 1 !important;
-	width: auto !important;
+	flex: 1;
+	width: auto;
 }
 
 .password-toggle-btn {
@@ -945,20 +1495,22 @@ input:checked+.slider_round:before {
 	background-color: #cc8181; /* Gray/red when disconnected */
 }
 
-/* Player autocomplete — override global div { display:flex } */
-#teamInfo .autocomplete-wrapper {
+/* Player autocomplete */
+#player1Details .autocomplete-wrapper,
+#player2Details .autocomplete-wrapper {
 	display: block;
 	position: relative;
-	width: 150px;
+	width: 260px;
 }
 
-#teamInfo .autocomplete-list {
+#player1Details .autocomplete-list,
+#player2Details .autocomplete-list {
 	display: block;
 	position: absolute;
 	top: 100%;
 	left: 0;
 	width: 100%;
-	min-width: 200px;
+	min-width: 260px;
 	z-index: 200;
 }
 
@@ -1039,7 +1591,9 @@ input:checked+.slider_round:before {
 }
 
 #statsModal .stats-modal-body {
-	display: block;
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
 	flex: 0 1 auto;
 	min-height: 0;
 	max-height: calc(88vh - 110px);
@@ -1075,7 +1629,7 @@ input:checked+.slider_round:before {
 	width: 100%;
 }
 
-/* Override global div { display:flex } — stats modal uses vertical rows */
+/* Stats modal layout */
 #statsModal .stats-modal-body > * {
 	flex: 0 0 auto;
 	align-self: stretch;
@@ -1117,21 +1671,34 @@ input:checked+.slider_round:before {
 #statsModal .stats-modal-body .stats-tab-bar {
 	display: flex;
 	flex-direction: row;
-	flex-wrap: wrap;
-	justify-content: flex-start;
+	flex-wrap: nowrap;
+	justify-content: space-between;
 	align-items: center;
+	gap: var(--pair-gap);
 	width: 100%;
+}
+
+#statsModal .stats-modal-body .stats-tab-bar .stats-tab-btn {
+	flex: 1 1 0;
+	min-width: 0;
 }
 
 #statsModal .stats-modal-body .stats-data-actions {
 	display: flex;
 	flex-direction: row;
-	flex-wrap: wrap;
-	justify-content: flex-start;
-	align-items: flex-start;
-	gap: 10px;
+	flex-wrap: nowrap;
+	justify-content: space-between;
+	align-items: stretch;
+	gap: var(--pair-gap);
 	width: 100%;
 	margin-bottom: 8px;
+}
+
+#statsModal .stats-modal-body .stats-data-actions > .button,
+#statsModal .stats-modal-body .stats-data-actions > .hover.button {
+	flex: 1 1 0;
+	min-width: 0;
+	text-align: center;
 }
 
 #statsModal .stats-modal-body .stats-h2h-player-row {
@@ -1335,6 +1902,14 @@ input:checked+.slider_round:before {
 
 .stats-player-stats-table {
 	margin-top: 0;
+}
+
+.stats-player-game-block {
+	margin-bottom: 10px;
+}
+
+.stats-player-game-block:last-of-type {
+	margin-bottom: 0;
 }
 
 .stats-match-racks-row td {
@@ -1563,4 +2138,54 @@ input:checked+.slider_round:before {
 	width: 100%;
 	box-sizing: border-box;
 	padding: 4px;
+}
+
+.stats-tab-help {
+	margin: 0 0 12px 0;
+	max-width: 720px;
+	opacity: 0.9;
+}
+
+.stats-visibility-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 10px 14px;
+	margin-bottom: 12px;
+	max-width: 720px;
+}
+
+.stats-visibility-toolbar label {
+	font-weight: bold;
+}
+
+.stats-visibility-panel {
+	max-width: 720px;
+}
+
+.stats-visibility-stat-list {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 8px 28px;
+	max-width: 720px;
+}
+
+.stats-visibility-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	cursor: pointer;
+	padding: 4px 0;
+	min-width: 0;
+}
+
+.stats-visibility-label {
+	flex: 1;
+	min-width: 0;
+}
+
+.stats-visibility-toggle {
+	flex-shrink: 0;
+	margin: 0;
 }
