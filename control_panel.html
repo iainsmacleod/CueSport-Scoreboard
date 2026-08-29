@@ -87,6 +87,10 @@ for more information about Salotto please visit https://salotto.app
                             <label for="snookerGoldCheckbox" id="labelForSnookerGoldCheckbox">Golden Ball</label>
                             <input type="checkbox" class="smallSize" id="snookerGoldCheckbox" onchange="snookerGoldToggle()" />
                         </div>
+                        <div class="setup-variant-option-panel noShow" id="earlyGameBallDiv">
+                            <label for="earlyGameBallCheckbox" id="labelForEarlyGameBallCheckbox">Win on Break</label>
+                            <input type="checkbox" class="smallSize" id="earlyGameBallCheckbox" onchange="earlyGameBallToggle()" />
+                        </div>
                         <div class="setup-variant-option-panel noShow" id="pointBasedDiv">
                             <label for="pointBased">Point Based</label>
                             <input type="checkbox" class="smallSize" id="pointBased"
@@ -243,14 +247,14 @@ for more information about Salotto please visit https://salotto.app
                         src="./common/images/14ball_small.png"></div>
                 <div class="ball" id="ball 15" onclick="togglePot(this)" title="Ball 15"><img
                         src="./common/images/15ball_small.png"></div>
-                <div class="ball snooker-undo-ball noShow" id="snookerUndoBtn" onclick="undoLastSnookerAction()"
-                    title="Undo last pot or foul" aria-disabled="true">
+                <div class="ball snooker-undo-ball noShow" id="snookerUndoBtn" onclick="undoLastScoringAction()"
+                    title="Undo last scoring action" aria-disabled="true">
                     <img src="./common/images/undo-small.png" alt="Undo">
                 </div>
             </div>
             </div>
-            <!-- Manual Controls -->
-            <div class="section-header" id="scoreLabel">Manual Controls</div>
+            <!-- Manual Adjustments -->
+            <div class="section-header" id="scoreLabel">Manual Adjustments</div>
             <div class="ball-set-row noShow" id="ballSet">
                 <span class="ball-set-label">Player 1 Chosen Ball:</span>
                 <label class="ball-set-choice" for="p1colorRed">
@@ -637,11 +641,22 @@ for more information about Salotto please visit https://salotto.app
         <!-- Stats Tab -->
         <div id="StatsSettings" class="tabcontent">
             <div class="section-header">Player Statistics</div>
-            <div class="column">
+            <div class="column stats-main-actions">
                 <div class="hover obs28 button" id="statsBtn" onclick="openStatsModal()">
-                    Edit Player Stats
+                    Player Stats
                 </div>
+                <div class="hover obs28 button" id="statsImportBtn" onclick="importStatsJsonFile()">
+                    Import
+                </div>
+                <div class="hover obs28 button" id="statsExportBtn" onclick="exportStatsJson()">
+                    Export
+                </div>
+                <div class="hover obs28 button stats-danger-btn" id="statsClearBtn" onclick="clearAllStatsConfirmed()">
+                    Clear
+                </div>
+                <input type="file" id="statsImportFile" accept=".json,application/json" class="noShow" onchange="handleStatsImportFile(this)" />
             </div>
+            <p class="stats-hint">Export creates a backup file. Import replaces all current statistics after confirmation. Clear permanently deletes statistics history and resets the current game (names, race/game info, and scoreline).</p>
             <div class="section-header">Overlay Stats Display</div>
             <p class="stats-tab-help">Choose which stats appear on the P1 / P2 / H2H overlay panels for the selected game type.</p>
             <div class="stats-visibility-toolbar">
@@ -761,7 +776,7 @@ for more information about Salotto please visit https://salotto.app
                     Clear All Data
                 </div>
             </div>
-            <p class="stats-hint">Clears scoreboard settings - does not effect player statistics - use Stats &gt; Clear All Stats to remove statistics history.</p>
+            <p class="stats-hint">Clears scoreboard settings - does not effect player statistics - use Stats &gt; Clear to remove statistics history.</p>
         </div> <!-- General Settings Tab-->
     </div> <!-- End of tab content -->
 
@@ -777,7 +792,6 @@ for more information about Salotto please visit https://salotto.app
                     <button type="button" class="stats-tab-btn hover obs28 button active" data-tab="leaderboard" onclick="switchStatsTab('leaderboard')">Board</button>
                     <button type="button" class="stats-tab-btn hover obs28 button" data-tab="detail" onclick="switchStatsTab('detail')">Player</button>
                     <button type="button" class="stats-tab-btn hover obs28 button" data-tab="h2h" onclick="switchStatsTab('h2h')">H2H</button>
-                    <button type="button" class="stats-tab-btn hover obs28 button" data-tab="data" onclick="switchStatsTab('data')">Data</button>
                 </div>
 
                 <div id="statsTab-leaderboard" class="stats-tab-panel">
@@ -830,16 +844,6 @@ for more information about Salotto please visit https://salotto.app
                             <div class="hover obs28 button stats-edit-btn" onclick="openAddMatchForH2H()">Add Match</div>
                         </div>
                     </div>
-                </div>
-
-                <div id="statsTab-data" class="stats-tab-panel noShow">
-                    <div class="stats-data-actions">
-                        <div class="hover obs28 button" onclick="exportStatsJson()">Export JSON</div>
-                        <div class="hover obs28 button" onclick="importStatsJsonFile()">Import JSON</div>
-                        <input type="file" id="statsImportFile" accept=".json,application/json" class="noShow" onchange="handleStatsImportFile(this)" />
-                        <div class="hover obs28 button stats-danger-btn" onclick="clearAllStatsConfirmed()">Clear All Stats</div>
-                    </div>
-                    <p class="stats-hint">Export creates a backup file. Import replaces all current statistics after confirmation. Clear All Stats permanently deletes statistics history (does not affect current game settings).</p>
                 </div>
             </div>
             <div class="modal-footer">

@@ -964,11 +964,18 @@ select.dropdown option,
 	cursor: not-allowed;
 }
 
-#ballTrackerDiv.ball-tracker-awaiting-breaker .ball {
+#ballTrackerDiv.ball-tracker-awaiting-breaker .ball:not(.snooker-undo-ball) {
 	opacity: 0.35;
 	pointer-events: none;
 	cursor: default;
 	filter: grayscale(0.4);
+}
+
+#ballTrackerDiv.ball-tracker-awaiting-breaker .ball.snooker-undo-ball:not(.snooker-ball-disabled) {
+	opacity: 1;
+	pointer-events: auto;
+	cursor: pointer;
+	filter: none;
 }
 
 #ballTrackerDiv .ball.snooker-ball-disabled,
@@ -1619,8 +1626,7 @@ input:checked+.slider_round:before {
 #statsModal .stats-modal-body .stats-scroll-panel,
 #statsModal .stats-modal-body .stats-h2h-player-row,
 #statsModal .stats-modal-body .stats-h2h-select-col,
-#statsModal .stats-modal-body .stats-h2h-inline-stats,
-#statsModal .stats-modal-body .stats-data-actions {
+#statsModal .stats-modal-body .stats-h2h-inline-stats {
 	min-height: 0;
 }
 
@@ -1660,7 +1666,7 @@ input:checked+.slider_round:before {
 	min-width: 0;
 }
 
-#statsModal .stats-modal-body .stats-data-actions {
+#StatsSettings .stats-main-actions {
 	display: flex;
 	flex-direction: row;
 	flex-wrap: nowrap;
@@ -1671,8 +1677,8 @@ input:checked+.slider_round:before {
 	margin-bottom: 8px;
 }
 
-#statsModal .stats-modal-body .stats-data-actions > .button,
-#statsModal .stats-modal-body .stats-data-actions > .hover.button {
+#StatsSettings .stats-main-actions > .button,
+#StatsSettings .stats-main-actions > .hover.button {
 	flex: 1 1 0;
 	min-width: 0;
 	text-align: center;
@@ -2041,13 +2047,6 @@ input:checked+.slider_round:before {
 	display: flex;
 	justify-content: flex-end;
 	margin-top: 8px;
-}
-
-.stats-data-actions {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 10px;
-	margin-bottom: 10px;
 }
 
 .stats-danger-btn {

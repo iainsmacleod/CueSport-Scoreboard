@@ -28,7 +28,7 @@
         { id: 'scoreMargin', label: 'Difference', gameTypes: ['game8'] },
         { id: 'pointsRemaining', label: 'Points Remaining', gameTypes: ['game8'] },
         { id: 'highestBreak', label: 'Highest Break / Longest Run', gameTypes: ['game4', 'game8'] },
-        { id: 'ballsPotted', label: 'Balls Potted', gameTypes: ['game5', 'game6', 'game7', 'game8'] },
+        { id: 'ballsPotted', label: 'Balls Potted', gameTypes: ['game1', 'game2', 'game3', 'game5', 'game6', 'game7', 'game8'] },
         { id: 'breakAndRun', label: 'Break & Run', gameTypes: ['game1', 'game2', 'game3'] },
         { id: 'tableRun', label: 'Table Run', gameTypes: ['game1', 'game2', 'game3'] }
     ];
@@ -187,7 +187,8 @@
     }
 
     function gameTypeHasBallScoring(gameType) {
-        return gameType === 'game5' || gameType === 'game6' || gameType === 'game7' || gameType === 'game8';
+        return gameType === 'game1' || gameType === 'game2' || gameType === 'game3' ||
+            gameType === 'game5' || gameType === 'game6' || gameType === 'game7' || gameType === 'game8';
     }
 
     function isSnookerGameType(gameType) {
@@ -226,6 +227,9 @@
     function showsBallStats(gameType) {
         const gt = gameType || getActiveGameType();
         if (isSnookerGameType(gt)) {
+            return true;
+        }
+        if (gt === 'game1' || gt === 'game2' || gt === 'game3') {
             return true;
         }
         if (gt === 'game5' || gt === 'game6') {
@@ -1460,8 +1464,8 @@
             return;
         }
         const context = getCurrentContext();
-        // Bank/One Pocket/Custom point-based, plus Snooker pots
-        if (!context.dualScore && context.gameType !== 'game8') {
+        // 8/9/10 Ball Scoring pots, Bank/One Pocket/Custom point-based, Snooker pots
+        if (!showsBallStats(context.gameType)) {
             return;
         }
 
@@ -1809,11 +1813,14 @@
 
         if (p1Name && p2Name) {
             const context = getCurrentContext();
-            if (sessionNeedsReset(p1Name, p2Name, context)) {
+            if (isPlayerSlotEnabled('1') && isPlayerSlotEnabled('2')) {
+                await ensureActiveSession();
+            } else if (sessionNeedsReset(p1Name, p2Name, context)) {
                 await abandonActivePendingMatch();
                 await resetSessionState();
             }
         }
+        maybeRefreshStatsModalH2H();
         broadcastOverlayStatsIfEnabled();
     }
 
@@ -2043,6 +2050,28 @@
         }
         return (match.player1Id === playerId1 && match.player2Id === playerId2) ||
             (match.player1Id === playerId2 && match.player2Id === playerId1);
+    }
+
+    function h2hSummaryIncludesInProgressMatch(summary) {
+        if (!summary || !summary.matches) {
+            return false;
+        }
+        return summary.matches.some(function (m) {
+            return m && m.status !== 'completed';
+        });
+    }
+
+    function h2hSummaryHasDisplayableActivity(summary, playerId1, playerId2) {
+        if (!summary) {
+            return false;
+        }
+        const totalGames = (summary.gamesWon[playerId1] || 0) + (summary.gamesWon[playerId2] || 0);
+        const totalRacks = (summary.racksWon[playerId1] || 0) + (summary.racksWon[playerId2] || 0);
+        const totalBalls = (summary.ballsWon[playerId1] || 0) + (summary.ballsWon[playerId2] || 0);
+        if (totalGames + totalRacks + totalBalls > 0) {
+            return true;
+        }
+        return h2hSummaryIncludesInProgressMatch(summary);
     }
 
     /** In-progress match eligible for H2H / stats editing (not yet written as completed). */
@@ -2907,6 +2936,11 @@
                 return player.id;
             }
         }
+        const sessionId = slot === '1' ? activeMatchSession.player1Id : activeMatchSession.player2Id;
+        const sessionName = slot === '1' ? activeMatchSession.player1Name : activeMatchSession.player2Name;
+        if (sessionId && sessionName && normalizeName(sessionName) === normalizeName(name)) {
+            return sessionId;
+        }
         const found = await lookupPlayer(name);
         return found ? found.id : null;
     }
@@ -3016,11 +3050,7 @@
         if (!h2h) {
             return { visible: visible, mode: 'h2h', title: 'Head to Head', emptyMessage: 'First match-up' };
         }
-        const totalGames = (h2h.gamesWon[p1Id] || 0) + (h2h.gamesWon[p2Id] || 0);
-        const totalRacks = (h2h.racksWon[p1Id] || 0) + (h2h.racksWon[p2Id] || 0);
-        const totalBalls = (h2h.ballsWon[p1Id] || 0) + (h2h.ballsWon[p2Id] || 0);
-        // Empty when no mutual results — do not treat career breaks as H2H activity
-        if (totalGames + totalRacks + totalBalls === 0) {
+        if (!h2hSummaryHasDisplayableActivity(h2h, p1Id, p2Id)) {
             return {
                 visible: visible,
                 mode: 'h2h',
@@ -3196,6 +3226,17 @@
         scheduleOverlayStatsRebuild();
     }
 
+    function maybeRefreshStatsModalH2H() {
+        const modal = document.getElementById('statsModal');
+        if (!modal || modal.style.display !== 'block') {
+            return;
+        }
+        const h2hPanel = document.getElementById('statsTab-h2h');
+        if (h2hPanel && !h2hPanel.classList.contains('noShow')) {
+            refreshH2HView();
+        }
+    }
+
     function broadcastOverlayStatsIfEnabled() {
         const gen = ++overlayBroadcastGeneration;
         buildOverlayStatsPayload().then(function (payload) {
@@ -3207,6 +3248,7 @@
             if (typeof bc !== 'undefined') {
                 bc.postMessage({ overlayStats: payload });
             }
+            maybeRefreshStatsModalH2H();
         }).catch(function (err) {
             console.error('Overlay stats broadcast error:', err);
         });
@@ -4164,6 +4206,10 @@
     }
 
     function switchStatsTab(tabName) {
+        const allowed = { leaderboard: true, detail: true, h2h: true };
+        if (!allowed[tabName]) {
+            tabName = 'leaderboard';
+        }
         document.querySelectorAll('.stats-tab-btn').forEach(function (btn) {
             btn.classList.toggle('active', btn.dataset.tab === tabName);
         });
@@ -4322,11 +4368,8 @@
         const h2hBreak2 = (h2h.highestBreak && h2h.highestBreak[opponentId]) || 0;
         const showBreak = showsHighestBreakStats(h2h.gameType) || h2hBreak1 > 0 || h2hBreak2 > 0;
         const racksHeader = usesFrameTerminology() ? 'Frames Won' : 'Racks Won';
-        const totalGames = (h2h.gamesWon[viewerId] || 0) + (h2h.gamesWon[opponentId] || 0);
-        const totalRacks = (h2h.racksWon[viewerId] || 0) + (h2h.racksWon[opponentId] || 0);
-        const totalBalls = (h2h.ballsWon[viewerId] || 0) + (h2h.ballsWon[opponentId] || 0);
 
-        if (totalGames + totalRacks + (showBalls ? totalBalls : 0) === 0) {
+        if (!h2hSummaryHasDisplayableActivity(h2h, viewerId, opponentId)) {
             return '<p class="stats-empty">No matches recorded vs this opponent.</p>';
         }
 
@@ -4395,10 +4438,7 @@
         }
         const showBalls = showsBallStats();
         const racksWord = usesFrameTerminology() ? 'Frames' : 'Racks';
-        const totalGames = (h2h.gamesWon[playerId] || 0) + (h2h.gamesWon[otherId] || 0);
-        const totalRacks = (h2h.racksWon[playerId] || 0) + (h2h.racksWon[otherId] || 0);
-        const totalBalls = (h2h.ballsWon[playerId] || 0) + (h2h.ballsWon[otherId] || 0);
-        if (totalGames + totalRacks + (showBalls ? totalBalls : 0) === 0) {
+        if (!h2hSummaryHasDisplayableActivity(h2h, playerId, otherId)) {
             return '<span class="stats-empty">No recorded matches</span>';
         }
         const hb = (h2h.highestBreak && h2h.highestBreak[playerId]) || 0;
@@ -4622,13 +4662,20 @@
     }
 
     async function clearAllStatsConfirmed() {
-        if (!confirm('Clear ALL player statistics and match history?\n\nThis permanently deletes your stats roster and cannot be undone.')) {
+        if (!confirm(
+            "Clear ALL player statistics and match history?\n\n" +
+            "This permanently deletes your stats roster, resets the current game " +
+            "(names, race/game info, and scoreline), and cannot be undone."
+        )) {
             return;
         }
-        if (!confirm('Are you absolutely sure? All recorded statistics will be permanently deleted.')) {
+        if (!confirm("Are you absolutely sure? All recorded statistics will be permanently deleted.")) {
             return;
         }
         await clearAllStats();
+        if (typeof window.resetCurrentGame === "function") {
+            window.resetCurrentGame({ skipStatsAbandon: true });
+        }
         statsModalSelectedPlayerId = null;
         await renderStatsLeaderboard();
         await populateH2HPlayerSelects();

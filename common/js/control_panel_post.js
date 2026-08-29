@@ -91,6 +91,22 @@ window.onload = function () {
 		setStorageItem("usePlayer2", "yes");
 	}
 
+	if (getStorageItem("rackBreakerSlot") === null) {
+		setStorageItem("rackBreakerSlot", "");
+	}
+	if (getStorageItem("lastRackBreakerSlot") === null) {
+		setStorageItem("lastRackBreakerSlot", "");
+	}
+	if (getStorageItem("rackOpponentVisited") === null) {
+		setStorageItem("rackOpponentVisited", "no");
+	}
+	if (!getStorageItem("lastRackBreakerSlot") && getStorageItem("rackBreakerSlot")) {
+		const legacySlot = getStorageItem("rackBreakerSlot");
+		if (legacySlot === "1" || legacySlot === "2") {
+			setStorageItem("lastRackBreakerSlot", legacySlot);
+		}
+	}
+
 	if (getStorageItem("scoreDisplay") === null) {
 		setStorageItem("scoreDisplay", "yes");
 	}
@@ -169,6 +185,23 @@ window.onload = function () {
 	if (snookerGoldCheckbox) {
 		snookerGoldCheckbox.checked = getStorageItem("snookerGoldEnabled") === "yes";
 	}
+	if (getStorageItem("winOnBreakEnabled") === null) {
+		setStorageItem("winOnBreakEnabled", "no");
+	}
+	if (getStorageItem("earlyGameBallEnabled9") === null) {
+		setStorageItem("earlyGameBallEnabled9", "no");
+	}
+	if (getStorageItem("earlyGameBallEnabled10") === null) {
+		setStorageItem("earlyGameBallEnabled10", "no");
+	}
+	// Drop legacy shared flag so it cannot re-enable all games together.
+	if (getStorageItem("earlyGameBallEnabled") !== null) {
+		setStorageItem("earlyGameBallEnabled", "no");
+	}
+	const earlyGameBallCheckbox = document.getElementById("earlyGameBallCheckbox");
+	if (earlyGameBallCheckbox && typeof isEarlyGameBallEnabled === "function") {
+		earlyGameBallCheckbox.checked = isEarlyGameBallEnabled();
+	}
 	if (getStorageItem("snookerRedsPotted") === null) {
 		setStorageItem("snookerRedsPotted", "0");
 	}
@@ -187,14 +220,14 @@ window.onload = function () {
 	if (getStorageItem("snookerUndoStack") === null) {
 		setStorageItem("snookerUndoStack", "[]");
 	}
-	if (getStorageItem("rackBreakerSlot") === null) {
-		setStorageItem("rackBreakerSlot", "");
-	}
-	if (getStorageItem("rackOpponentVisited") === null) {
-		setStorageItem("rackOpponentVisited", "no");
-	}
 	if (typeof loadSnookerUndoStackFromStorage === "function") {
 		loadSnookerUndoStackFromStorage();
+	}
+	if (typeof loadScoringUndoStackFromStorage === "function") {
+		loadScoringUndoStackFromStorage();
+	}
+	if (typeof updateScoringUndoButton === "function") {
+		updateScoringUndoButton();
 	}
 	if (getStorageItem("snookerClearedColors") === null) {
 		setStorageItem("snookerClearedColors", "[]");
