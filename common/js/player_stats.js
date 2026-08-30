@@ -20,8 +20,8 @@
     };
 
     const STAT_VISIBILITY_CATALOG = [
-        { id: 'gamesWL', label: 'Matches Won', gameTypes: ['game1', 'game2', 'game3', 'game4', 'game5', 'game6', 'game7', 'game8'] },
-        { id: 'racksWL', label: 'Racks / Frames W/L', gameTypes: ['game1', 'game2', 'game3', 'game4', 'game5', 'game6', 'game7', 'game8'] },
+        { id: 'gamesWL', label: 'Matches Won (H2H)', gameTypes: ['game1', 'game2', 'game3', 'game4', 'game5', 'game6', 'game7', 'game8'] },
+        { id: 'racksWL', label: 'Racks / Frames Won (H2H)', gameTypes: ['game1', 'game2', 'game3', 'game4', 'game5', 'game6', 'game7', 'game8'] },
         { id: 'winStreak', label: 'Win Streak', gameTypes: ['game1', 'game2', 'game3', 'game4', 'game5', 'game6', 'game7', 'game8'] },
         { id: 'currentBreak', label: 'Current Break / Run', gameTypes: ['game4', 'game8'] },
         { id: 'possibleBreak', label: 'Possible Break', gameTypes: ['game8'] },
@@ -2989,8 +2989,9 @@
             title: player.name,
             gameType: gameType,
             gameTypeLabel: GAME_TYPE_LABELS[gameType] || gameType,
-            showGamesWL: overlayStatEnabled(gameType, 'gamesWL'),
-            showRacksWL: overlayStatEnabled(gameType, 'racksWL'),
+            // Matches / racks won are H2H-only on the browser overlay.
+            showGamesWL: false,
+            showRacksWL: false,
             showWinStreak: overlayStatEnabled(gameType, 'winStreak'),
             showBalls: overlayStatEnabled(gameType, 'ballsPotted'),
             showHighestBreak: overlayStatEnabled(gameType, 'highestBreak'),

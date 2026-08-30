@@ -724,7 +724,7 @@ const SNOOKER_BALL_META = {
     7: { file: "snooker-black-small.png", title: "Black Ball (7-point)", points: 7 },
     8: { file: "snooker-gold-small.png", title: "Golden Ball (20-point)", points: 20 },
     9: { spacer: true, title: "" },
-    10: { file: "snooker-freeball-small.png", title: "Free Ball (1-point)", points: 1 },
+    10: { file: "snooker-freeball-small.png", title: "Free Ball", points: null },
     11: { file: "foul-small.png", title: "Foul Ball", foul: true }
 };
 
@@ -1669,6 +1669,30 @@ function getNextSnookerClearanceColor() {
     return null;
 }
 
+/** Points for the lowest ball still on the table (free ball scores this value). */
+function getSnookerLowestBallPoints() {
+    if (!isSnookerBallMode()) {
+        return 1;
+    }
+    if (getSnookerRemainingReds() > 0) {
+        return (SNOOKER_BALL_META[1] && SNOOKER_BALL_META[1].points) || 1;
+    }
+    const nextColor = getNextSnookerClearanceColor();
+    if (nextColor && SNOOKER_BALL_META[nextColor]) {
+        return SNOOKER_BALL_META[nextColor].points || 1;
+    }
+    return 1;
+}
+
+function refreshSnookerFreeBallLabel() {
+    const el = document.getElementById("ball 10");
+    if (!el || !isSnookerBallMode()) {
+        return;
+    }
+    const pts = getSnookerLowestBallPoints();
+    el.title = "Free Ball (" + pts + "-point)";
+}
+
 /** Final-colors package: 27 normally, or 47 when Golden Ball is enabled and still in play. */
 function getSnookerFinalColorsPoints() {
     let pts = 27;
@@ -1855,6 +1879,7 @@ function updateSnookerBallAvailability() {
 
     // Foul ball is unavailable once the frame has no colors left to foul on.
     setSnookerBallDisabled(11, allColorsCleared);
+    refreshSnookerFreeBallLabel();
     updateSnookerGoldVisibility();
     updateSnookerUndoButton();
 }
@@ -1877,6 +1902,7 @@ function flashSnookerColorFeedback(ballEl, afterFeedback) {
                 ballEl.classList.remove("snooker-ball-clicked");
                 snookerColorFeedbackBall = null;
             }
+            updateSnookerBallAvailability();
         });
     }
 }
@@ -2431,7 +2457,7 @@ async function handleSnookerBallClick(element) {
         commitSnookerUndoSnapshot(undoSnap, scorer);
         return;
     }
-    if (typeof meta.points !== "number") {
+    if (typeof meta.points !== "number" && num !== 10) {
         return;
     }
 
@@ -2473,10 +2499,11 @@ async function handleSnookerBallClick(element) {
         }
         const undoSnap = captureSnookerUndoSnapshot();
         const scorer = getSnookerActivePlayer();
-        if (!addSnookerPoints(scorer, meta.points)) {
+        const freeBallPoints = getSnookerLowestBallPoints();
+        if (!addSnookerPoints(scorer, freeBallPoints)) {
             return;
         }
-        addToSnookerBreak(scorer, meta.points);
+        addToSnookerBreak(scorer, freeBallPoints);
         setSnookerFreeBallOffered(false);
         setSnookerFoulAwaitingPlayerChange(false);
         if (!redsDone) {
@@ -2527,7 +2554,7 @@ async function handleSnookerBallClick(element) {
             return;
         }
 
-        // Reds phase (or color after 15th red): lock colors briefly, then return to red/clearance.
+        // Reds phase: color is re-spotted after each red. After the 15th red's color, clearance begins (yellow first).
         for (let i = 2; i <= 7; i++) {
             setSnookerBallDisabled(i, true);
         }
@@ -3209,7 +3236,11 @@ function updateControlPanelBallImages(selection) {
                     if (meta && meta.file) {
                         imageSrc = `./common/images/${meta.file}`;
                         img.style.display = "";
-                        ballElement.title = meta.title || "";
+                        if (i === 10) {
+                            refreshSnookerFreeBallLabel();
+                        } else {
+                            ballElement.title = meta.title || "";
+                        }
                     } else {
                         continue;
                     }

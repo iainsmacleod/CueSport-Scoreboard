@@ -683,12 +683,12 @@
 
             cp.setStorageItem('overlayStatsMode', 'p2');
             const p2LoserOverlay = await cp.PlayerStats.buildOverlayStatsPayload();
-            assert('Match History', 'P2 overlay shows stats after frame loss',
-                p2LoserOverlay && !p2LoserOverlay.emptyMessage && p2LoserOverlay.racksWL,
-                p2LoserOverlay && JSON.stringify(p2LoserOverlay));
-            assert('Match History', 'P2 overlay racks reflect loss',
-                p2LoserOverlay && String(p2LoserOverlay.racksWL).indexOf('0/1') !== -1,
-                p2LoserOverlay && String(p2LoserOverlay.racksWL));
+            assert('Match History', 'P2 overlay omits racks won from browser display',
+                p2LoserOverlay && p2LoserOverlay.showRacksWL === false,
+                p2LoserOverlay && JSON.stringify({ showRacksWL: p2LoserOverlay.showRacksWL }));
+            assert('Match History', 'P2 overlay omits matches won from browser display',
+                p2LoserOverlay && p2LoserOverlay.showGamesWL === false,
+                p2LoserOverlay && JSON.stringify({ showGamesWL: p2LoserOverlay.showGamesWL }));
             clearScopedStorage(cp, 'overlayStatsMode');
 
             // Edit / discard in-progress match from Stats window
@@ -1457,6 +1457,8 @@
                 visible: true,
                 mode: 'p1',
                 title: 'Smoke',
+                showGamesWL: false,
+                showRacksWL: false,
                 showBalls: true,
                 gamesWL: '1/0',
                 racksWL: '2/1',
@@ -1467,12 +1469,11 @@
             });
             await sleep(50);
             const overlayText = (bs.document.getElementById('overlayStatsBody').innerText || '');
-            assert('Ball Stats', 'Browser source labels Matches Won',
-                overlayText.indexOf('Matches Won') !== -1 && overlayText.indexOf('1/0') !== -1,
+            assert('Ball Stats', 'Browser source hides Matches Won on player overlay',
+                overlayText.indexOf('Matches Won') === -1, overlayText.replace(/\n/g, ' | '));
+            assert('Ball Stats', 'Browser source hides Rack W/L on player overlay',
+                overlayText.indexOf('Rack W/L') === -1 && overlayText.indexOf('Frame W/L') === -1,
                 overlayText.replace(/\n/g, ' | '));
-            assert('Ball Stats', 'Browser source labels Rack W/L with percentage',
-                overlayText.indexOf('Rack W/L') !== -1 && overlayText.indexOf('2/1') !== -1 &&
-                overlayText.indexOf('67%') !== -1, overlayText.replace(/\n/g, ' | '));
             assert('Ball Stats', 'Browser source labels Balls Potted',
                 overlayText.indexOf('Balls Potted') !== -1 && overlayText.indexOf('9') !== -1,
                 overlayText.replace(/\n/g, ' | '));
@@ -1488,6 +1489,8 @@
                 visible: true,
                 mode: 'p1',
                 title: 'SmokeZero',
+                showGamesWL: false,
+                showRacksWL: false,
                 showBalls: true,
                 showHighestBreak: true,
                 highestBreakLabel: 'Highest Break',
@@ -2645,6 +2648,8 @@
             assert('Snooker', 'Incoming player can pot Free Ball after foul',
                 parseInt(cp.getStorageItem('p2BallsCtrlPanel'), 10) === p2AfterReFoul + 1,
                 cp.getStorageItem('p2BallsCtrlPanel'));
+            assert('Snooker', 'Free ball scores lowest on table during reds',
+                cp.getSnookerLowestBallPoints() === 1);
             await cp.undoLastSnookerAction();
             await sleep(80);
             assert('Snooker', 'Undo Free Ball restores P2 foul score',
@@ -2969,6 +2974,43 @@
             assert('Snooker', 'Free ball offered after foul auto player change',
                 freeBall && !freeBall.classList.contains('snooker-ball-disabled') &&
                 cp.isSnookerFreeBallOffered() === true);
+            assert('Snooker', 'Free ball label shows 1-point during reds',
+                (freeBall.title || '').indexOf('1-point') !== -1, freeBall.title);
+            // Clearance: free ball scores the lowest color still on the table.
+            cp.setSnookerClearedColors([]);
+            cp.setSnookerRedsPotted(15);
+            cp.setSnookerPhase('red');
+            cp.updateSnookerBallAvailability();
+            assert('Snooker', 'Free ball value is yellow (2) in clearance',
+                cp.getSnookerLowestBallPoints() === 2, String(cp.getSnookerLowestBallPoints()));
+            assert('Snooker', 'Free ball label shows 2-point in clearance',
+                (freeBall.title || '').indexOf('2-point') !== -1, freeBall.title);
+            cp.openSnookerFoulPicker();
+            cp.selectSnookerFoul(cp.document.querySelector('#snookerFoulTargets [data-foul="blue"]'));
+            await sleep(50);
+            const p2ClearanceBefore = parseInt(cp.getStorageItem('p2BallsCtrlPanel'), 10) || 0;
+            cp.handleSnookerBallClick(freeBall);
+            await sleep(50);
+            assert('Snooker', 'Free ball in clearance awards yellow value (2)',
+                parseInt(cp.getStorageItem('p2BallsCtrlPanel'), 10) === p2ClearanceBefore + 2,
+                cp.getStorageItem('p2BallsCtrlPanel'));
+            await cp.undoLastSnookerAction();
+            await sleep(50);
+            cp.setSnookerClearedColors([2]);
+            cp.updateSnookerBallAvailability();
+            assert('Snooker', 'Free ball value is green (3) after yellow cleared',
+                cp.getSnookerLowestBallPoints() === 3, String(cp.getSnookerLowestBallPoints()));
+            cp.openSnookerFoulPicker();
+            cp.selectSnookerFoul(cp.document.querySelector('#snookerFoulTargets [data-foul="blue"]'));
+            await sleep(50);
+            const p2GreenFreeBefore = parseInt(cp.getStorageItem('p2BallsCtrlPanel'), 10) || 0;
+            cp.handleSnookerBallClick(freeBall);
+            await sleep(50);
+            assert('Snooker', 'Free ball after yellow cleared awards green value (3)',
+                parseInt(cp.getStorageItem('p2BallsCtrlPanel'), 10) === p2GreenFreeBefore + 3,
+                cp.getStorageItem('p2BallsCtrlPanel'));
+            await cp.undoLastSnookerAction();
+            await sleep(50);
             cp.clearSnookerFreeBallOfferState();
             cp.setSnookerClearedColors([]);
             cp.setSnookerRedsPotted(15);
@@ -2977,6 +3019,25 @@
             const yellow = cp.document.getElementById('ball 2');
             const green = cp.document.getElementById('ball 3');
             const black = cp.document.getElementById('ball 7');
+            // Potting yellow after the 15th red starts clearance; yellow is first on.
+            cp.setSnookerRedsPotted(15);
+            cp.setSnookerPhase('color');
+            cp.setStorageItem('activePlayer', '1');
+            cp.handleSnookerBallClick(yellow);
+            await sleep(50);
+            assert('Snooker', 'Color after 15th red does not mark yellow cleared',
+                cp.isSnookerColorCleared(2) === false);
+            assert('Snooker', 'Color after 15th red enters clearance phase',
+                cp.getSnookerPhase() === 'red' && cp.getSnookerRedsPotted() === 15);
+            assert('Snooker', 'Clearance enables yellow after last-red color pot',
+                yellow && !yellow.classList.contains('snooker-ball-disabled'));
+            assert('Snooker', 'Clearance disables green before yellow is cleared',
+                green && green.classList.contains('snooker-ball-disabled'));
+            cp.resetSnookerSequenceState();
+            cp.setSnookerClearedColors([]);
+            cp.setSnookerRedsPotted(15);
+            cp.setSnookerPhase('red');
+            cp.updateSnookerBallAvailability();
             assert('Snooker', 'Clearance enables yellow first',
                 yellow && !yellow.classList.contains('snooker-ball-disabled'));
             assert('Snooker', 'Clearance disables green before yellow',
