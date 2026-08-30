@@ -4511,6 +4511,9 @@ function postInfo() {
     bc.postMessage({ game: gamemsg });
     setStorageItem("raceInfo", raceInfoTxt.value);
     setStorageItem("gameInfo", gameInfoTxt.value);
+    if (window.PlayerStats && typeof window.PlayerStats.syncActiveMatchGameInfoFromUI === "function") {
+        window.PlayerStats.syncActiveMatchGameInfoFromUI();
+    }
     // Send update to stream sharing if enabled
     if (window.streamSharing) {
         window.streamSharing.sendUpdate();

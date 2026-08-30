@@ -616,6 +616,13 @@
             assert('Match History', 'Pending session starts when both names are set',
                 preScorePending && preScorePending.status === 'active',
                 preScorePending && preScorePending.status);
+            cp.document.getElementById('gameInfoTxt').value = 'League Night Test';
+            cp.postInfo();
+            await sleep(50);
+            const pendingWithInfo = cp.PlayerStats.getActivePendingMatch();
+            assert('Match History', 'Pending match stores game info from setup',
+                pendingWithInfo && pendingWithInfo.gameInfo === 'League Night Test',
+                pendingWithInfo && pendingWithInfo.gameInfo);
             cp.setStorageItem('overlayStatsMode', 'h2h');
             const preScoreH2HOverlay = await cp.PlayerStats.buildOverlayStatsPayload();
             assert('Match History', 'H2H overlay shows 0-0 before first rack',
@@ -1018,6 +1025,7 @@
                 player1Id: histP1.id,
                 player2Id: histP2.id,
                 gameType: 'game1',
+                gameInfo: 'Semifinal Table 3',
                 scoreP1: 2,
                 scoreP2: 1,
                 status: 'completed',
@@ -1027,6 +1035,9 @@
             const savedPoolMatch = savedMatches.find(function (m) {
                 return m.gameType === 'game1' && m.finalScore && m.finalScore.p1 === 2 && m.finalScore.p2 === 1;
             });
+            assert('Match History', 'Saved match stores game info',
+                savedPoolMatch && savedPoolMatch.gameInfo === 'Semifinal Table 3',
+                savedPoolMatch && savedPoolMatch.gameInfo);
             const poolBreakdown = savedPoolMatch && cp.PlayerStats.renderMatchRackBreakdown(savedPoolMatch, { viewerPlayerId: histP1.id });
             assert('Match History', 'Pool match shows rack breakdown',
                 poolBreakdown && poolBreakdown.indexOf('stats-rack-detail-table') !== -1);

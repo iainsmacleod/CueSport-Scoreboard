@@ -929,11 +929,19 @@
             activeMatchSession.gameType !== context.gameType) {
             return true;
         }
-        // Race-to alone must not discard an in-progress match (e.g. control panel refresh).
+        // Race-to / game info alone must not discard an in-progress match (e.g. control panel refresh).
         if (activeMatchSession.raceTo !== context.raceTo) {
             activeMatchSession.raceTo = context.raceTo;
             if (activeMatchSession.pendingMatch) {
                 activeMatchSession.pendingMatch.raceTo = context.raceTo;
+            }
+            queuePersistPendingSession();
+        }
+        const gameInfo = context.gameInfo || '';
+        if (activeMatchSession.gameInfo !== gameInfo) {
+            activeMatchSession.gameInfo = gameInfo;
+            if (activeMatchSession.pendingMatch) {
+                activeMatchSession.pendingMatch.gameInfo = gameInfo;
             }
             queuePersistPendingSession();
         }
@@ -1640,6 +1648,17 @@
         }
     }
 
+    function captureActiveMatchGameInfo() {
+        const context = getCurrentContext();
+        const gameInfo = (context.gameInfo || activeMatchSession.gameInfo || '').trim();
+        activeMatchSession.gameInfo = gameInfo;
+        const match = getActivePendingMatch();
+        if (match) {
+            match.gameInfo = gameInfo;
+        }
+        return gameInfo;
+    }
+
     async function finalizeMatchCompletion(winnerSlot, scores) {
         if (activeMatchSession.matchCompletedRecorded || activeMatchSession.duplicateNames) {
             return;
@@ -1659,6 +1678,7 @@
         match.completedAt = now;
         match.finalScore = { p1: scores.p1, p2: scores.p2 };
         match.winnerId = ids.winnerId;
+        captureActiveMatchGameInfo();
         await putMatch(match);
 
         await applyGameDelta(ids.winnerId, ids.loserId, activeMatchSession.gameType, 1);
@@ -1718,6 +1738,7 @@
             match.status = 'completed';
             match.completedAt = now;
             match.winnerId = null;
+            captureActiveMatchGameInfo();
             await putMatch(match);
             activeMatchSession.status = 'completed';
             activeMatchSession.matchCompletedRecorded = true;
@@ -2383,6 +2404,9 @@
         match.player1Name = p1.name;
         match.player2Name = p2.name;
         match.gameType = matchPayload.gameType || 'game1';
+        match.gameInfo = matchPayload.gameInfo != null
+            ? String(matchPayload.gameInfo).trim()
+            : (match.gameInfo || '');
 
         let racks;
         let scoreP1;
@@ -2538,6 +2562,10 @@
         match.status = 'active';
         match.winnerId = null;
         match.completedAt = null;
+        if (matchPayload.gameInfo != null) {
+            match.gameInfo = String(matchPayload.gameInfo).trim();
+            activeMatchSession.gameInfo = match.gameInfo;
+        }
         refreshMatchHighestBreakFromRacks(match);
 
         for (let i = 0; i < racks.length; i++) {
@@ -3612,6 +3640,15 @@
             rows + '</tbody></table></div>';
     }
 
+    function formatMatchGameCell(match) {
+        const label = GAME_TYPE_LABELS[match.gameType] || match.gameType;
+        const info = (match.gameInfo || '').trim();
+        if (!info) {
+            return label;
+        }
+        return label + '<div class="stats-match-game-info">' + escapeHtml(info) + '</div>';
+    }
+
     function renderMatchHistoryRows(matches, options) {
         const opts = options || {};
         const viewerId = opts.viewerPlayerId;
@@ -3634,7 +3671,7 @@
                 const p1Score = m.player1Id === id1 ? score.p1 : score.p2;
                 const p2Score = m.player1Id === id1 ? score.p2 : score.p1;
                 mainRow = '<tr class="stats-match-row"><td>' + dateLabel + '</td>' +
-                    '<td>' + (GAME_TYPE_LABELS[m.gameType] || m.gameType) + '</td>' +
+                    '<td>' + formatMatchGameCell(m) + '</td>' +
                     '<td>' + escapeHtml(h2h.name1) + ' ' + p1Score + ' - ' + p2Score + ' ' + escapeHtml(h2h.name2) + '</td>' +
                     renderMatchActionButtons(m.id) + '</tr>';
             } else {
@@ -3643,7 +3680,7 @@
                 const oppScore = m.player1Id === viewerId ? score.p2 : score.p1;
                 mainRow = '<tr class="stats-match-row"><td>' + dateLabel + '</td>' +
                     '<td>' + escapeHtml(opponent) + '</td>' +
-                    '<td>' + (GAME_TYPE_LABELS[m.gameType] || m.gameType) + '</td>' +
+                    '<td>' + formatMatchGameCell(m) + '</td>' +
                     '<td>' + viewerScore + ' - ' + oppScore + '</td>' +
                     renderMatchActionButtons(m.id) + '</tr>';
             }
@@ -3698,6 +3735,10 @@
         setMatchEditGameTypeLocked(inProgress);
         document.getElementById('statsMatchDate').value = dateInputFromIso(match.completedAt || match.startedAt);
         document.getElementById('statsMatchGameType').value = match.gameType || 'game1';
+        const gameInfoInput = document.getElementById('statsMatchGameInfo');
+        if (gameInfoInput) {
+            gameInfoInput.value = match.gameInfo || '';
+        }
         document.getElementById('statsMatchBallsP1').value = countBallsForPlayer(match, match.player1Id);
         document.getElementById('statsMatchBallsP2').value = countBallsForPlayer(match, match.player2Id);
         renderMatchRacksEditor(match.racks || []);
@@ -3760,7 +3801,12 @@
                 }
                 setMatchEditGameTypeLocked(false);
                 document.getElementById('statsMatchDate').value = dateInputFromIso(new Date().toISOString());
-                document.getElementById('statsMatchGameType').value = 'game1';
+                document.getElementById('statsMatchGameType').value = getActiveGameType();
+                const gameInfoInput = document.getElementById('statsMatchGameInfo');
+                const liveGameInfo = document.getElementById('gameInfoTxt');
+                if (gameInfoInput) {
+                    gameInfoInput.value = liveGameInfo ? (liveGameInfo.value || '').trim() : '';
+                }
                 document.getElementById('statsMatchBallsP1').value = 0;
                 document.getElementById('statsMatchBallsP2').value = 0;
                 renderMatchRacksEditor([]);
@@ -4028,6 +4074,7 @@
                 player2Id: player2Id,
                 date: document.getElementById('statsMatchDate').value,
                 gameType: document.getElementById('statsMatchGameType').value,
+                gameInfo: (document.getElementById('statsMatchGameInfo') || {}).value || '',
                 racks: collectMatchRacksFromEditor(),
                 ballsP1: document.getElementById('statsMatchBallsP1').value,
                 ballsP2: document.getElementById('statsMatchBallsP2').value
@@ -4740,6 +4787,7 @@
         buildOverlayStatsPayload: buildOverlayStatsPayload,
         renderMatchRackBreakdown: renderMatchRackBreakdown,
         getActivePendingMatch: getActivePendingMatch,
+        syncActiveMatchGameInfoFromUI: captureActiveMatchGameInfo,
         renderStatsVisibilityPanel: renderStatsVisibilityPanel,
         isStatVisible: isStatVisible,
         readStatsVisibilityGameType: readStatsVisibilityGameType
