@@ -19,7 +19,7 @@ function parseVersion(argv) {
   if (idx !== -1 && argv[idx + 1]) {
     return argv[idx + 1];
   }
-  return '7.2.0';
+  return '7.2.1';
 }
 
 async function clickTab(page, tabButtonId, tabContentId) {
