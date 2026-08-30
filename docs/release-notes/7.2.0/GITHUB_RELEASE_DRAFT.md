@@ -23,4 +23,4 @@ See [`docs/release-notes/7.2.0/RELEASE_NOTES.md`](https://github.com/iainsmacleo
 
 ### Screenshots
 
-Attach `docs/release-notes/7.2.0/images/*.png` when publishing (generate with `node docs/release-notes/capture-screenshots.mjs --version 7.2.0`).
+See [`docs/release-notes/7.2.0/RELEASE_NOTES.md`](https://github.com/iainsmacleod/CueSport-Scoreboard/blob/main/docs/release-notes/7.2.0/RELEASE_NOTES.md) for inline images. Optionally attach the same PNGs as release assets when publishing.
