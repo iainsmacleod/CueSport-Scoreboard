@@ -285,6 +285,8 @@
             ballType = 'International';
         } else if (ballSelection === 'unity') {
             ballType = 'Unity';
+        } else if (ballSelection === 'ultimate') {
+            ballType = 'Ultimate';
         } else if (ballSelection === 'snooker') {
             ballType = 'Snooker';
         }

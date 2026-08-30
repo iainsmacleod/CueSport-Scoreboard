@@ -19,7 +19,7 @@ function parseVersion(argv) {
   if (idx !== -1 && argv[idx + 1]) {
     return argv[idx + 1];
   }
-  return '7.2.1';
+  return '7.2.2';
 }
 
 async function clickTab(page, tabButtonId, tabContentId) {
@@ -59,6 +59,35 @@ async function main() {
   });
   await page.waitForTimeout(500);
   await page.locator('#Controls').screenshot({ path: path.join(OUT, '04-controls-breaking-player.png') });
+
+  // Ultimate Pool Balls on Controls (8-Ball + ball scoring + ultimate variant)
+  await page.evaluate(() => {
+    const gameSel = document.getElementById('gameTypeSelect');
+    if (gameSel) {
+      gameSel.value = 'game1';
+      if (typeof gameType === 'function') gameType('game1');
+    }
+  });
+  await page.waitForTimeout(400);
+  await clickTab(page, 'gameInfoTab', 'GameInfo');
+  await page.evaluate(() => {
+    const ballSel = document.getElementById('ballSelection');
+    if (ballSel) {
+      ballSel.value = 'ultimate';
+      if (typeof toggleBallSelection === 'function') toggleBallSelection();
+    }
+  });
+  await page.waitForTimeout(400);
+  await clickTab(page, 'controlsTab', 'Controls');
+  await page.evaluate(() => {
+    const cb = document.getElementById('ballTrackerCheckbox');
+    if (cb && !cb.checked) {
+      cb.checked = true;
+      if (typeof useBallTracker === 'function') useBallTracker();
+    }
+  });
+  await page.waitForTimeout(500);
+  await page.locator('#Controls').screenshot({ path: path.join(OUT, '01-controls-ultimate-balls.png') });
 
   await page.evaluate(() => {
     const sel = document.getElementById('gameTypeSelect');

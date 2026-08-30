@@ -467,6 +467,13 @@ const handlers = {
                 document.getElementById("currentBallP2").src = "common/images/15-ball-unity-small.png";
                 document.getElementById("currentBallP2").classList.remove("noShow");
                 document.getElementById("scoreBallContainerP2").classList.remove("noShow");
+            } else if (ballType === "ultimate") {
+                document.getElementById("currentBallP1").src = "common/images/ultimate-1ball-small.png";
+                document.getElementById("currentBallP1").classList.remove("noShow");
+                document.getElementById("scoreBallContainerP1").classList.remove("noShow");
+                document.getElementById("currentBallP2").src = "common/images/ultimate-15ball-small.png";
+                document.getElementById("currentBallP2").classList.remove("noShow");
+                document.getElementById("scoreBallContainerP2").classList.remove("noShow");
             } else {
                 document.getElementById("currentBallP1").src = "common/images/red-international-small-ball.png";
                 document.getElementById("currentBallP1").classList.remove("noShow");
@@ -485,6 +492,11 @@ const handlers = {
                 document.getElementById("currentBallP1").src = "common/images/15-ball-unity-small.png";
                 document.getElementById("scoreBallContainerP1").classList.remove("noShow");
                 document.getElementById("currentBallP2").src = "common/images/1-ball-unity-small.png";
+                document.getElementById("scoreBallContainerP2").classList.remove("noShow");
+            } else if (ballType === "ultimate") {
+                document.getElementById("currentBallP1").src = "common/images/ultimate-15ball-small.png";
+                document.getElementById("scoreBallContainerP1").classList.remove("noShow");
+                document.getElementById("currentBallP2").src = "common/images/ultimate-1ball-small.png";
                 document.getElementById("scoreBallContainerP2").classList.remove("noShow");
             } else {
                 document.getElementById("currentBallP1").src = "common/images/yellow-international-small-ball.png";
@@ -1308,6 +1320,13 @@ function initializeBrowserSourceExtensionStatus() {
                 document.getElementById("currentBallP2").src = "common/images/15-ball-unity-small.png";
                 document.getElementById("currentBallP2").classList.remove("noShow");
                 document.getElementById("scoreBallContainerP2").classList.remove("noShow");
+            } else if (ballType === "ultimate") {
+                document.getElementById("currentBallP1").src = "common/images/ultimate-1ball-small.png";
+                document.getElementById("currentBallP1").classList.remove("noShow");
+                document.getElementById("scoreBallContainerP1").classList.remove("noShow");
+                document.getElementById("currentBallP2").src = "common/images/ultimate-15ball-small.png";
+                document.getElementById("currentBallP2").classList.remove("noShow");
+                document.getElementById("scoreBallContainerP2").classList.remove("noShow");
             } else {
                 document.getElementById("currentBallP1").src = "common/images/red-international-small-ball.png";
                 document.getElementById("currentBallP1").classList.remove("noShow");
@@ -1326,6 +1345,11 @@ function initializeBrowserSourceExtensionStatus() {
                 document.getElementById("currentBallP1").src = "common/images/15-ball-unity-small.png";
                 document.getElementById("scoreBallContainerP1").classList.remove("noShow");
                 document.getElementById("currentBallP2").src = "common/images/1-ball-unity-small.png";
+                document.getElementById("scoreBallContainerP2").classList.remove("noShow");
+            } else if (ballType === "ultimate") {
+                document.getElementById("currentBallP1").src = "common/images/ultimate-15ball-small.png";
+                document.getElementById("scoreBallContainerP1").classList.remove("noShow");
+                document.getElementById("currentBallP2").src = "common/images/ultimate-1ball-small.png";
                 document.getElementById("scoreBallContainerP2").classList.remove("noShow");
             } else {
                 document.getElementById("currentBallP1").src = "common/images/yellow-international-small-ball.png";

@@ -245,6 +245,13 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 function toggleAnimationSetting() {
+    if (isSnookerBallMode()) {
+        const checkbox = document.getElementById("winAnimation");
+        if (checkbox) {
+            checkbox.checked = false;
+        }
+        return;
+    }
     if (!document.getElementById("winAnimation").checked) {
         setStorageItem("winAnimation", "no");
         console.log("Win animation disabled");
@@ -252,6 +259,23 @@ function toggleAnimationSetting() {
         setStorageItem("winAnimation", "yes");
         console.log("Win animation enabled");
     }
+}
+
+function syncWinAnimationControls() {
+    const winDiv = document.getElementById("winAnimationDiv");
+    const checkbox = document.getElementById("winAnimation");
+    if (!winDiv || !checkbox) {
+        return;
+    }
+    const snookerMode = isSnookerBallMode();
+    winDiv.classList.toggle("noShow", snookerMode);
+    if (snookerMode) {
+        checkbox.checked = false;
+        checkbox.disabled = true;
+        return;
+    }
+    checkbox.disabled = false;
+    checkbox.checked = getStorageItem("winAnimation") === "yes";
 }
 
 function isDualScoreMode() {
@@ -2007,6 +2031,9 @@ function updateSnookerUiVisibility() {
     if (typeof syncBallDisplayControls === "function") {
         syncBallDisplayControls();
     }
+    if (typeof syncWinAnimationControls === "function") {
+        syncWinAnimationControls();
+    }
 }
 
 function updateSnookerGoldVisibility() {
@@ -2909,7 +2936,7 @@ function ballType(value) {
     const redLabel = document.querySelector('label[for="p1colorRed"] span');
     const yellowLabel = document.querySelector('label[for="p1colorYellow"] span');
     if (redLabel) {
-        if (value === "american") {
+        if (value === "american" || value === "ultimate") {
             redLabel.textContent = "Smalls/Lows/Solids";
         } else if (value === "unity") {
             redLabel.textContent = "Pink";
@@ -2918,7 +2945,7 @@ function ballType(value) {
         }
     }
     if (yellowLabel) {
-        if (value === "american") {
+        if (value === "american" || value === "ultimate") {
             yellowLabel.textContent = "Bigs/Highs/Stripes";
         } else if (value === "unity") {
             yellowLabel.textContent = "Blue";
@@ -3258,6 +3285,11 @@ function updateControlPanelBallImages(selection) {
                 } else if (selection === "unity") {
                     // Unity ball naming convention
                     imageSrc = `./common/images/${i}-ball-unity-small.png`;
+                    img.style.display = "";
+                    ballElement.title = `Ball ${i}`;
+                } else if (selection === "ultimate") {
+                    // Ultimate Pool Balls naming convention
+                    imageSrc = `./common/images/ultimate-${i}ball-small.png`;
                     img.style.display = "";
                     ballElement.title = `Ball ${i}`;
                 } else {

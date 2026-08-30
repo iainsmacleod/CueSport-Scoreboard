@@ -40,6 +40,11 @@ function clearWinBlink() {
     }
 	
 	if (getStorageItem("winAnimation")== "yes") {
+		// No snooker-specific win clip yet — skip rather than playing a pool animation
+		if (gameType === "game8" || getStorageItem("ballSelection") === "snooker") {
+			console.log("Win animation skipped for snooker");
+			return;
+		}
 		playWebmAnimation(gameType, '#videoContainer');
 	} else {
 		console.log(`Animation flag disabled`)
@@ -598,6 +603,9 @@ function updateBallImages(selection) {
                 } else if (selection === "unity") {
                     // Unity ball naming convention
                     imageSrc = `./common/images/${i}-ball-unity-small.png`;
+                } else if (selection === "ultimate") {
+                    // Ultimate Pool Balls naming convention
+                    imageSrc = `./common/images/ultimate-${i}ball-small.png`;
                 } else {
                     // American ball naming convention (default)
                     imageSrc = `./common/images/${i}ball_small.png`;

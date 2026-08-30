@@ -307,7 +307,7 @@
 
             // --- Core ---
             assert('Core', 'PlayerStats loaded', !!cp.PlayerStats);
-            assert('Core', 'Version 7.2.1', cp.versionNum === '7.2.1', cp.versionNum);
+            assert('Core', 'Version 7.2.2', cp.versionNum === '7.2.2', cp.versionNum);
             assert('Core', 'Stats modal present', !!cp.document.getElementById('statsModal'));
             assert('Core', 'Stats tab present', !!cp.document.getElementById('StatsSettings'));
             assert('Core', 'Stats tab restore uses statsTab button',
@@ -3126,6 +3126,8 @@
                     bs.document.getElementById('ballTracker').style.display === 'none');
                 assert('Snooker', 'Display Balls control hidden for Snooker',
                     cp.document.getElementById('ballDisplayDiv').classList.contains('noShow'));
+                assert('Snooker', 'Win Animation control hidden for Snooker',
+                    cp.document.getElementById('winAnimationDiv').classList.contains('noShow'));
                 assert('Snooker', 'Ball Scoring can remain enabled for scoring',
                     cp.document.getElementById('ballTrackerCheckbox').checked === true);
                 if (typeof bs.applyOverlayBallTrackerLayout === 'function') {

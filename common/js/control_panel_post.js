@@ -249,7 +249,7 @@ window.onload = function () {
 	const redLabel = document.querySelector('label[for="p1colorRed"] span');
 	if (redLabel) {
 		const currentBallType = getStorageItem("ballSelection");
-		if (currentBallType === "american") {
+		if (currentBallType === "american" || currentBallType === "ultimate") {
 			redLabel.textContent = "Smalls/Lows/Solids";
 		} else if (currentBallType === "unity") {
 			redLabel.textContent = "Pink";
@@ -261,7 +261,7 @@ window.onload = function () {
 	const yellowLabel = document.querySelector('label[for="p1colorYellow"] span');
 	if (yellowLabel) {
 		const currentBallType = getStorageItem("ballSelection");
-		if (currentBallType === "american") {
+		if (currentBallType === "american" || currentBallType === "ultimate") {
 			yellowLabel.textContent = "Bigs/Highs/Stripes";
 		} else if (currentBallType === "unity") {
 			yellowLabel.textContent = "Blue";
@@ -681,6 +681,9 @@ if (getStorageItem("winAnimation") === "no" || getStorageItem("winAnimation") ==
 	console.log("Win animation enabled");
 	document.getElementById("winAnimation").checked = true;
 	setStorageItem("winAnimation", "yes");
+}
+if (typeof syncWinAnimationControls === "function") {
+	syncWinAnimationControls();
 }
 
 function setPlayerVisibility(playerNumber) {
