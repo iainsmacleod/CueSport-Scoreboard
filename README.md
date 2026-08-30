@@ -456,7 +456,7 @@ Open `http://localhost:8765/tests/smoke_test.html` and click **Run all tests**. 
 
 ## Release notes
 
-Versioned changelogs and screenshot tooling live in [`docs/release-notes/`](docs/release-notes/). Generated PNGs are gitignored; run `docs/release-notes/create-release.ps1 -Version 7.2.0` (requires [GitHub CLI](https://cli.github.com/)) to capture screenshots and open a **draft** GitHub release.
+Versioned changelogs and screenshot tooling live in [`docs/release-notes/`](docs/release-notes/). Screenshots are committed with each version’s `RELEASE_NOTES.md`. Run `docs/release-notes/create-release.ps1 -Version 7.2.0` (requires [GitHub CLI](https://cli.github.com/)) to refresh captures and open a **draft** GitHub release.
 
 ---
 

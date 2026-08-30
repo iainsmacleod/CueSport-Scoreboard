@@ -75,8 +75,6 @@ tmp/
 temp/
 *.tmp
 
-# Release notes — generated screenshots (regenerate via docs/release-notes/capture-screenshots.mjs)
-docs/release-notes/**/images/**
-!docs/release-notes/**/images/.gitkeep
+# Release notes tooling (screenshots in docs/release-notes/*/images/ are committed)
 docs/release-notes/node_modules/
 
