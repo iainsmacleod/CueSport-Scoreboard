@@ -3,20 +3,59 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>CueSport — Live Streams</title>
+  <title>CueSport Cloud</title>
   <link rel="stylesheet" href="/web/shared/styles.css" />
 </head>
 <body>
-  <header>
-    <h1>CueSport Live Streams</h1>
-    <p class="subtitle">Matches currently on air</p>
+  <header class="site-header">
+    <div class="site-header-inner">
+      <div>
+        <h1>CueSport Cloud</h1>
+        <p class="subtitle">Remote scoring, multi-table control, and live stream discovery</p>
+      </div>
+      <nav class="site-nav">
+        <a class="btn" href="/streams">Live streams</a>
+        <a class="btn primary" href="/dashboard">Sign in</a>
+      </nav>
+    </div>
   </header>
-  <main>
-    <ul id="streamList" class="stream-list"></ul>
-    <p id="empty" class="hidden">No active streams right now.</p>
+  <main class="landing-main">
+    <section class="hero panel">
+      <h2>Score from anywhere</h2>
+      <p>
+        Connect your OBS scoreboard dock to CueSport Cloud, then control matches from your phone —
+        or share a guest scorer link. Each OBS <code>?instance=</code> table gets its own room automatically.
+      </p>
+      <div class="hero-actions">
+        <a class="btn primary" href="/dashboard">Open dashboard</a>
+        <a class="btn" href="/streams">Browse live streams</a>
+      </div>
+    </section>
+
+    <section class="feature-grid">
+      <article class="panel">
+        <h3>CueSport Cloud</h3>
+        <p>Remote mobile control, match event logging, and synced stats (coming soon). Separate from public stream listing.</p>
+      </article>
+      <article class="panel">
+        <h3>Stream Promotion</h3>
+        <p>Opt-in listing on this site <strong>only while OBS is streaming</strong> with promotion enabled on the dock.</p>
+      </article>
+      <article class="panel">
+        <h3>Multi-table</h3>
+        <p>Run multiple OBS docks with different <code>instance</code> IDs — each registers as its own table in your account.</p>
+      </article>
+    </section>
+
+    <section class="panel">
+      <h2>Live now</h2>
+      <p class="hint">Only streams with Stream Promotion enabled and OBS actively streaming appear here.</p>
+      <ul id="streamList" class="stream-list"></ul>
+      <p id="empty" class="hidden">No one is streaming with promotion enabled right now.</p>
+    </section>
   </main>
   <script type="module">
-    async function load() {
+    async function loadStreams() {
       const res = await fetch('/api/streams');
       const streams = await res.json();
       const list = document.getElementById('streamList');
@@ -31,17 +70,22 @@
         const st = s.state || {};
         const li = document.createElement('li');
         li.className = 'stream-card';
+        const p1 = st.player1Name || 'Player 1';
+        const p2 = st.player2Name || 'Player 2';
+        const score = st.dualScoreMode
+          ? `${st.p1Balls ?? 0} — ${st.p2Balls ?? 0} <span class="stream-subscore">(${st.p1Score ?? 0}–${st.p2Score ?? 0} frames)</span>`
+          : `${st.p1Score ?? 0} — ${st.p2Score ?? 0}`;
         li.innerHTML = `
-          <h3>${st.player1Name || 'Player 1'} vs ${st.player2Name || 'Player 2'}</h3>
-          <p class="score">${st.p1Score ?? 0} — ${st.p2Score ?? 0}</p>
-          <p>${st.gameType || ''} ${st.raceInfo ? '· ' + st.raceInfo : ''}</p>
+          <h3>${p1} vs ${p2}</h3>
+          <p class="score">${score}</p>
+          <p class="stream-meta">${st.gameInfo || st.gameType || ''} ${st.raceInfo ? '· ' + st.raceInfo : ''}</p>
           ${s.stream_url ? `<a href="${s.stream_url}" target="_blank" rel="noopener">Watch stream</a>` : ''}
         `;
         list.appendChild(li);
       });
     }
-    load();
-    setInterval(load, 15000);
+    loadStreams();
+    setInterval(loadStreams, 15000);
   </script>
 </body>
 </html>

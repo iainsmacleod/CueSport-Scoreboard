@@ -7,32 +7,59 @@
   <link rel="stylesheet" href="/web/shared/styles.css" />
 </head>
 <body>
-  <header>
-    <h1>CueSport Cloud</h1>
-    <p class="subtitle">Account &amp; room management</p>
+  <header class="site-header">
+    <div class="site-header-inner">
+      <div>
+        <h1>CueSport Cloud</h1>
+        <p class="subtitle">Account &amp; tables</p>
+      </div>
+      <nav class="site-nav">
+        <a class="btn" href="/">Home</a>
+        <a class="btn" href="/streams">Live streams</a>
+      </nav>
+    </div>
   </header>
-  <main id="app">
-    <section id="loginSection">
-      <p>Sign in to manage rooms and API keys for remote mobile control.</p>
-      <button id="googleBtn" class="btn primary">Sign in with Google</button>
+  <main id="app" class="dashboard-main">
+    <section id="loginSection" class="panel">
+      <h2>Sign in</h2>
+      <p>Manage tables, API keys, and mobile control links.</p>
+      <button id="googleBtn" class="btn primary block">Sign in with Google</button>
       <div class="dev-login">
         <label>Dev login (local/self-host)</label>
         <input type="email" id="devEmail" placeholder="you@example.com" />
-        <button id="devLoginBtn" class="btn">Dev sign in</button>
+        <button id="devLoginBtn" class="btn block">Dev sign in</button>
       </div>
     </section>
+
     <section id="dashboardSection" class="hidden">
-      <p id="userEmail"></p>
-      <h2>Rooms</h2>
-      <ul id="roomList"></ul>
-      <h2>API keys (self-host)</h2>
-      <button id="createKeyBtn" class="btn">Create API key</button>
-      <pre id="newKeyDisplay" class="hidden"></pre>
-      <ul id="keyList"></ul>
-      <p><a id="mobileLink" href="#">Open mobile control</a></p>
-      <button id="signOutBtn" class="btn">Sign out</button>
+      <p id="userEmail" class="user-email"></p>
+      <div class="dash-tabs">
+        <button type="button" class="dash-tab active" data-tab="control">Tables &amp; control</button>
+        <button type="button" class="dash-tab" data-tab="stats">Stats &amp; account</button>
+      </div>
+
+      <div id="tabControl" class="dash-tab-panel">
+        <p class="hint">Only OBS docks currently connected to CueSport Cloud appear here. Tap Control for mobile scoring, or create a guest link.</p>
+        <div id="tableCards" class="table-cards"></div>
+      </div>
+
+      <div id="tabStats" class="dash-tab-panel hidden">
+        <div class="panel">
+          <h2>Player stats (cloud sync)</h2>
+          <p class="hint">Coming soon: sync roster and match history from local IndexedDB to your account, with search and filters.</p>
+        </div>
+        <div class="panel">
+          <h2>API keys (self-host dock)</h2>
+          <p class="hint">Paste into OBS → Replay/Share → CueSport Cloud self-host settings. Room/table ID is assigned automatically per instance.</p>
+          <button id="createKeyBtn" class="btn">Create API key</button>
+          <pre id="newKeyDisplay" class="key-display hidden"></pre>
+          <ul id="keyList"></ul>
+        </div>
+        <button id="signOutBtn" class="btn">Sign out</button>
+      </div>
+
+      <p id="error" class="error hidden"></p>
     </section>
-    <p id="error" class="error hidden"></p>
   </main>
   <script type="module" src="/web/dashboard/app.js"></script>
 </body>

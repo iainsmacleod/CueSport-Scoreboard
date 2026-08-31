@@ -81,13 +81,20 @@
     function dispatchCommand(msg) {
         if (msg.source === 'dock') return;
         replaying = true;
+        const pending = [];
         try {
             for (const fn of commandHandlers) {
-                fn(msg.action, msg.payload || {}, msg);
+                pending.push(Promise.resolve(fn(msg.action, msg.payload || {}, msg)));
             }
-        } finally {
+        } catch (err) {
             replaying = false;
+            throw err;
         }
+        Promise.all(pending).catch(function (err) {
+            console.error('cloudRelay command handler error', err);
+        }).finally(function () {
+            replaying = false;
+        });
     }
 
     function dispatchState(state) {
@@ -105,17 +112,18 @@
         return false;
     }
 
+    function getInstanceKey() {
+        return new URLSearchParams(window.location.search).get('instance') || 'default';
+    }
+
     function sendJoin() {
         const roomId = getRoomId();
-        if (!roomId) {
-            console.warn('cloudRelay: roomId not configured');
-            return false;
-        }
         const msg = {
             type: 'join',
-            room_id: roomId,
             client: getClientType(),
+            instance_id: getInstanceKey(),
         };
+        if (roomId) msg.room_id = roomId;
         const token = getAccessToken();
         const apiKey = getApiKey();
         if (token) msg.access_token = token;
@@ -265,6 +273,9 @@
                         el.getAttribute('aria-disabled') === 'true',
                     cooldown: el.classList.contains('ball-win-cooldown'),
                     clicked: el.classList.contains('snooker-ball-clicked'),
+                    // Roles match control_panel SNOOKER_BALL_META — do not infer from title text.
+                    foul: snooker && el.id === 'ball 11',
+                    freeball: snooker && el.id === 'ball 10',
                 });
             });
         }
@@ -272,6 +283,23 @@
             undoEl.classList.contains('snooker-ball-disabled') ||
             undoEl.getAttribute('aria-disabled') === 'true' ||
             undoEl.classList.contains('noShow');
+        const snookerFoulTargets = [];
+        if (snooker) {
+            const foulContainer = document.getElementById('snookerFoulTargets');
+            if (foulContainer) {
+                foulContainer.querySelectorAll('[data-foul]').forEach(function (el) {
+                    if (el.classList.contains('noShow')) return;
+                    const key = el.getAttribute('data-foul');
+                    if (!key) return;
+                    const img = el.querySelector('img');
+                    snookerFoulTargets.push({
+                        key: key,
+                        file: imageFileName(img),
+                        alt: (img && img.alt) ? img.alt : key,
+                    });
+                });
+            }
+        }
         return {
             visible: visible,
             snooker: !!snooker,
@@ -279,6 +307,7 @@
             locked: locked,
             canUndo: !undoDisabled && visible,
             balls: balls,
+            snookerFoulTargets: snookerFoulTargets,
         };
     }
 
@@ -331,6 +360,8 @@
             }
             state.ballSelection = dockStorage('ballSelection', 'american') || 'american';
             state.snookerGoldEnabled = dockStorage('snookerGoldEnabled', 'no') === 'yes';
+            state.snookerFreeBallOffered = dockStorage('snookerFreeBallOffered', 'no') === 'yes';
+            state.snookerPhase = dockStorage('snookerPhase', 'red') || 'red';
             state.dualScoreMode = typeof window.isDualScoreMode === 'function'
                 ? window.isDualScoreMode()
                 : (state.gameType === 'game5' || state.gameType === 'game6' || state.gameType === 'game8' ||
@@ -377,16 +408,40 @@
                 p1b > 0 ||
                 p2b > 0
             );
+            state.instanceKey = getInstanceKey();
+            if (typeof window.streamSharing?.getPromotionListingState === 'function') {
+                const promo = window.streamSharing.getPromotionListingState();
+                state.streamPromotionListed = !!promo.listed;
+                state.obsStreaming = !!promo.obsStreaming;
+                state.streamUrl = promo.listed ? (promo.streamUrl || '') : '';
+            } else {
+                state.streamPromotionListed = false;
+                state.obsStreaming = false;
+                state.streamUrl = '';
+            }
         } catch (err) {
             console.warn('cloudRelay: extended state collection error', err);
         }
         return state;
     }
 
+    let sendStateGeneration = 0;
+    let pushStateTimer = null;
+
+    function invalidatePendingState() {
+        sendStateGeneration += 1;
+    }
+
     async function sendState(baseState) {
         if (!isJoined) return false;
+        const localGen = ++sendStateGeneration;
         const state = await collectExtendedGameState(baseState);
+        // Drop superseded publishes when a newer sendState started.
+        if (localGen !== sendStateGeneration) {
+            return false;
+        }
         lastState = state;
+        state.stateSeq = localGen;
         return sendRaw({
             type: 'state',
             room_id: getRoomId(),
@@ -406,7 +461,6 @@
         });
     }
 
-    let pushStateTimer = null;
     function pushDockStateSoon(delayMs) {
         if (pushStateTimer) clearTimeout(pushStateTimer);
         pushStateTimer = setTimeout(function () {
@@ -428,8 +482,7 @@
             return;
         }
         if (!getRoomId()) {
-            console.warn('cloudRelay: cannot connect without roomId');
-            return;
+            console.warn('cloudRelay: room will be assigned on join (instance: ' + getInstanceKey() + ')');
         }
         if (!getAccessToken() && !getApiKey()) {
             console.warn('cloudRelay: cannot connect without credentials');
@@ -476,6 +529,7 @@
     function handleMessage(data) {
         if (data.type === 'joined') {
             isJoined = true;
+            if (data.room_id) setStorageItem('roomId', data.room_id);
             if (data.state) dispatchState(data.state);
             updateCloudUI();
             // Push authoritative dock snapshot to room (mobile + DB)
@@ -581,17 +635,29 @@
         const emailEl = document.getElementById('cloudSignedInEmail');
         if (emailEl) {
             const email = getStorageItem('signedInEmail') || '';
-            emailEl.textContent = email ? `Signed in: ${email}` : '';
+            const room = getRoomId();
+            const inst = getInstanceKey();
+            const parts = [];
+            if (email) parts.push(`Signed in: ${email}`);
+            if (room) parts.push(`Table: ${inst}${room ? '' : ''}`);
+            emailEl.textContent = parts.join(' · ');
+        }
+        const roomEl = document.getElementById('cloudRoomIdDisplay');
+        if (roomEl) {
+            const room = getRoomId();
+            roomEl.textContent = room
+                ? `Room ${room.slice(0, 8)}… (${getInstanceKey()})`
+                : `Auto table: ${getInstanceKey()}`;
         }
     }
 
     function hasCredentials() {
-        return !!(getRoomId() && (getAccessToken() || getApiKey()));
+        return !!(getAccessToken() || getApiKey());
     }
 
     function init() {
         isEnabled = getStorageItem('enabled') === 'true';
-        if (isEnabled && getRoomId() && (getAccessToken() || getApiKey())) {
+        if (isEnabled && (getAccessToken() || getApiKey())) {
             connect();
         }
         updateCloudUI();
@@ -614,6 +680,7 @@
         onState,
         onPresence,
         pushDockStateSoon,
+        invalidatePendingState,
         get replaying() { return replaying; },
         hasCredentials,
         init,

@@ -56,6 +56,24 @@ CREATE TABLE IF NOT EXISTS room_sessions (
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS room_docks (
+  account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  instance_key TEXT NOT NULL,
+  room_id TEXT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+  label TEXT NOT NULL DEFAULT 'Table',
+  last_seen_at TEXT,
+  PRIMARY KEY (account_id, instance_key)
+);
+
+CREATE TABLE IF NOT EXISTS room_guest_tokens (
+  token TEXT PRIMARY KEY,
+  room_id TEXT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+  account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  label TEXT NOT NULL DEFAULT 'Guest scorer',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  revoked_at TEXT
+);
+
 CREATE INDEX IF NOT EXISTS idx_api_keys_account ON api_keys(account_id);
 CREATE INDEX IF NOT EXISTS idx_rooms_account ON rooms(account_id);
 CREATE INDEX IF NOT EXISTS idx_match_events_room ON match_events(room_id, created_at DESC);
@@ -210,10 +228,15 @@ export function getActiveLiveStreams(maxAgeMinutes = 30) {
      JOIN rooms r ON r.id = ls.room_id
      WHERE datetime(ls.updated_at) > datetime('now', ?)
      ORDER BY ls.updated_at DESC`
-  ).all(`-${maxAgeMinutes} minutes`).map((row) => ({
-    ...row,
-    state: JSON.parse(row.state || '{}'),
-  }));
+  ).all(`-${maxAgeMinutes} minutes`).map((row) => {
+    const state = JSON.parse(row.state || '{}');
+    if (!state.streamPromotionListed) return null;
+    return {
+      ...row,
+      state,
+      stream_url: row.stream_url,
+    };
+  }).filter(Boolean);
 }
 
 export function getRoomSessionState(roomId) {
@@ -232,4 +255,76 @@ export function setRoomSessionState(roomId, sessionId, state) {
 export function setRoomSessionId(roomId, sessionId) {
   const existing = getRoomSessionState(roomId);
   setRoomSessionState(roomId, sessionId, existing.state);
+}
+
+function defaultInstanceLabel(instanceKey) {
+  if (!instanceKey || instanceKey === 'default') return 'Main table';
+  return instanceKey.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/** One room per OBS instance key (URL ?instance=) under an account. */
+export function ensureRoomForInstance(accountId, instanceKey, label) {
+  const database = getDb();
+  const key = (instanceKey || 'default').trim() || 'default';
+  let row = database.prepare(
+    'SELECT * FROM room_docks WHERE account_id = ? AND instance_key = ?'
+  ).get(accountId, key);
+  if (row) {
+    database.prepare(
+      `UPDATE room_docks SET last_seen_at = datetime('now'), label = COALESCE(?, label) WHERE account_id = ? AND instance_key = ?`
+    ).run(label || null, accountId, key);
+    return getRoom(row.room_id);
+  }
+  const roomId = uuidv4();
+  const roomLabel = label || defaultInstanceLabel(key);
+  database.prepare('INSERT INTO rooms (id, account_id, label) VALUES (?, ?, ?)').run(roomId, accountId, roomLabel);
+  database.prepare(
+    `INSERT INTO room_docks (account_id, instance_key, room_id, label, last_seen_at) VALUES (?, ?, ?, ?, datetime('now'))`
+  ).run(accountId, key, roomId, roomLabel);
+  return getRoom(roomId);
+}
+
+export function touchRoomDock(accountId, instanceKey) {
+  const key = (instanceKey || 'default').trim() || 'default';
+  getDb().prepare(
+    `UPDATE room_docks SET last_seen_at = datetime('now') WHERE account_id = ? AND instance_key = ?`
+  ).run(accountId, key);
+}
+
+export function getRoomsWithLiveState(accountId) {
+  const rooms = getRoomsForAccount(accountId);
+  return rooms.map((room) => {
+    const dock = getDb().prepare('SELECT * FROM room_docks WHERE room_id = ?').get(room.id);
+    const session = getRoomSessionState(room.id);
+    const clients = [];
+    return {
+      ...room,
+      instance_key: dock?.instance_key || null,
+      dock_label: dock?.label || room.label,
+      last_seen_at: dock?.last_seen_at || null,
+      live_state: session.state || {},
+      updated_at: getDb().prepare('SELECT updated_at FROM room_sessions WHERE room_id = ?').get(room.id)?.updated_at || null,
+    };
+  });
+}
+
+export function createGuestToken(roomId, accountId, label = 'Guest scorer') {
+  const token = generateApiKeyPlaintext() + generateApiKeyPlaintext();
+  getDb().prepare(
+    `INSERT INTO room_guest_tokens (token, room_id, account_id, label) VALUES (?, ?, ?, ?)`
+  ).run(token, roomId, accountId, label);
+  return token;
+}
+
+export function findGuestToken(token) {
+  if (!token) return null;
+  return getDb().prepare(
+    `SELECT * FROM room_guest_tokens WHERE token = ? AND revoked_at IS NULL`
+  ).get(token);
+}
+
+export function revokeGuestToken(token, accountId) {
+  getDb().prepare(
+    `UPDATE room_guest_tokens SET revoked_at = datetime('now') WHERE token = ? AND account_id = ?`
+  ).run(token, accountId);
 }

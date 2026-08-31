@@ -6,6 +6,7 @@ export class CloudClient {
     this.client = options.client || 'mobile';
     this.accessToken = options.accessToken || '';
     this.apiKey = options.apiKey || '';
+    this.guestToken = options.guestToken || '';
     this.ws = null;
     this.handlers = { state: [], command: [], joined: [], error: [], presence: [] };
     this.lastState = {};
@@ -27,7 +28,13 @@ export class CloudClient {
     return new Promise((resolve, reject) => {
       this.ws = new WebSocket(this.wsUrl());
       this.ws.onopen = () => {
-        const msg = { type: 'join', room_id: this.roomId, client: this.client };
+        const msg = { type: 'join', client: this.client };
+        if (this.guestToken) {
+          msg.guest_token = this.guestToken;
+          msg.client = 'mobile_guest';
+        } else if (this.roomId) {
+          msg.room_id = this.roomId;
+        }
         if (this.accessToken) msg.access_token = this.accessToken;
         else if (this.apiKey) msg.api_key = this.apiKey;
         this.ws.send(JSON.stringify(msg));
@@ -37,6 +44,7 @@ export class CloudClient {
         try { data = JSON.parse(ev.data); } catch { return; }
         if (data.type === 'joined') {
           this.connected = true;
+          if (data.room_id) this.roomId = data.room_id;
           if (Array.isArray(data.clients)) {
             this.handlers.presence.forEach((fn) => fn(data.clients));
           }
@@ -121,6 +129,20 @@ export async function createApiKey(serverUrl, token, label) {
     body: JSON.stringify({ label }),
   });
   if (!res.ok) throw new Error('Failed to create API key');
+  return res.json();
+}
+
+export async function createGuestLink(serverUrl, token, roomId, label) {
+  const base = serverUrl.replace(/\/$/, '');
+  const res = await fetch(`${base}/api/rooms/${roomId}/guest-link`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ label: label || 'Guest scorer' }),
+  });
+  if (!res.ok) throw new Error('Failed to create guest link');
   return res.json();
 }
 

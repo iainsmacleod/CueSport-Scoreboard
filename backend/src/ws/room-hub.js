@@ -105,29 +105,81 @@ async function handleMessage(ws, meta, msg) {
   }
 }
 
-async function handleJoin(ws, meta, msg, authenticateJoin) {
-  const roomId = msg.room_id || msg.room;
-  const client = msg.client || 'dock';
-  if (!roomId) {
-    send(ws, { type: 'error', code: 'room_required', message: 'room_id is required' });
-    return;
+/** Commands allowed for guest scorer links (no names, setup, match, or replay). */
+const GUEST_ALLOWED_COMMANDS = new Set([
+  'score_add', 'score_sub', 'balls_add', 'balls_sub',
+  'player_slot', 'select_breaker', 'toggle_pot', 'snooker_ball', 'snooker_foul', 'undo',
+  'set_race', 'set_game_info',
+]);
+
+function resolveRoomIdForJoin(msg, auth, client) {
+  let roomId = msg.room_id || msg.room || null;
+  if (client === 'dock' && auth?.account && msg.instance_id) {
+    const room = sqlite.ensureRoomForInstance(
+      auth.account.id,
+      msg.instance_id,
+      msg.instance_label || null
+    );
+    roomId = room.id;
   }
+  if (!roomId && client === 'dock' && auth?.account) {
+    const rooms = sqlite.getRoomsForAccount(auth.account.id);
+    if (rooms.length) roomId = rooms[0].id;
+  }
+  return roomId;
+}
 
-  const auth = await authenticateJoin({
-    apiKey: msg.api_key,
-    accessToken: msg.access_token,
-    roomId,
-    client,
-  });
+async function handleJoin(ws, meta, msg, authenticateJoin) {
+  let client = msg.client || 'dock';
+  let roomId = msg.room_id || msg.room;
+  let accountId = null;
 
-  if (auth.error) {
-    send(ws, { type: 'error', code: auth.error, message: auth.message });
-    return;
+  if (msg.guest_token) {
+    const guest = sqlite.findGuestToken(msg.guest_token);
+    if (!guest) {
+      send(ws, { type: 'error', code: 'invalid_guest_token', message: 'Invalid or expired guest link' });
+      return;
+    }
+    roomId = guest.room_id;
+    accountId = guest.account_id;
+    client = 'mobile_guest';
+    meta.client = client;
+    meta.accountId = accountId;
+    meta.guestToken = msg.guest_token;
+  } else {
+    const auth = await authenticateJoin({
+      apiKey: msg.api_key,
+      accessToken: msg.access_token,
+      roomId,
+      client,
+    });
+
+    if (auth.error) {
+      send(ws, { type: 'error', code: auth.error, message: auth.message });
+      return;
+    }
+
+    roomId = resolveRoomIdForJoin(msg, auth, client);
+    if (!roomId) {
+      send(ws, { type: 'error', code: 'room_required', message: 'room_id is required' });
+      return;
+    }
+
+    accountId = auth.account.id;
+    meta.accountId = accountId;
+
+    if (client === 'dock' && msg.instance_id) {
+      sqlite.touchRoomDock(accountId, msg.instance_id);
+    }
   }
 
   const room = sqlite.getRoom(roomId);
   if (!room) {
     send(ws, { type: 'error', code: 'room_not_found', message: 'Room not found' });
+    return;
+  }
+  if (accountId && room.account_id !== accountId) {
+    send(ws, { type: 'error', code: 'room_forbidden', message: 'No access to this room' });
     return;
   }
 
@@ -140,12 +192,11 @@ async function handleJoin(ws, meta, msg, authenticateJoin) {
 
   meta.roomId = roomId;
   meta.client = client;
-  meta.accountId = auth.account.id;
 
   getRoomClients(roomId).add({
     ws,
     client,
-    accountId: auth.account.id,
+    accountId: accountId || room.account_id,
     sourceId: meta.sourceId,
   });
 
@@ -203,8 +254,9 @@ function handleEvent(ws, meta, msg) {
 
 function handleCommand(ws, meta, msg) {
   if (!requireJoined(ws, meta)) return;
-  if (meta.client !== 'mobile' && meta.client !== 'dock') {
-    // Relay commands to dock only from mobile (or dock echo prevention handled client-side)
+  if (meta.client === 'mobile_guest' && !GUEST_ALLOWED_COMMANDS.has(msg.action)) {
+    send(ws, { type: 'error', code: 'guest_forbidden', message: 'Not available on guest scorer links' });
+    return;
   }
   const envelope = {
     type: 'command',
@@ -216,7 +268,7 @@ function handleCommand(ws, meta, msg) {
     ts: msg.ts || new Date().toISOString(),
   };
   persistEvent(meta, `command:${msg.action}`, envelope.payload, envelope.source);
-  // Commands go to dock; mobile receives ack via state/events
+  // Relay to other room members. Dock executes; mobile CloudClient ignores command messages.
   broadcast(meta.roomId, envelope, ws);
 }
 
@@ -224,9 +276,13 @@ function handleState(ws, meta, msg) {
   if (!requireJoined(ws, meta)) return;
   const state = msg.state || {};
   sqlite.setRoomSessionState(meta.roomId, sqlite.getRoomSessionState(meta.roomId).sessionId, state);
-  const streamUrl = state.streamUrl || null;
-  if (streamUrl) {
-    sqlite.upsertLiveStream(meta.roomId, streamUrl, state);
+  const listed = state.streamPromotionListed === true &&
+    state.obsStreaming === true &&
+    state.streamUrl;
+  if (listed) {
+    sqlite.upsertLiveStream(meta.roomId, state.streamUrl, state);
+  } else {
+    sqlite.deleteLiveStream(meta.roomId);
   }
   persistEvent(meta, 'state', state, meta.client);
   const envelope = {
@@ -302,4 +358,13 @@ function handleLegacyUpdate(ws, meta, msg) {
 
 export function getConnectionCount() {
   return connections.size;
+}
+
+/** True when at least one dock WebSocket is joined to the room. */
+export function roomHasConnectedDock(roomId) {
+  if (!roomId) return false;
+  for (const conn of getRoomClients(roomId)) {
+    if (conn.client === 'dock' && conn.ws.readyState === 1) return true;
+  }
+  return false;
 }

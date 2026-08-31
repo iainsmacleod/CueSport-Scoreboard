@@ -1,5 +1,6 @@
 import * as sqlite from '../db/sqlite.js';
 import { ensureAccountFromOAuth } from '../ws/auth.js';
+import { roomHasConnectedDock } from '../ws/room-hub.js';
 import { config } from '../config.js';
 
 export async function registerAccountRoutes(app) {
@@ -35,7 +36,10 @@ export async function registerAccountRoutes(app) {
   app.get('/api/me', async (request, reply) => {
     const account = await resolveAccountFromRequest(request);
     if (!account) return reply.code(401).send({ error: 'Unauthorized' });
-    const rooms = sqlite.getRoomsForAccount(account.id);
+    const rooms = sqlite.getRoomsWithLiveState(account.id).map((room) => ({
+      ...room,
+      dock_connected: roomHasConnectedDock(room.id),
+    }));
     const keys = sqlite.getApiKeysForAccount(account.id);
     return {
       account: {
@@ -46,6 +50,33 @@ export async function registerAccountRoutes(app) {
       },
       rooms,
       api_keys: keys,
+    };
+  });
+
+  app.post('/api/rooms/:roomId/guest-link', async (request, reply) => {
+    const account = await resolveAccountFromRequest(request);
+    if (!account) return reply.code(401).send({ error: 'Unauthorized' });
+    const { roomId } = request.params;
+    if (!sqlite.roomBelongsToAccount(roomId, account.id)) {
+      return reply.code(403).send({ error: 'Forbidden' });
+    }
+    const { label } = request.body || {};
+    const token = sqlite.createGuestToken(roomId, account.id, label || 'Guest scorer');
+    // Prefer the host the dashboard actually used (avoids PUBLIC_URL mismatch → 404).
+    const xfProto = request.headers['x-forwarded-proto'];
+    const xfHost = request.headers['x-forwarded-host'] || request.headers.host;
+    let base = config.publicUrl.replace(/\/$/, '');
+    if (xfHost) {
+      const proto = (Array.isArray(xfProto) ? xfProto[0] : xfProto) ||
+        (request.protocol === 'https' ? 'https' : 'http');
+      const host = String(Array.isArray(xfHost) ? xfHost[0] : xfHost).split(',')[0].trim();
+      base = `${proto}://${host}`.replace(/\/$/, '');
+    }
+    return {
+      token,
+      path: `/g/${token}`,
+      url: `${base}/g/${token}`,
+      label: label || 'Guest scorer',
     };
   });
 

@@ -395,8 +395,12 @@ function resumeRackBreakerAfterPageLoad() {
         return;
     }
     const last = getStorageItem("lastRackBreakerSlot");
-    const slot = (last === "1" || last === "2") ? last : getActivePlayerSlot();
-    setStorageItem("rackBreakerSlot", slot);
+    // Only restore a previously chosen breaker — never invent one from active player
+    // (that broke Reset Frame/Rack by re-applying a breaker after clearLastKnown).
+    if (last !== "1" && last !== "2") {
+        return;
+    }
+    setStorageItem("rackBreakerSlot", last);
 }
 
 function updateRackBreakerPickerLabels() {
@@ -557,7 +561,9 @@ function hideRackBreakerPicker() {
 }
 
 function syncRackBreakerPickerVisibility() {
-    resumeRackBreakerAfterPageLoad();
+    // Do not call resumeRackBreakerAfterPageLoad here — that is page-load only.
+    // Calling it after an intentional clear (reset frame/rack) re-applies the old
+    // breaker whenever mid-rack markers have not been cleared yet.
     if (!isRackBreakerPromptEnabled()) {
         hideRackBreakerPicker();
         updateRackBreakerBallLock();
@@ -1626,13 +1632,18 @@ function updateBallTrackerLockState() {
     }
 }
 
-/** Label/style for reset: "Reset Score" until race/Best Of is met, then "End Match". Always danger. */
+/** Mid-match reset label: Frame (snooker) or Rack (pool). Race complete → End Match. */
+function getResetScoreActionLabel() {
+    return isSnooker() ? "Reset Frame" : "Reset Rack";
+}
+
+/** Label/style for reset: "Reset Frame/Rack" until race/Best Of is met, then "End Match". Always danger. */
 function updateResetScoreButton() {
     const resetBtn = document.getElementById("resetScores");
     if (!resetBtn) {
         return;
     }
-    resetBtn.textContent = isRaceComplete() ? "End Match" : "Reset Score";
+    resetBtn.textContent = isRaceComplete() ? "End Match" : getResetScoreActionLabel();
     resetBtn.classList.add("danger-btn");
     // Danger class owns color; clear any leftover inline race-complete green.
     resetBtn.style.backgroundColor = "";
@@ -2306,7 +2317,7 @@ function addSnookerPoints(player, delta) {
     bc.postMessage({ player: player, balls: next });
     stopClock();
     updateScoreControlAvailability();
-    if (window.streamSharing) {
+    if (window.streamSharing && !window.__snookerFoulApplying) {
         window.streamSharing.sendUpdate();
     }
     return true;
@@ -2401,51 +2412,90 @@ function clearSnookerFoulHoverLabel() {
     }
 }
 
-function selectSnookerFoul(element) {
-    if (!element || !isSnookerBallMode()) {
-        return;
+function isCloudRemoteCommand() {
+    return !!(window.cloudRelay && window.cloudRelay.replaying);
+}
+
+function applySnookerFoulByKey(foulKey) {
+    if (!foulKey || !isSnookerBallMode()) {
+        return false;
     }
-    const foulKey = element.getAttribute("data-foul");
+    cancelSnookerFoul();
     if (foulKey === "gold") {
         if (!isSnookerGoldEnabled() || isSnookerGoldenBallFouled()) {
-            return;
+            return false;
         }
     }
     const points = SNOOKER_FOUL_POINTS[foulKey];
     if (!points) {
-        return;
+        return false;
     }
+
+    // Cancel any in-flight cloud state publish that may have snapshotted pre-foul scores
+    // while awaiting OBS GetStreamServiceSettings.
+    if (window.streamSharing && typeof window.streamSharing.invalidatePendingPublishes === "function") {
+        window.streamSharing.invalidatePendingPublishes();
+    }
+
     const undoSnap = captureSnookerUndoSnapshot();
     const active = getSnookerActivePlayer();
     const opponent = active === "1" ? "2" : "1";
-    if (!addSnookerPoints(opponent, points)) {
+
+    // Suppress incidental sendUpdate from addSnookerPoints; we publish once at the end.
+    window.__snookerFoulApplying = true;
+    let applied = false;
+    try {
+        if (!addSnookerPoints(opponent, points)) {
+            return false;
+        }
+        // Foul ends the active player's break (foul points are not break points).
+        endSnookerBreak();
+        // Break ended — next shot can be a red (unless all reds are gone).
+        setSnookerPhase("red");
+        setSnookerAfterFreeball(false);
+        // Free Ball becomes available only after the Active Player is changed.
+        setSnookerFreeBallOffered(false);
+        setSnookerFoulAwaitingPlayerChange(true);
+        clearSnookerColorFeedback();
+        if (foulKey === "gold") {
+            removeSnookerGoldenBallFromPlay();
+        }
+        commitSnookerUndoSnapshot(undoSnap, null);
+        updateSnookerBallAvailability();
+        updateSnookerGoldVisibility();
+        cancelSnookerFoul();
+        // Incoming player takes the table after a foul (also unlocks Free Ball).
+        const nextIsP1 = opponent === "1";
+        const playerToggle = document.getElementById("playerToggleCheckbox");
+        if (playerToggle) {
+            playerToggle.checked = nextIsP1;
+        }
+        togglePlayer(nextIsP1);
+        applied = true;
+        console.log(`Snooker foul (${foulKey}) awarded ${points} to player ${opponent}; active player → ${opponent}`);
+    } finally {
+        window.__snookerFoulApplying = false;
+    }
+
+    if (applied) {
+        // One authoritative publish after points + player switch are both committed.
+        if (window.streamSharing && typeof window.streamSharing.sendUpdate === "function") {
+            window.streamSharing.sendUpdate();
+        } else if (window.cloudRelay && typeof window.cloudRelay.pushDockStateSoon === "function") {
+            window.cloudRelay.pushDockStateSoon(0);
+        }
+    }
+    return applied;
+}
+
+function selectSnookerFoul(element) {
+    if (!element) {
         return;
     }
-    // Foul ends the active player's break (foul points are not break points).
-    endSnookerBreak();
-    // Break ended — next shot can be a red (unless all reds are gone).
-    setSnookerPhase("red");
-    setSnookerAfterFreeball(false);
-    // Free Ball becomes available only after the Active Player is changed.
-    setSnookerFreeBallOffered(false);
-    setSnookerFoulAwaitingPlayerChange(true);
-    clearSnookerColorFeedback();
-    if (foulKey === "gold") {
-        removeSnookerGoldenBallFromPlay();
-    }
-    commitSnookerUndoSnapshot(undoSnap, null);
-    updateSnookerBallAvailability();
-    updateSnookerGoldVisibility();
-    cancelSnookerFoul();
-    // Incoming player takes the table after a foul (also unlocks Free Ball).
-    const nextIsP1 = opponent === "1";
-    const playerToggle = document.getElementById("playerToggleCheckbox");
-    if (playerToggle) {
-        playerToggle.checked = nextIsP1;
-    }
-    togglePlayer(nextIsP1);
-    console.log(`Snooker foul (${foulKey}) awarded ${points} to player ${opponent}; active player → ${opponent}`);
+    applySnookerFoulByKey(element.getAttribute("data-foul"));
 }
+
+window.applySnookerFoulByKey = applySnookerFoulByKey;
 
 async function handleSnookerBallClick(element) {
     if (!element || !element.id || isGameScoringLocked()) {
@@ -2464,7 +2514,10 @@ async function handleSnookerBallClick(element) {
         return;
     }
     if (meta.foul) {
-        openSnookerFoulPicker();
+        // Remote mobile/guest uses snooker_foul — never open dock modal for cloud commands.
+        if (!isCloudRemoteCommand()) {
+            openSnookerFoulPicker();
+        }
         return;
     }
     if (num === 8) {
@@ -2737,7 +2790,7 @@ let gameTypeSwitchChain = Promise.resolve();
 
 /**
  * Finalize the open match before leaving a game type:
- * End Match if race/Best Of is complete, Call Match Early if racks/frames exist, else Reset Score.
+ * End Match if race/Best Of is complete, Call Match Early if racks/frames exist, else Reset Frame/Rack.
  * Must run while storage still has the previous gameType.
  */
 function finalizeMatchBeforeGameTypeSwitch() {
@@ -4483,7 +4536,13 @@ function initPushScoresFieldListeners() {
     updatePushScoresButtonVisibility();
 }
 
+let didResumeRackBreakerAfterLoad = false;
+
 function updateScoreControlAvailability() {
+    if (!didResumeRackBreakerAfterLoad) {
+        didResumeRackBreakerAfterLoad = true;
+        resumeRackBreakerAfterPageLoad();
+    }
     const raceTarget = getRaceTarget();
     const p1Input = document.getElementById("p1Score");
     const p2Input = document.getElementById("p2Score");
@@ -5325,12 +5384,14 @@ function openResetScoresModal(action) {
     const message = document.getElementById("resetScoresModalMessage");
     const confirmBtn = document.getElementById("resetScoresModalConfirm");
 
+    const resetLabel = getResetScoreActionLabel();
+    const unit = isSnooker() ? "frame" : "rack";
     const copy = {
         reset: {
-            title: "Reset Score",
-            message: "Reset all scores for this match? This cannot be undone from here.",
-            confirm: "Reset Score",
-            fallback: "Click OK to confirm score reset"
+            title: resetLabel,
+            message: "Clear the current " + unit + " scoreline for this match? This cannot be undone from here.",
+            confirm: resetLabel,
+            fallback: "Click OK to confirm " + resetLabel.toLowerCase()
         },
         endMatch: {
             title: "End Match",
@@ -5428,8 +5489,21 @@ function restoreRackBreakerPromptAfterScoreReset() {
     if (!isRackBreakerPromptEnabled()) {
         return;
     }
+    // Clear breaker + last-known so resume-on-load cannot revive this rack's breaker.
     clearRackBreakerState(true);
-    syncRackBreakerPickerVisibility();
+    // showRackBreakerPicker clears again and updates lock/UI without page-load resume.
+    showRackBreakerPicker();
+}
+
+function publishCloudStateAfterScoreReset() {
+    if (window.streamSharing && typeof window.streamSharing.invalidatePendingPublishes === 'function') {
+        window.streamSharing.invalidatePendingPublishes();
+    }
+    if (window.streamSharing && typeof window.streamSharing.sendUpdate === 'function') {
+        window.streamSharing.sendUpdate();
+    } else if (window.cloudRelay && typeof window.cloudRelay.pushDockStateSoon === 'function') {
+        window.cloudRelay.pushDockStateSoon(0);
+    }
 }
 
 function performResetScores(options) {
@@ -5464,33 +5538,32 @@ function performResetScores(options) {
 
         resetExt('p1', 'noflash');
         resetExt('p2', 'noflash');
-        resetBallTracker();
-        resetBallSet();
+        // Clear snooker mid-frame markers before breaker restore so resume heuristics stay off.
         if (isSnookerBallMode()) {
             resetSnookerSequenceState();
             cancelSnookerFoul();
         }
+        resetBallTracker();
+        resetBallSet();
         clearAllScoringUndoHistory();
 
-        // Send update to stream sharing if enabled
-        if (window.streamSharing) {
-            window.streamSharing.sendUpdate();
-        }
-
         if (window.PlayerStats) {
-            // End Match / Call Match Early keeps recorded stats; mid-match Reset Score undoes the open session.
+            // End Match / Call Match Early keeps recorded stats; mid-match Reset Frame/Rack undoes the open session.
             const opts = endMatch ? { endMatch: true } : undefined;
             window.PlayerStats.onResetScores(opts).then(function () {
                 updateScoreControlAvailability();
                 restoreRackBreakerPromptAfterScoreReset();
+                publishCloudStateAfterScoreReset();
             }).catch(function (err) {
                 console.error('PlayerStats onResetScores error:', err);
                 updateScoreControlAvailability();
                 restoreRackBreakerPromptAfterScoreReset();
+                publishCloudStateAfterScoreReset();
             });
         } else {
             updateScoreControlAvailability();
             restoreRackBreakerPromptAfterScoreReset();
+            publishCloudStateAfterScoreReset();
         }
 
         clearScoreFieldsDirty();

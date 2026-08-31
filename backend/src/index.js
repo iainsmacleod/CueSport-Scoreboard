@@ -46,6 +46,7 @@ app.get('/', async (_req, reply) => sendWebHtml(reply, 'public-listing/index.htm
 app.get('/streams', async (_req, reply) => sendWebHtml(reply, 'public-listing/index.html'));
 app.get('/dashboard', async (_req, reply) => sendWebHtml(reply, 'dashboard/index.html'));
 app.get('/m/:roomId', async (_req, reply) => sendWebHtml(reply, 'mobile/index.html'));
+app.get('/g/:guestToken', async (_req, reply) => sendWebHtml(reply, 'mobile/index.html'));
 
 app.get('/health', async () => ({
   ok: true,

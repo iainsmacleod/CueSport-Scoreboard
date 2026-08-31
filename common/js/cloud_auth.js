@@ -77,7 +77,6 @@
         const modal = document.getElementById('cloudSelfHostModal');
         if (!modal) return;
         const serverUrl = document.getElementById('cloudServerUrlModal');
-        const roomId = document.getElementById('cloudRoomIdModal');
         const apiKey = document.getElementById('cloudApiKeyModal');
         const prefix = 'cloudRelay_';
         const instanceId = new URLSearchParams(window.location.search).get('instance') || '';
@@ -86,7 +85,6 @@
             return localStorage.getItem(key) || '';
         }
         if (serverUrl) serverUrl.value = get('serverUrl') || 'http://localhost:3000';
-        if (roomId) roomId.value = get('roomId');
         if (apiKey) apiKey.value = get('apiKey');
         modal.style.display = 'block';
     }
@@ -99,16 +97,14 @@
     function saveCloudSelfHostSettings() {
         if (!window.cloudRelay) return;
         const serverUrl = document.getElementById('cloudServerUrlModal')?.value?.trim();
-        const roomId = document.getElementById('cloudRoomIdModal')?.value?.trim();
         const apiKey = document.getElementById('cloudApiKeyModal')?.value?.trim();
         window.cloudRelay.setCredentials({
             serverUrl: serverUrl || undefined,
-            roomId: roomId || undefined,
             apiKey: apiKey || undefined,
         });
         closeCloudSelfHostModal();
         window.cloudRelay.updateCloudUI();
-        alert('Self-host settings saved. Enable the CueSport Cloud toggle to connect.');
+        alert('Settings saved. Enable CueSport Cloud to connect — your table room is created automatically from the OBS instance (?instance=).');
     }
 
     function toggleCloudRelay() {
@@ -118,7 +114,7 @@
             if (!window.cloudRelay.hasCredentials()) {
                 toggle.checked = false;
                 openCloudSelfHostModal();
-                alert('Configure server URL, Room ID, and API key (from the same server you logged into). Or use Dev sign-in in the dock.');
+                alert('Sign in or configure server URL + API key (from your dashboard). Room/table is assigned automatically from your OBS instance.');
                 return;
             }
         }

@@ -3,6 +3,8 @@ import {
   devLogin,
   fetchMe,
   createApiKey,
+  createGuestLink,
+  GAME_TYPES,
 } from '../shared/cloud-client.js';
 
 const TOKEN_KEY = 'cuesport_token';
@@ -30,6 +32,46 @@ function getToken() {
   return localStorage.getItem(TOKEN_KEY) || '';
 }
 
+function gameTypeLabel(id) {
+  const g = GAME_TYPES.find((x) => x.id === id);
+  return g ? g.label : (id || '—');
+}
+
+function formatTableCard(room, serverUrl) {
+  const st = room.live_state || {};
+  const p1 = st.player1Name || 'P1';
+  const p2 = st.player2Name || 'P2';
+  const dual = st.dualScoreMode || st.gameType === 'game8';
+  const scoreLine = dual
+    ? `${st.p1Balls ?? 0} – ${st.p2Balls ?? 0} pts · ${st.p1Score ?? 0}–${st.p2Score ?? 0} ${st.primaryScoreLabel || 'frames'}`
+    : `${st.p1Score ?? 0} – ${st.p2Score ?? 0}`;
+  const meta = [
+    gameTypeLabel(st.gameType),
+    st.raceInfo ? `${st.raceLabel || 'Race'} ${st.raceInfo}` : null,
+    st.gameInfo || null,
+  ].filter(Boolean).join(' · ');
+  const label = room.dock_label || room.label || 'Table';
+  const inst = room.instance_key ? ` (${room.instance_key})` : '';
+
+  const card = document.createElement('article');
+  card.className = 'table-card panel';
+  card.innerHTML = `
+    <div class="table-card-head">
+      <h3>${label}${inst}</h3>
+      <span class="table-status online">Dock online</span>
+    </div>
+    <p class="table-players">${p1} vs ${p2}</p>
+    <p class="table-score">${scoreLine}</p>
+    <p class="table-meta">${meta || 'No match info yet'}</p>
+    <div class="table-actions">
+      <a class="btn primary" href="${serverUrl.replace(/\/$/, '')}/m/${room.id}">Control</a>
+      <button type="button" class="btn guest-link-btn" data-room="${room.id}">Guest link</button>
+    </div>
+    <p class="guest-url hidden" data-guest-for="${room.id}"></p>
+  `;
+  return card;
+}
+
 async function renderDashboard() {
   const token = getToken();
   if (!token) {
@@ -43,12 +85,32 @@ async function renderDashboard() {
     show('dashboardSection', true);
     document.getElementById('userEmail').textContent = me.account.email;
 
-    const roomList = document.getElementById('roomList');
-    roomList.innerHTML = '';
-    me.rooms.forEach((room) => {
-      const li = document.createElement('li');
-      li.innerHTML = `<strong>${room.label}</strong><br><code>${room.id}</code>`;
-      roomList.appendChild(li);
+    const container = document.getElementById('tableCards');
+    container.innerHTML = '';
+    const activeRooms = (me.rooms || []).filter((room) => room.dock_connected);
+    if (!activeRooms.length) {
+      container.innerHTML = '<p class="hint">No docks online. Enable CueSport Cloud on an OBS dock — connected tables appear here automatically.</p>';
+    } else {
+      activeRooms.forEach((room) => {
+        container.appendChild(formatTableCard(room, getServerUrl()));
+      });
+    }
+
+    container.querySelectorAll('.guest-link-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        try {
+          const data = await createGuestLink(getServerUrl(), getToken(), btn.dataset.room);
+          const el = container.querySelector(`[data-guest-for="${btn.dataset.room}"]`);
+          if (el) {
+            const server = getServerUrl().replace(/\/$/, '');
+            const url = data.path ? `${server}${data.path}` : data.url;
+            el.innerHTML = `Guest scorer: <a href="${url}" target="_blank" rel="noopener">${url}</a>`;
+            el.classList.remove('hidden');
+          }
+        } catch (err) {
+          setError(err.message);
+        }
+      });
     });
 
     const keyList = document.getElementById('keyList');
@@ -58,17 +120,22 @@ async function renderDashboard() {
       li.textContent = `${k.label} — created ${k.created_at}`;
       keyList.appendChild(li);
     });
-
-    if (me.rooms[0]) {
-      const link = document.getElementById('mobileLink');
-      link.href = `${getServerUrl().replace(/\/$/, '')}/m/${me.rooms[0].id}`;
-    }
   } catch (err) {
     localStorage.removeItem(TOKEN_KEY);
     setError(err.message);
     renderDashboard();
   }
 }
+
+document.querySelectorAll('.dash-tab').forEach((tab) => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.dash-tab').forEach((t) => t.classList.remove('active'));
+    tab.classList.add('active');
+    const which = tab.dataset.tab;
+    show('tabControl', which === 'control');
+    show('tabStats', which === 'stats');
+  });
+});
 
 document.getElementById('devLoginBtn').addEventListener('click', async () => {
   setError('');

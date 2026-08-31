@@ -34,7 +34,7 @@ async function verifySupabaseJwt(token) {
 
 /**
  * Resolve account from API key or JWT access token.
- * Returns { account, roomId?, authMethod: 'api_key'|'jwt' }
+ * Returns { account, authMethod: 'api_key'|'jwt'|'dev' }
  */
 export async function authenticateJoin({ apiKey, accessToken, roomId, client }) {
   if (apiKey) {
@@ -52,7 +52,6 @@ export async function authenticateJoin({ apiKey, accessToken, roomId, client }) 
   }
 
   if (accessToken) {
-    // Dev tokens are not JWTs — never pass them to JWT verification
     if (accessToken.startsWith('dev:')) {
       if (!config.allowDevAuth) {
         return { error: 'invalid_token', message: 'Dev auth is disabled on this server' };

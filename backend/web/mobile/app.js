@@ -11,11 +11,93 @@ let lastState = {};
 let syncTimer = null;
 let dockPresent = false;
 
-function roomFromPath() {
+let guestToken = '';
+let isGuestMode = false;
+/** @type {'control' | 'setup' | 'replay'} */
+let activeView = 'control';
+
+function pathContext() {
   const parts = window.location.pathname.split('/').filter(Boolean);
-  const idx = parts.indexOf('m');
-  if (idx >= 0 && parts[idx + 1]) return parts[idx + 1];
-  return '';
+  const gIdx = parts.indexOf('g');
+  if (gIdx >= 0 && parts[gIdx + 1]) return { guestToken: parts[gIdx + 1] };
+  const mIdx = parts.indexOf('m');
+  if (mIdx >= 0 && parts[mIdx + 1]) return { roomId: parts[mIdx + 1] };
+  return {};
+}
+
+function applyGuestUI() {
+  const title = document.getElementById('pageTitle');
+  if (title) title.textContent = 'CueSport Scoreboard Guest Control';
+  show('loginSection', false);
+  show('controlSection', true);
+  ['adminPlayersPanel', 'matchPanel', 'viewReplay'].forEach((id) => show(id, false));
+  document.querySelectorAll('.admin-only').forEach((el) => el.classList.add('hidden'));
+  // Guests keep Setup (race/game info) but not Dashboard/Replay.
+  const replayBtn = document.getElementById('navReplayBtn');
+  if (replayBtn) replayBtn.classList.add('hidden');
+  const dash = document.getElementById('dashboardLink');
+  if (dash) dash.classList.add('hidden');
+  showMobileNav(true);
+  setActiveView('control');
+}
+
+function showMobileNav(visible) {
+  const nav = document.getElementById('mobileBottomNav');
+  if (!nav) return;
+  nav.classList.toggle('hidden', !visible);
+  document.body.classList.toggle('has-mobile-nav', !!visible);
+}
+
+function setActiveView(view) {
+  if (view !== 'control' && view !== 'setup' && view !== 'replay') view = 'control';
+  if (isGuestMode && view === 'replay') view = 'control';
+  activeView = view;
+  show('viewControl', view === 'control');
+  show('viewSetup', view === 'setup');
+  show('viewReplay', view === 'replay' && !isGuestMode);
+
+  const toggleBtn = document.getElementById('navToggleSetupBtn');
+  if (toggleBtn) {
+    // On Control: button says Setup. On Setup (or Replay): button says Control.
+    const showControlLabel = view === 'setup';
+    toggleBtn.dataset.mode = showControlLabel ? 'control' : 'setup';
+    const label = document.getElementById('navToggleSetupLabel');
+    if (label) label.textContent = showControlLabel ? 'Control' : 'Setup';
+    toggleBtn.setAttribute('aria-label', showControlLabel ? 'Control' : 'Setup');
+    toggleBtn.classList.toggle('active', view === 'setup');
+  }
+  const replayBtn = document.getElementById('navReplayBtn');
+  if (replayBtn) replayBtn.classList.toggle('active', view === 'replay');
+}
+
+function wireMobileNav() {
+  const toggleBtn = document.getElementById('navToggleSetupBtn');
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', () => {
+      setActiveView(activeView === 'setup' ? 'control' : 'setup');
+    });
+  }
+  const replayBtn = document.getElementById('navReplayBtn');
+  if (replayBtn) {
+    replayBtn.addEventListener('click', () => {
+      setActiveView(activeView === 'replay' ? 'control' : 'replay');
+    });
+  }
+}
+
+function setConnectionStatus(kind) {
+  const el = document.getElementById('connectionStatus');
+  if (!el) return;
+  const map = {
+    connected: 'Connected',
+    waiting: 'Waiting for dock',
+    disconnected: 'Disconnected',
+  };
+  const label = map[kind] || map.disconnected;
+  el.classList.remove('connected', 'waiting', 'disconnected');
+  el.classList.add(map[kind] ? kind : 'disconnected');
+  el.title = label;
+  el.setAttribute('aria-label', label);
 }
 
 function show(id, visible) {
@@ -43,6 +125,11 @@ function gameTypeLabel(id) {
 
 function applyState(state) {
   if (!state || typeof state !== 'object') return;
+  // Ignore superseded dock publishes (stale in-flight snapshots).
+  if (typeof state.stateSeq === 'number') {
+    if (state.stateSeq < lastStateSeq) return;
+    lastStateSeq = state.stateSeq;
+  }
   const prevTs = lastState.timestamp;
   lastState = state;
   setSyncing(false);
@@ -64,32 +151,21 @@ function applyState(state) {
     state.gameType === 'game6' ||
     (state.gameType === 'game7' && state.pointBased === 'yes');
 
-  document.getElementById('liveP1Name').textContent = p1Name;
-  document.getElementById('liveP2Name').textContent = p2Name;
-
   show('dualScoresPanel', dual);
   show('singleScoresPanel', !dual);
-  show('liveP1Secondary', dual);
-  show('liveP2Secondary', dual);
 
   if (dual) {
-    document.getElementById('liveP1Score').textContent = String(p1Balls);
-    document.getElementById('liveP2Score').textContent = String(p2Balls);
-    document.getElementById('liveP1Secondary').textContent = `${primaryLabel}: ${p1Score}`;
-    document.getElementById('liveP2Secondary').textContent = `${primaryLabel}: ${p2Score}`;
-    document.getElementById('p1SecondaryLabel').textContent = `P1 ${secondaryLabel.toLowerCase()}`;
-    document.getElementById('p2SecondaryLabel').textContent = `P2 ${secondaryLabel.toLowerCase()}`;
-    document.getElementById('p1SecondaryValue').textContent = String(p1Balls);
-    document.getElementById('p2SecondaryValue').textContent = String(p2Balls);
-    document.getElementById('p1PrimaryLabel').textContent = `P1 ${primaryLabel.toLowerCase()}`;
-    document.getElementById('p2PrimaryLabel').textContent = `P2 ${primaryLabel.toLowerCase()}`;
+    document.getElementById('p1PrimaryLabel').textContent = `${p1Name} - ${primaryLabel}`;
+    document.getElementById('p2PrimaryLabel').textContent = `${p2Name} - ${primaryLabel}`;
     document.getElementById('p1PrimaryValue').textContent = String(p1Score);
     document.getElementById('p2PrimaryValue').textContent = String(p2Score);
+    document.getElementById('p1SecondaryLabel').textContent = `${p1Name} - ${secondaryLabel}`;
+    document.getElementById('p2SecondaryLabel').textContent = `${p2Name} - ${secondaryLabel}`;
+    document.getElementById('p1SecondaryValue').textContent = String(p1Balls);
+    document.getElementById('p2SecondaryValue').textContent = String(p2Balls);
   } else {
-    document.getElementById('liveP1Score').textContent = String(p1Score);
-    document.getElementById('liveP2Score').textContent = String(p2Score);
-    document.getElementById('p1SingleLabel').textContent = `P1 ${primaryLabel.toLowerCase()}`;
-    document.getElementById('p2SingleLabel').textContent = `P2 ${primaryLabel.toLowerCase()}`;
+    document.getElementById('p1SingleLabel').textContent = `${p1Name} - ${primaryLabel}`;
+    document.getElementById('p2SingleLabel').textContent = `${p2Name} - ${primaryLabel}`;
     document.getElementById('p1SingleValue').textContent = String(p1Score);
     document.getElementById('p2SingleValue').textContent = String(p2Score);
   }
@@ -98,17 +174,13 @@ function applyState(state) {
   if (raceLabel) raceLabel.textContent = state.raceLabel || (state.gameType === 'game8' ? 'Best Of' : 'Race');
 
   const active = String(state.activePlayer || '1');
-  document.getElementById('liveP1').classList.toggle('is-active', active === '1');
-  document.getElementById('liveP2').classList.toggle('is-active', active === '2');
-
   const slotMode = inferPlayerSlotMode(state);
-  const playerSlotPanel = document.getElementById('playerSlotPanel');
   const slotQuestion = document.getElementById('playerSlotQuestion');
   const slotP1 = document.getElementById('playerSlotP1Btn');
   const slotP2 = document.getElementById('playerSlotP2Btn');
-  const showPlayerSlot = slotMode !== 'off';
-  show('playerSlotPanel', showPlayerSlot);
-  if (showPlayerSlot && slotQuestion) {
+  // Always show at top of sticky board (replaces the old name-only live-scores row).
+  show('playerSlotPanel', true);
+  if (slotQuestion) {
     if (slotMode === 'match_locked') {
       slotQuestion.textContent = 'End match to continue';
     } else if (slotMode === 'breaker') {
@@ -118,16 +190,15 @@ function applyState(state) {
     }
   }
   if (slotP1 && slotP2) {
-    const p1Label = p1Name || 'P1';
-    const p2Label = p2Name || 'P2';
-    slotP1.textContent = p1Label;
-    slotP2.textContent = p2Label;
+    slotP1.textContent = p1Name || 'P1';
+    slotP2.textContent = p2Name || 'P2';
     slotP1.classList.remove('selected', 'rack-breaker-match-locked', 'rack-breaker-inactive');
     slotP2.classList.remove('selected', 'rack-breaker-match-locked', 'rack-breaker-inactive');
     if (slotMode === 'breaker' || slotMode === 'match_locked') {
       slotP1.classList.toggle('rack-breaker-match-locked', slotMode === 'match_locked');
       slotP2.classList.toggle('rack-breaker-match-locked', slotMode === 'match_locked');
-    } else if (slotMode === 'active') {
+    } else {
+      // Active (or off): highlight current player — names live here now.
       slotP1.classList.toggle('selected', active === '1');
       slotP2.classList.toggle('selected', active === '2');
       slotP1.classList.toggle('rack-breaker-inactive', active !== '1');
@@ -142,24 +213,6 @@ function applyState(state) {
   if (state.gameInfo != null) document.getElementById('gameInfoInput').value = state.gameInfo;
   if (state.gameType) document.getElementById('gameTypeSelect').value = state.gameType;
 
-  const statusEl = document.getElementById('matchStatus');
-  if (!dockPresent && !state.timestamp && !state.player1Name && p1Score === 0 && p2Score === 0) {
-    statusEl.textContent = 'Waiting for dock… enable CueSport Cloud on the control panel';
-    statusEl.className = 'match-status warn';
-  } else if (inferAwaitingBreaker(state) || slotMode === 'breaker') {
-    statusEl.textContent = 'Choose breaking player';
-    statusEl.className = 'match-status warn';
-  } else if (state.gameScoringLocked) {
-    statusEl.textContent = 'Game locked — start next rack or end match';
-    statusEl.className = 'match-status locked';
-  } else if (state.matchInProgress || state.canCallGame) {
-    statusEl.textContent = 'Match in progress';
-    statusEl.className = 'match-status live';
-  } else {
-    statusEl.textContent = 'Ready';
-    statusEl.className = 'match-status';
-  }
-
   const metaParts = [
     gameTypeLabel(state.gameType),
     state.raceInfo ? `${state.raceLabel || 'Race'} ${state.raceInfo}` : null,
@@ -171,16 +224,46 @@ function applyState(state) {
   const callBtn = document.getElementById('callMatchBtn');
   if (callBtn) callBtn.disabled = state.canCallGame === false;
 
+  const resetBtn = document.getElementById('resetScoresBtn');
+  if (resetBtn) {
+    resetBtn.textContent = state.gameType === 'game8' ? 'Reset frame' : 'Reset rack';
+  }
+
   const replayPanel = document.getElementById('replayPanel');
-  replayPanel.querySelectorAll('button').forEach((btn) => {
-    btn.disabled = state.obsConnected === false;
-  });
+  if (replayPanel) {
+    replayPanel.querySelectorAll('button').forEach((btn) => {
+      btn.disabled = state.obsConnected === false;
+    });
+  }
 
   renderBallGrid(state);
 }
 
 const BALL_IMG = '/images/balls';
 let lastBallGridKey = '';
+let lastStateSeq = 0;
+
+const SNOOKER_FOUL_POINTS = {
+  white: 4,
+  yellow: 4,
+  green: 4,
+  brown: 4,
+  gold: 20,
+  blue: 5,
+  pink: 6,
+  black: 7,
+};
+
+const SNOOKER_FOUL_IMAGES = {
+  white: 'snooker-white-small.png',
+  yellow: 'snooker-yellow-small.png',
+  green: 'snooker-green-small.png',
+  brown: 'snooker-brown-small.png',
+  blue: 'snooker-blue-small.png',
+  pink: 'snooker-pink-small.png',
+  black: 'snooker-black-small.png',
+  gold: 'snooker-gold-small.png',
+};
 
 const BREAKER_GAME_TYPES = new Set([
   'game1', 'game2', 'game3', 'game4', 'game5', 'game6', 'game7', 'game8',
@@ -266,6 +349,7 @@ function appendBallButton(grid, { src, title, faded, disabled, awaiting, action,
   btn.type = 'button';
   btn.className = 'ball-btn' + (extraClass ? ` ${extraClass}` : '');
   btn.title = title;
+  btn.setAttribute('aria-label', title || 'Ball');
   btn.dataset.ballId = payload && payload.ballId ? payload.ballId : '';
   const locked = !!disabled || !!awaiting;
   btn.disabled = locked;
@@ -279,23 +363,15 @@ function appendBallButton(grid, { src, title, faded, disabled, awaiting, action,
   btn.appendChild(img);
   if (!locked && action) {
     btn.onclick = () => {
-      if (action === 'toggle_pot' && payload && payload.ballId) {
-        optimisticTogglePot(payload.ballId);
+      if (action === 'open_foul_picker') {
+        openSnookerFoulPicker();
+        return;
       }
+      // Dock owns scoring rules (snooker free ball, rack wins, pocket pots, etc.).
       sendCmd(action, payload);
     };
   }
   grid.appendChild(btn);
-}
-
-function optimisticTogglePot(ballId) {
-  if (!ballId) return;
-  if (!lastState.ballState || typeof lastState.ballState !== 'object') {
-    lastState.ballState = {};
-  }
-  lastState.ballState[ballId] = !lastState.ballState[ballId];
-  lastBallGridKey = '';
-  renderBallGrid(lastState);
 }
 
 function appendUndoButton(grid, { canUndo, title }) {
@@ -335,6 +411,7 @@ function renderBallGrid(state) {
     awaiting,
     locked,
     canUndo,
+    freeBall: !!state.snookerFreeBallOffered,
     ballState: state.ballState,
     ballScoringEnabled: state.ballScoringEnabled,
     gameType: state.gameType,
@@ -355,10 +432,14 @@ function renderBallGrid(state) {
 
   if (hint) {
     if (awaiting) {
-      hint.textContent = 'Choose breaking player first';
-      hint.classList.remove('hidden');
+      // Breaker prompt is already in player slot + match status — no extra hint.
+      hint.textContent = '';
+      hint.classList.add('hidden');
     } else if (locked) {
       hint.textContent = 'Scoring locked';
+      hint.classList.remove('hidden');
+    } else if (state.snookerFreeBallOffered && snapshot && snapshot.snooker) {
+      hint.textContent = 'Free ball available';
       hint.classList.remove('hidden');
     } else if (!useSnapshot && (state.gameType === 'game8' || state.ballSelection === 'snooker')) {
       hint.textContent = 'Waiting for ball state from dock…';
@@ -372,6 +453,9 @@ function renderBallGrid(state) {
   if (useSnapshot) {
     snapshot.balls.forEach((b) => {
       if (b.hidden) return;
+      // Foul is the only local UI exception (dock modal cannot run on the phone).
+      // Free ball, colors, reds, and pool pots all go through dock handlers.
+      const isFoul = b.foul === true || b.id === 'ball 11';
       appendBallButton(grid, {
         src: b.file ? `${BALL_IMG}/${b.file}` : `${BALL_IMG}/8ball_small.png`,
         title: b.title,
@@ -380,7 +464,8 @@ function renderBallGrid(state) {
         awaiting,
         cooldown: !!b.cooldown,
         clicked: !!b.clicked,
-        action: snapshot.snooker ? 'snooker_ball' : 'toggle_pot',
+        extraClass: b.freeball ? 'freeball-btn' : '',
+        action: isFoul ? 'open_foul_picker' : (snapshot.snooker ? 'snooker_ball' : 'toggle_pot'),
         payload: { ballId: b.id },
       });
     });
@@ -410,6 +495,81 @@ function renderBallGrid(state) {
     });
   }
   appendUndoButton(grid, { canUndo, title: undoTitle });
+}
+
+function defaultSnookerFoulTargets() {
+  return Object.keys(SNOOKER_FOUL_IMAGES)
+    .filter((key) => key !== 'gold')
+    .map((key) => ({
+      key,
+      file: SNOOKER_FOUL_IMAGES[key],
+      alt: key.charAt(0).toUpperCase() + key.slice(1),
+    }));
+}
+
+function openSnookerFoulPicker() {
+  const modal = document.getElementById('snookerFoulModal');
+  const container = document.getElementById('snookerFoulTargets');
+  const hint = document.getElementById('snookerFoulHint');
+  if (!modal || !container) return;
+
+  const snapshot = lastState.ballGrid;
+  const fromDock = snapshot && Array.isArray(snapshot.snookerFoulTargets) && snapshot.snookerFoulTargets.length
+    ? snapshot.snookerFoulTargets
+    : defaultSnookerFoulTargets();
+
+  container.innerHTML = '';
+  fromDock.forEach((target) => {
+    const key = target.key;
+    const points = SNOOKER_FOUL_POINTS[key];
+    if (!points) return;
+    const file = target.file || SNOOKER_FOUL_IMAGES[key];
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'foul-target-btn';
+    btn.dataset.foul = key;
+    btn.title = `${points}-point foul`;
+    const img = document.createElement('img');
+    img.src = `${BALL_IMG}/${file}`;
+    img.alt = target.alt || key;
+    btn.appendChild(img);
+    btn.addEventListener('pointerdown', (e) => {
+      // preventDefault on pointerdown suppresses the compatibility mouse click that
+      // would otherwise land on the ball grid (often Undo) after the modal closes.
+      if (e.pointerType !== 'mouse' || e.button === 0) {
+        e.preventDefault();
+      }
+    });
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      selectSnookerFoul(key);
+    });
+    btn.addEventListener('pointerenter', () => {
+      if (hint) hint.textContent = `${points}-point foul`;
+    });
+    container.appendChild(btn);
+  });
+
+  if (hint) hint.textContent = '';
+  modal.classList.remove('hidden');
+}
+
+function closeSnookerFoulPicker() {
+  const modal = document.getElementById('snookerFoulModal');
+  const hint = document.getElementById('snookerFoulHint');
+  if (modal) modal.classList.add('hidden');
+  if (hint) hint.textContent = '';
+}
+
+function selectSnookerFoul(foulKey) {
+  closeSnookerFoulPicker();
+  sendCmd('snooker_foul', { foulKey });
+}
+
+function wireSnookerFoulModal() {
+  document.getElementById('snookerFoulCancel')?.addEventListener('click', closeSnookerFoulPicker);
+  document.getElementById('snookerFoulBackdrop')?.addEventListener('click', closeSnookerFoulPicker);
 }
 
 function sendCmd(action, payload) {
@@ -454,7 +614,40 @@ function wireCommands() {
 
 async function connect() {
   setError('');
-  roomId = roomFromPath();
+  const ctx = pathContext();
+  guestToken = ctx.guestToken || '';
+  isGuestMode = !!guestToken;
+  roomId = ctx.roomId || '';
+
+  if (isGuestMode) {
+    applyGuestUI();
+    if (client) {
+      try { client.disconnect(); } catch (_) { /* ignore */ }
+    }
+    client = new CloudClient({
+      serverUrl: window.location.origin,
+      guestToken,
+      client: 'mobile_guest',
+    });
+    client.on('state', applyState);
+    client.on('presence', (clients) => {
+      dockPresent = (clients || []).includes('dock');
+      setConnectionStatus(dockPresent ? 'connected' : 'waiting');
+    });
+    client.on('error', (e) => setError(e.message || e.code || 'Connection failed'));
+    try {
+      await client.connect();
+      setConnectionStatus('connected');
+      show('loginSection', false);
+      show('controlSection', true);
+      showMobileNav(true);
+      setActiveView('control');
+    } catch (err) {
+      setError(err.message);
+    }
+    return;
+  }
+
   if (!roomId) {
     setError('Room ID missing in URL (/m/{room_id})');
     return;
@@ -490,14 +683,7 @@ async function connect() {
   client.on('state', applyState);
   client.on('presence', (clients) => {
     dockPresent = (clients || []).includes('dock');
-    document.getElementById('connectionStatus').textContent = dockPresent
-      ? 'Connected · dock online'
-      : 'Connected · waiting for dock';
-    if (!dockPresent && Object.keys(lastState).length === 0) {
-      const statusEl = document.getElementById('matchStatus');
-      statusEl.textContent = 'Waiting for dock… enable CueSport Cloud on the control panel';
-      statusEl.className = 'match-status warn';
-    }
+    setConnectionStatus(dockPresent ? 'connected' : 'waiting');
   });
   client.on('error', (e) => {
     const msg = String(e.message || e.code || '');
@@ -518,21 +704,16 @@ async function connect() {
 
   try {
     const joined = await client.connect();
-    document.getElementById('connectionStatus').textContent = 'Connected';
+    setConnectionStatus('connected');
     show('loginSection', false);
     show('controlSection', true);
+    showMobileNav(true);
+    setActiveView('control');
     dockPresent = (joined.clients || []).includes('dock');
     if (joined.state && Object.keys(joined.state).length) {
       applyState(joined.state);
-    } else {
-      document.getElementById('matchStatus').textContent = dockPresent
-        ? 'Dock online — waiting for first state snapshot…'
-        : 'Waiting for dock… enable CueSport Cloud on the control panel';
-      document.getElementById('matchStatus').className = 'match-status warn';
     }
-    if (dockPresent) {
-      document.getElementById('connectionStatus').textContent = 'Connected · dock online';
-    }
+    setConnectionStatus(dockPresent ? 'connected' : 'waiting');
   } catch (err) {
     setError(err.message);
   }
@@ -550,12 +731,18 @@ document.getElementById('connectBtn').addEventListener('click', connect);
 document.getElementById('clearTokenBtn').addEventListener('click', () => {
   localStorage.removeItem(TOKEN_KEY);
   setError('');
-  document.getElementById('connectionStatus').textContent = 'Disconnected';
+  setConnectionStatus('disconnected');
   show('loginSection', true);
   show('controlSection', false);
+  showMobileNav(false);
+  setActiveView('control');
 });
 wireCommands();
+wireSnookerFoulModal();
+wireMobileNav();
 
-if (localStorage.getItem(TOKEN_KEY) && roomFromPath()) {
+if (pathContext().guestToken) {
+  connect().catch(() => {});
+} else if (localStorage.getItem(TOKEN_KEY) && pathContext().roomId) {
   connect().catch(() => {});
 }

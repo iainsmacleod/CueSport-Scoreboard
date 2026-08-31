@@ -237,6 +237,25 @@
     }
     
     // Collect current game state
+    let publishGeneration = 0;
+
+    function invalidatePendingPublishes() {
+        publishGeneration += 1;
+        if (window.cloudRelay && typeof window.cloudRelay.invalidatePendingState === 'function') {
+            window.cloudRelay.invalidatePendingState();
+        }
+    }
+
+    function readScoreInt(storageKey, inputId, storagePrefix) {
+        // Storage is authoritative for cloud sync — DOM can lag mid-update.
+        const fromStorage = parseInt(localStorage.getItem(`${storagePrefix}${storageKey}`) || localStorage.getItem(storageKey) || '0', 10);
+        if (!Number.isNaN(fromStorage)) {
+            return fromStorage;
+        }
+        const el = document.getElementById(inputId);
+        return el ? (parseInt(el.value, 10) || 0) : 0;
+    }
+
     async function collectGameState() {
         // Helper to safely get value
         const getValue = (id, defaultValue = '') => {
@@ -256,8 +275,22 @@
         
         const instanceId = new URLSearchParams(window.location.search).get('instance') || '';
         const storagePrefix = instanceId ? `${instanceId}_` : '';
+
+        // Snapshot scoreline BEFORE any await so in-flight OBS calls cannot interleave with scoring.
+        const scoreSnapshot = {
+            player1Name: getValue('p1Name', '') || getStorage(`${storagePrefix}p1NameCtrlPanel`, ''),
+            player2Name: getValue('p2Name', '') || getStorage(`${storagePrefix}p2NameCtrlPanel`, ''),
+            p1Score: readScoreInt('p1ScoreCtrlPanel', 'p1Score', storagePrefix),
+            p2Score: readScoreInt('p2ScoreCtrlPanel', 'p2Score', storagePrefix),
+            p1Balls: readScoreInt('p1BallsCtrlPanel', 'p1Balls', storagePrefix),
+            p2Balls: readScoreInt('p2BallsCtrlPanel', 'p2Balls', storagePrefix),
+            pointBased: getStorage(`${storagePrefix}pointBased`, 'no'),
+            gameType: getStorage(`${storagePrefix}gameType`, 'game1'),
+            raceInfo: getValue('raceInfoTxt', '') || getStorage(`${storagePrefix}raceInfo`, ''),
+            gameInfo: getValue('gameInfoTxt', '') || getStorage(`${storagePrefix}gameInfo`, ''),
+        };
         
-        // Get stream URL from OBS (validate it)
+        // Get stream URL from OBS (validate it) — may await; score snapshot already frozen above.
         const streamUrl = await getStreamUrl();
         const validatedUrl = isValidStreamUrl(streamUrl) ? streamUrl : '';
         
@@ -292,16 +325,7 @@
         }
         
         return {
-            player1Name: getValue('p1Name', '') || getStorage(`${storagePrefix}p1NameCtrlPanel`, ''),
-            player2Name: getValue('p2Name', '') || getStorage(`${storagePrefix}p2NameCtrlPanel`, ''),
-            p1Score: parseInt(getValue('p1Score', '0')) || parseInt(getStorage(`${storagePrefix}p1ScoreCtrlPanel`, '0')) || 0,
-            p2Score: parseInt(getValue('p2Score', '0')) || parseInt(getStorage(`${storagePrefix}p2ScoreCtrlPanel`, '0')) || 0,
-            p1Balls: parseInt(getValue('p1Balls', '0')) || parseInt(getStorage(`${storagePrefix}p1BallsCtrlPanel`, '0')) || 0,
-            p2Balls: parseInt(getValue('p2Balls', '0')) || parseInt(getStorage(`${storagePrefix}p2BallsCtrlPanel`, '0')) || 0,
-            pointBased: getStorage(`${storagePrefix}pointBased`, 'no'),
-            gameType: getStorage(`${storagePrefix}gameType`, 'game1'),
-            raceInfo: getValue('raceInfoTxt', '') || getStorage(`${storagePrefix}raceInfo`, ''),
-            gameInfo: getValue('gameInfoTxt', '') || getStorage(`${storagePrefix}gameInfo`, ''),
+            ...scoreSnapshot,
             streamUrl: validatedUrl,
             player1Enabled,
             player2Enabled,
@@ -317,8 +341,13 @@
     
     // Send game state update to server
     async function sendGameState() {
+        const gen = publishGeneration;
         try {
             const state = await collectGameState();
+            if (gen !== publishGeneration) {
+                // A newer scoring change invalidated this in-flight publish.
+                return false;
+            }
 
             // CueSport Cloud relay (primary path when cloud is enabled)
             if (window.cloudRelay && typeof window.cloudRelay.isEnabled === 'function' && window.cloudRelay.isEnabled()) {
@@ -326,6 +355,9 @@
             }
 
             if (!ws || ws.readyState !== WebSocket.OPEN || !isAuthenticated) {
+                return false;
+            }
+            if (gen !== publishGeneration) {
                 return false;
             }
 
@@ -595,10 +627,13 @@
             disconnect();
         }
 
-        // Note: We keep isEnabled true to maintain persistent state
-        // Connection will resume automatically when streaming starts again
         updateStreamPromotionToggle();
         updateStreamSharingVisibility();
+        if (window.cloudRelay && typeof window.cloudRelay.isEnabled === 'function' && window.cloudRelay.isEnabled()) {
+            if (window.streamSharing && typeof window.streamSharing.sendUpdate === 'function') {
+                window.streamSharing.sendUpdate();
+            }
+        }
     }
     
     // Check OBS streaming status
@@ -636,6 +671,11 @@
                     if (!isBlockedByServer && isEnabled && (!isConnected || !isAuthenticated)) {
                         console.log('OBS streaming detected, reconnecting stream sharing');
                         connect();
+                    }
+                    if (window.cloudRelay && typeof window.cloudRelay.isEnabled === 'function' && window.cloudRelay.isEnabled()) {
+                        if (window.streamSharing && typeof window.streamSharing.sendUpdate === 'function') {
+                            window.streamSharing.sendUpdate();
+                        }
                     }
                 }
                 
@@ -912,6 +952,9 @@
                 sendGameState();
             }
         },
+
+        /** Drop in-flight state publishes so a newer score change cannot be overwritten by an older snapshot. */
+        invalidatePendingPublishes: invalidatePendingPublishes,
         
         // Check if sharing is enabled
         isEnabled: function() {
@@ -921,6 +964,18 @@
         // Check if connected
         isConnected: function() {
             return isConnected && isAuthenticated;
+        },
+
+        /** For CueSport Cloud state — public listing only when promotion on + OBS streaming. */
+        getPromotionListingState: function() {
+            const promotionOn = getStorageItem('streamPromotionEnabled') === 'true';
+            const manualUrl = getManualStreamUrl();
+            const streamUrl = isValidStreamUrl(manualUrl) ? manualUrl : '';
+            return {
+                listed: promotionOn && isObsStreaming && !!streamUrl,
+                obsStreaming: isObsStreaming,
+                streamUrl: streamUrl,
+            };
         },
         
         // Disconnect stream sharing (called when WebSocket disconnects)

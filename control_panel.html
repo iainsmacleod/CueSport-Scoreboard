@@ -29,11 +29,11 @@ for more information about Salotto please visit https://salotto.app
     </script>
     <script src="./common/js/obs-websocket-js.js?v=7.2.2"></script>
     <script src="./common/js/jquery.js?v=7.2.2"></script>
-    <script src="./common/js/cloud_relay.js?v=7.2.3-balls"></script>
-    <script src="./common/js/stream_sharing.js?v=7.2.2"></script>
+    <script src="./common/js/cloud_relay.js?v=7.2.3-score-mirror"></script>
+    <script src="./common/js/stream_sharing.js?v=7.2.3-foul-sync"></script>
     <script src="./common/js/player_stats.js?v=7.2.2"></script>
-    <script src="./common/js/control_panel.js?v=7.2.2"></script>
-    <script src="./common/js/cloud_commands.js?v=7.2.3-breaker3"></script>
+    <script src="./common/js/control_panel.js?v=7.2.3-reset-breaker"></script>
+    <script src="./common/js/cloud_commands.js?v=7.2.3-score-mirror"></script>
     <script src="./common/js/cloud_auth.js?v=7.2.2"></script>
     <script src="hotkeys.js?v=7.2.2"></script>
 
@@ -315,7 +315,7 @@ for more information about Salotto please visit https://salotto.app
             </div>
             <div class="column button-row" id="scoreEditing">
                 <div class="hover obs28 button danger-btn" id="resetScores" onclick="resetScores()">
-                    Reset Score
+                    Reset Rack
                 </div>
                 <div class="tooltip noShow" id="callGameWrap">
                     <div class="hover obs28 button danger-btn" id="callGame" onclick="callGameScores()">
@@ -564,7 +564,12 @@ for more information about Salotto please visit https://salotto.app
                 </div>
                 <div class="form-row">
                     <div class="field">
-                        <a href="#" onclick="openCloudSelfHostModal(); return false;" style="font-size: 0.85em;">Self-host settings (server URL, room ID, API key)</a>
+                        <span id="cloudRoomIdDisplay" style="font-size: 0.85em; opacity: 0.9;"></span>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="field">
+                        <a href="#" onclick="openCloudSelfHostModal(); return false;" style="font-size: 0.85em;">Self-host settings (server URL + API key)</a>
                     </div>
                 </div>
             </div>
@@ -572,7 +577,7 @@ for more information about Salotto please visit https://salotto.app
             <!-- Stream Promotion Section -->
             <div class="section-header-with-controls">
                 <span id="streamSharingLabel">
-                    Stream Promotion (<a href="https://cuesports.macleod.systems" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: underline;">https://cuesports.macleod.systems</a>)
+                    Stream Promotion — public listing (<a href="https://cuesports.macleod.systems/streams" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: underline;">live streams page</a>; only while OBS is streaming)
                 </span>
                 <div class="section-controls">
                     <button class="settings-cog-btn" id="streamPromotionSettingsCog" onclick="openStreamPromotionSettingsModal()" title="Stream Promotion Settings">
@@ -687,16 +692,13 @@ for more information about Salotto please visit https://salotto.app
                         <span class="modal-close" onclick="closeCloudSelfHostModal()">&times;</span>
                     </div>
                     <div class="modal-body">
+                        <p style="font-size: 0.9em; opacity: 0.9; margin-bottom: 0.75rem;">
+                            Each OBS dock URL <code>?instance=</code> gets its own table room automatically when Cloud connects. Copy the API key from your dashboard.
+                        </p>
                         <div class="form-row">
                             <div class="field">
                                 <label for="cloudServerUrlModal">Server URL:</label>
                                 <input type="text" id="cloudServerUrlModal" placeholder="http://localhost:3000" style="width: 100%;" />
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="field">
-                                <label for="cloudRoomIdModal">Room ID:</label>
-                                <input type="text" id="cloudRoomIdModal" placeholder="UUID from dashboard" style="width: 100%;" />
                             </div>
                         </div>
                         <div class="form-row">

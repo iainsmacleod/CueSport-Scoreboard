@@ -2416,8 +2416,8 @@
 
             const resetBtn = cp.document.getElementById('resetScores');
             cp.updateScoreControlAvailability();
-            assert('Snooker', 'Mid-match Reset Score label',
-                resetBtn && resetBtn.textContent.trim() === 'Reset Score', resetBtn && resetBtn.textContent);
+            assert('Snooker', 'Mid-match Reset Frame label',
+                resetBtn && resetBtn.textContent.trim() === 'Reset Frame', resetBtn && resetBtn.textContent);
             assert('Snooker', 'Reset button danger style',
                 resetBtn && resetBtn.classList.contains('danger-btn'));
 
@@ -2443,8 +2443,8 @@
             cp.document.getElementById('p1Score').value = '0';
             cp.setStorageItem('p1ScoreCtrlPanel', 0);
             cp.updateScoreControlAvailability();
-            assert('Snooker', 'Below goal returns to Reset Score',
-                resetBtn.textContent.trim() === 'Reset Score');
+            assert('Snooker', 'Below goal returns to Reset Frame',
+                resetBtn.textContent.trim() === 'Reset Frame');
 
             const goldCheckbox = cp.document.getElementById('snookerGoldCheckbox');
             assert('Snooker', 'Golden Ball label',
@@ -3201,7 +3201,7 @@
                     bs.document.getElementById('ballTracker').style.display === 'none');
             }
 
-            // Reset Score (mid-match) clears frames + points via in-page confirm modal
+            // Reset Frame (mid-match) clears frames + points via in-page confirm modal
             cp.setStorageItem('p1ScoreCtrlPanel', 2);
             cp.setStorageItem('p2ScoreCtrlPanel', 1);
             cp.document.getElementById('p1Score').value = '2';
@@ -3211,15 +3211,15 @@
             if (p1BallsEl) { p1BallsEl.value = '14'; }
             if (p2BallsEl) { p2BallsEl.value = '9'; }
             cp.updateScoreControlAvailability();
-            assert('Snooker', 'Mid-match button is Reset Score before clear',
-                resetBtn.textContent.trim() === 'Reset Score');
+            assert('Snooker', 'Mid-match button is Reset Frame before clear',
+                resetBtn.textContent.trim() === 'Reset Frame');
             cp.resetScores();
             await sleep(50);
             const resetModal = cp.document.getElementById('resetScoresModal');
-            assert('Snooker', 'Reset Score opens confirm modal',
+            assert('Snooker', 'Reset Frame opens confirm modal',
                 resetModal && cp.getComputedStyle(resetModal).display !== 'none');
             assert('Snooker', 'Reset modal title',
-                (cp.document.getElementById('resetScoresModalTitle').textContent || '') === 'Reset Score');
+                (cp.document.getElementById('resetScoresModalTitle').textContent || '') === 'Reset Frame');
             cp.cancelResetScores();
             await sleep(50);
             assert('Snooker', 'Cancel leaves scores unchanged',
@@ -3228,13 +3228,13 @@
             await sleep(50);
             cp.confirmResetScores();
             await sleep(300);
-            assert('Snooker', 'Reset Score clears frames',
+            assert('Snooker', 'Reset Frame clears frames',
                 parseInt(cp.getStorageItem('p1ScoreCtrlPanel'), 10) === 0 &&
                 parseInt(cp.getStorageItem('p2ScoreCtrlPanel'), 10) === 0);
-            assert('Snooker', 'Reset Score clears points',
+            assert('Snooker', 'Reset Frame clears points',
                 parseInt(cp.getStorageItem('p1BallsCtrlPanel'), 10) === 0 &&
                 parseInt(cp.getStorageItem('p2BallsCtrlPanel'), 10) === 0);
-            assert('Snooker', 'Reset Score button stays danger',
+            assert('Snooker', 'Reset Frame button stays danger',
                 resetBtn.classList.contains('danger-btn'));
 
             // Restore gold; leave panel on 8-Ball
@@ -3253,10 +3253,10 @@
             cp.document.getElementById('p2Score').value = '0';
             cp.updateScoreControlAvailability();
             const resetAfter = cp.document.getElementById('resetScores');
-            assert('Snooker', 'Non-snooker mid-race is Reset Score',
-                resetAfter && resetAfter.textContent.trim() === 'Reset Score',
+            assert('Snooker', 'Non-snooker mid-race is Reset Rack',
+                resetAfter && resetAfter.textContent.trim() === 'Reset Rack',
                 resetAfter && resetAfter.textContent);
-            assert('Snooker', 'Non-snooker Reset Score is danger',
+            assert('Snooker', 'Non-snooker Reset Rack is danger',
                 resetAfter && resetAfter.classList.contains('danger-btn'));
 
             cp.document.getElementById('p1Score').value = '5';
