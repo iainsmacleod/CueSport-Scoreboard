@@ -160,6 +160,8 @@ ul { padding-left: 1.2rem; }
 .icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .row.equal { display: flex; flex-wrap: nowrap; gap: 0.4rem; margin: 0.35rem 0; }
 .row.equal .btn { flex: 1; margin: 0; min-width: 0; font-size: 0.85rem; padding: 0.55rem 0.35rem; }
+.row.equal .btn.rack-breaker-inactive { opacity: 0.35; }
+.row.equal .btn.rack-breaker-match-locked { opacity: 0.55; }
 .ball-grid {
   display: flex;
   flex-wrap: wrap;
@@ -184,6 +186,15 @@ ul { padding-left: 1.2rem; }
   filter: grayscale(0.4);
   pointer-events: none;
 }
+.ball-btn.ball-cooldown:disabled,
+.ball-btn.ball-cooldown.is-disabled {
+  opacity: 0.35;
+  filter: grayscale(0.4);
+}
+.ball-btn.ball-clicked {
+  opacity: 0.25;
+  transform: scale(0.92);
+}
 .ball-grid.awaiting-breaker .ball-btn:not(.undo-ball) {
   opacity: 0.35;
   pointer-events: none;
@@ -195,4 +206,6 @@ ul { padding-left: 1.2rem; }
   opacity: 0.8;
   margin: 0 0 0.4rem;
 }
+.ball-btn.undo-ball { opacity: 1; filter: none; }
+.ball-btn.undo-ball:disabled { opacity: 0.35; filter: grayscale(0.4); }
 .clips { flex-wrap: wrap; }

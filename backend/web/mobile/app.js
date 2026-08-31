@@ -43,8 +43,12 @@ function gameTypeLabel(id) {
 
 function applyState(state) {
   if (!state || typeof state !== 'object') return;
+  const prevTs = lastState.timestamp;
   lastState = state;
   setSyncing(false);
+  if (state.timestamp && state.timestamp !== prevTs) {
+    lastBallGridKey = '';
+  }
 
   const p1Name = state.player1Name != null && state.player1Name !== '' ? state.player1Name : 'P1';
   const p2Name = state.player2Name != null && state.player2Name !== '' ? state.player2Name : 'P2';
@@ -89,12 +93,40 @@ function applyState(state) {
   const active = String(state.activePlayer || '1');
   document.getElementById('liveP1').classList.toggle('is-active', active === '1');
   document.getElementById('liveP2').classList.toggle('is-active', active === '2');
-  document.getElementById('activeP1Btn').classList.toggle('selected', active === '1');
-  document.getElementById('activeP2Btn').classList.toggle('selected', active === '2');
 
-  const breaker = String(state.rackBreakerSlot || '');
-  document.getElementById('breakerP1Btn').classList.toggle('selected', breaker === '1');
-  document.getElementById('breakerP2Btn').classList.toggle('selected', breaker === '2');
+  const slotMode = inferPlayerSlotMode(state);
+  const playerSlotPanel = document.getElementById('playerSlotPanel');
+  const slotQuestion = document.getElementById('playerSlotQuestion');
+  const slotP1 = document.getElementById('playerSlotP1Btn');
+  const slotP2 = document.getElementById('playerSlotP2Btn');
+  const showPlayerSlot = slotMode !== 'off';
+  show('playerSlotPanel', showPlayerSlot);
+  if (showPlayerSlot && slotQuestion) {
+    if (slotMode === 'match_locked') {
+      slotQuestion.textContent = 'End match to continue';
+    } else if (slotMode === 'breaker') {
+      slotQuestion.textContent = 'Breaking player?';
+    } else {
+      slotQuestion.textContent = 'Active player';
+    }
+  }
+  if (slotP1 && slotP2) {
+    const p1Label = p1Name || 'P1';
+    const p2Label = p2Name || 'P2';
+    slotP1.textContent = p1Label;
+    slotP2.textContent = p2Label;
+    slotP1.classList.remove('selected', 'rack-breaker-match-locked', 'rack-breaker-inactive');
+    slotP2.classList.remove('selected', 'rack-breaker-match-locked', 'rack-breaker-inactive');
+    if (slotMode === 'breaker' || slotMode === 'match_locked') {
+      slotP1.classList.toggle('rack-breaker-match-locked', slotMode === 'match_locked');
+      slotP2.classList.toggle('rack-breaker-match-locked', slotMode === 'match_locked');
+    } else if (slotMode === 'active') {
+      slotP1.classList.toggle('selected', active === '1');
+      slotP2.classList.toggle('selected', active === '2');
+      slotP1.classList.toggle('rack-breaker-inactive', active !== '1');
+      slotP2.classList.toggle('rack-breaker-inactive', active !== '2');
+    }
+  }
 
   // Form fields — always sync from dock (including empty)
   if (state.player1Name != null) document.getElementById('p1Name').value = state.player1Name;
@@ -103,18 +135,11 @@ function applyState(state) {
   if (state.gameInfo != null) document.getElementById('gameInfoInput').value = state.gameInfo;
   if (state.gameType) document.getElementById('gameTypeSelect').value = state.gameType;
 
-  const hint = document.getElementById('breakerHint');
-  if (state.breakerPromptVisible) {
-    hint.textContent = 'Breaking player? — pick breaker below';
-  } else {
-    hint.textContent = `Active: P${active} | Breaker: ${breaker || '—'}`;
-  }
-
   const statusEl = document.getElementById('matchStatus');
   if (!dockPresent && !state.timestamp && !state.player1Name && p1Score === 0 && p2Score === 0) {
     statusEl.textContent = 'Waiting for dock… enable CueSport Cloud on the control panel';
     statusEl.className = 'match-status warn';
-  } else if (state.breakerPromptVisible) {
+  } else if (inferAwaitingBreaker(state) || slotMode === 'breaker') {
     statusEl.textContent = 'Choose breaking player';
     statusEl.className = 'match-status warn';
   } else if (state.gameScoringLocked) {
@@ -139,9 +164,6 @@ function applyState(state) {
   const callBtn = document.getElementById('callMatchBtn');
   if (callBtn) callBtn.disabled = state.canCallGame === false;
 
-  const undoBtn = document.getElementById('undoBtn');
-  if (undoBtn) undoBtn.disabled = !state.canUndo;
-
   const replayPanel = document.getElementById('replayPanel');
   replayPanel.querySelectorAll('button').forEach((btn) => {
     btn.disabled = state.obsConnected === false;
@@ -152,6 +174,59 @@ function applyState(state) {
 
 const BALL_IMG = '/images/balls';
 let lastBallGridKey = '';
+
+const BREAKER_GAME_TYPES = new Set([
+  'game1', 'game2', 'game3', 'game4', 'game5', 'game6', 'game7', 'game8',
+]);
+
+function isBallScoringOn(state) {
+  if (!state) return false;
+  if (state.ballScoringEnabled === true || state.ballTrackerEnabled === true) return true;
+  return !!(state.ballGrid && state.ballGrid.visible);
+}
+
+function isBreakerPromptGame(state) {
+  if (!state || !BREAKER_GAME_TYPES.has(state.gameType || '')) return false;
+  if (!isBallScoringOn(state)) return false;
+  if (state.player1Enabled === false || state.player2Enabled === false) return false;
+  return true;
+}
+
+/** Match control_panel: lock balls until rackBreakerSlot is set for this frame. */
+function inferAwaitingBreaker(state) {
+  if (!state || state.gameScoringLocked) return false;
+  const slot = String(state.rackBreakerSlot || '');
+  if (slot === '1' || slot === '2') return false;
+  if (state.awaitingBreaker === true) return true;
+  if (state.ballGrid && state.ballGrid.awaitingBreaker === true) return true;
+  return isBreakerPromptGame(state);
+}
+
+function inferPlayerSlotMode(state) {
+  if (!isBreakerPromptGame(state)) return 'off';
+  const slot = String(state.rackBreakerSlot || '');
+  if (slot === '1' || slot === '2') return 'active';
+  if (state.gameScoringLocked) return 'match_locked';
+  return 'breaker';
+}
+
+function optimisticSelectBreaker(slot) {
+  const s = String(slot);
+  if (s !== '1' && s !== '2') return;
+  lastState = {
+    ...lastState,
+    rackBreakerSlot: s,
+    activePlayer: s,
+    awaitingBreaker: false,
+    breakerPromptVisible: false,
+    playerSlotMode: 'active',
+    ballGrid: lastState.ballGrid
+      ? { ...lastState.ballGrid, awaitingBreaker: false }
+      : lastState.ballGrid,
+  };
+  lastBallGridKey = '';
+  applyState(lastState);
+}
 
 function ballImageFile(n, selection) {
   if (selection === 'international') {
@@ -179,25 +254,55 @@ function ballImageFile(n, selection) {
   return `${n}ball_small.png`;
 }
 
-function appendBallButton(grid, { src, title, faded, disabled, awaiting, action, payload, snooker }) {
+function appendBallButton(grid, { src, title, faded, disabled, awaiting, action, payload, extraClass, cooldown, clicked }) {
   const btn = document.createElement('button');
   btn.type = 'button';
-  btn.className = 'ball-btn';
+  btn.className = 'ball-btn' + (extraClass ? ` ${extraClass}` : '');
   btn.title = title;
+  btn.dataset.ballId = payload && payload.ballId ? payload.ballId : '';
   const locked = !!disabled || !!awaiting;
   btn.disabled = locked;
   if (faded) btn.classList.add('faded');
+  if (cooldown) btn.classList.add('ball-cooldown');
+  if (clicked) btn.classList.add('ball-clicked');
   if (locked) btn.classList.add('is-disabled');
   const img = document.createElement('img');
   img.src = src;
   img.alt = title;
   btn.appendChild(img);
-  if (!locked) {
+  if (!locked && action) {
     btn.onclick = () => {
-      if (!snooker && !faded) btn.classList.add('faded');
-      else if (!snooker && faded) btn.classList.remove('faded');
+      if (action === 'toggle_pot' && payload && payload.ballId) {
+        optimisticTogglePot(payload.ballId);
+      }
       sendCmd(action, payload);
     };
+  }
+  grid.appendChild(btn);
+}
+
+function optimisticTogglePot(ballId) {
+  if (!ballId) return;
+  if (!lastState.ballState || typeof lastState.ballState !== 'object') {
+    lastState.ballState = {};
+  }
+  lastState.ballState[ballId] = !lastState.ballState[ballId];
+  lastBallGridKey = '';
+  renderBallGrid(lastState);
+}
+
+function appendUndoButton(grid, { canUndo, title }) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'ball-btn undo-ball';
+  btn.title = title || 'Undo last scoring action';
+  btn.disabled = !canUndo;
+  const img = document.createElement('img');
+  img.src = `${BALL_IMG}/undo-small.png`;
+  img.alt = 'Undo';
+  btn.appendChild(img);
+  if (!btn.disabled) {
+    btn.onclick = () => sendCmd('undo', {});
   }
   grid.appendChild(btn);
 }
@@ -207,85 +312,82 @@ function renderBallGrid(state) {
   const grid = document.getElementById('ballGrid');
   const hint = document.getElementById('ballGridHint');
   const snapshot = state.ballGrid;
-  const key = JSON.stringify(snapshot || {
-    gameType: state.gameType,
+  const awaiting = inferAwaitingBreaker(state);
+  const locked = !!(state.gameScoringLocked || (snapshot && snapshot.locked));
+  const canUndo = state.canUndo === true || (snapshot && snapshot.canUndo === true);
+  const undoTitle = snapshot && snapshot.snooker
+    ? 'Undo last pot or foul'
+    : 'Undo last scoring action (pots, fouls, breaker)';
+  const useSnapshot = !!(snapshot && Array.isArray(snapshot.balls) && snapshot.balls.length);
+  const ballSig = useSnapshot
+    ? snapshot.balls.map((b) => `${b.id}:${b.disabled ? 1 : 0}:${b.faded ? 1 : 0}:${b.hidden ? 1 : 0}:${b.clicked ? 1 : 0}`).join('|')
+    : '';
+  const key = JSON.stringify({
+    ballSig,
+    snooker: snapshot && snapshot.snooker,
+    awaiting,
+    locked,
+    canUndo,
     ballState: state.ballState,
     ballScoringEnabled: state.ballScoringEnabled,
-    locked: state.gameScoringLocked,
+    gameType: state.gameType,
+    rackBreakerSlot: state.rackBreakerSlot,
+    ts: state.timestamp,
   });
   if (key === lastBallGridKey) return;
   lastBallGridKey = key;
   grid.innerHTML = '';
+  grid.classList.toggle('awaiting-breaker', awaiting);
 
-  if (snapshot && snapshot.visible) {
-    panel.classList.remove('hidden');
-    grid.classList.toggle('awaiting-breaker', !!snapshot.awaitingBreaker);
-    if (hint) {
-      if (snapshot.awaitingBreaker) {
-        hint.textContent = 'Choose breaking player first';
-        hint.classList.remove('hidden');
-      } else if (snapshot.locked) {
-        hint.textContent = 'Scoring locked';
-        hint.classList.remove('hidden');
-      } else {
-        hint.textContent = '';
-        hint.classList.add('hidden');
-      }
+  const showGrid = useSnapshot || isBallScoringOn(state);
+  if (!showGrid) {
+    panel.classList.add('hidden');
+    return;
+  }
+  panel.classList.remove('hidden');
+
+  if (hint) {
+    if (awaiting) {
+      hint.textContent = 'Choose breaking player first';
+      hint.classList.remove('hidden');
+    } else if (locked) {
+      hint.textContent = 'Scoring locked';
+      hint.classList.remove('hidden');
+    } else if (!useSnapshot && (state.gameType === 'game8' || state.ballSelection === 'snooker')) {
+      hint.textContent = 'Waiting for ball state from dock…';
+      hint.classList.remove('hidden');
+    } else {
+      hint.textContent = '';
+      hint.classList.add('hidden');
     }
+  }
+
+  if (useSnapshot) {
     snapshot.balls.forEach((b) => {
       if (b.hidden) return;
       appendBallButton(grid, {
         src: b.file ? `${BALL_IMG}/${b.file}` : `${BALL_IMG}/8ball_small.png`,
         title: b.title,
-        faded: !!b.faded,
-        disabled: !!b.disabled || !!snapshot.locked,
-        awaiting: snapshot.awaitingBreaker,
-        snooker: !!snapshot.snooker,
+        faded: !!b.faded || !!(state.ballState && state.ballState[b.id]),
+        disabled: !!b.disabled || locked,
+        awaiting,
+        cooldown: !!b.cooldown,
+        clicked: !!b.clicked,
         action: snapshot.snooker ? 'snooker_ball' : 'toggle_pot',
         payload: { ballId: b.id },
       });
     });
+    appendUndoButton(grid, { canUndo, title: undoTitle });
     return;
   }
 
   const gt = state.gameType;
   const selection = state.ballSelection || 'american';
-  const awaiting = !!state.breakerPromptVisible && !state.rackBreakerSlot;
-
   if (gt === 'game8' || selection === 'snooker') {
-    panel.classList.remove('hidden');
-    grid.classList.toggle('awaiting-breaker', awaiting);
-    if (hint) {
-      hint.textContent = awaiting ? 'Choose breaking player first' : '';
-      hint.classList.toggle('hidden', !awaiting);
-    }
-    const snookerIds = [1, 2, 3, 4, 5, 6, 7];
-    if (state.snookerGoldEnabled) snookerIds.push(8);
-    snookerIds.push(10, 11);
-    snookerIds.forEach((n) => {
-      appendBallButton(grid, {
-        src: `${BALL_IMG}/${ballImageFile(n, 'snooker')}`,
-        title: `Ball ${n}`,
-        faded: false,
-        disabled: !!state.gameScoringLocked,
-        awaiting,
-        snooker: true,
-        action: 'snooker_ball',
-        payload: { ballId: `ball ${n}` },
-      });
-    });
+    appendUndoButton(grid, { canUndo, title: undoTitle });
     return;
   }
-  if (!state.ballScoringEnabled) {
-    panel.classList.add('hidden');
-    return;
-  }
-  panel.classList.remove('hidden');
-  grid.classList.toggle('awaiting-breaker', awaiting);
-  if (hint) {
-    hint.textContent = awaiting ? 'Choose breaking player first' : '';
-    hint.classList.toggle('hidden', !awaiting);
-  }
+
   const max = gt === 'game2' ? 9 : gt === 'game3' ? 10 : 15;
   const style = (gt === 'game2' || gt === 'game3') ? 'american' : selection;
   for (let i = 1; i <= max; i++) {
@@ -294,13 +396,13 @@ function renderBallGrid(state) {
       src: `${BALL_IMG}/${ballImageFile(i, style)}`,
       title: `Ball ${i}`,
       faded: !!(state.ballState && state.ballState[id]),
-      disabled: !!state.gameScoringLocked,
+      disabled: locked,
       awaiting,
-      snooker: false,
       action: 'toggle_pot',
       payload: { ballId: id },
     });
   }
+  appendUndoButton(grid, { canUndo, title: undoTitle });
 }
 
 function sendCmd(action, payload) {
@@ -322,6 +424,11 @@ function wireCommands() {
       if (cmd === 'set_player_name') {
         payload.slot = el.dataset.slot;
         payload.name = document.getElementById(payload.slot === '1' ? 'p1Name' : 'p2Name').value;
+      }
+      if (cmd === 'player_slot' && payload.slot && inferPlayerSlotMode(lastState) === 'breaker') {
+        optimisticSelectBreaker(payload.slot);
+        sendCmd('select_breaker', { slot: payload.slot });
+        return;
       }
       sendCmd(cmd, payload);
     });

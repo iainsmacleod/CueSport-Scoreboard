@@ -172,19 +172,80 @@
         }
     }
 
+    function computeRackBreakerPromptEnabled() {
+        if (typeof window.isRackBreakerPromptEnabled === 'function') {
+            return window.isRackBreakerPromptEnabled();
+        }
+        const bothPlayers =
+            dockStorage('usePlayer1', 'no') === 'yes' &&
+            dockStorage('usePlayer2', 'no') === 'yes';
+        if (!bothPlayers) {
+            return false;
+        }
+        const type = dockStorage('gameType', 'game1') || 'game1';
+        return type === 'game1' || type === 'game2' || type === 'game3' ||
+            type === 'game4' || type === 'game5' || type === 'game6' ||
+            type === 'game7' || type === 'game8';
+    }
+
+    function computeBallTrackerVisible() {
+        if (typeof window.isBallTrackerControlsVisible === 'function') {
+            return window.isBallTrackerControlsVisible();
+        }
+        if (dockStorage('enableBallTracker', 'no') !== 'yes') {
+            return false;
+        }
+        return dockStorage('usePlayer1', 'no') === 'yes' &&
+            dockStorage('usePlayer2', 'no') === 'yes' &&
+            dockStorage('scoreDisplay', 'yes') === 'yes';
+    }
+
+    function computePlayerSlotPickerVisible(ballTrackerVisible, rackBreakerPromptEnabled) {
+        if (!ballTrackerVisible) {
+            return false;
+        }
+        return dockStorage('usePlayerToggle', 'no') === 'yes' || rackBreakerPromptEnabled;
+    }
+
+    function computeAwaitingBreaker(hasRackBreaker, gameScoringLocked) {
+        const tracker = document.getElementById('ballTrackerDiv');
+        if (tracker && tracker.classList.contains('ball-tracker-awaiting-breaker')) {
+            return true;
+        }
+        if (gameScoringLocked || hasRackBreaker) {
+            return false;
+        }
+        if (typeof window.isRackBreakerBallGridLockEnabled === 'function' &&
+            typeof window.getRackBreakerSlot === 'function') {
+            return window.isRackBreakerBallGridLockEnabled() && !window.getRackBreakerSlot();
+        }
+        const rackBreakerPromptEnabled = computeRackBreakerPromptEnabled();
+        return dockStorage('enableBallTracker', 'no') === 'yes' &&
+            rackBreakerPromptEnabled &&
+            !hasRackBreaker;
+    }
+
     function collectBallGridSnapshot() {
+        if (typeof window.updateSnookerBallAvailability === 'function') {
+            window.updateSnookerBallAvailability();
+        }
+        if (typeof window.updateScoringUndoButton === 'function') {
+            window.updateScoringUndoButton();
+        }
         const tracker = document.getElementById('ballTrackerDiv');
         const undoEl = document.getElementById('snookerUndoBtn');
         const snooker = typeof window.isSnookerBallMode === 'function' && window.isSnookerBallMode();
-        const visible = !!(
-            tracker &&
-            !tracker.classList.contains('noShow') &&
-            (typeof window.isBallTrackerControlsVisible === 'function'
-                ? window.isBallTrackerControlsVisible()
-                : dockStorage('enableBallTracker', 'no') === 'yes')
-        );
-        const awaitingBreaker = !!(tracker && tracker.classList.contains('ball-tracker-awaiting-breaker'));
-        const locked = !!(tracker && tracker.classList.contains('ball-tracker-locked'));
+        const ballTrackerVisible = computeBallTrackerVisible();
+        // Mobile remote: export balls whenever ball scoring is on (ignore Controls-tab noShow).
+        const visible = !!ballTrackerVisible;
+        const rackBreakerSlotRaw = dockStorage('rackBreakerSlot', '') || '';
+        const hasRackBreaker = rackBreakerSlotRaw === '1' || rackBreakerSlotRaw === '2';
+        const gameScoringLocked = typeof window.isGameScoringLocked === 'function'
+            ? window.isGameScoringLocked()
+            : !!(tracker && tracker.classList.contains('ball-tracker-locked'));
+        const awaitingBreaker = computeAwaitingBreaker(hasRackBreaker, gameScoringLocked);
+        const locked = !!(tracker && tracker.classList.contains('ball-tracker-locked')) ||
+            (typeof window.isGameScoringLocked === 'function' && window.isGameScoringLocked());
         const balls = [];
         if (tracker) {
             tracker.querySelectorAll('.ball').forEach(function (el) {
@@ -203,6 +264,7 @@
                         el.classList.contains('ball-win-cooldown') ||
                         el.getAttribute('aria-disabled') === 'true',
                     cooldown: el.classList.contains('ball-win-cooldown'),
+                    clicked: el.classList.contains('snooker-ball-clicked'),
                 });
             });
         }
@@ -231,12 +293,35 @@
                 state.ballState = {};
             }
             state.ballScoringEnabled = dockStorage('enableBallTracker', 'no') === 'yes';
-            state.breakerPromptVisible = typeof window.isRackBreakerPromptEnabled === 'function'
-                ? window.isRackBreakerPromptEnabled()
-                : false;
+            state.ballTrackerEnabled = baseState && baseState.ballTrackerEnabled === true
+                ? true
+                : state.ballScoringEnabled;
+            const rackBreakerPromptEnabled = computeRackBreakerPromptEnabled();
+            const rackBreakerSlotRaw = dockStorage('rackBreakerSlot', '') || '';
+            const hasRackBreaker = rackBreakerSlotRaw === '1' || rackBreakerSlotRaw === '2';
+            state.rackBreakerSlot = hasRackBreaker ? rackBreakerSlotRaw : '';
             state.gameScoringLocked = typeof window.isGameScoringLocked === 'function'
                 ? window.isGameScoringLocked()
                 : false;
+            state.awaitingBreaker = computeAwaitingBreaker(hasRackBreaker, state.gameScoringLocked);
+            state.breakerPromptVisible = typeof window.isPlayerSlotPickerBreakerMode === 'function'
+                ? window.isPlayerSlotPickerBreakerMode()
+                : (rackBreakerPromptEnabled && !hasRackBreaker);
+            state.playerSlotPickerVisible = computePlayerSlotPickerVisible(
+                computeBallTrackerVisible(),
+                rackBreakerPromptEnabled
+            );
+            if (!state.playerSlotPickerVisible || !rackBreakerPromptEnabled) {
+                state.playerSlotMode = 'off';
+            } else if (hasRackBreaker) {
+                state.playerSlotMode = 'active';
+            } else if (state.gameScoringLocked && state.breakerPromptVisible) {
+                state.playerSlotMode = 'match_locked';
+            } else if (state.breakerPromptVisible) {
+                state.playerSlotMode = 'breaker';
+            } else {
+                state.playerSlotMode = 'off';
+            }
             state.obsConnected = dockStorage('isConnected', 'false') === 'true';
             state.canCallGame = window.PlayerStats && typeof window.PlayerStats.canCallGame === 'function'
                 ? window.PlayerStats.canCallGame()
@@ -272,6 +357,9 @@
                 ? (undoStackLen('snookerUndoStack') > 0 || undoStackLen('scoringUndoStack') > 0)
                 : undoStackLen('scoringUndoStack') > 0;
             state.ballGrid = collectBallGridSnapshot();
+            state.ballGrid.awaitingBreaker = state.awaitingBreaker;
+            state.ballGrid.locked = state.gameScoringLocked;
+            state.ballGrid.canUndo = state.canUndo;
             // Match progress heuristics for mobile UI
             const p1 = Number(state.p1Score) || 0;
             const p2 = Number(state.p2Score) || 0;

@@ -613,6 +613,9 @@ function selectRackBreaker(slot) {
     hideRackBreakerPicker();
     syncRackBreakerPlayerToggleVisibility();
     updatePlayerBallControlVisibility();
+    if (window.streamSharing && typeof window.streamSharing.sendUpdate === 'function') {
+        window.streamSharing.sendUpdate();
+    }
 }
 
 function noteRackOpponentVisitForSlot(activeSlot) {

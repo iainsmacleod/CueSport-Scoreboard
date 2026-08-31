@@ -33,8 +33,17 @@
                 }
                 break;
             case 'player_slot':
-                if (payload && payload.slot && typeof onPlayerSlotButton === 'function') {
-                    onPlayerSlotButton(String(payload.slot));
+                if (payload && payload.slot) {
+                    const slot = String(payload.slot);
+                    const breakerPick = payload.mode === 'breaker' ||
+                        (typeof isPlayerSlotPickerBreakerMode === 'function' && isPlayerSlotPickerBreakerMode());
+                    if (breakerPick && typeof selectRackBreaker === 'function') {
+                        selectRackBreaker(slot);
+                    } else if (typeof onPlayerSlotButton === 'function') {
+                        onPlayerSlotButton(slot);
+                    } else if (typeof selectRackBreaker === 'function') {
+                        selectRackBreaker(slot);
+                    }
                 }
                 break;
             case 'set_player_name': {

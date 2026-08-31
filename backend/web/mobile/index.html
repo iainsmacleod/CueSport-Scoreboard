@@ -78,12 +78,7 @@
         </div>
       </div>
       <div class="panel">
-        <div class="panel-head">
-          <h2>Scores</h2>
-          <button type="button" class="icon-btn undo-btn" id="undoBtn" data-cmd="undo" title="Undo last scoring action" aria-label="Undo" disabled>
-            <img src="/images/balls/undo-small.png" alt="">
-          </button>
-        </div>
+        <h2>Scores</h2>
         <div class="score-row">
           <span id="p1PrimaryLabel">P1</span>
           <button class="btn" data-cmd="score_sub" data-player="1">−</button>
@@ -112,16 +107,11 @@
           </div>
         </div>
       </div>
-      <div class="panel" id="breakerPanel">
-        <h2>Breaking / Active player</h2>
-        <p id="breakerHint"></p>
-        <div class="row">
-          <button class="btn" id="breakerP1Btn" data-cmd="select_breaker" data-slot="1">P1 breaker</button>
-          <button class="btn" id="breakerP2Btn" data-cmd="select_breaker" data-slot="2">P2 breaker</button>
-        </div>
-        <div class="row">
-          <button class="btn" id="activeP1Btn" data-cmd="toggle_active_player" data-isp1="true">Active P1</button>
-          <button class="btn" id="activeP2Btn" data-cmd="toggle_active_player" data-isp1="false">Active P2</button>
+      <div class="panel hidden" id="playerSlotPanel">
+        <h2 id="playerSlotQuestion">Active Player</h2>
+        <div class="row equal">
+          <button type="button" class="btn" id="playerSlotP1Btn" data-cmd="player_slot" data-slot="1">P1</button>
+          <button type="button" class="btn" id="playerSlotP2Btn" data-cmd="player_slot" data-slot="2">P2</button>
         </div>
       </div>
       <div class="panel hidden" id="ballGridPanel">
@@ -154,6 +144,6 @@
     </section>
     <p id="error" class="error hidden"></p>
   </main>
-  <script type="module" src="/web/mobile/app.js"></script>
+  <script type="module" src="/web/mobile/app.js?v=7.2.3-balls"></script>
 </body>
 </html>
