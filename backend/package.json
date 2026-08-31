@@ -1,0 +1,29 @@
+{
+  "name": "cuesport-cloud",
+  "version": "1.0.0",
+  "description": "CueSport Cloud — room relay, auth, and web control for CueSport Scoreboard",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "migrate": "node src/db/migrate.js",
+    "test": "node tests/cloud-api.mjs",
+    "test:cloud": "node tests/cloud-api.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@fastify/static": "^8.0.0",
+    "@fastify/websocket": "^11.0.0",
+    "@supabase/supabase-js": "^2.49.0",
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.8.0",
+    "dotenv": "^16.4.7",
+    "fastify": "^5.2.1",
+    "jose": "^5.9.6",
+    "uuid": "^11.0.5",
+    "ws": "^8.18.0"
+  }
+}

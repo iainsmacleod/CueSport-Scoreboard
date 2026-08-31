@@ -17,7 +17,17 @@
 var cLogoName = "Player 1 Logo";  // 13 character limit. it will auto trim to 13 characters.
 var cLogoName2 = "Player 2 Logo";
 const bc = new BroadcastChannel(`main_${INSTANCE_ID}`);
-const bcr = new BroadcastChannel(`recv_${INSTANCE_ID}`); // return channel from browser_source 
+const bcr = new BroadcastChannel(`recv_${INSTANCE_ID}`); // return channel from browser_source
+
+(function wrapBroadcastChannelForCloud() {
+    const _post = bc.postMessage.bind(bc);
+    bc.postMessage = function (data) {
+        _post(data);
+        if (window.cloudRelay && typeof window.cloudRelay.sendEvent === 'function' && !window.cloudRelay.replaying) {
+            window.cloudRelay.sendEvent(data);
+        }
+    };
+})();
 var hotkeyP1ScoreUp;
 var hotkeyP1ScoreDown;
 var hotkeyP2ScoreUp;

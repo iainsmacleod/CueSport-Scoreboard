@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CueSport — Live Streams</title>
+  <link rel="stylesheet" href="/web/shared/styles.css" />
+</head>
+<body>
+  <header>
+    <h1>CueSport Live Streams</h1>
+    <p class="subtitle">Matches currently on air</p>
+  </header>
+  <main>
+    <ul id="streamList" class="stream-list"></ul>
+    <p id="empty" class="hidden">No active streams right now.</p>
+  </main>
+  <script type="module">
+    async function load() {
+      const res = await fetch('/api/streams');
+      const streams = await res.json();
+      const list = document.getElementById('streamList');
+      const empty = document.getElementById('empty');
+      list.innerHTML = '';
+      if (!streams.length) {
+        empty.classList.remove('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+      streams.forEach((s) => {
+        const st = s.state || {};
+        const li = document.createElement('li');
+        li.className = 'stream-card';
+        li.innerHTML = `
+          <h3>${st.player1Name || 'Player 1'} vs ${st.player2Name || 'Player 2'}</h3>
+          <p class="score">${st.p1Score ?? 0} — ${st.p2Score ?? 0}</p>
+          <p>${st.gameType || ''} ${st.raceInfo ? '· ' + st.raceInfo : ''}</p>
+          ${s.stream_url ? `<a href="${s.stream_url}" target="_blank" rel="noopener">Watch stream</a>` : ''}
+        `;
+        list.appendChild(li);
+      });
+    }
+    load();
+    setInterval(load, 15000);
+  </script>
+</body>
+</html>

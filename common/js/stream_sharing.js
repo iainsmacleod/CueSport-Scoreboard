@@ -317,18 +317,24 @@
     
     // Send game state update to server
     async function sendGameState() {
-        if (!ws || ws.readyState !== WebSocket.OPEN || !isAuthenticated) {
-            return false;
-        }
-        
         try {
             const state = await collectGameState();
+
+            // CueSport Cloud relay (primary path when cloud is enabled)
+            if (window.cloudRelay && typeof window.cloudRelay.isEnabled === 'function' && window.cloudRelay.isEnabled()) {
+                return window.cloudRelay.sendState(state);
+            }
+
+            if (!ws || ws.readyState !== WebSocket.OPEN || !isAuthenticated) {
+                return false;
+            }
+
             const message = {
                 type: 'update',
                 api_key: getApiKey(),
                 state: state
             };
-            
+
             ws.send(JSON.stringify(message));
             return true;
         } catch (error) {
@@ -339,6 +345,11 @@
     
     // Connect to WebSocket server
     function connect() {
+        if (window.cloudRelay && typeof window.cloudRelay.isEnabled === 'function' && window.cloudRelay.isEnabled()) {
+            window.cloudRelay.connect();
+            return;
+        }
+
         if (ws && (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN)) {
             return; // Already connecting or connected
         }
@@ -487,6 +498,10 @@
     
     // Disconnect from server
     function disconnect() {
+        if (window.cloudRelay && typeof window.cloudRelay.isEnabled === 'function' && window.cloudRelay.isEnabled()) {
+            window.cloudRelay.disconnect();
+        }
+
         if (reconnectTimer) {
             clearTimeout(reconnectTimer);
             reconnectTimer = null;
@@ -888,6 +903,11 @@
     window.streamSharing = {
         // Send current game state (called from update functions)
         sendUpdate: function() {
+            // CueSport Cloud: push whenever cloud relay is enabled (independent of legacy stream toggle)
+            if (window.cloudRelay && typeof window.cloudRelay.isEnabled === 'function' && window.cloudRelay.isEnabled()) {
+                sendGameState();
+                return;
+            }
             if (isEnabled && isConnected && isAuthenticated) {
                 sendGameState();
             }

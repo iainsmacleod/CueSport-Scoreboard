@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+  <title>CueSport Mobile Control</title>
+  <link rel="stylesheet" href="/web/shared/styles.css" />
+</head>
+<body class="mobile">
+  <header>
+    <h1>Mobile Control</h1>
+    <p id="connectionStatus">Disconnected</p>
+  </header>
+  <main id="app">
+    <section id="loginSection">
+      <p class="hint">Use the <strong>same email</strong> as on the dashboard. A saved Google sign-in token will not work here — enter your dev email.</p>
+      <input type="email" id="devEmail" placeholder="Email (dev login)" autocomplete="email" />
+      <button id="connectBtn" class="btn primary block">Connect</button>
+      <button type="button" id="clearTokenBtn" class="btn block secondary">Clear saved login</button>
+    </section>
+    <section id="controlSection" class="hidden">
+      <div id="liveBoard" class="live-board">
+        <div id="matchStatus" class="match-status">Waiting for dock…</div>
+        <div class="live-scores">
+          <div class="live-player" id="liveP1">
+            <div class="live-name" id="liveP1Name">P1</div>
+            <div class="live-score" id="liveP1Score">0</div>
+            <div class="live-balls hidden" id="liveP1Balls">Balls: 0</div>
+          </div>
+          <div class="live-vs">vs</div>
+          <div class="live-player" id="liveP2">
+            <div class="live-name" id="liveP2Name">P2</div>
+            <div class="live-score" id="liveP2Score">0</div>
+            <div class="live-balls hidden" id="liveP2Balls">Balls: 0</div>
+          </div>
+        </div>
+        <div id="liveMeta" class="live-meta"></div>
+        <div id="syncHint" class="sync-hint hidden">Updating…</div>
+      </div>
+
+      <div class="panel">
+        <h2>Players</h2>
+        <div class="field-row">
+          <input id="p1Name" placeholder="Player 1" maxlength="20" />
+          <button type="button" class="icon-btn" data-cmd="set_player_name" data-slot="1" title="Save player 1" aria-label="Save player 1">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          </button>
+        </div>
+        <div class="field-row">
+          <input id="p2Name" placeholder="Player 2" maxlength="20" />
+          <button type="button" class="icon-btn" data-cmd="set_player_name" data-slot="2" title="Save player 2" aria-label="Save player 2">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Setup</h2>
+        <label id="raceLabel">Race</label>
+        <div class="field-row">
+          <input id="raceInput" maxlength="3" />
+          <button type="button" class="icon-btn" id="saveRaceBtn" title="Save race" aria-label="Save race">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          </button>
+        </div>
+        <label>Game info</label>
+        <div class="field-row">
+          <input id="gameInfoInput" maxlength="60" />
+          <button type="button" class="icon-btn" id="saveGameInfoBtn" title="Save game info" aria-label="Save game info">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          </button>
+        </div>
+        <label>Game type</label>
+        <div class="field-row">
+          <select id="gameTypeSelect"></select>
+          <button type="button" class="icon-btn" id="saveGameTypeBtn" title="Save game type" aria-label="Save game type">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Scores</h2>
+          <button type="button" class="icon-btn undo-btn" id="undoBtn" data-cmd="undo" title="Undo last scoring action" aria-label="Undo" disabled>
+            <img src="/images/balls/undo-small.png" alt="">
+          </button>
+        </div>
+        <div class="score-row">
+          <span id="p1PrimaryLabel">P1</span>
+          <button class="btn" data-cmd="score_sub" data-player="1">−</button>
+          <span class="score-value" id="p1PrimaryValue">0</span>
+          <button class="btn" data-cmd="score_add" data-player="1">+</button>
+        </div>
+        <div class="score-row">
+          <span id="p2PrimaryLabel">P2</span>
+          <button class="btn" data-cmd="score_sub" data-player="2">−</button>
+          <span class="score-value" id="p2PrimaryValue">0</span>
+          <button class="btn" data-cmd="score_add" data-player="2">+</button>
+        </div>
+        <div id="ballsPanel" class="hidden">
+          <h3 id="secondaryHeading">Points</h3>
+          <div class="score-row">
+            <span id="p1SecondaryLabel">P1 points</span>
+            <button class="btn" data-cmd="balls_sub" data-player="1">−</button>
+            <span class="score-value" id="p1SecondaryValue">0</span>
+            <button class="btn" data-cmd="balls_add" data-player="1">+</button>
+          </div>
+          <div class="score-row">
+            <span id="p2SecondaryLabel">P2 points</span>
+            <button class="btn" data-cmd="balls_sub" data-player="2">−</button>
+            <span class="score-value" id="p2SecondaryValue">0</span>
+            <button class="btn" data-cmd="balls_add" data-player="2">+</button>
+          </div>
+        </div>
+      </div>
+      <div class="panel" id="breakerPanel">
+        <h2>Breaking / Active player</h2>
+        <p id="breakerHint"></p>
+        <div class="row">
+          <button class="btn" id="breakerP1Btn" data-cmd="select_breaker" data-slot="1">P1 breaker</button>
+          <button class="btn" id="breakerP2Btn" data-cmd="select_breaker" data-slot="2">P2 breaker</button>
+        </div>
+        <div class="row">
+          <button class="btn" id="activeP1Btn" data-cmd="toggle_active_player" data-isp1="true">Active P1</button>
+          <button class="btn" id="activeP2Btn" data-cmd="toggle_active_player" data-isp1="false">Active P2</button>
+        </div>
+      </div>
+      <div class="panel hidden" id="ballGridPanel">
+        <h2>Balls</h2>
+        <p id="ballGridHint" class="ball-grid-hint hidden"></p>
+        <div id="ballGrid" class="ball-grid"></div>
+      </div>
+      <div class="panel">
+        <h2>Match</h2>
+        <div class="row equal">
+          <button class="btn danger" data-cmd="reset_scores">Reset score</button>
+          <button class="btn" data-cmd="end_match">End match</button>
+          <button class="btn" id="callMatchBtn" data-cmd="call_match_early">Call match</button>
+        </div>
+      </div>
+      <div class="panel" id="replayPanel">
+        <h2>Replay</h2>
+        <div class="row equal">
+          <button class="btn" data-cmd="toggle_monitoring">Monitor</button>
+          <button class="btn" data-cmd="instant_replay">Instant replay</button>
+        </div>
+        <div class="row clips">
+          <button class="btn" data-cmd="play_clip" data-index="0">Clip 1</button>
+          <button class="btn" data-cmd="play_clip" data-index="1">Clip 2</button>
+          <button class="btn" data-cmd="play_clip" data-index="2">Clip 3</button>
+          <button class="btn" data-cmd="play_clip" data-index="3">Clip 4</button>
+          <button class="btn" data-cmd="play_clip" data-index="4">Clip 5</button>
+        </div>
+      </div>
+    </section>
+    <p id="error" class="error hidden"></p>
+  </main>
+  <script type="module" src="/web/mobile/app.js"></script>
+</body>
+</html>

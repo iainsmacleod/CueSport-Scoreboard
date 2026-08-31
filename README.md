@@ -34,6 +34,7 @@ Display player names, race and game info, racks (and balls where needed), logos,
   - [Settings](#settings)
 - [OBS WebSocket Setup](#obs-websocket-setup)
 - [Instant Replay](#instant-replay)
+- [CueSport Cloud](#cuesport-cloud)
 - [Stream Promotion](#stream-promotion)
 - [Player Statistics](#player-statistics)
 - [Game Types & Scoring Modes](#game-types--scoring-modes)
@@ -256,6 +257,43 @@ Click **Update Sources** after editing names. Names must match OBS **exactly** (
 
 ---
 
+## CueSport Cloud
+
+Optional **remote mobile control**, **match event logging**, and **public stream listing** via the CueSport Cloud backend ([`backend/`](backend/)). Self-host for free (GPL) or use the hosted service at **[https://cuesports.macleod.systems](https://cuesports.macleod.systems)**.
+
+### Features
+
+- **Mobile web control** — score, breaking player, ball grid, race/game setup, match lifecycle, and OBS replay from your phone
+- **Stats-safe relay** — mobile commands invoke the same dock functions as the control panel (`postScore`, `selectRackBreaker`, etc.)
+- **Cloud event log** — every command and session is stored for future stats dashboards
+- **Google sign-in** (hosted) or **API key** (self-host) in the Replay/Share tab
+
+### Quick start (self-host)
+
+```bash
+cd backend
+cp .env.example .env
+npm install
+npm start
+```
+
+1. Open **http://localhost:3000/dashboard** and dev-sign-in with your email.
+2. In OBS **Replay/Share**, use **CueSport Cloud** → **Self-host settings** → server URL, room ID, and API key.
+3. Enable the **CueSport Cloud** toggle.
+4. On your phone, open **http://localhost:3000/m/{room_id}** and connect with the same email.
+
+See [`backend/README.md`](backend/README.md) for Supabase/Google OAuth production setup.
+
+### Hosted vs self-host
+
+| | Hosted | Self-host |
+|---|--------|-----------|
+| Auth | Sign in with Google in dock | API key + server URL |
+| Backend | `cuesports.macleod.systems` | Your own `backend/` deployment |
+| Cost | Optional paid tier (later) | Free (you run the server) |
+
+---
+
 ## Stream Promotion
 
 Optional listing on **[https://cuesports.macleod.systems](https://cuesports.macleod.systems)** so others can find streams that are currently on air with live match info.
@@ -451,6 +489,12 @@ python -m http.server 8765
 ```
 
 Open `http://localhost:8765/tests/smoke_test.html` and click **Run all tests**. Coverage includes core wiring and version; Setup (**Game Selection** / **Game Information**, player details, game-variant option integrity); dock **zoom** and **tab** persistence; Stats tab restore; **Manual Adjustments** layout (chosen ball placement, player-tracking block visibility); Show Scores / Ball Scoring preference handling; Stats tab (Player Stats, Import / Export / Clear, per-game overlay visibility toggles); **OverlayVisibility** (stats toggles through initial build, broadcast rebuild, and Snooker live publish); overlay mode toggles and payload sync; stats APIs and match history; live H2H / in-progress match editing; **Breaking Player?** / **Active Player** (all game types with Ball Scoring on, section hidden when off, race-complete lock, player switching, International Red/Yellow auto-assign); Snooker (frames/points, Golden Ball, fouls, Free Ball, undo stack, scoring lock, overlay Display Balls rules); Ball Scoring rack wins (8/9/10-ball, Straight 14.1 re-rack, Bank/One Pocket); **Call Match Early** modal copy; replay clip delete note; and related UI labels.
+
+**CueSport Cloud** (requires `backend` running on port 3000 or 4003):
+
+- API/WebSocket (headless): `cd backend && npm test` (or `npm test -- http://localhost:4003`)
+- Browser relay tests: `http://localhost:8765/tests/cloud_relay_test.html` (`?server=http://localhost:4003` for Docker)
+- Control panel **Cloud** suite in smoke tests above; optional backend checks via `?cloud=http://localhost:4003` on smoke_test URL
 
 ---
 

@@ -446,6 +446,69 @@
             }
             await sleep(50);
 
+            // --- CueSport Cloud (client modules in control panel) ---
+            assert('Cloud', 'cloudRelay loaded', typeof cp.cloudRelay === 'object');
+            assert('Cloud', 'cloudCommands loaded', typeof cp.cloudCommands === 'object');
+            assert('Cloud', 'signInWithGoogle exposed', typeof cp.signInWithGoogle === 'function');
+            assert('Cloud', 'toggleCloudRelay exposed', typeof cp.toggleCloudRelay === 'function');
+            assert('Cloud', 'cloudRelayToggle in DOM', !!cp.document.getElementById('cloudRelayToggle'));
+            assert('Cloud', 'cloudSelfHostModal in DOM', !!cp.document.getElementById('cloudSelfHostModal'));
+            assert('Cloud', 'cloudRelayStatus in DOM', !!cp.document.getElementById('cloudRelayStatus'));
+            assert('Cloud', 'cloudRelay.hasCredentials fn', typeof cp.cloudRelay.hasCredentials === 'function');
+            assert('Cloud', 'cloudRelay.sendSession fn', typeof cp.cloudRelay.sendSession === 'function');
+            assert('Cloud', 'cloudRelay.sendCommand fn', typeof cp.cloudRelay.sendCommand === 'function');
+            assert('Cloud', 'cloudCommands.runCommand fn', typeof cp.cloudCommands.runCommand === 'function');
+            assert('Cloud', 'undoLastScoringAction on dock', typeof cp.undoLastScoringAction === 'function');
+            assert('Cloud', 'isDualScoreMode on dock', typeof cp.isDualScoreMode === 'function');
+            assert('Cloud', 'Snooker dual-score helper treats game8 as frames+points',
+                (function () {
+                    const orig = cp.getStoredGameType ? cp.getStoredGameType() : cp.getStorageItem('gameType');
+                    cp.setStorageItem('gameType', 'game8');
+                    const dual = cp.isDualScoreMode() === true;
+                    const primary = cp.getPrimaryScoreSuffix() === 'Frames';
+                    const secondary = cp.getSecondaryScoreSuffix() === 'Points';
+                    cp.setStorageItem('gameType', orig || 'game1');
+                    return dual && primary && secondary;
+                })());
+
+            const cloudPrefix = (cp.INSTANCE_ID ? cp.INSTANCE_ID + '_' : '') + 'cloudRelay_';
+            cp.localStorage.removeItem(cloudPrefix + 'roomId');
+            cp.localStorage.removeItem(cloudPrefix + 'apiKey');
+            cp.localStorage.removeItem(cloudPrefix + 'accessToken');
+            assert('Cloud', 'hasCredentials false when empty', cp.cloudRelay.hasCredentials() === false);
+
+            cp.cloudRelay.setCredentials({
+                serverUrl: 'http://localhost:3000',
+                roomId: '00000000-0000-0000-0000-000000000099',
+                apiKey: '0123456789abcdef0123456789abcdef'
+            });
+            assert('Cloud', 'hasCredentials true when configured', cp.cloudRelay.hasCredentials() === true);
+
+            cp.localStorage.removeItem(cloudPrefix + 'roomId');
+            cp.localStorage.removeItem(cloudPrefix + 'apiKey');
+
+            const cloudServer = new URLSearchParams(window.location.search).get('cloud') || 'http://localhost:3000';
+            try {
+                const cloudHealth = await fetch(cloudServer + '/health', { signal: AbortSignal.timeout(3000) });
+                const cloudBody = await cloudHealth.json();
+                assert('Cloud', 'Backend health (optional)', cloudHealth.ok && cloudBody.ok === true, cloudServer);
+                if (cloudHealth.ok) {
+                    const devEmail = 'smoke-cp-' + Date.now() + '@test.local';
+                    const loginRes = await fetch(cloudServer + '/api/auth/dev-login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: devEmail }),
+                        signal: AbortSignal.timeout(5000)
+                    });
+                    const loginBody = await loginRes.json();
+                    assert('Cloud', 'Backend dev-login', loginRes.ok && loginBody.access_token?.startsWith('dev:'));
+                    assert('Cloud', 'Backend dev-login room', !!loginBody.room?.id);
+                }
+            } catch (cloudErr) {
+                assert('Cloud', 'Backend health (optional)', false,
+                    'skipped — start backend or pass ?cloud=http://localhost:4003');
+            }
+
             // --- Overlay ---
             clearScopedStorage(cp, 'overlayStatsMode');
             cp.localStorage.setItem('h2hOverlayEnabled', 'yes');

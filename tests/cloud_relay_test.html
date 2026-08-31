@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>CueSport Cloud Relay Tests</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 1rem; background: #111; color: #eee; max-width: 720px; }
+    .pass { color: #9ece6a; }
+    .fail { color: #f7768e; }
+    .skip { color: #e0af68; }
+    button { padding: 0.5rem 1rem; cursor: pointer; }
+    code { background: #1a1b26; padding: 2px 6px; border-radius: 4px; }
+    ul { padding-left: 1.2rem; }
+  </style>
+</head>
+<body>
+  <h1>CueSport Cloud Relay Tests</h1>
+  <p>
+    Backend: <code id="serverUrl">http://localhost:3000</code>
+    (override with <code>?server=http://localhost:4003</code>)
+  </p>
+  <button id="runBtn">Run all tests</button>
+  <p id="summary"></p>
+  <ul id="results"></ul>
+  <script src="../common/js/cloud_relay.js"></script>
+  <script>
+    const SERVER = new URLSearchParams(location.search).get('server') || 'http://localhost:3000';
+    document.getElementById('serverUrl').textContent = SERVER;
+
+    function log(msg, status) {
+      const li = document.createElement('li');
+      li.className = status;
+      li.textContent = (status === 'pass' ? 'PASS: ' : status === 'skip' ? 'SKIP: ' : 'FAIL: ') + msg;
+      document.getElementById('results').appendChild(li);
+      return status === 'pass';
+    }
+
+    async function fetchJson(path, options) {
+      const res = await fetch(SERVER + path, options);
+      const body = await res.json().catch(() => ({}));
+      return { ok: res.ok, body };
+    }
+
+    function wsJoin(payload) {
+      const wsUrl = SERVER.replace(/^http/, 'ws') + '/ws';
+      return new Promise((resolve, reject) => {
+        const ws = new WebSocket(wsUrl);
+        const t = setTimeout(() => { ws.close(); reject(new Error('timeout')); }, 8000);
+        ws.onopen = () => ws.send(JSON.stringify({ type: 'join', ...payload }));
+        ws.onmessage = (ev) => {
+          const data = JSON.parse(ev.data);
+          if (data.type === 'joined') {
+            clearTimeout(t);
+            resolve({ ws, data });
+          } else if (data.type === 'error') {
+            clearTimeout(t);
+            ws.close();
+            reject(new Error(data.message || data.code));
+          }
+        };
+        ws.onerror = () => { clearTimeout(t); reject(new Error('ws error')); };
+      });
+    }
+
+    async function runTests() {
+      document.getElementById('results').innerHTML = '';
+      document.getElementById('summary').textContent = '';
+      let passed = 0, failed = 0, skipped = 0;
+      function assert(name, cond, detail) {
+        if (cond) { passed++; log(name, 'pass'); }
+        else { failed++; log(name + (detail ? ' (' + detail + ')' : ''), 'fail'); }
+      }
+      function skip(name, reason) {
+        skipped++;
+        log(name + (reason ? ' — ' + reason : ''), 'skip');
+      }
+
+      // Backend unreachable → skip API tests
+      const health = await fetch(SERVER + '/health').then(r => r.json()).catch(() => null);
+      if (!health?.ok) {
+        skip('Backend tests', 'Start backend: cd backend && npm start');
+        assert('cloudRelay global exists', typeof window.cloudRelay === 'object');
+        document.getElementById('summary').textContent = `${passed} passed, ${failed} failed, ${skipped} skipped (backend offline)`;
+        return;
+      }
+
+      assert('Health endpoint', health.ok === true);
+
+      assert('Dashboard CSS', (await fetch(SERVER + '/web/shared/styles.css')).ok);
+      assert('Dashboard app.js', (await fetch(SERVER + '/web/dashboard/app.js')).ok);
+
+      const email = 'browser-test-' + Date.now() + '@cuesport.test';
+      const login = await fetchJson('/api/auth/dev-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      assert('Dev login', login.ok && login.body.access_token?.startsWith('dev:'));
+      assert('Dev login room', !!login.body.room?.id);
+
+      const token = login.body.access_token;
+      const roomId = login.body.room.id;
+
+      const keyRes = await fetchJson('/api/api-keys', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label: 'browser-test' }),
+      });
+      assert('Create API key', keyRes.ok && keyRes.body.key?.length === 32);
+      const apiKey = keyRes.body.key;
+
+      let mobileJoin;
+      try {
+        mobileJoin = await wsJoin({ room_id: roomId, client: 'mobile', access_token: token });
+        assert('WS join mobile (dev token)', mobileJoin.data.room_id === roomId);
+        mobileJoin.ws.close();
+      } catch (e) {
+        assert('WS join mobile (dev token)', false, e.message);
+      }
+
+      let dockJoin;
+      try {
+        dockJoin = await wsJoin({ room_id: roomId, client: 'dock', api_key: apiKey });
+        assert('WS join dock (api key)', dockJoin.data.room_id === roomId);
+      } catch (e) {
+        assert('WS join dock (api key)', false, e.message);
+      }
+
+      if (dockJoin) {
+        try {
+          const mobile2 = await wsJoin({ room_id: roomId, client: 'mobile', access_token: token });
+          const cmdPromise = new Promise((resolve, reject) => {
+            const t = setTimeout(() => reject(new Error('no command')), 5000);
+            mobile2.ws.onmessage = (ev) => {
+              const d = JSON.parse(ev.data);
+              if (d.type === 'command') { clearTimeout(t); resolve(d); }
+            };
+          });
+          dockJoin.ws.send(JSON.stringify({
+            type: 'command', room_id: roomId, action: 'score_add',
+            payload: { player: '1' }, source: 'dock',
+          }));
+          const cmd = await cmdPromise;
+          assert('Command relay', cmd.action === 'score_add');
+          mobile2.ws.close();
+          dockJoin.ws.close();
+        } catch (e) {
+          assert('Command relay', false, e.message);
+          dockJoin.ws.close();
+        }
+      }
+
+      assert('cloudRelay global', typeof window.cloudRelay === 'object');
+      assert('cloudRelay.hasCredentials', typeof window.cloudRelay.hasCredentials === 'function');
+      assert('cloudRelay.sendSession', typeof window.cloudRelay.sendSession === 'function');
+
+      window.cloudRelay.setCredentials({ serverUrl: SERVER, roomId: 'test-room', apiKey: 'abc' });
+      assert('hasCredentials when configured', window.cloudRelay.hasCredentials() === true);
+
+      document.getElementById('summary').textContent =
+        passed + ' / ' + (passed + failed) + ' passed' + (skipped ? ', ' + skipped + ' skipped' : '');
+      document.getElementById('summary').className = failed ? 'fail' : 'pass';
+    }
+
+    document.getElementById('runBtn').onclick = () => runTests().catch(e => log(e.message, 'fail'));
+  </script>
+</body>
+</html>

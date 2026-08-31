@@ -29,9 +29,12 @@ for more information about Salotto please visit https://salotto.app
     </script>
     <script src="./common/js/obs-websocket-js.js?v=7.2.2"></script>
     <script src="./common/js/jquery.js?v=7.2.2"></script>
+    <script src="./common/js/cloud_relay.js?v=7.2.2"></script>
     <script src="./common/js/stream_sharing.js?v=7.2.2"></script>
     <script src="./common/js/player_stats.js?v=7.2.2"></script>
     <script src="./common/js/control_panel.js?v=7.2.2"></script>
+    <script src="./common/js/cloud_commands.js?v=7.2.2"></script>
+    <script src="./common/js/cloud_auth.js?v=7.2.2"></script>
     <script src="hotkeys.js?v=7.2.2"></script>
 
     <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
@@ -529,6 +532,43 @@ for more information about Salotto please visit https://salotto.app
                 </div>
             </div>
             
+            <!-- CueSport Cloud Section -->
+            <div class="section-header-with-controls">
+                <span id="cloudRelayLabel">
+                    CueSport Cloud (<a href="https://cuesports.macleod.systems" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: underline;">remote control + stats</a>)
+                </span>
+                <div class="section-controls">
+                    <button class="settings-cog-btn" id="cloudSelfHostCog" onclick="openCloudSelfHostModal()" title="Self-host settings">
+                        &#x2699;
+                    </button>
+                    <label class="switch toggle">
+                        <input type="checkbox" id="cloudRelayToggle" onchange="toggleCloudRelay()" />
+                        <span class="slider_round"></span>
+                    </label>
+                </div>
+            </div>
+            <div class="column form-rows" style="margin-bottom: 10px;">
+                <div class="form-row">
+                    <div class="field">
+                        <div class="hover obs28 button" onclick="signInWithGoogle()">Sign in with Google</div>
+                    </div>
+                    <div class="field">
+                        <div class="hover obs28 button" onclick="signOutCloud()">Sign out</div>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="field">
+                        <span id="cloudSignedInEmail" style="font-size: 0.85em;"></span>
+                        &nbsp;|&nbsp;Status: <span id="cloudRelayStatus">Off</span>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="field">
+                        <a href="#" onclick="openCloudSelfHostModal(); return false;" style="font-size: 0.85em;">Self-host settings (server URL, room ID, API key)</a>
+                    </div>
+                </div>
+            </div>
+
             <!-- Stream Promotion Section -->
             <div class="section-header-with-controls">
                 <span id="streamSharingLabel">
@@ -634,6 +674,42 @@ for more information about Salotto please visit https://salotto.app
                         <div class="modal-footer-buttons">
                             <button class="modal-save-btn hover obs28 button" onclick="saveStreamPromotionSettings()">Save</button>
                             <button class="modal-cancel-btn hover obs28 button" onclick="closeStreamPromotionSettingsModal()">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CueSport Cloud Self-Host Modal -->
+            <div id="cloudSelfHostModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2>CueSport Cloud — Self-host</h2>
+                        <span class="modal-close" onclick="closeCloudSelfHostModal()">&times;</span>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-row">
+                            <div class="field">
+                                <label for="cloudServerUrlModal">Server URL:</label>
+                                <input type="text" id="cloudServerUrlModal" placeholder="http://localhost:3000" style="width: 100%;" />
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="field">
+                                <label for="cloudRoomIdModal">Room ID:</label>
+                                <input type="text" id="cloudRoomIdModal" placeholder="UUID from dashboard" style="width: 100%;" />
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="field">
+                                <label for="cloudApiKeyModal">API key (self-host only):</label>
+                                <input type="text" id="cloudApiKeyModal" placeholder="32-char hex key" style="width: 100%;" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <div class="modal-footer-buttons">
+                            <button class="modal-save-btn hover obs28 button" onclick="saveCloudSelfHostSettings()">Save</button>
+                            <button class="modal-cancel-btn hover obs28 button" onclick="closeCloudSelfHostModal()">Cancel</button>
                         </div>
                     </div>
                 </div>

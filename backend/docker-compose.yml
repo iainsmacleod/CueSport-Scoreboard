@@ -1,0 +1,25 @@
+services:
+  cuesport-cloud:
+    build: .
+    image: cuesport-cloud:local
+    container_name: cuesport-cloud
+    ports:
+      # Host 4003 matches legacy stream-backend port; use PUBLIC_URL=http://localhost:4003
+      - "4003:3000"
+    volumes:
+      - ./data:/app/data
+      - ../common/images:/app/common/images:ro
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOST: 0.0.0.0
+      SQLITE_PATH: /app/data/cuesport.db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s

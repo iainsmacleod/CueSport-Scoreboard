@@ -36,6 +36,12 @@
     const STATS_VISIBILITY_STORAGE_KEY = 'statsVisibility';
     const STATS_VISIBILITY_GAME_TYPE_KEY = 'statsVisibilityGameType';
 
+    function emitCloudSession(action, payload) {
+        if (window.cloudRelay && typeof window.cloudRelay.sendSession === 'function') {
+            window.cloudRelay.sendSession(action, payload || {});
+        }
+    }
+
     function readStatsVisibilityConfig() {
         if (typeof getStorageItem === 'function') {
             try {
@@ -993,6 +999,12 @@
         activeMatchSession.straightPoolRunSlot = null;
         activeMatchSession.straightPoolRunLength = 0;
         await persistPendingSession();
+        emitCloudSession('start', {
+            sessionId: match.id,
+            gameType: context.gameType,
+            player1: match.player1Name,
+            player2: match.player2Name,
+        });
         return true;
     }
 
@@ -1685,6 +1697,12 @@
         activeMatchSession.status = 'completed';
         activeMatchSession.matchCompletedRecorded = true;
         await persistPendingSession();
+        emitCloudSession('end', {
+            matchId: match.id,
+            winnerSlot: winnerSlot,
+            scores: scores,
+            reason: 'race_complete',
+        });
         broadcastOverlayStatsIfEnabled();
     }
 
@@ -1743,6 +1761,7 @@
             activeMatchSession.status = 'completed';
             activeMatchSession.matchCompletedRecorded = true;
             await persistPendingSession();
+            emitCloudSession('end', { reason: 'call_early', scores: scores });
             broadcastOverlayStatsIfEnabled();
         }
         return true;
@@ -1856,6 +1875,7 @@
         if (endMatch) {
             // End Match: rack/frame stats are already stored on the match row. The scoreboard
             // is cleared before this runs, so do not persist finalScore from live storage.
+            emitCloudSession('end', { reason: 'end_match' });
             await resetSessionState();
             await ensureActiveSession();
             broadcastOverlayStatsIfEnabled();

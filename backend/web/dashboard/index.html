@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CueSport Cloud — Dashboard</title>
+  <link rel="stylesheet" href="/web/shared/styles.css" />
+</head>
+<body>
+  <header>
+    <h1>CueSport Cloud</h1>
+    <p class="subtitle">Account &amp; room management</p>
+  </header>
+  <main id="app">
+    <section id="loginSection">
+      <p>Sign in to manage rooms and API keys for remote mobile control.</p>
+      <button id="googleBtn" class="btn primary">Sign in with Google</button>
+      <div class="dev-login">
+        <label>Dev login (local/self-host)</label>
+        <input type="email" id="devEmail" placeholder="you@example.com" />
+        <button id="devLoginBtn" class="btn">Dev sign in</button>
+      </div>
+    </section>
+    <section id="dashboardSection" class="hidden">
+      <p id="userEmail"></p>
+      <h2>Rooms</h2>
+      <ul id="roomList"></ul>
+      <h2>API keys (self-host)</h2>
+      <button id="createKeyBtn" class="btn">Create API key</button>
+      <pre id="newKeyDisplay" class="hidden"></pre>
+      <ul id="keyList"></ul>
+      <p><a id="mobileLink" href="#">Open mobile control</a></p>
+      <button id="signOutBtn" class="btn">Sign out</button>
+    </section>
+    <p id="error" class="error hidden"></p>
+  </main>
+  <script type="module" src="/web/dashboard/app.js"></script>
+</body>
+</html>

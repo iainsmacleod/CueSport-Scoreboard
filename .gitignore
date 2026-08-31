@@ -14,8 +14,9 @@ yarn.lock
 .env.development
 *.env
 
-# Backend (not deployed with the OBS scoreboard package)
-backend/
+# Backend local data (schema and source are tracked)
+backend/data/
+backend/node_modules/
 
 # Database files (SQLite)
 *.db
