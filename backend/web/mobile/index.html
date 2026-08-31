@@ -44,7 +44,7 @@
         <div id="liveBoard" class="live-board">
           <div id="liveMeta" class="live-meta"></div>
           <div class="panel live-inline-panel" id="playerSlotPanel">
-            <h2 id="playerSlotQuestion">Active player</h2>
+            <h2 id="playerSlotQuestion">Active Player</h2>
             <div class="row equal">
               <button type="button" class="btn" id="playerSlotP1Btn" data-cmd="player_slot" data-slot="1">P1</button>
               <button type="button" class="btn" id="playerSlotP2Btn" data-cmd="player_slot" data-slot="2">P2</button>
@@ -97,11 +97,10 @@
             </div>
           </div>
           <div class="panel live-inline-panel" id="matchPanel">
-            <h2>Match</h2>
             <div class="row equal">
-              <button class="btn danger" id="resetScoresBtn" data-cmd="reset_scores">Reset rack</button>
-              <button class="btn" data-cmd="end_match">End match</button>
-              <button class="btn" id="callMatchBtn" data-cmd="call_match_early">Call match</button>
+              <button class="btn danger" id="resetScoresBtn" data-cmd="reset_scores">Reset Rack</button>
+              <button class="btn" data-cmd="end_match">End Match</button>
+              <button class="btn" id="callMatchBtn" data-cmd="call_match_early">Call Match</button>
             </div>
           </div>
           <div id="syncHint" class="sync-hint hidden">Updating…</div>
@@ -125,7 +124,7 @@
           </div>
         </div>
         <div class="panel" id="setupPanel">
-          <h2>Setup</h2>
+          <h2>Game Setup</h2>
           <label id="raceLabel">Race</label>
           <div class="field-row">
             <input id="raceInput" maxlength="3" />
@@ -133,14 +132,14 @@
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
             </button>
           </div>
-          <label>Game info</label>
+          <label>Game Information</label>
           <div class="field-row">
             <input id="gameInfoInput" maxlength="60" />
             <button type="button" class="icon-btn" id="saveGameInfoBtn" title="Save game info" aria-label="Save game info">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
             </button>
           </div>
-          <label class="admin-only">Game type</label>
+          <label class="admin-only">Game Type</label>
           <div class="field-row admin-only">
             <select id="gameTypeSelect"></select>
             <button type="button" class="icon-btn" id="saveGameTypeBtn" title="Save game type" aria-label="Save game type">
@@ -166,6 +165,25 @@
           </div>
         </div>
       </div>
+
+      <div id="viewShare" class="mobile-view hidden">
+        <div class="panel share-panel">
+          <h2>Public Control Link</h2>
+          <p class="hint share-limitations">
+            Guests can score, pot balls, apply fouls, pick the breaker, and edit race / game info.
+            They cannot change player names, game type, reset or end the match, or use replay.
+          </p>
+          <div id="shareQrWrap" class="share-qr-wrap">
+            <img id="shareQrImg" class="share-qr hidden" alt="QR code for public control link" />
+            <p id="shareStatus" class="hint">Preparing link…</p>
+          </div>
+          <p id="shareUrl" class="share-url hidden"></p>
+          <div class="row equal share-actions">
+            <button type="button" id="shareCopyBtn" class="btn" disabled>Copy link</button>
+            <button type="button" id="shareNativeBtn" class="btn primary" disabled>Share link</button>
+          </div>
+        </div>
+      </div>
     </section>
     <p id="error" class="error hidden"></p>
   </main>
@@ -186,6 +204,12 @@
       </svg>
       <span id="navToggleSetupLabel">Setup</span>
     </button>
+    <button type="button" id="navShareBtn" class="mobile-nav-btn admin-only">
+      <svg class="mobile-nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/>
+      </svg>
+      <span>Share</span>
+    </button>
     <button type="button" id="navReplayBtn" class="mobile-nav-btn admin-only">
       <svg class="mobile-nav-icon" viewBox="0 0 24 24" aria-hidden="true">
         <path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
@@ -198,13 +222,13 @@
     <div class="mobile-modal-backdrop" id="snookerFoulBackdrop"></div>
     <div class="mobile-modal-sheet snooker-foul-sheet">
       <div class="mobile-modal-head">
-        <h2 id="snookerFoulTitle">Select fouled ball</h2>
+        <h2 id="snookerFoulTitle">Select Fouled Ball</h2>
         <button type="button" class="icon-btn mobile-modal-close" id="snookerFoulCancel" aria-label="Cancel">×</button>
       </div>
       <p id="snookerFoulHint" class="snooker-foul-hint" aria-live="polite"></p>
       <div id="snookerFoulTargets" class="snooker-foul-targets"></div>
     </div>
   </div>
-  <script type="module" src="/web/mobile/app.js?v=7.2.3-nav-icons"></script>
+  <script type="module" src="/web/mobile/app.js?v=7.2.3-title-case"></script>
 </body>
 </html>

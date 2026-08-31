@@ -284,15 +284,75 @@ ul { padding-left: 1.2rem; }
   max-width: 720px;
   margin: 0 auto;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 1rem;
+  flex-wrap: wrap;
+}
+.site-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
   flex-wrap: wrap;
 }
 .site-nav {
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
+}
+.header-user-email {
+  margin: 0;
+  font-size: 0.85rem;
+  opacity: 0.85;
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-menu {
+  position: relative;
+}
+.account-menu-btn {
+  width: 2.35rem;
+  height: 2.35rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: #24283b;
+  color: #c0caf5;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.account-menu-btn:hover,
+.account-menu-btn[aria-expanded="true"] {
+  background: #414868;
+  outline: 2px solid #7aa2f7;
+}
+.account-menu-btn svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  fill: currentColor;
+}
+.account-menu-panel {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  right: 0;
+  z-index: 30;
+  min-width: 14rem;
+  padding: 0.75rem;
+  background: #16161e;
+  border: 1px solid #292e42;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.account-menu-email {
+  margin: 0 0 0.65rem;
+  font-size: 0.85rem;
+  word-break: break-all;
+  opacity: 0.9;
 }
 .landing-main,
 .dashboard-main {
@@ -323,33 +383,62 @@ ul { padding-left: 1.2rem; }
 }
 .dash-tab {
   flex: 1;
-  padding: 0.55rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  padding: 0.5rem 0.4rem 0.55rem;
   border: none;
   border-radius: 8px;
   background: #414868;
   color: #c0caf5;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  min-height: 3.15rem;
 }
-.dash-tab.active { background: #7aa2f7; color: #1a1b26; font-weight: 600; }
+.dash-tab-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  fill: currentColor;
+}
+.dash-tab.active { background: #7aa2f7; color: #1a1b26; }
+.account-email {
+  margin: 0 0 0.75rem;
+  word-break: break-all;
+  opacity: 0.9;
+}
 .table-cards {
   display: grid;
   gap: 0.75rem;
 }
-.table-card-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.5rem;
+a.table-card {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  text-align: center;
+  transition: border-color 0.15s ease, background 0.15s ease;
+  cursor: pointer;
 }
-.table-card h3 { margin: 0; font-size: 1rem; }
-.table-status { font-size: 0.75rem; opacity: 0.7; }
+a.table-card:hover,
+a.table-card:focus-visible {
+  border-color: #7aa2f7;
+  outline: none;
+}
+.table-card h3 {
+  margin: 0.2rem 0 0.45rem;
+  font-size: 1rem;
+}
+.table-status {
+  margin: 0;
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
 .table-status.online { color: #9ece6a; opacity: 1; }
-.table-players { margin: 0.35rem 0 0.15rem; font-weight: 600; }
-.table-score { margin: 0; font-size: 1.1rem; }
-.table-meta { font-size: 0.8rem; opacity: 0.75; margin: 0.35rem 0 0.75rem; }
-.table-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
-.guest-url { font-size: 0.75rem; word-break: break-all; margin-top: 0.5rem; opacity: 0.9; }
+.table-players { margin: 0.15rem 0; font-weight: 600; }
+.table-score { margin: 0; font-size: 1.15rem; font-weight: 700; }
+.table-caption { font-size: 0.75rem; opacity: 0.65; margin: 0.45rem 0 0; }
 .user-email { opacity: 0.9; margin-bottom: 0.25rem; }
 .key-display {
   background: #1a1b26;
@@ -490,3 +579,27 @@ a.mobile-nav-btn {
   display: flex;
 }
 .mobile-view { min-height: 1px; }
+.share-panel h2 { margin-top: 0; text-align: center; }
+.share-limitations { text-align: center; margin-bottom: 1rem; }
+.share-qr-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+.share-qr {
+  width: 220px;
+  height: 220px;
+  background: #fff;
+  border-radius: 8px;
+  padding: 0.5rem;
+}
+.share-url {
+  font-size: 0.8rem;
+  word-break: break-all;
+  text-align: center;
+  opacity: 0.85;
+  margin: 0.5rem 0 0.75rem;
+}
+.share-actions { margin-top: 0.25rem; }

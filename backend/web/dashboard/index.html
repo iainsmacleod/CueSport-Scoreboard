@@ -3,59 +3,86 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>CueSport Cloud — Dashboard</title>
+  <title>CueSport Scoreboard Cloud — Dashboard</title>
   <link rel="stylesheet" href="/web/shared/styles.css" />
 </head>
 <body>
   <header class="site-header">
     <div class="site-header-inner">
       <div>
-        <h1>CueSport Cloud</h1>
-        <p class="subtitle">Account &amp; tables</p>
+        <h1>CueSport Scoreboard Cloud</h1>
       </div>
-      <nav class="site-nav">
-        <a class="btn" href="/">Home</a>
-        <a class="btn" href="/streams">Live streams</a>
-      </nav>
+      <div class="site-header-actions">
+        <nav class="site-nav">
+          <a class="btn" href="/streams">Live Streams</a>
+        </nav>
+      </div>
     </div>
   </header>
   <main id="app" class="dashboard-main">
     <section id="loginSection" class="panel">
-      <h2>Sign in</h2>
+      <h2>Sign In</h2>
       <p>Manage tables, API keys, and mobile control links.</p>
-      <button id="googleBtn" class="btn primary block">Sign in with Google</button>
+      <button id="googleBtn" class="btn primary block">Sign In with Google</button>
       <div class="dev-login">
-        <label>Dev login (local/self-host)</label>
+        <label>Dev Login (Local/Self-Host)</label>
         <input type="email" id="devEmail" placeholder="you@example.com" />
-        <button id="devLoginBtn" class="btn block">Dev sign in</button>
+        <button id="devLoginBtn" class="btn block">Dev Sign In</button>
       </div>
     </section>
 
     <section id="dashboardSection" class="hidden">
-      <p id="userEmail" class="user-email"></p>
       <div class="dash-tabs">
-        <button type="button" class="dash-tab active" data-tab="control">Tables &amp; control</button>
-        <button type="button" class="dash-tab" data-tab="stats">Stats &amp; account</button>
+        <button type="button" class="dash-tab active" data-tab="tables">
+          <svg class="dash-tab-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/>
+            <circle cx="12" cy="12" r="2.2" fill="currentColor"/>
+            <circle cx="8.2" cy="9.2" r="1.1" fill="currentColor"/>
+            <circle cx="15.8" cy="9.2" r="1.1" fill="currentColor"/>
+            <circle cx="9.2" cy="15.2" r="1.1" fill="currentColor"/>
+            <circle cx="14.8" cy="15.2" r="1.1" fill="currentColor"/>
+          </svg>
+          <span>Tables</span>
+        </button>
+        <button type="button" class="dash-tab" data-tab="stats">
+          <svg class="dash-tab-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 20h3V10H4v10zm6.5 0h3V4h-3v16zM17 20h3v-7h-3v7z"/>
+          </svg>
+          <span>Stats</span>
+        </button>
+        <button type="button" class="dash-tab" data-tab="account">
+          <svg class="dash-tab-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v1.2h19.2v-1.2c0-3.2-6.4-4.8-9.6-4.8z"/>
+          </svg>
+          <span>Account</span>
+        </button>
       </div>
 
-      <div id="tabControl" class="dash-tab-panel">
-        <p class="hint">Only OBS docks currently connected to CueSport Cloud appear here. Tap Control for mobile scoring, or create a guest link.</p>
+      <div id="tabTables" class="dash-tab-panel">
+        <p class="hint">Only OBS docks currently connected appear here. Tap a table to open mobile control. Each OBS <code>?instance=</code> is a separate table.</p>
         <div id="tableCards" class="table-cards"></div>
       </div>
 
       <div id="tabStats" class="dash-tab-panel hidden">
         <div class="panel">
-          <h2>Player stats (cloud sync)</h2>
+          <h2>Player Stats (Cloud Sync)</h2>
           <p class="hint">Coming soon: sync roster and match history from local IndexedDB to your account, with search and filters.</p>
         </div>
+      </div>
+
+      <div id="tabAccount" class="dash-tab-panel hidden">
         <div class="panel">
-          <h2>API keys (self-host dock)</h2>
+          <h2>Signed In</h2>
+          <p id="userEmail" class="account-email"></p>
+          <button type="button" id="signOutBtn" class="btn">Sign Out</button>
+        </div>
+        <div class="panel">
+          <h2>API Keys (Self-Host Dock)</h2>
           <p class="hint">Paste into OBS → Replay/Share → CueSport Cloud self-host settings. Room/table ID is assigned automatically per instance.</p>
-          <button id="createKeyBtn" class="btn">Create API key</button>
+          <button id="createKeyBtn" class="btn">Create API Key</button>
           <pre id="newKeyDisplay" class="key-display hidden"></pre>
           <ul id="keyList"></ul>
         </div>
-        <button id="signOutBtn" class="btn">Sign out</button>
       </div>
 
       <p id="error" class="error hidden"></p>

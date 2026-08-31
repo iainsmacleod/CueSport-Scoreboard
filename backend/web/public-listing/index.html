@@ -3,32 +3,32 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>CueSport Cloud</title>
+  <title>CueSport Scoreboard Cloud</title>
   <link rel="stylesheet" href="/web/shared/styles.css" />
 </head>
 <body>
   <header class="site-header">
     <div class="site-header-inner">
       <div>
-        <h1>CueSport Cloud</h1>
+        <h1>CueSport Scoreboard Cloud</h1>
         <p class="subtitle">Remote scoring, multi-table control, and live stream discovery</p>
       </div>
       <nav class="site-nav">
-        <a class="btn" href="/streams">Live streams</a>
-        <a class="btn primary" href="/dashboard">Sign in</a>
+        <a class="btn" href="/streams">Live Streams</a>
+        <a class="btn primary" href="/dashboard">Sign In</a>
       </nav>
     </div>
   </header>
   <main class="landing-main">
     <section class="hero panel">
-      <h2>Score from anywhere</h2>
+      <h2>Score From Anywhere</h2>
       <p>
         Connect your OBS scoreboard dock to CueSport Cloud, then control matches from your phone —
         or share a guest scorer link. Each OBS <code>?instance=</code> table gets its own room automatically.
       </p>
       <div class="hero-actions">
-        <a class="btn primary" href="/dashboard">Open dashboard</a>
-        <a class="btn" href="/streams">Browse live streams</a>
+        <a class="btn primary" href="/dashboard">Open Dashboard</a>
+        <a class="btn" href="/streams">Browse Live Streams</a>
       </div>
     </section>
 
@@ -42,13 +42,13 @@
         <p>Opt-in listing on this site <strong>only while OBS is streaming</strong> with promotion enabled on the dock.</p>
       </article>
       <article class="panel">
-        <h3>Multi-table</h3>
+        <h3>Multi-Table</h3>
         <p>Run multiple OBS docks with different <code>instance</code> IDs — each registers as its own table in your account.</p>
       </article>
     </section>
 
     <section class="panel">
-      <h2>Live now</h2>
+      <h2>Live Now</h2>
       <p class="hint">Only streams with Stream Promotion enabled and OBS actively streaming appear here.</p>
       <ul id="streamList" class="stream-list"></ul>
       <p id="empty" class="hidden">No one is streaming with promotion enabled right now.</p>
@@ -79,7 +79,7 @@
           <h3>${p1} vs ${p2}</h3>
           <p class="score">${score}</p>
           <p class="stream-meta">${st.gameInfo || st.gameType || ''} ${st.raceInfo ? '· ' + st.raceInfo : ''}</p>
-          ${s.stream_url ? `<a href="${s.stream_url}" target="_blank" rel="noopener">Watch stream</a>` : ''}
+          ${s.stream_url ? `<a href="${s.stream_url}" target="_blank" rel="noopener">Watch Stream</a>` : ''}
         `;
         list.appendChild(li);
       });

@@ -3,7 +3,6 @@ import {
   devLogin,
   fetchMe,
   createApiKey,
-  createGuestLink,
   GAME_TYPES,
 } from '../shared/cloud-client.js';
 
@@ -45,31 +44,41 @@ function formatTableCard(room, serverUrl) {
   const scoreLine = dual
     ? `${st.p1Balls ?? 0} – ${st.p2Balls ?? 0} pts · ${st.p1Score ?? 0}–${st.p2Score ?? 0} ${st.primaryScoreLabel || 'frames'}`
     : `${st.p1Score ?? 0} – ${st.p2Score ?? 0}`;
-  const meta = [
+  const matchTitle = [
     gameTypeLabel(st.gameType),
     st.raceInfo ? `${st.raceLabel || 'Race'} ${st.raceInfo}` : null,
     st.gameInfo || null,
-  ].filter(Boolean).join(' · ');
-  const label = room.dock_label || room.label || 'Table';
-  const inst = room.instance_key ? ` (${room.instance_key})` : '';
+  ].filter(Boolean).join(' · ') || 'Match in progress';
+  // Only label extra OBS instances (?instance=foo). "default" / Main table is noise.
+  const instanceKey = (room.instance_key || '').trim();
+  const showTableCaption = instanceKey && instanceKey !== 'default';
+  const tableCaption = showTableCaption
+    ? (room.dock_label && room.dock_label !== 'Main table'
+      ? room.dock_label
+      : instanceKey)
+    : '';
+  const controlUrl = `${serverUrl.replace(/\/$/, '')}/m/${room.id}`;
 
-  const card = document.createElement('article');
+  const card = document.createElement('a');
   card.className = 'table-card panel';
+  card.href = controlUrl;
   card.innerHTML = `
-    <div class="table-card-head">
-      <h3>${label}${inst}</h3>
-      <span class="table-status online">Dock online</span>
-    </div>
+    <p class="table-status online">Dock online</p>
+    <h3>${matchTitle}</h3>
     <p class="table-players">${p1} vs ${p2}</p>
     <p class="table-score">${scoreLine}</p>
-    <p class="table-meta">${meta || 'No match info yet'}</p>
-    <div class="table-actions">
-      <a class="btn primary" href="${serverUrl.replace(/\/$/, '')}/m/${room.id}">Control</a>
-      <button type="button" class="btn guest-link-btn" data-room="${room.id}">Guest link</button>
-    </div>
-    <p class="guest-url hidden" data-guest-for="${room.id}"></p>
+    ${tableCaption ? `<p class="table-caption">${tableCaption}</p>` : ''}
   `;
   return card;
+}
+
+function setActiveDashTab(which) {
+  document.querySelectorAll('.dash-tab').forEach((t) => {
+    t.classList.toggle('active', t.dataset.tab === which);
+  });
+  show('tabTables', which === 'tables');
+  show('tabStats', which === 'stats');
+  show('tabAccount', which === 'account');
 }
 
 async function renderDashboard() {
@@ -96,23 +105,6 @@ async function renderDashboard() {
       });
     }
 
-    container.querySelectorAll('.guest-link-btn').forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        try {
-          const data = await createGuestLink(getServerUrl(), getToken(), btn.dataset.room);
-          const el = container.querySelector(`[data-guest-for="${btn.dataset.room}"]`);
-          if (el) {
-            const server = getServerUrl().replace(/\/$/, '');
-            const url = data.path ? `${server}${data.path}` : data.url;
-            el.innerHTML = `Guest scorer: <a href="${url}" target="_blank" rel="noopener">${url}</a>`;
-            el.classList.remove('hidden');
-          }
-        } catch (err) {
-          setError(err.message);
-        }
-      });
-    });
-
     const keyList = document.getElementById('keyList');
     keyList.innerHTML = '';
     (me.api_keys || []).forEach((k) => {
@@ -128,13 +120,7 @@ async function renderDashboard() {
 }
 
 document.querySelectorAll('.dash-tab').forEach((tab) => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.dash-tab').forEach((t) => t.classList.remove('active'));
-    tab.classList.add('active');
-    const which = tab.dataset.tab;
-    show('tabControl', which === 'control');
-    show('tabStats', which === 'stats');
-  });
+  tab.addEventListener('click', () => setActiveDashTab(tab.dataset.tab));
 });
 
 document.getElementById('devLoginBtn').addEventListener('click', async () => {
@@ -148,6 +134,7 @@ document.getElementById('devLoginBtn').addEventListener('click', async () => {
     if (data.api_key) {
       document.getElementById('newKeyDisplay').textContent = `New API key (copy now): ${data.api_key}`;
       show('newKeyDisplay', true);
+      setActiveDashTab('account');
     }
     await renderDashboard();
   } catch (err) {

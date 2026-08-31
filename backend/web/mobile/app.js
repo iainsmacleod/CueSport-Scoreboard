@@ -1,6 +1,7 @@
 import {
   CloudClient,
   devLogin,
+  createGuestLink,
   GAME_TYPES,
 } from '../shared/cloud-client.js';
 
@@ -13,8 +14,10 @@ let dockPresent = false;
 
 let guestToken = '';
 let isGuestMode = false;
-/** @type {'control' | 'setup' | 'replay'} */
+/** @type {'control' | 'setup' | 'replay' | 'share'} */
 let activeView = 'control';
+let cachedGuestShareUrl = '';
+let guestSharePromise = null;
 
 function pathContext() {
   const parts = window.location.pathname.split('/').filter(Boolean);
@@ -30,11 +33,12 @@ function applyGuestUI() {
   if (title) title.textContent = 'CueSport Scoreboard Guest Control';
   show('loginSection', false);
   show('controlSection', true);
-  ['adminPlayersPanel', 'matchPanel', 'viewReplay'].forEach((id) => show(id, false));
+  ['adminPlayersPanel', 'matchPanel', 'viewReplay', 'viewShare'].forEach((id) => show(id, false));
   document.querySelectorAll('.admin-only').forEach((el) => el.classList.add('hidden'));
-  // Guests keep Setup (race/game info) but not Dashboard/Replay.
   const replayBtn = document.getElementById('navReplayBtn');
   if (replayBtn) replayBtn.classList.add('hidden');
+  const shareBtn = document.getElementById('navShareBtn');
+  if (shareBtn) shareBtn.classList.add('hidden');
   const dash = document.getElementById('dashboardLink');
   if (dash) dash.classList.add('hidden');
   showMobileNav(true);
@@ -49,16 +53,18 @@ function showMobileNav(visible) {
 }
 
 function setActiveView(view) {
-  if (view !== 'control' && view !== 'setup' && view !== 'replay') view = 'control';
-  if (isGuestMode && view === 'replay') view = 'control';
+  if (view !== 'control' && view !== 'setup' && view !== 'replay' && view !== 'share') {
+    view = 'control';
+  }
+  if (isGuestMode && (view === 'replay' || view === 'share')) view = 'control';
   activeView = view;
   show('viewControl', view === 'control');
   show('viewSetup', view === 'setup');
   show('viewReplay', view === 'replay' && !isGuestMode);
+  show('viewShare', view === 'share' && !isGuestMode);
 
   const toggleBtn = document.getElementById('navToggleSetupBtn');
   if (toggleBtn) {
-    // On Control: button says Setup. On Setup (or Replay): button says Control.
     const showControlLabel = view === 'setup';
     toggleBtn.dataset.mode = showControlLabel ? 'control' : 'setup';
     const label = document.getElementById('navToggleSetupLabel');
@@ -68,6 +74,61 @@ function setActiveView(view) {
   }
   const replayBtn = document.getElementById('navReplayBtn');
   if (replayBtn) replayBtn.classList.toggle('active', view === 'replay');
+  const shareBtn = document.getElementById('navShareBtn');
+  if (shareBtn) shareBtn.classList.toggle('active', view === 'share');
+
+  if (view === 'share') {
+    ensureGuestShareLink().catch((err) => setError(err.message || 'Failed to create guest link'));
+  }
+}
+
+async function ensureGuestShareLink() {
+  if (cachedGuestShareUrl) {
+    renderShareLink(cachedGuestShareUrl);
+    return cachedGuestShareUrl;
+  }
+  if (guestSharePromise) return guestSharePromise;
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!roomId || !token) {
+    throw new Error('Sign in required to create a public control link');
+  }
+  const status = document.getElementById('shareStatus');
+  if (status) {
+    status.textContent = 'Preparing link…';
+    status.classList.remove('hidden');
+  }
+  guestSharePromise = createGuestLink(window.location.origin, token, roomId)
+    .then((data) => {
+      const url = data.path
+        ? `${window.location.origin}${data.path}`
+        : data.url;
+      cachedGuestShareUrl = url;
+      renderShareLink(url);
+      return url;
+    })
+    .finally(() => {
+      guestSharePromise = null;
+    });
+  return guestSharePromise;
+}
+
+function renderShareLink(url) {
+  const status = document.getElementById('shareStatus');
+  const urlEl = document.getElementById('shareUrl');
+  const qr = document.getElementById('shareQrImg');
+  const copyBtn = document.getElementById('shareCopyBtn');
+  const shareBtn = document.getElementById('shareNativeBtn');
+  if (status) status.classList.add('hidden');
+  if (urlEl) {
+    urlEl.textContent = url;
+    urlEl.classList.remove('hidden');
+  }
+  if (qr) {
+    qr.src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(url)}`;
+    qr.classList.remove('hidden');
+  }
+  if (copyBtn) copyBtn.disabled = false;
+  if (shareBtn) shareBtn.disabled = false;
 }
 
 function wireMobileNav() {
@@ -81,6 +142,50 @@ function wireMobileNav() {
   if (replayBtn) {
     replayBtn.addEventListener('click', () => {
       setActiveView(activeView === 'replay' ? 'control' : 'replay');
+    });
+  }
+  const shareNavBtn = document.getElementById('navShareBtn');
+  if (shareNavBtn) {
+    shareNavBtn.addEventListener('click', () => {
+      setActiveView(activeView === 'share' ? 'control' : 'share');
+    });
+  }
+  const copyBtn = document.getElementById('shareCopyBtn');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', async () => {
+      if (!cachedGuestShareUrl) return;
+      try {
+        await navigator.clipboard.writeText(cachedGuestShareUrl);
+        copyBtn.textContent = 'Copied';
+        setTimeout(() => { copyBtn.textContent = 'Copy link'; }, 1500);
+      } catch (_) {
+        setError('Could not copy link');
+      }
+    });
+  }
+  const nativeShareBtn = document.getElementById('shareNativeBtn');
+  if (nativeShareBtn) {
+    nativeShareBtn.addEventListener('click', async () => {
+      if (!cachedGuestShareUrl) return;
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: 'CueSport public control link',
+            text: 'Join as guest scorer',
+            url: cachedGuestShareUrl,
+          });
+        } catch (err) {
+          if (err && err.name !== 'AbortError') setError(err.message || 'Share failed');
+        }
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(cachedGuestShareUrl);
+        nativeShareBtn.textContent = 'Link copied';
+        setTimeout(() => { nativeShareBtn.textContent = 'Share link'; }, 1500);
+      } catch (_) {
+        setError('Sharing not supported on this device');
+      }
     });
   }
 }
@@ -182,11 +287,11 @@ function applyState(state) {
   show('playerSlotPanel', true);
   if (slotQuestion) {
     if (slotMode === 'match_locked') {
-      slotQuestion.textContent = 'End match to continue';
+      slotQuestion.textContent = 'End Match to Continue';
     } else if (slotMode === 'breaker') {
-      slotQuestion.textContent = 'Breaking player?';
+      slotQuestion.textContent = 'Breaking Player?';
     } else {
-      slotQuestion.textContent = 'Active player';
+      slotQuestion.textContent = 'Active Player';
     }
   }
   if (slotP1 && slotP2) {
@@ -226,7 +331,7 @@ function applyState(state) {
 
   const resetBtn = document.getElementById('resetScoresBtn');
   if (resetBtn) {
-    resetBtn.textContent = state.gameType === 'game8' ? 'Reset frame' : 'Reset rack';
+    resetBtn.textContent = state.gameType === 'game8' ? 'Reset Frame' : 'Reset Rack';
   }
 
   const replayPanel = document.getElementById('replayPanel');
