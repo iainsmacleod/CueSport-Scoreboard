@@ -66,26 +66,33 @@ function applyState(state) {
 
   document.getElementById('liveP1Name').textContent = p1Name;
   document.getElementById('liveP2Name').textContent = p2Name;
-  document.getElementById('liveP1Score').textContent = String(p1Score);
-  document.getElementById('liveP2Score').textContent = String(p2Score);
 
-  show('ballsPanel', dual);
-  show('liveP1Balls', dual);
-  show('liveP2Balls', dual);
+  show('dualScoresPanel', dual);
+  show('singleScoresPanel', !dual);
+  show('liveP1Secondary', dual);
+  show('liveP2Secondary', dual);
+
   if (dual) {
-    document.getElementById('liveP1Balls').textContent = `${secondaryLabel}: ${p1Balls}`;
-    document.getElementById('liveP2Balls').textContent = `${secondaryLabel}: ${p2Balls}`;
-    document.getElementById('secondaryHeading').textContent = secondaryLabel;
+    document.getElementById('liveP1Score').textContent = String(p1Balls);
+    document.getElementById('liveP2Score').textContent = String(p2Balls);
+    document.getElementById('liveP1Secondary').textContent = `${primaryLabel}: ${p1Score}`;
+    document.getElementById('liveP2Secondary').textContent = `${primaryLabel}: ${p2Score}`;
     document.getElementById('p1SecondaryLabel').textContent = `P1 ${secondaryLabel.toLowerCase()}`;
     document.getElementById('p2SecondaryLabel').textContent = `P2 ${secondaryLabel.toLowerCase()}`;
     document.getElementById('p1SecondaryValue').textContent = String(p1Balls);
     document.getElementById('p2SecondaryValue').textContent = String(p2Balls);
+    document.getElementById('p1PrimaryLabel').textContent = `P1 ${primaryLabel.toLowerCase()}`;
+    document.getElementById('p2PrimaryLabel').textContent = `P2 ${primaryLabel.toLowerCase()}`;
+    document.getElementById('p1PrimaryValue').textContent = String(p1Score);
+    document.getElementById('p2PrimaryValue').textContent = String(p2Score);
+  } else {
+    document.getElementById('liveP1Score').textContent = String(p1Score);
+    document.getElementById('liveP2Score').textContent = String(p2Score);
+    document.getElementById('p1SingleLabel').textContent = `P1 ${primaryLabel.toLowerCase()}`;
+    document.getElementById('p2SingleLabel').textContent = `P2 ${primaryLabel.toLowerCase()}`;
+    document.getElementById('p1SingleValue').textContent = String(p1Score);
+    document.getElementById('p2SingleValue').textContent = String(p2Score);
   }
-
-  document.getElementById('p1PrimaryLabel').textContent = `P1 ${primaryLabel.toLowerCase()}`;
-  document.getElementById('p2PrimaryLabel').textContent = `P2 ${primaryLabel.toLowerCase()}`;
-  document.getElementById('p1PrimaryValue').textContent = String(p1Score);
-  document.getElementById('p2PrimaryValue').textContent = String(p2Score);
 
   const raceLabel = document.getElementById('raceLabel');
   if (raceLabel) raceLabel.textContent = state.raceLabel || (state.gameType === 'game8' ? 'Best Of' : 'Race');

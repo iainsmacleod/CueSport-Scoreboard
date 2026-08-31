@@ -84,9 +84,29 @@ input, select {
 }
 .live-name { font-size: 0.85rem; opacity: 0.9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .live-score { font-size: 2rem; font-weight: 700; line-height: 1.1; }
-.live-balls { font-size: 0.75rem; opacity: 0.8; margin-top: 0.15rem; }
+.live-secondary { font-size: 0.75rem; opacity: 0.75; margin-top: 0.2rem; }
 .live-vs { opacity: 0.5; font-size: 0.8rem; }
 .live-meta { margin-top: 0.45rem; font-size: 0.75rem; opacity: 0.75; }
+.live-inline-panel {
+  margin: 0.65rem 0 0;
+  padding: 0.55rem 0.65rem;
+  background: #1a1b26;
+  border-radius: 8px;
+}
+.live-inline-panel h2 {
+  margin: 0 0 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  opacity: 0.9;
+}
+.live-ball-section {
+  margin-top: 0.65rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid #292e42;
+}
+.ball-grid-live {
+  justify-content: center;
+}
 .sync-hint { margin-top: 0.35rem; font-size: 0.75rem; color: #7aa2f7; }
 .dev-login { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #414868; }
 code { font-size: 0.8rem; word-break: break-all; }
@@ -111,6 +131,22 @@ ul { padding-left: 1.2rem; }
   text-align: center;
   font-weight: 700;
   font-size: 1.15rem;
+}
+.mobile .score-row-primary .score-value {
+  font-size: 1.5rem;
+}
+.mobile .score-row-secondary {
+  opacity: 0.8;
+  margin-top: 0.15rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid #414868;
+}
+.mobile .score-row-secondary .score-value {
+  font-size: 1rem;
+  font-weight: 600;
+}
+.mobile .score-row-secondary span:first-child {
+  font-size: 0.85rem;
 }
 .field-row {
   display: flex;
