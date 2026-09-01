@@ -8,7 +8,15 @@ export class CloudClient {
     this.apiKey = options.apiKey || '';
     this.guestToken = options.guestToken || '';
     this.ws = null;
-    this.handlers = { state: [], command: [], joined: [], error: [], presence: [] };
+    this.handlers = {
+      state: [],
+      command: [],
+      joined: [],
+      error: [],
+      presence: [],
+      close: [],
+      tables: [],
+    };
     this.lastState = {};
     this.connected = false;
   }
@@ -32,7 +40,7 @@ export class CloudClient {
         if (this.guestToken) {
           msg.guest_token = this.guestToken;
           msg.client = 'mobile_guest';
-        } else if (this.roomId) {
+        } else if (this.client !== 'dashboard' && this.roomId) {
           msg.room_id = this.roomId;
         }
         if (this.accessToken) msg.access_token = this.accessToken;
@@ -48,6 +56,9 @@ export class CloudClient {
           if (Array.isArray(data.clients)) {
             this.handlers.presence.forEach((fn) => fn(data.clients));
           }
+          if (Array.isArray(data.rooms)) {
+            this.handlers.tables.forEach((fn) => fn(data.rooms));
+          }
           if (data.state && typeof data.state === 'object' && Object.keys(data.state).length) {
             this.lastState = data.state;
             this.handlers.state.forEach((fn) => fn(data.state));
@@ -57,6 +68,8 @@ export class CloudClient {
         } else if (data.type === 'state') {
           this.lastState = data.state || {};
           this.handlers.state.forEach((fn) => fn(this.lastState));
+        } else if (data.type === 'tables') {
+          this.handlers.tables.forEach((fn) => fn(data.rooms || []));
         } else if (data.type === 'error') {
           this.handlers.error.forEach((fn) => fn(data));
           if (!this.connected) reject(new Error(data.message || data.code));
@@ -64,7 +77,14 @@ export class CloudClient {
           this.handlers.presence.forEach((fn) => fn(data.clients || []));
         }
       };
-      this.ws.onerror = () => reject(new Error('WebSocket error'));
+      this.ws.onerror = () => {
+        if (!this.connected) reject(new Error('WebSocket error'));
+      };
+      this.ws.onclose = () => {
+        const wasConnected = this.connected;
+        this.connected = false;
+        this.handlers.close.forEach((fn) => fn({ wasConnected }));
+      };
     });
   }
 
@@ -82,7 +102,10 @@ export class CloudClient {
   }
 
   disconnect() {
-    if (this.ws) this.ws.close();
+    if (this.ws) {
+      this.ws.onclose = null;
+      this.ws.close();
+    }
     this.ws = null;
     this.connected = false;
   }

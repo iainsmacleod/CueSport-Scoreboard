@@ -7,6 +7,12 @@ const rooms = new Map();
 /** ws -> connection meta */
 const connections = new Map();
 
+/** accountId -> Set<ws> for dashboard live table feeds */
+const accountDashboards = new Map();
+
+/** accountId -> debounce timer for tables push after state churn */
+const tablesNotifyTimers = new Map();
+
 function getRoomClients(roomId) {
   if (!rooms.has(roomId)) {
     rooms.set(roomId, new Set());
@@ -38,6 +44,48 @@ function send(ws, message) {
   }
 }
 
+function buildDashboardRooms(accountId) {
+  return sqlite.getRoomsWithLiveState(accountId).map((room) => ({
+    ...room,
+    dock_connected: roomHasConnectedDock(room.id),
+  }));
+}
+
+function addAccountDashboard(accountId, ws) {
+  if (!accountDashboards.has(accountId)) accountDashboards.set(accountId, new Set());
+  accountDashboards.get(accountId).add(ws);
+}
+
+function removeAccountDashboard(accountId, ws) {
+  const set = accountDashboards.get(accountId);
+  if (!set) return;
+  set.delete(ws);
+  if (!set.size) accountDashboards.delete(accountId);
+}
+
+/** Push full tables snapshot to any open dashboards for this account. */
+function notifyAccountTables(accountId, { immediate = false } = {}) {
+  if (!accountId || !accountDashboards.has(accountId)) return;
+
+  const flush = () => {
+    tablesNotifyTimers.delete(accountId);
+    const set = accountDashboards.get(accountId);
+    if (!set || !set.size) return;
+    const message = { type: 'tables', rooms: buildDashboardRooms(accountId) };
+    for (const ws of set) send(ws, message);
+  };
+
+  if (immediate) {
+    const pending = tablesNotifyTimers.get(accountId);
+    if (pending) clearTimeout(pending);
+    flush();
+    return;
+  }
+
+  if (tablesNotifyTimers.has(accountId)) return;
+  tablesNotifyTimers.set(accountId, setTimeout(flush, 250));
+}
+
 export function handleConnection(ws) {
   const sourceId = uuidv4();
   connections.set(ws, { roomId: null, client: null, accountId: null, sourceId });
@@ -64,7 +112,15 @@ export function handleConnection(ws) {
 
   ws.on('close', () => {
     const meta = connections.get(ws);
-    if (meta?.roomId) {
+    if (!meta) return;
+
+    if (meta.client === 'dashboard' && meta.accountId) {
+      removeAccountDashboard(meta.accountId, ws);
+    }
+
+    if (meta.roomId) {
+      const wasDock = meta.client === 'dock';
+      const accountId = meta.accountId;
       const clients = getRoomClients(meta.roomId);
       for (const c of clients) {
         if (c.ws === ws) clients.delete(c);
@@ -74,6 +130,9 @@ export function handleConnection(ws) {
         room_id: meta.roomId,
         clients: listClientTypes(meta.roomId),
       });
+      if (wasDock && accountId) {
+        notifyAccountTables(accountId, { immediate: true });
+      }
     }
     connections.delete(ws);
   });
@@ -134,6 +193,40 @@ async function handleJoin(ws, meta, msg, authenticateJoin) {
   let roomId = msg.room_id || msg.room;
   let accountId = null;
 
+  // Account-scoped dashboard feed: no room join; push tables on dock/state changes.
+  if (client === 'dashboard') {
+    const auth = await authenticateJoin({
+      apiKey: msg.api_key,
+      accessToken: msg.access_token,
+      client: 'dashboard',
+    });
+    if (auth.error) {
+      send(ws, { type: 'error', code: auth.error, message: auth.message });
+      return;
+    }
+    if (meta.client === 'dashboard' && meta.accountId) {
+      removeAccountDashboard(meta.accountId, ws);
+    }
+    if (meta.roomId) {
+      const old = getRoomClients(meta.roomId);
+      for (const c of old) {
+        if (c.ws === ws) old.delete(c);
+      }
+    }
+    accountId = auth.account.id;
+    meta.accountId = accountId;
+    meta.client = 'dashboard';
+    meta.roomId = null;
+    addAccountDashboard(accountId, ws);
+    send(ws, {
+      type: 'joined',
+      client: 'dashboard',
+      account_id: accountId,
+      rooms: buildDashboardRooms(accountId),
+    });
+    return;
+  }
+
   if (msg.guest_token) {
     const guest = sqlite.findGuestToken(msg.guest_token);
     if (!guest) {
@@ -183,6 +276,10 @@ async function handleJoin(ws, meta, msg, authenticateJoin) {
     return;
   }
 
+  if (meta.client === 'dashboard' && meta.accountId) {
+    removeAccountDashboard(meta.accountId, ws);
+  }
+
   if (meta.roomId) {
     const old = getRoomClients(meta.roomId);
     for (const c of old) {
@@ -216,6 +313,10 @@ async function handleJoin(ws, meta, msg, authenticateJoin) {
     room_id: roomId,
     clients: listClientTypes(roomId),
   }, ws);
+
+  if (client === 'dock') {
+    notifyAccountTables(accountId || room.account_id, { immediate: true });
+  }
 }
 
 function requireJoined(ws, meta) {
@@ -293,6 +394,9 @@ function handleState(ws, meta, msg) {
     ts: new Date().toISOString(),
   };
   broadcast(meta.roomId, envelope, ws);
+  if (meta.accountId) {
+    notifyAccountTables(meta.accountId);
+  }
 }
 
 function handleSession(ws, meta, msg) {
@@ -341,6 +445,7 @@ async function handleLegacyAuth(ws, meta, msg, authenticateJoin) {
   meta.roomId = meta.legacyRoomId;
   getRoomClients(meta.legacyRoomId).add({ ws, client: 'dock', accountId: auth.account.id, sourceId: meta.sourceId });
   send(ws, { type: 'auth', status: 'success' });
+  notifyAccountTables(auth.account.id, { immediate: true });
 }
 
 function handleLegacyUpdate(ws, meta, msg) {
@@ -354,6 +459,7 @@ function handleLegacyUpdate(ws, meta, msg) {
     sqlite.upsertLiveStream(meta.legacyRoomId, state.streamUrl, state);
   }
   send(ws, { type: 'ack', status: 'ok' });
+  if (meta.accountId) notifyAccountTables(meta.accountId);
 }
 
 export function getConnectionCount() {

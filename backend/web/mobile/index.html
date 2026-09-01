@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
   <title>CueSport Scoreboard Cloud Control</title>
-  <link rel="stylesheet" href="/web/shared/styles.css" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=7.2.3-match-confirm" />
 </head>
 <body class="mobile">
   <header>
@@ -99,8 +99,8 @@
           <div class="panel live-inline-panel" id="matchPanel">
             <div class="row equal">
               <button class="btn danger" id="resetScoresBtn" data-cmd="reset_scores">Reset Rack</button>
-              <button class="btn" data-cmd="end_match">End Match</button>
-              <button class="btn" id="callMatchBtn" data-cmd="call_match_early">Call Match</button>
+              <button class="btn danger" data-cmd="end_match">End Match</button>
+              <button class="btn danger" id="callMatchBtn" data-cmd="call_match_early">Call Match</button>
             </div>
           </div>
           <div id="syncHint" class="sync-hint hidden">Updating…</div>
@@ -218,6 +218,21 @@
     </button>
   </nav>
 
+  <div id="confirmModal" class="mobile-modal hidden" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
+    <div class="mobile-modal-backdrop" id="confirmModalBackdrop"></div>
+    <div class="mobile-modal-sheet confirm-modal-sheet">
+      <div class="mobile-modal-head">
+        <h2 id="confirmModalTitle">Confirm</h2>
+        <button type="button" class="icon-btn mobile-modal-close" id="confirmModalCancel" aria-label="Cancel">×</button>
+      </div>
+      <p id="confirmModalMessage" class="confirm-modal-message"></p>
+      <div class="row equal confirm-modal-actions">
+        <button type="button" class="btn" id="confirmModalDismiss">Cancel</button>
+        <button type="button" class="btn danger" id="confirmModalConfirm">Confirm</button>
+      </div>
+    </div>
+  </div>
+
   <div id="snookerFoulModal" class="mobile-modal hidden" role="dialog" aria-modal="true" aria-labelledby="snookerFoulTitle">
     <div class="mobile-modal-backdrop" id="snookerFoulBackdrop"></div>
     <div class="mobile-modal-sheet snooker-foul-sheet">
@@ -229,6 +244,6 @@
       <div id="snookerFoulTargets" class="snooker-foul-targets"></div>
     </div>
   </div>
-  <script type="module" src="/web/mobile/app.js?v=7.2.3-title-case"></script>
+  <script type="module" src="/web/mobile/app.js?v=7.2.3-match-confirm"></script>
 </body>
 </html>

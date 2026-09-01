@@ -203,6 +203,34 @@ function setConnectionStatus(kind) {
   el.classList.add(map[kind] ? kind : 'disconnected');
   el.title = label;
   el.setAttribute('aria-label', label);
+  updateControlsLock();
+}
+
+/** Controls require a live cloud socket AND a dock in the room. */
+function controlsEnabled() {
+  return !!(client && client.connected && dockPresent);
+}
+
+function updateControlsLock() {
+  const locked = !controlsEnabled();
+  document.body.classList.toggle('controls-locked', locked);
+  const live = document.getElementById('liveBoard');
+  if (live) {
+    live.setAttribute('aria-disabled', locked ? 'true' : 'false');
+    if (locked) live.title = controlLockMessage();
+    else live.removeAttribute('title');
+  }
+}
+
+function wireClientLifecycle(c) {
+  c.on('presence', (clients) => {
+    dockPresent = (clients || []).includes('dock');
+    setConnectionStatus(dockPresent ? 'connected' : 'waiting');
+  });
+  c.on('close', () => {
+    dockPresent = false;
+    setConnectionStatus('disconnected');
+  });
 }
 
 function show(id, visible) {
@@ -331,7 +359,7 @@ function applyState(state) {
 
   const resetBtn = document.getElementById('resetScoresBtn');
   if (resetBtn) {
-    resetBtn.textContent = state.gameType === 'game8' ? 'Reset Frame' : 'Reset Rack';
+    resetBtn.textContent = getResetActionLabel();
   }
 
   const replayPanel = document.getElementById('replayPanel');
@@ -677,8 +705,73 @@ function wireSnookerFoulModal() {
   document.getElementById('snookerFoulBackdrop')?.addEventListener('click', closeSnookerFoulPicker);
 }
 
+function getResetActionLabel() {
+  return lastState?.gameType === 'game8' ? 'Reset Frame' : 'Reset Rack';
+}
+
+const MATCH_CONFIRM_CMDS = new Set(['reset_scores', 'end_match', 'call_match_early']);
+let pendingMatchConfirm = null;
+
+function getMatchActionConfirmCopy(cmd) {
+  const resetLabel = getResetActionLabel();
+  const unit = lastState?.gameType === 'game8' ? 'frame' : 'rack';
+  const copy = {
+    reset_scores: {
+      title: resetLabel,
+      message: `Clear the current ${unit} scoreline for this match? This cannot be undone from here.`,
+      confirm: resetLabel,
+    },
+    end_match: {
+      title: 'End Match',
+      message: 'End the match and clear all scores? Recorded stats will be kept.',
+      confirm: 'End Match',
+    },
+    call_match_early: {
+      title: 'Call Match Early',
+      message: 'End this match early and keep completed racks/frames in match history? Scores will clear after saving. Please note, this is not ending the frame, this is the entire match — to complete a frame, score it for the appropriate player.',
+      confirm: 'Call Match Early',
+    },
+  };
+  return copy[cmd] || { title: 'Confirm', message: 'Are you sure?', confirm: 'Confirm' };
+}
+
+function closeMatchConfirmModal() {
+  pendingMatchConfirm = null;
+  document.getElementById('confirmModal')?.classList.add('hidden');
+}
+
+function openMatchConfirmModal(cmd, run) {
+  const cfg = getMatchActionConfirmCopy(cmd);
+  pendingMatchConfirm = run;
+  document.getElementById('confirmModalTitle').textContent = cfg.title;
+  document.getElementById('confirmModalMessage').textContent = cfg.message;
+  document.getElementById('confirmModalConfirm').textContent = cfg.confirm;
+  document.getElementById('confirmModal')?.classList.remove('hidden');
+}
+
+function wireMatchConfirmModal() {
+  const dismiss = () => closeMatchConfirmModal();
+  document.getElementById('confirmModalCancel')?.addEventListener('click', dismiss);
+  document.getElementById('confirmModalDismiss')?.addEventListener('click', dismiss);
+  document.getElementById('confirmModalBackdrop')?.addEventListener('click', dismiss);
+  document.getElementById('confirmModalConfirm')?.addEventListener('click', () => {
+    const run = pendingMatchConfirm;
+    closeMatchConfirmModal();
+    if (run) run();
+  });
+}
+
+function controlLockMessage() {
+  if (!client || !client.connected) return 'Not connected to cloud — controls are paused';
+  if (!dockPresent) return 'Waiting for dock — controls are paused';
+  return 'Controls are paused';
+}
+
 function sendCmd(action, payload) {
-  if (!client) return;
+  if (!controlsEnabled()) {
+    setError(controlLockMessage());
+    return;
+  }
   setSyncing(true);
   client.sendCommand(action, payload);
 }
@@ -686,7 +779,10 @@ function sendCmd(action, payload) {
 function wireCommands() {
   document.querySelectorAll('[data-cmd]').forEach((el) => {
     el.addEventListener('click', () => {
-      if (!client) return;
+      if (!controlsEnabled()) {
+        setError(controlLockMessage());
+        return;
+      }
       const cmd = el.dataset.cmd;
       const payload = {};
       if (el.dataset.player) payload.player = el.dataset.player;
@@ -700,6 +796,10 @@ function wireCommands() {
       if (cmd === 'player_slot' && payload.slot && inferPlayerSlotMode(lastState) === 'breaker') {
         optimisticSelectBreaker(payload.slot);
         sendCmd('select_breaker', { slot: payload.slot });
+        return;
+      }
+      if (MATCH_CONFIRM_CMDS.has(cmd)) {
+        openMatchConfirmModal(cmd, () => sendCmd(cmd, payload));
         return;
       }
       sendCmd(cmd, payload);
@@ -735,20 +835,22 @@ async function connect() {
       client: 'mobile_guest',
     });
     client.on('state', applyState);
-    client.on('presence', (clients) => {
-      dockPresent = (clients || []).includes('dock');
-      setConnectionStatus(dockPresent ? 'connected' : 'waiting');
-    });
+    wireClientLifecycle(client);
     client.on('error', (e) => setError(e.message || e.code || 'Connection failed'));
     try {
-      await client.connect();
-      setConnectionStatus('connected');
+      const joined = await client.connect();
       show('loginSection', false);
       show('controlSection', true);
       showMobileNav(true);
       setActiveView('control');
+      dockPresent = (joined.clients || []).includes('dock');
+      if (joined.state && Object.keys(joined.state).length) {
+        applyState(joined.state);
+      }
+      setConnectionStatus(dockPresent ? 'connected' : 'waiting');
     } catch (err) {
       setError(err.message);
+      setConnectionStatus('disconnected');
     }
     return;
   }
@@ -786,10 +888,7 @@ async function connect() {
     accessToken: token,
   });
   client.on('state', applyState);
-  client.on('presence', (clients) => {
-    dockPresent = (clients || []).includes('dock');
-    setConnectionStatus(dockPresent ? 'connected' : 'waiting');
-  });
+  wireClientLifecycle(client);
   client.on('error', (e) => {
     const msg = String(e.message || e.code || '');
     if (
@@ -809,7 +908,6 @@ async function connect() {
 
   try {
     const joined = await client.connect();
-    setConnectionStatus('connected');
     show('loginSection', false);
     show('controlSection', true);
     showMobileNav(true);
@@ -821,6 +919,7 @@ async function connect() {
     setConnectionStatus(dockPresent ? 'connected' : 'waiting');
   } catch (err) {
     setError(err.message);
+    setConnectionStatus('disconnected');
   }
 }
 
@@ -835,6 +934,11 @@ GAME_TYPES.forEach((g) => {
 document.getElementById('connectBtn').addEventListener('click', connect);
 document.getElementById('clearTokenBtn').addEventListener('click', () => {
   localStorage.removeItem(TOKEN_KEY);
+  if (client) {
+    try { client.disconnect(); } catch (_) { /* ignore */ }
+    client = null;
+  }
+  dockPresent = false;
   setError('');
   setConnectionStatus('disconnected');
   show('loginSection', true);
@@ -843,6 +947,7 @@ document.getElementById('clearTokenBtn').addEventListener('click', () => {
   setActiveView('control');
 });
 wireCommands();
+wireMatchConfirmModal();
 wireSnookerFoulModal();
 wireMobileNav();
 

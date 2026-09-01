@@ -1,4 +1,5 @@
 import {
+  CloudClient,
   fetchPublicConfig,
   devLogin,
   fetchMe,
@@ -8,6 +9,12 @@ import {
 
 const TOKEN_KEY = 'cuesport_token';
 const SERVER_KEY = 'cuesport_server';
+
+let dashClient = null;
+let reconnectTimer = null;
+let reconnectAttempt = 0;
+let lastTablesFingerprint = '';
+let wantLiveFeed = false;
 
 function show(id, visible) {
   document.getElementById(id).classList.toggle('hidden', !visible);
@@ -72,6 +79,43 @@ function formatTableCard(room, serverUrl) {
   return card;
 }
 
+function tablesFingerprint(rooms) {
+  const active = (rooms || []).filter((room) => room.dock_connected);
+  return JSON.stringify(active.map((room) => ({
+    id: room.id,
+    instance_key: room.instance_key || null,
+    dock_label: room.dock_label || null,
+    live_state: room.live_state || {},
+  })));
+}
+
+function renderTableCards(rooms) {
+  const fp = tablesFingerprint(rooms);
+  if (fp === lastTablesFingerprint) return;
+  lastTablesFingerprint = fp;
+
+  const container = document.getElementById('tableCards');
+  container.innerHTML = '';
+  const activeRooms = (rooms || []).filter((room) => room.dock_connected);
+  if (!activeRooms.length) {
+    container.innerHTML = '<p class="hint">No docks online. Enable CueSport Cloud on an OBS dock — connected tables appear here automatically.</p>';
+    return;
+  }
+  activeRooms.forEach((room) => {
+    container.appendChild(formatTableCard(room, getServerUrl()));
+  });
+}
+
+function renderApiKeys(keys) {
+  const keyList = document.getElementById('keyList');
+  keyList.innerHTML = '';
+  (keys || []).forEach((k) => {
+    const li = document.createElement('li');
+    li.textContent = `${k.label} — created ${k.created_at}`;
+    keyList.appendChild(li);
+  });
+}
+
 function setActiveDashTab(which) {
   document.querySelectorAll('.dash-tab').forEach((t) => {
     t.classList.toggle('active', t.dataset.tab === which);
@@ -81,9 +125,80 @@ function setActiveDashTab(which) {
   show('tabAccount', which === 'account');
 }
 
+function clearReconnect() {
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+}
+
+function stopLiveFeed() {
+  wantLiveFeed = false;
+  clearReconnect();
+  reconnectAttempt = 0;
+  if (dashClient) {
+    try { dashClient.disconnect(); } catch (_) { /* ignore */ }
+    dashClient = null;
+  }
+}
+
+function scheduleLiveReconnect() {
+  if (!wantLiveFeed || !getToken()) return;
+  clearReconnect();
+  const delay = Math.min(10000, 800 * (2 ** Math.min(reconnectAttempt, 4)));
+  reconnectAttempt += 1;
+  reconnectTimer = setTimeout(() => {
+    connectLiveFeed().catch(() => {});
+  }, delay);
+}
+
+async function connectLiveFeed() {
+  const token = getToken();
+  if (!wantLiveFeed || !token) return;
+
+  if (dashClient) {
+    try { dashClient.disconnect(); } catch (_) { /* ignore */ }
+    dashClient = null;
+  }
+
+  const client = new CloudClient({
+    serverUrl: getServerUrl(),
+    client: 'dashboard',
+    accessToken: token,
+  });
+  dashClient = client;
+
+  client.on('tables', (rooms) => {
+    renderTableCards(rooms);
+  });
+  client.on('error', (e) => {
+    if (e.code === 'invalid_token' || e.code === 'room_forbidden') {
+      localStorage.removeItem(TOKEN_KEY);
+      stopLiveFeed();
+      setError(e.message || 'Session expired');
+      show('loginSection', true);
+      show('dashboardSection', false);
+    }
+  });
+  client.on('close', () => {
+    if (dashClient === client) dashClient = null;
+    if (wantLiveFeed && getToken()) scheduleLiveReconnect();
+  });
+
+  try {
+    await client.connect();
+    reconnectAttempt = 0;
+  } catch (err) {
+    if (dashClient === client) dashClient = null;
+    scheduleLiveReconnect();
+  }
+}
+
 async function renderDashboard() {
   const token = getToken();
   if (!token) {
+    stopLiveFeed();
+    lastTablesFingerprint = '';
     show('loginSection', true);
     show('dashboardSection', false);
     return;
@@ -93,29 +208,18 @@ async function renderDashboard() {
     show('loginSection', false);
     show('dashboardSection', true);
     document.getElementById('userEmail').textContent = me.account.email;
-
-    const container = document.getElementById('tableCards');
-    container.innerHTML = '';
-    const activeRooms = (me.rooms || []).filter((room) => room.dock_connected);
-    if (!activeRooms.length) {
-      container.innerHTML = '<p class="hint">No docks online. Enable CueSport Cloud on an OBS dock — connected tables appear here automatically.</p>';
-    } else {
-      activeRooms.forEach((room) => {
-        container.appendChild(formatTableCard(room, getServerUrl()));
-      });
-    }
-
-    const keyList = document.getElementById('keyList');
-    keyList.innerHTML = '';
-    (me.api_keys || []).forEach((k) => {
-      const li = document.createElement('li');
-      li.textContent = `${k.label} — created ${k.created_at}`;
-      keyList.appendChild(li);
-    });
+    renderApiKeys(me.api_keys);
+    // Seed from HTTP once, then keep live via dashboard WebSocket.
+    renderTableCards(me.rooms);
+    wantLiveFeed = true;
+    clearReconnect();
+    connectLiveFeed().catch(() => {});
   } catch (err) {
+    stopLiveFeed();
     localStorage.removeItem(TOKEN_KEY);
     setError(err.message);
-    renderDashboard();
+    show('loginSection', true);
+    show('dashboardSection', false);
   }
 }
 
@@ -136,6 +240,7 @@ document.getElementById('devLoginBtn').addEventListener('click', async () => {
       show('newKeyDisplay', true);
       setActiveDashTab('account');
     }
+    lastTablesFingerprint = '';
     await renderDashboard();
   } catch (err) {
     setError(err.message);
@@ -155,6 +260,7 @@ document.getElementById('createKeyBtn').addEventListener('click', async () => {
 
 document.getElementById('signOutBtn').addEventListener('click', () => {
   localStorage.removeItem(TOKEN_KEY);
+  stopLiveFeed();
   renderDashboard();
 });
 
@@ -164,6 +270,14 @@ document.getElementById('googleBtn').addEventListener('click', async () => {
     window.location.href = `${config.supabaseUrl}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(window.location.href)}`;
   } else {
     setError('Google OAuth not configured. Use dev login.');
+  }
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && wantLiveFeed && getToken() && (!dashClient || !dashClient.connected)) {
+    clearReconnect();
+    reconnectAttempt = 0;
+    connectLiveFeed().catch(() => {});
   }
 });
 
