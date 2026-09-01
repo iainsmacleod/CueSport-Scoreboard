@@ -317,7 +317,7 @@ The OBS **dock remains the scoring authority**. Mobile and guest clients send co
 - **Connection gating** — mobile/guest controls pause when the dock is offline or the cloud socket is down, so the UI does not drift out of sync
 - **Match confirmations** — Reset Rack/Frame, End Match, and Call Match require confirmation on mobile (danger-styled buttons)
 - **Cloud event log** — commands and sessions stored for future stats dashboards
-- **Google sign-in** (hosted) or **dev email / API key** (self-host) in the Replay/Share tab
+- **Google sign-in** (hosted) or **dev auth secret / API key** (self-host) in the Replay/Share tab
 
 ### Quick start (self-host)
 
@@ -337,10 +337,10 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-1. Open **http://localhost:3000/dashboard** (or **:4003** with Docker) and **dev sign-in** with your email.
+1. Open **http://localhost:3000/dashboard** (or **:4003** with Docker) and **dev sign-in** with your `DEV_AUTH_SECRET`.
 2. In OBS **Replay/Share**, open **CueSport Cloud → Self-host settings** → server URL, room ID, and API key.
 3. Enable the **CueSport Cloud** toggle on the dock.
-4. On your phone, open **http://localhost:3000/m/{room_id}** (same email for dev login). Tables appear on the dashboard when the dock connects — no page refresh needed.
+4. On your phone, open **http://localhost:3000/m/{room_id}** — if you already signed in on the dashboard in the same browser, tap **Connect**; on a new device, enter the dev secret once (it is saved for next time).
 5. Optional: from mobile **Share**, create a **guest link** (`/g/{token}`) for helpers who should not change names, game type, or end the match.
 
 See [`backend/README.md`](backend/README.md) for Supabase/Google OAuth production setup.
@@ -349,7 +349,7 @@ See [`backend/README.md`](backend/README.md) for Supabase/Google OAuth productio
 
 | | Hosted | Self-host |
 |---|--------|-----------|
-| Auth | Sign in with Google in dock + dashboard | Dev email on dashboard; API key + server URL in dock |
+| Auth | Sign in with Google in dock + dashboard | Dev secret on dashboard; API key + server URL in dock |
 | Backend | `cuesports.macleod.systems` | Your own `backend/` deployment |
 | Cost | Optional paid tier (later) | Free (you run the server) |
 

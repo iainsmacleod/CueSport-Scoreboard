@@ -8,10 +8,11 @@ $Tag = "latest"
 $FullImage = "${ImageName}:${Tag}"
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-Set-Location $ScriptDir
+$RepoRoot = (Resolve-Path (Join-Path $ScriptDir "..")).Path
+$Dockerfile = Join-Path $ScriptDir "Dockerfile"
 
-Write-Host "Building $FullImage ..." -ForegroundColor Cyan
-docker build -t $FullImage .
+Write-Host "Building $FullImage (context: $RepoRoot) ..." -ForegroundColor Cyan
+docker build -f $Dockerfile -t $FullImage $RepoRoot
 
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Docker build failed."

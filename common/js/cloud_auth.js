@@ -20,16 +20,18 @@
         }
     }
 
-    async function devLogin(email) {
+    async function devLogin(secret) {
         const base = getCloudServerUrl().replace(/\/$/, '');
         const res = await fetch(`${base}/api/auth/dev-login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email }),
+            body: JSON.stringify({ secret }),
         });
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
-            throw new Error(err.error || 'Login failed');
+            const msg = err.error || err.message ||
+                (res.status === 401 ? 'Invalid dev auth secret' : 'Dev login failed');
+            throw new Error(msg);
         }
         return res.json();
     }
@@ -45,10 +47,14 @@
             );
             return;
         }
-        const email = prompt('Dev login — enter your email:', '');
-        if (!email) return;
-        const data = await devLogin(email.trim());
-        applyLoginResult(data);
+        const secret = prompt('Dev login — enter your server dev auth secret:', '');
+        if (!secret) return;
+        try {
+            const data = await devLogin(secret.trim());
+            applyLoginResult(data);
+        } catch (err) {
+            alert(err.message || 'Dev login failed');
+        }
     }
 
     function applyLoginResult(data) {

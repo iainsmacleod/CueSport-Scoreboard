@@ -2,6 +2,7 @@ import {
   CloudClient,
   devLogin,
   createGuestLink,
+  fetchPlayers,
   GAME_TYPES,
 } from '../shared/cloud-client.js';
 
@@ -26,6 +27,27 @@ function pathContext() {
   const mIdx = parts.indexOf('m');
   if (mIdx >= 0 && parts[mIdx + 1]) return { roomId: parts[mIdx + 1] };
   return {};
+}
+
+function hasSavedLogin() {
+  return !!localStorage.getItem(TOKEN_KEY);
+}
+
+function syncLoginPanel() {
+  const saved = hasSavedLogin();
+  const hint = document.getElementById('loginHint');
+  const secretRow = document.getElementById('devSecretRow');
+  if (saved) {
+    if (hint) {
+      hint.innerHTML = 'Using saved login from this browser. Tap <strong>Connect</strong> to open this table. Use <strong>Clear saved login</strong> to sign in with a different secret.';
+    }
+    secretRow?.classList.add('hidden');
+  } else {
+    if (hint) {
+      hint.innerHTML = 'Sign in on the <a href="/dashboard">dashboard</a> first (same browser), or enter your <strong>dev auth secret</strong> once below.';
+    }
+    secretRow?.classList.remove('hidden');
+  }
 }
 
 function applyGuestUI() {
@@ -239,9 +261,13 @@ function show(id, visible) {
 }
 
 function setError(msg) {
-  const el = document.getElementById('error');
-  el.textContent = msg || '';
-  show('error', !!msg);
+  const text = msg || '';
+  ['loginError', 'error'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = text;
+    el.classList.toggle('hidden', !text);
+  });
 }
 
 function setSyncing(on) {
@@ -345,7 +371,8 @@ function applyState(state) {
   if (state.player2Name != null) document.getElementById('p2Name').value = state.player2Name;
   if (state.raceInfo != null) document.getElementById('raceInput').value = state.raceInfo;
   if (state.gameInfo != null) document.getElementById('gameInfoInput').value = state.gameInfo;
-  if (state.gameType) document.getElementById('gameTypeSelect').value = state.gameType;
+  syncSelectFromState('gameTypeSelect', 'gameType', state.gameType);
+  syncSetupFieldsFromState(state);
 
   const metaParts = [
     gameTypeLabel(state.gameType),
@@ -373,9 +400,44 @@ function applyState(state) {
   renderBallGrid(state);
 }
 
-const BALL_IMG = '/images/balls';
+const BALL_IMG = '/web/images/balls';
 let lastBallGridKey = '';
 let lastStateSeq = 0;
+
+/** Hold local setup edits until dock state confirms (avoids select/checkbox snap-back). */
+const pendingSetupSync = {};
+
+function markSetupPending(key, value) {
+  pendingSetupSync[key] = { value: String(value), until: Date.now() + 5000 };
+}
+
+function shouldSyncSetupFromState(key, stateValue) {
+  const pending = pendingSetupSync[key];
+  if (!pending) return true;
+  if (Date.now() > pending.until) {
+    delete pendingSetupSync[key];
+    return true;
+  }
+  if (String(stateValue) === pending.value) {
+    delete pendingSetupSync[key];
+    return true;
+  }
+  return false;
+}
+
+function syncSelectFromState(selectId, key, stateValue) {
+  if (stateValue == null || stateValue === '') return;
+  if (!shouldSyncSetupFromState(key, stateValue)) return;
+  const el = document.getElementById(selectId);
+  if (el && el.value !== String(stateValue)) el.value = String(stateValue);
+}
+
+function syncCheckboxFromState(checkboxId, key, checked) {
+  if (typeof checked !== 'boolean') return;
+  if (!shouldSyncSetupFromState(key, checked ? '1' : '0')) return;
+  const el = document.getElementById(checkboxId);
+  if (el) el.checked = checked;
+}
 
 const SNOOKER_FOUL_POINTS = {
   white: 4,
@@ -478,6 +540,23 @@ function ballImageFile(n, selection) {
   return `${n}ball_small.png`;
 }
 
+function ballImageBasename(file) {
+  if (!file) return '';
+  return String(file).split('/').pop().split('?')[0];
+}
+
+function resolveBallImageSrc(state, ballId, snapshotFile) {
+  const file = ballImageBasename(snapshotFile);
+  if (file) return `${BALL_IMG}/${file}`;
+  const n = parseInt(String(ballId || '').replace(/\D/g, ''), 10);
+  if (n >= 1 && n <= 15) {
+    const gt = state.gameType;
+    const style = (gt === 'game2' || gt === 'game3') ? 'american' : (state.ballSelection || 'american');
+    return `${BALL_IMG}/${ballImageFile(n, style)}`;
+  }
+  return `${BALL_IMG}/8ball_small.png`;
+}
+
 function appendBallButton(grid, { src, title, faded, disabled, awaiting, action, payload, extraClass, cooldown, clicked }) {
   const btn = document.createElement('button');
   btn.type = 'button';
@@ -537,10 +616,11 @@ function renderBallGrid(state) {
     : 'Undo last scoring action (pots, fouls, breaker)';
   const useSnapshot = !!(snapshot && Array.isArray(snapshot.balls) && snapshot.balls.length);
   const ballSig = useSnapshot
-    ? snapshot.balls.map((b) => `${b.id}:${b.disabled ? 1 : 0}:${b.faded ? 1 : 0}:${b.hidden ? 1 : 0}:${b.clicked ? 1 : 0}`).join('|')
+    ? snapshot.balls.map((b) => `${b.id}:${b.file || ''}:${b.disabled ? 1 : 0}:${b.faded ? 1 : 0}:${b.hidden ? 1 : 0}:${b.clicked ? 1 : 0}`).join('|')
     : '';
   const key = JSON.stringify({
     ballSig,
+    ballSelection: state.ballSelection || 'american',
     snooker: snapshot && snapshot.snooker,
     awaiting,
     locked,
@@ -591,7 +671,7 @@ function renderBallGrid(state) {
       // Free ball, colors, reds, and pool pots all go through dock handlers.
       const isFoul = b.foul === true || b.id === 'ball 11';
       appendBallButton(grid, {
-        src: b.file ? `${BALL_IMG}/${b.file}` : `${BALL_IMG}/8ball_small.png`,
+        src: resolveBallImageSrc(state, b.id, b.file),
         title: b.title,
         faded: !!b.faded || !!(state.ballState && state.ballState[b.id]),
         disabled: !!b.disabled || locked,
@@ -774,7 +854,338 @@ function sendCmd(action, payload) {
     return;
   }
   setSyncing(true);
-  client.sendCommand(action, payload);
+  const sent = client.sendCommand(action, payload);
+  if (!sent) {
+    setSyncing(false);
+    setError('Failed to send command — check connection');
+  }
+}
+
+function normalizePlayerName(name) {
+  return String(name || '').trim().toLowerCase();
+}
+
+function truncatePlayerName(name) {
+  return String(name || '').trim().slice(0, 20);
+}
+
+function escapeHtml(text) {
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function formatPlayerPreview(lastSeenAt) {
+  if (!lastSeenAt) return 'Saved player';
+  const d = new Date(lastSeenAt);
+  if (Number.isNaN(d.getTime())) return 'Saved player';
+  return `Last seen ${d.toLocaleDateString()}`;
+}
+
+const playerAutocompleteState = {};
+
+async function searchCloudPlayers(query, limit) {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) return [];
+  return fetchPlayers(window.location.origin, token, query, limit);
+}
+
+function dockPlayerName(slot) {
+  return truncatePlayerName(slot === '1' ? (lastState.player1Name || '') : (lastState.player2Name || ''));
+}
+
+function commitPlayerNameIfChanged(slot) {
+  const input = document.getElementById(slot === '1' ? 'p1Name' : 'p2Name');
+  if (!input) return;
+  const name = truncatePlayerName(input.value);
+  if (!name) return;
+  if (normalizePlayerName(name) === normalizePlayerName(dockPlayerName(slot))) return;
+  sendCmd('set_player_name', { slot, name });
+}
+
+function pickPlayerName(slot, name) {
+  const input = document.getElementById(slot === '1' ? 'p1Name' : 'p2Name');
+  const trimmed = truncatePlayerName(name);
+  if (input) input.value = trimmed;
+  sendCmd('set_player_name', { slot, name: trimmed });
+}
+
+function initPlayerAutocompleteForSlot(slot, inputId, listId) {
+  const input = document.getElementById(inputId);
+  const list = document.getElementById(listId);
+  if (!input || !list) return;
+
+  playerAutocompleteState[slot] = { activeIndex: -1, results: [], createNewName: null };
+  let debounceTimer = null;
+
+  const hideList = () => list.classList.add('hidden');
+  const showList = () => list.classList.remove('hidden');
+
+  const refresh = async (options = {}) => {
+    const browseAll = !!options.browseAll;
+    const query = input.value.trim();
+    if (!query && !browseAll) {
+      playerAutocompleteState[slot].createNewName = null;
+      list.classList.remove('autocomplete-browse');
+      hideList();
+      list.innerHTML = '';
+      return;
+    }
+
+    try {
+      const results = browseAll
+        ? await searchCloudPlayers('', 250)
+        : await searchCloudPlayers(query, 8);
+      const queryNorm = normalizePlayerName(query);
+      const exactExists = !!(queryNorm && results.some(
+        (p) => normalizePlayerName(p.name) === queryNorm,
+      ));
+      const createName = (!browseAll && query && !exactExists) ? truncatePlayerName(query) : null;
+
+      playerAutocompleteState[slot].results = results;
+      playerAutocompleteState[slot].createNewName = createName;
+      playerAutocompleteState[slot].activeIndex = -1;
+      list.innerHTML = '';
+      list.classList.toggle('autocomplete-browse', browseAll);
+
+      if (browseAll && results.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'autocomplete-item autocomplete-new';
+        empty.textContent = 'No saved players yet.';
+        list.appendChild(empty);
+        showList();
+        return;
+      }
+
+      if (createName) {
+        const createItem = document.createElement('div');
+        createItem.className = 'autocomplete-item autocomplete-new';
+        createItem.textContent = `Create new player: "${createName}"`;
+        createItem.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          pickPlayerName(slot, createName);
+          hideList();
+        });
+        list.appendChild(createItem);
+      }
+
+      results.forEach((player, index) => {
+        const item = document.createElement('div');
+        item.className = 'autocomplete-item';
+        item.dataset.index = String(createName ? index + 1 : index);
+        item.innerHTML = `<span class="autocomplete-name">${escapeHtml(player.name)}</span>`
+          + `<span class="autocomplete-preview">${escapeHtml(formatPlayerPreview(player.last_seen_at))}</span>`;
+        item.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          pickPlayerName(slot, player.name);
+          hideList();
+        });
+        list.appendChild(item);
+      });
+
+      if (createName || results.length > 0) showList();
+      else hideList();
+      if (browseAll) list.scrollTop = 0;
+    } catch (err) {
+      console.error('Player autocomplete error:', err);
+    }
+  };
+
+  const navCount = () => {
+    const state = playerAutocompleteState[slot];
+    return (state.createNewName ? 1 : 0) + (state.results?.length || 0);
+  };
+
+  const highlight = (index) => {
+    list.querySelectorAll('.autocomplete-item').forEach((item, i) => {
+      item.classList.toggle('autocomplete-active', i === index);
+    });
+  };
+
+  const activateIndex = (index) => {
+    const state = playerAutocompleteState[slot];
+    if (index < 0) return;
+    if (state.createNewName) {
+      if (index === 0) {
+        pickPlayerName(slot, state.createNewName);
+        hideList();
+        return;
+      }
+      const player = state.results[index - 1];
+      if (player) pickPlayerName(slot, player.name);
+      hideList();
+      return;
+    }
+    const player = state.results[index];
+    if (player) pickPlayerName(slot, player.name);
+    hideList();
+  };
+
+  input.addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => refresh(), 150);
+  });
+
+  input.addEventListener('focus', () => refresh());
+
+  input.addEventListener('blur', () => {
+    setTimeout(() => {
+      if (list.classList.contains('hidden')) commitPlayerNameIfChanged(slot);
+    }, 150);
+  });
+
+  input.addEventListener('dblclick', (e) => {
+    e.preventDefault();
+    input.select();
+    refresh({ browseAll: true });
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (list.classList.contains('hidden')) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        commitPlayerNameIfChanged(slot);
+      }
+      return;
+    }
+    const state = playerAutocompleteState[slot];
+    const count = navCount();
+    if (count === 0) {
+      if (e.key === 'Escape') hideList();
+      return;
+    }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      state.activeIndex = state.activeIndex < 0 ? 0 : Math.min(state.activeIndex + 1, count - 1);
+      highlight(state.activeIndex);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      state.activeIndex = state.activeIndex < 0 ? count - 1 : Math.max(state.activeIndex - 1, 0);
+      highlight(state.activeIndex);
+    } else if (e.key === 'Enter' && state.activeIndex >= 0) {
+      e.preventDefault();
+      activateIndex(state.activeIndex);
+    } else if (e.key === 'Escape') {
+      hideList();
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!input.contains(e.target) && !list.contains(e.target)) hideList();
+  });
+}
+
+function wirePlayerAutocomplete() {
+  initPlayerAutocompleteForSlot('1', 'p1Name', 'p1Autocomplete');
+  initPlayerAutocompleteForSlot('2', 'p2Name', 'p2Autocomplete');
+}
+
+function showSetupRow(id, visible) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('hidden', !visible);
+}
+
+function isBallVariantVisible(gameType) {
+  return gameType !== 'game2' && gameType !== 'game3' && gameType !== 'game8';
+}
+
+function syncSetupVariantOptions(state) {
+  const gameType = state?.gameType
+    || document.getElementById('gameTypeSelect')?.value
+    || 'game1';
+
+  const showBallVariant = isBallVariantVisible(gameType);
+  showSetupRow('setupBallVariantLabel', showBallVariant);
+  showSetupRow('setupBallVariantRow', showBallVariant);
+
+  const showEarly = gameType === 'game1' || gameType === 'game2' || gameType === 'game3';
+  showSetupRow('setupEarlyGameRow', showEarly);
+  const earlyLabel = document.getElementById('earlyGameBallLabel');
+  if (earlyLabel) {
+    earlyLabel.textContent = gameType === 'game1'
+      ? 'Win on Break'
+      : 'Early Game Ball/Win on Break';
+  }
+
+  showSetupRow('setupSnookerGoldRow', gameType === 'game8');
+  showSetupRow('setupPointBasedRow', gameType === 'game7');
+
+  const ballSel = document.getElementById('ballSelectionSelect');
+  if (ballSel) {
+    ballSel.querySelectorAll('option').forEach((opt) => {
+      if (opt.value === 'snooker') opt.hidden = gameType !== 'game7';
+    });
+  }
+
+  const raceLabel = document.getElementById('raceLabel');
+  if (raceLabel) {
+    raceLabel.textContent = state?.raceLabel || (gameType === 'game8' ? 'Best Of' : 'Race');
+  }
+}
+
+function syncSetupFieldsFromState(state) {
+  if (!state) return;
+  if (typeof state.earlyGameBallEnabled === 'boolean') {
+    syncCheckboxFromState('earlyGameBallCheckbox', 'earlyGameBall', state.earlyGameBallEnabled);
+  }
+  if (typeof state.snookerGoldEnabled === 'boolean') {
+    syncCheckboxFromState('snookerGoldCheckbox', 'snookerGold', state.snookerGoldEnabled);
+  }
+  if (state.pointBased != null) {
+    syncCheckboxFromState(
+      'pointBasedCheckbox',
+      'pointBased',
+      state.pointBased === 'yes' || state.pointBased === true,
+    );
+  }
+  syncSelectFromState('ballSelectionSelect', 'ballSelection', state.ballSelection);
+  syncSetupVariantOptions(state);
+}
+
+function wireSetupPanel() {
+  document.getElementById('saveRaceBtn').onclick = () => {
+    sendCmd('set_race', { value: document.getElementById('raceInput').value });
+  };
+  document.getElementById('saveGameInfoBtn').onclick = () => {
+    sendCmd('set_game_info', { value: document.getElementById('gameInfoInput').value });
+  };
+
+  const gameTypeSelect = document.getElementById('gameTypeSelect');
+  if (gameTypeSelect) {
+    gameTypeSelect.addEventListener('change', () => {
+      markSetupPending('gameType', gameTypeSelect.value);
+      sendCmd('set_game_type', { gameType: gameTypeSelect.value });
+      syncSetupVariantOptions({
+        gameType: gameTypeSelect.value,
+        ballSelection: document.getElementById('ballSelectionSelect')?.value,
+      });
+    });
+  }
+
+  document.getElementById('earlyGameBallCheckbox')?.addEventListener('change', (e) => {
+    markSetupPending('earlyGameBall', e.target.checked ? '1' : '0');
+    sendCmd('set_early_game_ball', { enabled: e.target.checked });
+  });
+  document.getElementById('snookerGoldCheckbox')?.addEventListener('change', (e) => {
+    markSetupPending('snookerGold', e.target.checked ? '1' : '0');
+    sendCmd('set_snooker_gold', { enabled: e.target.checked });
+  });
+  document.getElementById('pointBasedCheckbox')?.addEventListener('change', (e) => {
+    markSetupPending('pointBased', e.target.checked ? '1' : '0');
+    sendCmd('set_point_based', { enabled: e.target.checked });
+  });
+  document.getElementById('ballSelectionSelect')?.addEventListener('change', (e) => {
+    markSetupPending('ballSelection', e.target.value);
+    sendCmd('set_ball_selection', { value: e.target.value });
+    syncSetupVariantOptions({
+      gameType: gameTypeSelect?.value,
+      ballSelection: e.target.value,
+    });
+  });
+
+  syncSetupVariantOptions({});
 }
 
 function wireCommands() {
@@ -806,16 +1217,6 @@ function wireCommands() {
       sendCmd(cmd, payload);
     });
   });
-
-  document.getElementById('saveRaceBtn').onclick = () => {
-    sendCmd('set_race', { value: document.getElementById('raceInput').value });
-  };
-  document.getElementById('saveGameInfoBtn').onclick = () => {
-    sendCmd('set_game_info', { value: document.getElementById('gameInfoInput').value });
-  };
-  document.getElementById('saveGameTypeBtn').onclick = () => {
-    sendCmd('set_game_type', { gameType: document.getElementById('gameTypeSelect').value });
-  };
 }
 
 async function connect() {
@@ -861,20 +1262,22 @@ async function connect() {
     return;
   }
 
-  const email = document.getElementById('devEmail').value.trim();
   let token = localStorage.getItem(TOKEN_KEY);
+  const secretEl = document.getElementById('devSecret');
+  const secret = secretEl ? secretEl.value.trim() : '';
 
-  if (email) {
+  if (secret) {
     try {
-      const data = await devLogin(window.location.origin, email);
+      const data = await devLogin(window.location.origin, secret);
       token = data.access_token;
       localStorage.setItem(TOKEN_KEY, token);
+      syncLoginPanel();
     } catch (err) {
       setError(err.message || 'Login failed');
       return;
     }
   } else if (!token) {
-    setError('Enter the same email you used on the dashboard (dev login)');
+    setError('Sign in on the dashboard first, or enter the dev auth secret.');
     return;
   }
 
@@ -901,7 +1304,7 @@ async function connect() {
       localStorage.removeItem(TOKEN_KEY);
     }
     if (e.code === 'room_forbidden') {
-      setError('This room belongs to another account. Use the same email as on the dashboard, or open the mobile link from your dashboard after signing in.');
+      setError('This room belongs to another account. Sign in with the dev secret for that account, or open the mobile link from your dashboard.');
       return;
     }
     setError(e.message || e.code || 'Connection failed');
@@ -932,8 +1335,8 @@ GAME_TYPES.forEach((g) => {
   select.appendChild(opt);
 });
 
-document.getElementById('connectBtn').addEventListener('click', connect);
-document.getElementById('clearTokenBtn').addEventListener('click', () => {
+document.getElementById('connectBtn')?.addEventListener('click', connect);
+document.getElementById('clearTokenBtn')?.addEventListener('click', () => {
   localStorage.removeItem(TOKEN_KEY);
   if (client) {
     try { client.disconnect(); } catch (_) { /* ignore */ }
@@ -946,11 +1349,15 @@ document.getElementById('clearTokenBtn').addEventListener('click', () => {
   show('controlSection', false);
   showMobileNav(false);
   setActiveView('control');
+  syncLoginPanel();
 });
 wireCommands();
+wireSetupPanel();
+wirePlayerAutocomplete();
 wireMatchConfirmModal();
 wireSnookerFoulModal();
 wireMobileNav();
+syncLoginPanel();
 
 if (pathContext().guestToken) {
   connect().catch(() => {});

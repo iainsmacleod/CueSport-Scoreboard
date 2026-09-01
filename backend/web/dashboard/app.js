@@ -21,13 +21,13 @@ function show(id, visible) {
 }
 
 function setError(msg) {
-  const el = document.getElementById('error');
-  if (msg) {
-    el.textContent = msg;
-    show('error', true);
-  } else {
-    show('error', false);
-  }
+  const text = msg || '';
+  ['loginError', 'error'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = text;
+    el.classList.toggle('hidden', !text);
+  });
 }
 
 function getServerUrl() {
@@ -229,10 +229,12 @@ document.querySelectorAll('.dash-tab').forEach((tab) => {
 
 document.getElementById('devLoginBtn').addEventListener('click', async () => {
   setError('');
-  const email = document.getElementById('devEmail').value.trim();
-  if (!email) return setError('Email required');
+  const secret = document.getElementById('devSecret').value;
+  if (!secret) return setError('Dev auth secret required');
+  const btn = document.getElementById('devLoginBtn');
+  btn.disabled = true;
   try {
-    const data = await devLogin(getServerUrl(), email);
+    const data = await devLogin(getServerUrl(), secret);
     localStorage.setItem(TOKEN_KEY, data.access_token);
     localStorage.setItem(SERVER_KEY, getServerUrl());
     if (data.api_key) {
@@ -244,6 +246,8 @@ document.getElementById('devLoginBtn').addEventListener('click', async () => {
     await renderDashboard();
   } catch (err) {
     setError(err.message);
+  } finally {
+    btn.disabled = false;
   }
 });
 

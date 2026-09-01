@@ -1,4 +1,11 @@
 import * as sqlite from '../db/sqlite.js';
+import {
+  ensureDevAccount,
+  isDevAuthConfigured,
+  issueDevToken,
+  resolveDevAccountFromToken,
+  validateDevSecret,
+} from '../dev-auth.js';
 import { ensureAccountFromOAuth } from '../ws/auth.js';
 import { roomHasConnectedDock } from '../ws/room-hub.js';
 import { config } from '../config.js';
@@ -9,11 +16,17 @@ export async function registerAccountRoutes(app) {
     if (!config.allowDevAuth) {
       return reply.code(403).send({ error: 'Dev auth disabled' });
     }
-    const { email } = request.body || {};
-    if (!email || typeof email !== 'string') {
-      return reply.code(400).send({ error: 'email required' });
+    if (!isDevAuthConfigured()) {
+      return reply.code(503).send({ error: 'Dev auth not configured (set DEV_AUTH_SECRET)' });
     }
-    const { account, room } = sqlite.ensureAccountWithRoom(email.trim());
+    const { secret } = request.body || {};
+    if (!secret || typeof secret !== 'string') {
+      return reply.code(400).send({ error: 'secret required' });
+    }
+    if (!validateDevSecret(secret)) {
+      return reply.code(401).send({ error: 'Invalid dev auth secret', message: 'Invalid dev auth secret' });
+    }
+    const { account, room } = ensureDevAccount();
     let apiKey = sqlite.getApiKeysForAccount(account.id)[0];
     let apiKeyPlain = null;
     if (!apiKey) {
@@ -21,7 +34,7 @@ export async function registerAccountRoutes(app) {
       apiKeyPlain = created.plaintext;
     }
     return {
-      access_token: `dev:${account.email}`,
+      access_token: issueDevToken(account.id),
       account: { id: account.id, email: account.email, subscription_status: account.subscription_status },
       room: { id: room.id, label: room.label },
       api_key: apiKeyPlain,
@@ -51,6 +64,15 @@ export async function registerAccountRoutes(app) {
       rooms,
       api_keys: keys,
     };
+  });
+
+  app.get('/api/players', async (request, reply) => {
+    const account = await resolveAccountFromRequest(request);
+    if (!account) return reply.code(401).send({ error: 'Unauthorized' });
+    const q = typeof request.query.q === 'string' ? request.query.q : '';
+    const limit = request.query.limit || '8';
+    const players = sqlite.searchAccountPlayers(account.id, q, limit);
+    return { players };
   });
 
   app.post('/api/rooms/:roomId/guest-link', async (request, reply) => {
@@ -105,6 +127,7 @@ export async function registerAccountRoutes(app) {
     supabaseUrl: config.supabaseUrl || null,
     supabaseAnonKey: process.env.SUPABASE_ANON_KEY || null,
     allowDevAuth: config.allowDevAuth,
+    devAuthConfigured: isDevAuthConfigured(),
   }));
 }
 
@@ -114,9 +137,7 @@ async function resolveAccountFromRequest(request) {
   if (!token) return null;
 
   if (token.startsWith('dev:')) {
-    const email = token.slice(4);
-    const { account } = sqlite.ensureAccountWithRoom(email);
-    return account;
+    return resolveDevAccountFromToken(token);
   }
 
   const { authenticateJoin } = await import('../ws/auth.js');

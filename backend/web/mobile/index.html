@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
   <title>CueSport Scoreboard Cloud Control</title>
-  <link rel="stylesheet" href="/web/shared/styles.css?v=7.2.3-match-confirm" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=7.2.3-setup-font" />
 </head>
 <body class="mobile">
   <header>
@@ -34,10 +34,13 @@
   </header>
   <main id="app">
     <section id="loginSection">
-      <p class="hint">Use the <strong>same email</strong> as on the dashboard. A saved Google sign-in token will not work here — enter your dev email.</p>
-      <input type="email" id="devEmail" placeholder="Email (dev login)" autocomplete="email" />
+      <p id="loginHint" class="hint">Sign in on the <a href="/dashboard">dashboard</a> first (same browser), or enter your <strong>dev auth secret</strong> once below.</p>
+      <div id="devSecretRow">
+        <input type="password" id="devSecret" placeholder="Dev auth secret (only if needed)" autocomplete="current-password" />
+      </div>
       <button id="connectBtn" class="btn primary block">Connect</button>
       <button type="button" id="clearTokenBtn" class="btn block secondary">Clear saved login</button>
+      <p id="loginError" class="error hidden" role="alert"></p>
     </section>
     <section id="controlSection" class="hidden">
       <div id="viewControl" class="mobile-view">
@@ -111,38 +114,59 @@
         <div class="panel" id="adminPlayersPanel">
           <h2>Players</h2>
           <div class="field-row">
-            <input id="p1Name" placeholder="Player 1" maxlength="20" />
-            <button type="button" class="icon-btn" data-cmd="set_player_name" data-slot="1" title="Save player 1" aria-label="Save player 1">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-            </button>
+            <div class="autocomplete-wrapper">
+              <input id="p1Name" placeholder="Player 1" maxlength="20" autocomplete="off" />
+              <div id="p1Autocomplete" class="autocomplete-list hidden"></div>
+            </div>
           </div>
           <div class="field-row">
-            <input id="p2Name" placeholder="Player 2" maxlength="20" />
-            <button type="button" class="icon-btn" data-cmd="set_player_name" data-slot="2" title="Save player 2" aria-label="Save player 2">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-            </button>
+            <div class="autocomplete-wrapper">
+              <input id="p2Name" placeholder="Player 2" maxlength="20" autocomplete="off" />
+              <div id="p2Autocomplete" class="autocomplete-list hidden"></div>
+            </div>
           </div>
         </div>
         <div class="panel" id="setupPanel">
           <h2>Game Setup</h2>
-          <label id="raceLabel">Race</label>
-          <div class="field-row">
-            <input id="raceInput" maxlength="3" />
-            <button type="button" class="icon-btn" id="saveRaceBtn" title="Save race" aria-label="Save race">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-            </button>
-          </div>
-          <label>Game Information</label>
+          <label for="gameInfoInput">Game Information</label>
           <div class="field-row">
             <input id="gameInfoInput" maxlength="60" />
             <button type="button" class="icon-btn" id="saveGameInfoBtn" title="Save game info" aria-label="Save game info">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
             </button>
           </div>
-          <label class="admin-only">Game Type</label>
+          <label class="admin-only" for="gameTypeSelect">Game Type</label>
           <div class="field-row admin-only">
             <select id="gameTypeSelect"></select>
-            <button type="button" class="icon-btn" id="saveGameTypeBtn" title="Save game type" aria-label="Save game type">
+          </div>
+          <label id="setupBallVariantLabel" class="admin-only hidden" for="ballSelectionSelect">Ball Variant</label>
+          <div id="setupBallVariantRow" class="field-row admin-only hidden">
+            <select id="ballSelectionSelect">
+              <option value="american">World (Small/Big, Lows/Highs, Solids/Stripes)</option>
+              <option value="international">International (Red/Yellow)</option>
+              <option value="unity">Unity Balls</option>
+              <option value="ultimate">Ultimate Pool Balls</option>
+              <option value="snooker">Snooker</option>
+            </select>
+          </div>
+          <div id="setupVariantOptions" class="setup-variant-options admin-only">
+            <label id="setupEarlyGameRow" class="setup-option-row hidden" for="earlyGameBallCheckbox">
+              <span id="earlyGameBallLabel">Win on Break</span>
+              <input type="checkbox" id="earlyGameBallCheckbox" class="setup-option-check" />
+            </label>
+            <label id="setupSnookerGoldRow" class="setup-option-row hidden" for="snookerGoldCheckbox">
+              <span>Golden Ball</span>
+              <input type="checkbox" id="snookerGoldCheckbox" class="setup-option-check" />
+            </label>
+            <label id="setupPointBasedRow" class="setup-option-row hidden" for="pointBasedCheckbox">
+              <span>Point Based</span>
+              <input type="checkbox" id="pointBasedCheckbox" class="setup-option-check" />
+            </label>
+          </div>
+          <label id="raceLabel" for="raceInput">Race</label>
+          <div class="field-row">
+            <input id="raceInput" maxlength="3" inputmode="numeric" pattern="[0-9]*" />
+            <button type="button" class="icon-btn" id="saveRaceBtn" title="Save race" aria-label="Save race">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
             </button>
           </div>
@@ -244,6 +268,6 @@
       <div id="snookerFoulTargets" class="snooker-foul-targets"></div>
     </div>
   </div>
-  <script type="module" src="/web/mobile/app.js?v=7.2.3-qr-local"></script>
+  <script type="module" src="/web/mobile/app.js?v=7.2.3-ball-images-web"></script>
 </body>
 </html>

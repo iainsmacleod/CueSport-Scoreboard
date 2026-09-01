@@ -19,6 +19,8 @@ Open:
 
 Default database is **SQLite** at `backend/data/cuesport.db` — no external services required for development.
 
+Set `DEV_AUTH_SECRET` in `.env` (see `.env.example`) before using dev sign-in on the dashboard or mobile.
+
 ### Docker (self-host)
 
 ```bash
@@ -32,9 +34,17 @@ docker compose up -d --build
 - **WebSocket:** ws://localhost:4003/ws
 - **Data:** persisted in `backend/data/` (SQLite)
 
+Web UI and ball images are **baked into the Docker image** at build time. Only `./data` is mounted by default.
+
+**Local live reload** (optional): copy `docker-compose.override.example.yml` to `docker-compose.override.yml` to mount `backend/web` and `common/images` from your repo. Do **not** use those mounts on a production server unless the full repo paths exist on the host — an empty mount hides the image files and causes `ENOENT` on `/m/...`.
+
 In the OBS dock **Self-host settings**, use server URL `http://localhost:4003` (or your public hostname).
 
-To publish an image: `docker build -t cuesport-cloud:latest .`
+To publish an image (from repo root — includes `common/images` ball assets):
+
+```bash
+docker build -f backend/Dockerfile -t cuesport-cloud:latest .
+```
 
 ## OBS dock connection
 
@@ -63,7 +73,9 @@ See [`.env.example`](.env.example).
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-side Supabase key |
 | `SUPABASE_JWT_SECRET` | JWT verification (or use JWKS) |
 | `SUPABASE_ANON_KEY` | Exposed to web clients for OAuth |
-| `ALLOW_DEV_AUTH` | Enable email dev-login when Supabase not configured |
+| `ALLOW_DEV_AUTH` | Enable secret dev-login when Supabase not configured |
+| `DEV_AUTH_SECRET` | Shared secret for dev login (required when dev auth is on) |
+| `DEV_AUTH_ACCOUNT_EMAIL` | Email label for the single self-host account (default `dev@local`) |
 
 ## Supabase setup (production)
 
@@ -90,7 +102,7 @@ This backend is GPL-licensed alongside the scoreboard. You may run your own inst
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/config/public` | Client-facing config |
-| POST | `/api/auth/dev-login` | Dev auth (email → token) |
+| POST | `/api/auth/dev-login` | Dev auth (secret → signed token) |
 | GET | `/api/me` | Account, rooms, keys (Bearer token) |
 | POST | `/api/api-keys` | Create API key |
 | GET | `/api/rooms/:roomId/events` | Match event log |

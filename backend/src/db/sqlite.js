@@ -74,6 +74,14 @@ CREATE TABLE IF NOT EXISTS room_guest_tokens (
   revoked_at TEXT
 );
 
+CREATE TABLE IF NOT EXISTS account_players (
+  account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  name_normalized TEXT NOT NULL,
+  last_seen_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (account_id, name_normalized)
+);
+
 CREATE INDEX IF NOT EXISTS idx_api_keys_account ON api_keys(account_id);
 CREATE INDEX IF NOT EXISTS idx_rooms_account ON rooms(account_id);
 CREATE INDEX IF NOT EXISTS idx_match_events_room ON match_events(room_id, created_at DESC);
@@ -327,4 +335,69 @@ export function revokeGuestToken(token, accountId) {
   getDb().prepare(
     `UPDATE room_guest_tokens SET revoked_at = datetime('now') WHERE token = ? AND account_id = ?`
   ).run(token, accountId);
+}
+
+function normalizePlayerName(name) {
+  return String(name || '').trim().toLowerCase();
+}
+
+function truncatePlayerName(name) {
+  return String(name || '').trim().slice(0, 20);
+}
+
+/** Remember a player name for account roster / mobile autocomplete. */
+export function upsertAccountPlayer(accountId, name) {
+  if (!accountId) return;
+  const display = truncatePlayerName(name);
+  const normalized = normalizePlayerName(display);
+  if (!normalized) return;
+  getDb().prepare(
+    `INSERT INTO account_players (account_id, name, name_normalized, last_seen_at)
+     VALUES (?, ?, ?, datetime('now'))
+     ON CONFLICT(account_id, name_normalized) DO UPDATE SET
+       name = excluded.name,
+       last_seen_at = datetime('now')`
+  ).run(accountId, display, normalized);
+}
+
+export function upsertAccountPlayersFromState(accountId, state) {
+  if (!accountId || !state || typeof state !== 'object') return;
+  if (state.player1Name) upsertAccountPlayer(accountId, state.player1Name);
+  if (state.player2Name) upsertAccountPlayer(accountId, state.player2Name);
+}
+
+/** Seed roster from saved room session state when table is still empty. */
+export function seedAccountPlayersFromSessions(accountId) {
+  const count = getDb().prepare(
+    'SELECT COUNT(*) AS n FROM account_players WHERE account_id = ?'
+  ).get(accountId)?.n || 0;
+  if (count > 0) return;
+  for (const room of getRoomsForAccount(accountId)) {
+    const { state } = getRoomSessionState(room.id);
+    upsertAccountPlayersFromState(accountId, state);
+  }
+}
+
+export function searchAccountPlayers(accountId, query, limit = 8) {
+  seedAccountPlayersFromSessions(accountId);
+  const max = Math.min(Math.max(parseInt(limit, 10) || 8, 1), 250);
+  const normalized = normalizePlayerName(query);
+  if (!normalized) {
+    return getDb().prepare(
+      `SELECT name, last_seen_at FROM account_players
+       WHERE account_id = ?
+       ORDER BY last_seen_at DESC, name COLLATE NOCASE ASC
+       LIMIT ?`
+    ).all(accountId, max);
+  }
+  const like = `%${normalized}%`;
+  return getDb().prepare(
+    `SELECT name, last_seen_at FROM account_players
+     WHERE account_id = ? AND (name_normalized LIKE ? OR LOWER(name) LIKE ?)
+     ORDER BY
+       CASE WHEN name_normalized = ? THEN 0 WHEN name_normalized LIKE ? THEN 1 ELSE 2 END,
+       last_seen_at DESC,
+       name COLLATE NOCASE ASC
+     LIMIT ?`
+  ).all(accountId, like, like, normalized, `${normalized}%`, max);
 }

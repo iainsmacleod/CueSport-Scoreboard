@@ -7,12 +7,14 @@ RUN apt-get update \
 
 WORKDIR /app
 
-COPY package.json ./
+COPY backend/package.json ./
 RUN npm install --omit=dev
 
-COPY src ./src
-COPY web ./web
-COPY supabase ./supabase
+COPY backend/src ./src
+COPY backend/web ./web
+COPY backend/supabase ./supabase
+COPY common/images ./common/images
+COPY common/images ./web/images/balls
 
 RUN mkdir -p /app/data
 

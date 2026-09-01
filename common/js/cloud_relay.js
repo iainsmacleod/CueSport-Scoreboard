@@ -79,7 +79,11 @@
     }
 
     function dispatchCommand(msg) {
-        if (msg.source === 'dock') return;
+        if (!msg || msg.source === 'dock') return;
+        if (!isJoined) {
+            console.warn('cloudRelay: command ignored (not joined):', msg.action);
+            return;
+        }
         replaying = true;
         const pending = [];
         try {
@@ -360,6 +364,19 @@
             }
             state.ballSelection = dockStorage('ballSelection', 'american') || 'american';
             state.snookerGoldEnabled = dockStorage('snookerGoldEnabled', 'no') === 'yes';
+            state.pointBased = dockStorage('pointBased', 'no');
+            state.useBallSet = dockStorage('useBallSet', 'no') === 'yes';
+            state.playerBallSet = dockStorage('playerBallSet', 'p1Open') || 'p1Open';
+            const gt = state.gameType || dockStorage('gameType', 'game1') || 'game1';
+            if (gt === 'game1') {
+                state.earlyGameBallEnabled = dockStorage('winOnBreakEnabled', 'no') === 'yes';
+            } else if (gt === 'game2') {
+                state.earlyGameBallEnabled = dockStorage('earlyGameBallEnabled9', 'no') === 'yes';
+            } else if (gt === 'game3') {
+                state.earlyGameBallEnabled = dockStorage('earlyGameBallEnabled10', 'no') === 'yes';
+            } else {
+                state.earlyGameBallEnabled = false;
+            }
             state.snookerFreeBallOffered = dockStorage('snookerFreeBallOffered', 'no') === 'yes';
             state.snookerPhase = dockStorage('snookerPhase', 'red') || 'red';
             state.dualScoreMode = typeof window.isDualScoreMode === 'function'
@@ -531,6 +548,9 @@
             isJoined = true;
             if (data.room_id) setStorageItem('roomId', data.room_id);
             if (data.state) dispatchState(data.state);
+            if (window.cloudCommands && typeof window.cloudCommands.initCloudCommands === 'function') {
+                window.cloudCommands.initCloudCommands();
+            }
             updateCloudUI();
             // Push authoritative dock snapshot to room (mobile + DB)
             pushDockStateSoon();

@@ -493,16 +493,20 @@
                 const cloudBody = await cloudHealth.json();
                 assert('Cloud', 'Backend health (optional)', cloudHealth.ok && cloudBody.ok === true, cloudServer);
                 if (cloudHealth.ok) {
-                    const devEmail = 'smoke-cp-' + Date.now() + '@test.local';
-                    const loginRes = await fetch(cloudServer + '/api/auth/dev-login', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ email: devEmail }),
-                        signal: AbortSignal.timeout(5000)
-                    });
-                    const loginBody = await loginRes.json();
-                    assert('Cloud', 'Backend dev-login', loginRes.ok && loginBody.access_token?.startsWith('dev:'));
-                    assert('Cloud', 'Backend dev-login room', !!loginBody.room?.id);
+                    const devSecret = new URLSearchParams(window.location.search).get('dev_secret');
+                    if (!devSecret) {
+                        assert('Cloud', 'Backend dev-login', true, 'skipped — add ?dev_secret=YOUR_DEV_AUTH_SECRET');
+                    } else {
+                        const loginRes = await fetch(cloudServer + '/api/auth/dev-login', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ secret: devSecret }),
+                            signal: AbortSignal.timeout(5000)
+                        });
+                        const loginBody = await loginRes.json();
+                        assert('Cloud', 'Backend dev-login', loginRes.ok && loginBody.access_token?.startsWith('dev:'));
+                        assert('Cloud', 'Backend dev-login room', !!loginBody.room?.id);
+                    }
                 }
             } catch (cloudErr) {
                 assert('Cloud', 'Backend health (optional)', false,

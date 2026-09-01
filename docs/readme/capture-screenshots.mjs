@@ -108,7 +108,7 @@ function startMockCloudServer() {
         });
       }
       if (url.pathname === '/api/config/public') {
-        return json({ allowDevAuth: true, publicUrl: base });
+        return json({ allowDevAuth: true, devAuthConfigured: true, publicUrl: base });
       }
       if (url.pathname === '/dashboard') {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -125,8 +125,11 @@ function startMockCloudServer() {
           return res.end(readFileSync(filePath));
         }
       }
-      if (url.pathname.startsWith('/images/balls/')) {
-        const filePath = path.join(REPO, 'common', 'images', url.pathname.slice('/images/balls/'.length));
+      if (url.pathname.startsWith('/images/balls/') || url.pathname.startsWith('/web/images/balls/')) {
+        const prefix = url.pathname.startsWith('/web/images/balls/')
+          ? '/web/images/balls/'
+          : '/images/balls/';
+        const filePath = path.join(REPO, 'common', 'images', url.pathname.slice(prefix.length));
         if (existsSync(filePath)) {
           res.writeHead(200, { 'Content-Type': contentType(filePath) });
           return res.end(readFileSync(filePath));
@@ -175,7 +178,7 @@ async function captureControlPanel(browser, panelBase) {
 async function captureCloudDashboard(browser, cloudBase) {
   const dashPage = await browser.newPage({ viewport: { width: 900, height: 820 } });
   await dashPage.goto(`${cloudBase}/dashboard`, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  await dashPage.fill('#devEmail', 'readme-screenshots@example.com');
+  await dashPage.fill('#devSecret', 'readme-screenshot-secret');
   await dashPage.click('#devLoginBtn');
   await dashPage.waitForSelector('#dashboardSection:not(.hidden)', { timeout: 15000 });
   await dashPage.waitForTimeout(600);

@@ -15,5 +15,7 @@ export const config = {
   supabaseServiceKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
   supabaseJwtSecret: process.env.SUPABASE_JWT_SECRET || '',
   allowDevAuth: process.env.ALLOW_DEV_AUTH !== 'false',
+  devAuthSecret: process.env.DEV_AUTH_SECRET || '',
+  devAuthAccountEmail: process.env.DEV_AUTH_ACCOUNT_EMAIL || 'dev@local',
   isSupabase: () => !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY),
 };

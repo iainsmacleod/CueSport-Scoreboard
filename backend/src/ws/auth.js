@@ -1,6 +1,7 @@
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { createClient } from '@supabase/supabase-js';
 import { config } from '../config.js';
+import { isDevAuthConfigured, resolveDevAccountFromToken } from '../dev-auth.js';
 import * as sqlite from '../db/sqlite.js';
 
 let supabase = null;
@@ -53,14 +54,13 @@ export async function authenticateJoin({ apiKey, accessToken, roomId, client }) 
 
   if (accessToken) {
     if (accessToken.startsWith('dev:')) {
-      if (!config.allowDevAuth) {
+      if (!isDevAuthConfigured()) {
         return { error: 'invalid_token', message: 'Dev auth is disabled on this server' };
       }
-      const email = accessToken.slice(4);
-      if (!email) {
+      const account = resolveDevAccountFromToken(accessToken);
+      if (!account) {
         return { error: 'invalid_token', message: 'Invalid dev token' };
       }
-      const { account } = sqlite.ensureAccountWithRoom(email);
       if (roomId && !sqlite.roomBelongsToAccount(roomId, account.id)) {
         return { error: 'room_forbidden', message: 'No access to this room' };
       }

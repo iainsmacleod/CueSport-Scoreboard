@@ -386,6 +386,9 @@ function handleState(ws, meta, msg) {
     sqlite.deleteLiveStream(meta.roomId);
   }
   persistEvent(meta, 'state', state, meta.client);
+  if (meta.accountId) {
+    sqlite.upsertAccountPlayersFromState(meta.accountId, state);
+  }
   const envelope = {
     type: 'state',
     room_id: meta.roomId,

@@ -89,11 +89,12 @@
       assert('Dashboard CSS', (await fetch(SERVER + '/web/shared/styles.css')).ok);
       assert('Dashboard app.js', (await fetch(SERVER + '/web/dashboard/app.js')).ok);
 
-      const email = 'browser-test-' + Date.now() + '@cuesport.test';
+      const secret = window.prompt('Dev auth secret (DEV_AUTH_SECRET from server .env):', '');
+      if (!secret) throw new Error('Dev auth secret required');
       const login = await fetchJson('/api/auth/dev-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ secret }),
       });
       assert('Dev login', login.ok && login.body.access_token?.startsWith('dev:'));
       assert('Dev login room', !!login.body.room?.id);

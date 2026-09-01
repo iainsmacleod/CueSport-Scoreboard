@@ -26,9 +26,10 @@
       <button id="googleBtn" class="btn primary block">Sign In with Google</button>
       <div class="dev-login">
         <label>Dev Login (Local/Self-Host)</label>
-        <input type="email" id="devEmail" placeholder="you@example.com" />
+        <input type="password" id="devSecret" placeholder="Dev auth secret" autocomplete="current-password" />
         <button id="devLoginBtn" class="btn block">Dev Sign In</button>
       </div>
+      <p id="loginError" class="error hidden" role="alert"></p>
     </section>
 
     <section id="dashboardSection" class="hidden">

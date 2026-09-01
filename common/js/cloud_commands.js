@@ -23,34 +23,74 @@
         }
     }
 
+    /** Apply ball variant from mobile without toggleBallSelection guard rails reverting the pick. */
+    function applyRemoteBallSelection(value) {
+        const val = String(value || 'american');
+        const currentGame = typeof getStoredGameType === 'function'
+            ? getStoredGameType()
+            : (document.getElementById('gameTypeSelect') ? document.getElementById('gameTypeSelect').value : 'game1');
+        if (currentGame === 'game2' || currentGame === 'game3') {
+            return;
+        }
+        if (val === 'snooker' && currentGame !== 'game7' && currentGame !== 'game8') {
+            return;
+        }
+        if (typeof setStorageItem === 'function') {
+            setStorageItem('ballSelection', val);
+        }
+        const el = document.getElementById('ballSelection');
+        if (el) {
+            el.value = val;
+        }
+        if (typeof updateControlPanelBallImages === 'function') {
+            updateControlPanelBallImages(val);
+        }
+        if (typeof ballType === 'function') {
+            ballType(val);
+        }
+        if (typeof applySnookerTrackerLayout === 'function') {
+            applySnookerTrackerLayout();
+        }
+        if (typeof updateSnookerUiVisibility === 'function') {
+            updateSnookerUiVisibility();
+        }
+        if (typeof syncBallDisplayControls === 'function') {
+            syncBallDisplayControls();
+        }
+        if (typeof bc !== 'undefined' && bc && typeof bc.postMessage === 'function') {
+            const displayOn = typeof isBallDisplayEnabled === 'function' ? isBallDisplayEnabled() : false;
+            bc.postMessage({ ballSelection: val, displayBallTracker: displayOn });
+        }
+    }
+
     function runCommand(action, payload) {
         switch (action) {
             case 'score_add':
                 if (payload && payload.player) postScore('add', String(payload.player));
-                break;
+                return Promise.resolve().then(publishAfterScoring);
             case 'score_sub':
                 if (payload && payload.player) postScore('sub', String(payload.player));
-                break;
+                return Promise.resolve().then(publishAfterScoring);
             case 'balls_add':
                 if (payload && payload.player) postBalls('add', String(payload.player));
-                break;
+                return Promise.resolve().then(publishAfterScoring);
             case 'balls_sub':
                 if (payload && payload.player) postBalls('sub', String(payload.player));
-                break;
+                return Promise.resolve().then(publishAfterScoring);
             case 'select_breaker':
                 if (payload && payload.slot && typeof onPlayerSlotButton === 'function') {
                     onPlayerSlotButton(String(payload.slot));
                 } else if (payload && payload.slot) {
                     selectRackBreaker(String(payload.slot));
                 }
-                break;
+                return Promise.resolve().then(publishAfterScoring);
             case 'toggle_active_player':
                 if (typeof onPlayerSlotButton === 'function') {
                     onPlayerSlotButton(payload && payload.isP1 === false ? '2' : '1');
                 } else if (payload && typeof payload.isP1 === 'boolean') {
                     togglePlayer(payload.isP1);
                 }
-                break;
+                return Promise.resolve().then(publishAfterScoring);
             case 'player_slot':
                 if (payload && payload.slot) {
                     const slot = String(payload.slot);
@@ -64,7 +104,7 @@
                         selectRackBreaker(slot);
                     }
                 }
-                break;
+                return Promise.resolve().then(publishAfterScoring);
             case 'set_player_name': {
                 const slot = payload && payload.slot;
                 const name = payload && payload.name != null ? String(payload.name) : '';
@@ -76,45 +116,90 @@
                     if (el) el.value = name.substring(0, 20);
                 }
                 postNames();
-                break;
+                return Promise.resolve().then(publishAfterScoring);
             }
             case 'set_race': {
                 const el = document.getElementById('raceInfoTxt');
                 if (el && payload) el.value = String(payload.value != null ? payload.value : '');
                 postInfo();
-                break;
+                return Promise.resolve().then(publishAfterScoring);
             }
             case 'set_game_info': {
                 const el = document.getElementById('gameInfoTxt');
                 if (el && payload) el.value = String(payload.value != null ? payload.value : '').substring(0, 60);
                 postInfo();
-                break;
+                return Promise.resolve().then(publishAfterScoring);
             }
             case 'set_game_type':
-                if (payload && payload.gameType) gameType(String(payload.gameType));
-                break;
+                if (payload && payload.gameType && typeof gameType === 'function') {
+                    return Promise.resolve(gameType(String(payload.gameType))).then(publishAfterScoring);
+                }
+                return Promise.resolve();
+            case 'set_early_game_ball': {
+                const cb = document.getElementById('earlyGameBallCheckbox');
+                if (cb && payload && typeof payload.enabled === 'boolean') {
+                    cb.checked = payload.enabled;
+                    if (typeof earlyGameBallToggle === 'function') earlyGameBallToggle();
+                }
+                return Promise.resolve().then(publishAfterScoring);
+            }
+            case 'set_snooker_gold': {
+                const cb = document.getElementById('snookerGoldCheckbox');
+                if (cb && payload && typeof payload.enabled === 'boolean') {
+                    cb.checked = payload.enabled;
+                    if (typeof snookerGoldToggle === 'function') snookerGoldToggle();
+                }
+                return Promise.resolve().then(publishAfterScoring);
+            }
+            case 'set_point_based': {
+                const cb = document.getElementById('pointBased');
+                if (cb && payload && typeof payload.enabled === 'boolean') {
+                    cb.checked = payload.enabled;
+                    if (typeof pointBasedSetting === 'function') pointBasedSetting();
+                }
+                return Promise.resolve().then(publishAfterScoring);
+            }
+            case 'set_ball_selection': {
+                const val = payload && payload.value ? String(payload.value) : '';
+                if (val) applyRemoteBallSelection(val);
+                return Promise.resolve().then(publishAfterScoring);
+            }
+            case 'set_use_ball_set': {
+                const cb = document.getElementById('ballSetCheckbox');
+                if (cb && payload && typeof payload.enabled === 'boolean') {
+                    cb.checked = payload.enabled;
+                    if (typeof useBallSetToggle === 'function') useBallSetToggle();
+                }
+                return Promise.resolve().then(publishAfterScoring);
+            }
+            case 'set_player_ball_set': {
+                const val = payload && payload.value ? String(payload.value) : '';
+                if (val) {
+                    const radio = document.querySelector('input[name="p1BallSetSelect"][value="' + val + '"]');
+                    if (radio) {
+                        radio.checked = true;
+                        if (typeof ballSetChange === 'function') ballSetChange();
+                    }
+                }
+                return Promise.resolve().then(publishAfterScoring);
+            }
             case 'toggle_pot':
             case 'snooker_ball': {
                 const ballId = payload && payload.ballId;
-                // Foul requires a fouled-ball key — never open the dock foul modal from remote.
                 if (isSnookerFoulBallId(ballId)) {
-                    return;
+                    return Promise.resolve();
                 }
                 const el = ballId ? document.getElementById(ballId) : null;
-                if (!el) break;
-                // Same entry points as clicking the ball on the control panel.
+                if (!el) return Promise.resolve();
                 if (typeof isSnookerBallMode === 'function' && isSnookerBallMode() &&
                     typeof handleSnookerBallClick === 'function') {
-                    return Promise.resolve(handleSnookerBallClick(el)).then(function () {
-                        publishAfterScoring();
-                    });
+                    return Promise.resolve(handleSnookerBallClick(el)).then(publishAfterScoring);
                 }
                 togglePot(el);
-                publishAfterScoring();
-                return;
+                return Promise.resolve().then(publishAfterScoring);
             }
             case 'snooker_foul': {
-                if (!payload || !payload.foulKey) return;
+                if (!payload || !payload.foulKey) return Promise.resolve();
                 if (typeof cancelSnookerFoul === 'function') {
                     cancelSnookerFoul();
                 }
@@ -122,39 +207,35 @@
                     ? applySnookerFoulByKey
                     : (typeof window.applySnookerFoulByKey === 'function' ? window.applySnookerFoulByKey : null);
                 if (apply) apply(String(payload.foulKey));
-                // applySnookerFoulByKey publishes once after points + player switch.
-                return;
+                return Promise.resolve();
             }
             case 'reset_scores':
                 performResetScores();
-                break;
+                return Promise.resolve().then(publishAfterScoring);
             case 'end_match':
                 performResetScores({ endMatch: true });
-                break;
+                return Promise.resolve().then(publishAfterScoring);
             case 'call_match_early':
                 performCallGame();
-                break;
+                return Promise.resolve().then(publishAfterScoring);
             case 'instant_replay':
                 triggerInstantReplay();
-                break;
+                return Promise.resolve();
             case 'toggle_monitoring':
-                toggleReplayMonitoring();
-                break;
+                triggerReplayMonitoring();
+                return Promise.resolve();
             case 'play_clip':
                 if (payload && payload.index != null) playPreviousReplay(parseInt(payload.index, 10));
-                break;
+                return Promise.resolve();
             case 'undo':
                 if (typeof undoLastScoringAction === 'function') {
-                    return Promise.resolve(undoLastScoringAction()).then(function () {
-                        publishAfterScoring();
-                    });
+                    return Promise.resolve(undoLastScoringAction()).then(publishAfterScoring);
                 }
-                break;
+                return Promise.resolve();
             default:
                 console.warn('cloud_commands: unknown action', action);
+                return Promise.resolve();
         }
-
-        publishAfterScoring();
     }
 
     function initCloudCommands() {

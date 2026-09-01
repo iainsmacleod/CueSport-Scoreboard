@@ -1,0 +1,10 @@
+# Local development only — copy to docker-compose.override.yml (auto-merged by Docker Compose).
+# Do NOT use these mounts in production: they replace image assets and fail if host paths are missing.
+#
+#   cp docker-compose.override.example.yml docker-compose.override.yml
+#
+services:
+  cuesport-cloud:
+    volumes:
+      - ../common/images:/app/common/images:ro
+      - ./web:/app/web:ro

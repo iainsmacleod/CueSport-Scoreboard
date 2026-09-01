@@ -118,18 +118,27 @@ export async function fetchPublicConfig(serverUrl) {
   return res.json();
 }
 
-export async function devLogin(serverUrl, email) {
+export async function devLogin(serverUrl, secret) {
   const base = serverUrl.replace(/\/$/, '');
   const res = await fetch(`${base}/api/auth/dev-login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ secret }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || 'Login failed');
+    const msg = err.error || err.message || defaultDevLoginError(res.status);
+    throw new Error(msg);
   }
   return res.json();
+}
+
+function defaultDevLoginError(status) {
+  if (status === 401) return 'Invalid dev auth secret';
+  if (status === 403) return 'Dev auth disabled on this server';
+  if (status === 503) return 'Dev auth not configured (set DEV_AUTH_SECRET on the server)';
+  if (status === 400) return 'Dev auth secret required';
+  return 'Dev login failed';
 }
 
 export async function fetchMe(serverUrl, token) {
@@ -139,6 +148,19 @@ export async function fetchMe(serverUrl, token) {
   });
   if (!res.ok) throw new Error('Unauthorized');
   return res.json();
+}
+
+export async function fetchPlayers(serverUrl, token, query = '', limit = 8) {
+  const base = serverUrl.replace(/\/$/, '');
+  const params = new URLSearchParams();
+  if (query) params.set('q', query);
+  params.set('limit', String(limit));
+  const res = await fetch(`${base}/api/players?${params}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Failed to load players');
+  const data = await res.json();
+  return data.players || [];
 }
 
 export async function createApiKey(serverUrl, token, label) {

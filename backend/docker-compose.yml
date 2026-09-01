@@ -1,6 +1,8 @@
 services:
   cuesport-cloud:
-    build: .
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
     image: cuesport-cloud:local
     container_name: cuesport-cloud
     ports:
@@ -8,9 +10,6 @@ services:
       - "4003:3000"
     volumes:
       - ./data:/app/data
-      - ../common/images:/app/common/images:ro
-      # Live mobile/dashboard assets during development (rebuild image for production)
-      - ./web:/app/web:ro
     env_file:
       - .env
     environment:
