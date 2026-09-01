@@ -8,6 +8,7 @@ import { config } from './config.js';
 import { handleConnection, getConnectionCount } from './ws/room-hub.js';
 import { registerAccountRoutes } from './api/accounts.js';
 import { registerEventRoutes } from './api/events.js';
+import { registerQrRoutes } from './api/qr.js';
 import * as sqlite from './db/sqlite.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -61,6 +62,7 @@ app.get('/ws', { websocket: true }, (socket) => {
 
 await registerAccountRoutes(app);
 await registerEventRoutes(app);
+registerQrRoutes(app);
 
 sqlite.getDb();
 

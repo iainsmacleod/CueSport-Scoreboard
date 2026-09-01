@@ -124,7 +124,8 @@ function renderShareLink(url) {
     urlEl.classList.remove('hidden');
   }
   if (qr) {
-    qr.src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(url)}`;
+    const base = window.location.origin.replace(/\/$/, '');
+    qr.src = `${base}/api/qr?size=220&margin=2&data=${encodeURIComponent(url)}`;
     qr.classList.remove('hidden');
   }
   if (copyBtn) copyBtn.disabled = false;
