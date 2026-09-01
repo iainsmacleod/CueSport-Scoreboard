@@ -78,4 +78,5 @@ temp/
 
 # Release notes tooling (screenshots in docs/release-notes/*/images/ are committed)
 docs/release-notes/node_modules/
+docs/readme/node_modules/
 

@@ -20,6 +20,7 @@ Display player names, race and game info, racks (and balls where needed), logos,
 
 - [Acknowledgement](#acknowledgement)
 - [How It Works](#how-it-works)
+- [Screenshots](#screenshots)
 - [Installation](#installation)
   - [Windows](#windows)
   - [macOS](#macos)
@@ -78,7 +79,37 @@ CueSport Scoreboard is two HTML pages that talk to each other (and optionally to
 4. For **instant replay** and **stream promotion**, the dock also connects to **OBS WebSocket**.
 5. **Player statistics** are stored separately in **IndexedDB** (`cuesport_stats`) so match history survives clearing scoreboard settings.
 
-You do not need a public server for the scoreboard itself. Local files or a tiny local HTTP server are enough. Stream promotion is optional and only sends match metadata (not video or audio) when you enable it.
+You do not need a public server for the scoreboard itself. Local files or a tiny local HTTP server are enough. **CueSport Cloud** (optional) adds remote mobile control, a web dashboard, and guest scorer links via the [`backend/`](backend/) relay — see [CueSport Cloud](#cuesport-cloud). Stream promotion is optional and only sends match metadata (not video or audio) when you enable it.
+
+---
+
+## Screenshots
+
+### OBS control panel
+
+**Setup** — game variant, race/Best Of, player names, and options.
+
+![Control panel — Setup tab](docs/readme/images/01-control-panel-setup.png)
+
+**Controls** — breaking/active player, ball grid, scores, and match actions.
+
+![Control panel — Controls tab with ball scoring](docs/readme/images/02-control-panel-controls.png)
+
+**Replay/Share** — OBS WebSocket, **CueSport Cloud** relay, and stream promotion.
+
+![Control panel — Replay/Share tab with CueSport Cloud](docs/readme/images/03-control-panel-cloud.png)
+
+### CueSport Cloud (optional)
+
+**Dashboard** — live tables when an OBS dock is connected (WebSocket push, no polling).
+
+![CueSport Cloud dashboard — Tables tab](docs/readme/images/04-cloud-dashboard.png)
+
+**Mobile control** — phone/tablet remote at `/m/{room_id}`; guests use `/g/{token}` with limited permissions.
+
+![CueSport Cloud mobile control](docs/readme/images/05-cloud-mobile-control.png)
+
+Regenerate these images anytime: [`docs/readme/README.md`](docs/readme/README.md).
 
 ---
 
@@ -259,14 +290,34 @@ Click **Update Sources** after editing names. Names must match OBS **exactly** (
 
 ## CueSport Cloud
 
-Optional **remote mobile control**, **match event logging**, and **public stream listing** via the CueSport Cloud backend ([`backend/`](backend/)). Self-host for free (GPL) or use the hosted service at **[https://cuesports.macleod.systems](https://cuesports.macleod.systems)**.
+Optional **remote mobile control**, **web dashboard**, **guest scorer links**, **match event logging**, and **public stream listing** via the CueSport Cloud backend ([`backend/`](backend/)). Self-host for free (GPL) or use the hosted service at **[https://cuesports.macleod.systems](https://cuesports.macleod.systems)**.
+
+The OBS **dock remains the scoring authority**. Mobile and guest clients send commands through the cloud relay; the dock executes them with the same logic as the control panel, then publishes state back to all connected clients.
+
+```text
+  Phone / guest browser          Cloud backend              OBS dock
+  (mobile / dashboard)           (WebSocket hub)            (control panel)
+        |                              |                         |
+        |------ command (score, etc.) ->|---- relay command ----->|
+        |                              |<------- state publish ---|
+        |<----- state / tables --------|                         |
+```
 
 ### Features
 
-- **Mobile web control** — score, breaking player, ball grid, race/game setup, match lifecycle, and OBS replay from your phone
+| Surface | URL | Purpose |
+|---------|-----|---------|
+| **Dashboard** | `/dashboard` | Sign in, see live tables, API keys, open mobile control |
+| **Mobile control** | `/m/{room_id}` | Full remote (admin): score, balls, setup, replay, share |
+| **Guest control** | `/g/{token}` | Limited remote: score, balls, fouls, race/game info — no names, game type, reset/end, or replay |
+| **Stream listing** | `/` or `/streams` | Public page of promoted live streams |
+
 - **Stats-safe relay** — mobile commands invoke the same dock functions as the control panel (`postScore`, `selectRackBreaker`, etc.)
-- **Cloud event log** — every command and session is stored for future stats dashboards
-- **Google sign-in** (hosted) or **API key** (self-host) in the Replay/Share tab
+- **Live dashboard** — account WebSocket pushes table list updates when docks connect, disconnect, or publish state (no polling)
+- **Connection gating** — mobile/guest controls pause when the dock is offline or the cloud socket is down, so the UI does not drift out of sync
+- **Match confirmations** — Reset Rack/Frame, End Match, and Call Match require confirmation on mobile (danger-styled buttons)
+- **Cloud event log** — commands and sessions stored for future stats dashboards
+- **Google sign-in** (hosted) or **dev email / API key** (self-host) in the Replay/Share tab
 
 ### Quick start (self-host)
 
@@ -277,10 +328,20 @@ npm install
 npm start
 ```
 
-1. Open **http://localhost:3000/dashboard** and dev-sign-in with your email.
-2. In OBS **Replay/Share**, use **CueSport Cloud** → **Self-host settings** → server URL, room ID, and API key.
-3. Enable the **CueSport Cloud** toggle.
-4. On your phone, open **http://localhost:3000/m/{room_id}** and connect with the same email.
+Docker (host port **4003**):
+
+```bash
+cd backend
+cp .env.example .env
+# Set PUBLIC_URL=http://localhost:4003 in .env
+docker compose up -d --build
+```
+
+1. Open **http://localhost:3000/dashboard** (or **:4003** with Docker) and **dev sign-in** with your email.
+2. In OBS **Replay/Share**, open **CueSport Cloud → Self-host settings** → server URL, room ID, and API key.
+3. Enable the **CueSport Cloud** toggle on the dock.
+4. On your phone, open **http://localhost:3000/m/{room_id}** (same email for dev login). Tables appear on the dashboard when the dock connects — no page refresh needed.
+5. Optional: from mobile **Share**, create a **guest link** (`/g/{token}`) for helpers who should not change names, game type, or end the match.
 
 See [`backend/README.md`](backend/README.md) for Supabase/Google OAuth production setup.
 
@@ -288,7 +349,7 @@ See [`backend/README.md`](backend/README.md) for Supabase/Google OAuth productio
 
 | | Hosted | Self-host |
 |---|--------|-----------|
-| Auth | Sign in with Google in dock | API key + server URL |
+| Auth | Sign in with Google in dock + dashboard | Dev email on dashboard; API key + server URL in dock |
 | Backend | `cuesports.macleod.systems` | Your own `backend/` deployment |
 | Cost | Optional paid tier (later) | Free (you run the server) |
 
@@ -500,7 +561,7 @@ Open `http://localhost:8765/tests/smoke_test.html` and click **Run all tests**. 
 
 ## Release notes
 
-Versioned changelogs and screenshot tooling live in [`docs/release-notes/`](docs/release-notes/). Screenshots are committed with each version’s `RELEASE_NOTES.md`. Run `docs/release-notes/create-release.ps1 -Version 7.2.2` (requires [GitHub CLI](https://cli.github.com/)) to refresh captures and open a **draft** GitHub release.
+Versioned changelogs and screenshot tooling live in [`docs/release-notes/`](docs/release-notes/). README screenshots are in [`docs/readme/images/`](docs/readme/images/) (regenerate with [`docs/readme/capture-screenshots.mjs`](docs/readme/capture-screenshots.mjs)). Run `docs/release-notes/create-release.ps1 -Version 7.2.2` (requires [GitHub CLI](https://cli.github.com/)) to refresh release-note captures and open a **draft** GitHub release.
 
 ---
 

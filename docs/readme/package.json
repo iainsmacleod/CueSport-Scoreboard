@@ -1,0 +1,12 @@
+{
+  "name": "cuesport-readme-screenshots",
+  "private": true,
+  "description": "Screenshot tooling for the root README",
+  "type": "module",
+  "scripts": {
+    "capture": "node capture-screenshots.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.62.0"
+  }
+}
