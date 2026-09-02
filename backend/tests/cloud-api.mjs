@@ -148,8 +148,10 @@ async function run() {
       headers: { Authorization: `Bearer ${token}` },
     });
     assert('GET /api/me with dev token', me.ok && me.body.account?.email === devAccountEmail);
+    assert('GET /api/me includes quota', !!me.body.quota?.limits?.maxApiKeys);
 
-    // Create API key
+    // Create API key (or use existing from prior runs / auto-created on first login)
+    let apiKey = null;
     const keyRes = await fetchJson('/api/api-keys', {
       method: 'POST',
       headers: {
@@ -158,13 +160,70 @@ async function run() {
       },
       body: JSON.stringify({ label: 'smoke-test' }),
     });
-    assert('POST /api/api-keys', keyRes.ok && keyRes.body.key?.length === 32);
-    const apiKey = keyRes.body.key;
+    if (keyRes.ok) {
+      assert('POST /api/api-keys', keyRes.body.key?.length === 32);
+      apiKey = keyRes.body.key;
+    } else {
+      assert('POST /api/api-keys at limit or ok', keyRes.status === 403 && keyRes.body.code === 'api_key_limit');
+      // Need a key for dock tests — create by revoking one first
+      const keys = me.body.api_keys || [];
+      if (keys[0]) {
+        await fetchJson(`/api/api-keys/${keys[0].id}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const retry = await fetchJson('/api/api-keys', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ label: 'smoke-test-retry' }),
+        });
+        assert('POST /api/api-keys after revoke', retry.ok && retry.body.key?.length === 32);
+        apiKey = retry.body.key;
+      } else {
+        assert('Have API key for dock tests', false, 'no keys and create failed');
+      }
+    }
+
+    // Revoke + recreate cycle
+    const me2 = await fetchJson('/api/me', { headers: { Authorization: `Bearer ${token}` } });
+    const smokeKey = (me2.body.api_keys || []).find((k) => k.label === 'smoke-test' || k.label === 'smoke-test-retry');
+    if (smokeKey) {
+      const revoked = await fetchJson(`/api/api-keys/${smokeKey.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      assert('DELETE /api/api-keys', revoked.ok);
+      const recreate = await fetchJson('/api/api-keys', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ label: 'smoke-test-2' }),
+      });
+      assert('Recreate API key after revoke', recreate.ok && recreate.body.key?.length === 32);
+      apiKey = recreate.body.key;
+    }
+
+    // Invalidate sessions — old token dies, fresh token works
+    const invalidated = await fetchJson('/api/sessions/invalidate-all', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    assert('POST /api/sessions/invalidate-all', invalidated.ok && !!invalidated.body.access_token);
+    const staleMe = await fetchJson('/api/me', { headers: { Authorization: `Bearer ${token}` } });
+    assert('Old token rejected after invalidate', staleMe.status === 401);
+    const tokenFresh = invalidated.body.access_token;
+    const meFresh = await fetchJson('/api/me', { headers: { Authorization: `Bearer ${tokenFresh}` } });
+    assert('Fresh token works after invalidate', meFresh.ok);
 
     // WebSocket: mobile dev token (regression for payload.sub crash)
     let mobileJoin;
     try {
-      mobileJoin = await wsJoin({ roomId, client: 'mobile', accessToken: token });
+      mobileJoin = await wsJoin({ roomId, client: 'mobile', accessToken: tokenFresh });
       assert('WS join mobile + dev token', mobileJoin.data.room_id === roomId);
       mobileJoin.ws.close();
     } catch (e) {
@@ -183,7 +242,7 @@ async function run() {
     // Command relay dock → mobile
     if (dockJoin) {
       try {
-        const mobile2 = await wsJoin({ roomId, client: 'mobile', accessToken: token });
+        const mobile2 = await wsJoin({ roomId, client: 'mobile', accessToken: tokenFresh });
         const cmdPromise = wsOnce(mobile2.ws);
         dockJoin.ws.send(JSON.stringify({
           type: 'command',
@@ -215,7 +274,7 @@ async function run() {
       await wsJoin({
         roomId: '00000000-0000-0000-0000-000000000000',
         client: 'mobile',
-        accessToken: token,
+        accessToken: tokenFresh,
       });
       assert('Wrong room rejected', false, 'should have failed');
     } catch (e) {
@@ -238,7 +297,7 @@ async function run() {
       }));
       await sleep(200);
       const events = await fetchJson(`/api/rooms/${roomId}/events?limit=5`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${tokenFresh}` },
       });
       assert('Events persisted', events.ok && Array.isArray(events.body) && events.body.length > 0);
       dock2.ws.close();

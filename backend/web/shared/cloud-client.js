@@ -173,7 +173,10 @@ export async function createApiKey(serverUrl, token, label) {
     },
     body: JSON.stringify({ label }),
   });
-  if (!res.ok) throw new Error('Failed to create API key');
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || err.message || 'Failed to create API key');
+  }
   return res.json();
 }
 
@@ -188,6 +191,55 @@ export async function createGuestLink(serverUrl, token, roomId, label) {
     body: JSON.stringify({ label: label || 'Guest scorer' }),
   });
   if (!res.ok) throw new Error('Failed to create guest link');
+  return res.json();
+}
+
+export async function revokeApiKey(serverUrl, token, keyId) {
+  const base = serverUrl.replace(/\/$/, '');
+  const res = await fetch(`${base}/api/api-keys/${encodeURIComponent(keyId)}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to revoke API key');
+  }
+  return res.json();
+}
+
+export async function fetchGuestLinks(serverUrl, token) {
+  const base = serverUrl.replace(/\/$/, '');
+  const res = await fetch(`${base}/api/guest-links`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Failed to load guest links');
+  const data = await res.json();
+  return data.guest_links || [];
+}
+
+export async function revokeGuestLink(serverUrl, token, guestToken) {
+  const base = serverUrl.replace(/\/$/, '');
+  const res = await fetch(`${base}/api/guest-links/${encodeURIComponent(guestToken)}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to revoke guest link');
+  }
+  return res.json();
+}
+
+export async function invalidateAllSessions(serverUrl, token) {
+  const base = serverUrl.replace(/\/$/, '');
+  const res = await fetch(`${base}/api/sessions/invalidate-all`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to invalidate sessions');
+  }
   return res.json();
 }
 

@@ -12,7 +12,9 @@ CREATE TABLE IF NOT EXISTS accounts (
   email TEXT NOT NULL,
   stripe_customer_id TEXT,
   subscription_status TEXT NOT NULL DEFAULT 'active',
-  subscription_tier TEXT NOT NULL DEFAULT 'pro',
+  subscription_tier TEXT NOT NULL DEFAULT 'starter',
+  sessions_invalid_after TEXT,
+  session_epoch INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -89,6 +91,20 @@ CREATE INDEX IF NOT EXISTS idx_match_events_room ON match_events(room_id, create
 
 let db;
 
+function tableColumns(database, table) {
+  return database.prepare(`PRAGMA table_info(${table})`).all().map((row) => row.name);
+}
+
+function ensureAccountColumns(database) {
+  const cols = new Set(tableColumns(database, 'accounts'));
+  if (!cols.has('sessions_invalid_after')) {
+    database.exec('ALTER TABLE accounts ADD COLUMN sessions_invalid_after TEXT');
+  }
+  if (!cols.has('session_epoch')) {
+    database.exec('ALTER TABLE accounts ADD COLUMN session_epoch INTEGER NOT NULL DEFAULT 1');
+  }
+}
+
 export function getDb() {
   if (!db) {
     const dir = path.dirname(config.sqlitePath);
@@ -99,6 +115,7 @@ export function getDb() {
     db.pragma('journal_mode = WAL');
     db.pragma('foreign_keys = ON');
     db.exec(SCHEMA);
+    ensureAccountColumns(db);
   }
   return db;
 }
@@ -117,15 +134,22 @@ export function verifyApiKey(key, hash) {
   return bcrypt.compareSync(key, hash);
 }
 
+/** Sync helper for default tier (avoid circular import with quotas.js). */
+function defaultTierSync() {
+  const raw = (process.env.TIER_DEFAULT || (config.allowDevAuth ? 'selfhost' : 'starter')).toLowerCase();
+  return raw || 'starter';
+}
+
 /** Dev / self-host: ensure account + default room exist for email */
 export function ensureAccountWithRoom(email, authUserId = null) {
   const database = getDb();
   let account = database.prepare('SELECT * FROM accounts WHERE email = ?').get(email);
   if (!account) {
     const id = uuidv4();
+    const tier = defaultTierSync();
     database.prepare(
-      `INSERT INTO accounts (id, auth_user_id, email) VALUES (?, ?, ?)`
-    ).run(id, authUserId, email);
+      `INSERT INTO accounts (id, auth_user_id, email, subscription_tier) VALUES (?, ?, ?, ?)`
+    ).run(id, authUserId, email, tier);
     account = database.prepare('SELECT * FROM accounts WHERE id = ?').get(id);
   } else if (authUserId && !account.auth_user_id) {
     database.prepare('UPDATE accounts SET auth_user_id = ? WHERE id = ?').run(authUserId, account.id);
@@ -166,6 +190,8 @@ export function findAccountByApiKey(plaintextKey) {
           email: row.email,
           subscription_status: row.subscription_status,
           subscription_tier: row.subscription_tier,
+          sessions_invalid_after: row.sessions_invalid_after,
+          session_epoch: row.session_epoch,
         },
         keyId: row.id,
       };
@@ -199,6 +225,46 @@ export function getApiKeysForAccount(accountId) {
   return getDb().prepare(
     `SELECT id, label, created_at, revoked_at FROM api_keys WHERE account_id = ? AND revoked_at IS NULL ORDER BY created_at`
   ).all(accountId);
+}
+
+export function countActiveApiKeys(accountId) {
+  return getDb().prepare(
+    `SELECT COUNT(*) AS n FROM api_keys WHERE account_id = ? AND revoked_at IS NULL`
+  ).get(accountId)?.n || 0;
+}
+
+export function countRoomsForAccount(accountId) {
+  return getDb().prepare(
+    `SELECT COUNT(*) AS n FROM rooms WHERE account_id = ?`
+  ).get(accountId)?.n || 0;
+}
+
+export function revokeApiKey(keyId, accountId) {
+  const result = getDb().prepare(
+    `UPDATE api_keys SET revoked_at = datetime('now')
+     WHERE id = ? AND account_id = ? AND revoked_at IS NULL`
+  ).run(keyId, accountId);
+  return result.changes > 0;
+}
+
+export function listGuestTokensForAccount(accountId) {
+  return getDb().prepare(
+    `SELECT g.token, g.room_id, g.label, g.created_at, r.label AS room_label
+     FROM room_guest_tokens g
+     JOIN rooms r ON r.id = g.room_id
+     WHERE g.account_id = ? AND g.revoked_at IS NULL
+     ORDER BY g.created_at DESC`
+  ).all(accountId);
+}
+
+export function invalidateAllSessions(accountId) {
+  getDb().prepare(
+    `UPDATE accounts
+     SET sessions_invalid_after = datetime('now'),
+         session_epoch = COALESCE(session_epoch, 1) + 1
+     WHERE id = ?`
+  ).run(accountId);
+  return getAccountById(accountId);
 }
 
 export function insertMatchEvent({ roomId, sessionId, eventType, payload, sourceClient }) {
@@ -270,13 +336,22 @@ function defaultInstanceLabel(instanceKey) {
   return instanceKey.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-/** One room per OBS instance key (URL ?instance=) under an account. */
+/** One room per OBS instance key (URL ?instance=) under an account.
+ *  Returns { room } for existing mapping, or creates a new room.
+ *  Callers must enforce room quotas before create (see room-hub).
+ *  Use peekRoomDock / createRoomForInstance when you need a pre-check.
+ */
+export function peekRoomDock(accountId, instanceKey) {
+  const key = (instanceKey || 'default').trim() || 'default';
+  return getDb().prepare(
+    'SELECT * FROM room_docks WHERE account_id = ? AND instance_key = ?'
+  ).get(accountId, key) || null;
+}
+
 export function ensureRoomForInstance(accountId, instanceKey, label) {
   const database = getDb();
   const key = (instanceKey || 'default').trim() || 'default';
-  let row = database.prepare(
-    'SELECT * FROM room_docks WHERE account_id = ? AND instance_key = ?'
-  ).get(accountId, key);
+  let row = peekRoomDock(accountId, key);
   if (row) {
     database.prepare(
       `UPDATE room_docks SET last_seen_at = datetime('now'), label = COALESCE(?, label) WHERE account_id = ? AND instance_key = ?`

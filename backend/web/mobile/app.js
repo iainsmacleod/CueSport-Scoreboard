@@ -1307,6 +1307,10 @@ async function connect() {
       setError('This room belongs to another account. Sign in with the dev secret for that account, or open the mobile link from your dashboard.');
       return;
     }
+    if (e.code === 'control_connection_limit') {
+      setError(e.message || 'Too many devices controlling this table. Disconnect another phone or upgrade your plan.');
+      return;
+    }
     setError(e.message || e.code || 'Connection failed');
   });
 

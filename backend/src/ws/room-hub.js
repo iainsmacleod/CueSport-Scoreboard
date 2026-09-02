@@ -1,5 +1,10 @@
 import { v4 as uuidv4 } from 'uuid';
 import * as sqlite from '../db/sqlite.js';
+import {
+  assertCanCreateRoom,
+  getMaxControlConnections,
+  isControlClient,
+} from '../quotas.js';
 
 /** roomId -> Set<{ ws, client, accountId, sourceId }> */
 const rooms = new Map();
@@ -171,21 +176,45 @@ const GUEST_ALLOWED_COMMANDS = new Set([
   'set_race', 'set_game_info',
 ]);
 
+function countControlConnections(roomId, excludeWs = null) {
+  let n = 0;
+  for (const conn of getRoomClients(roomId)) {
+    if (!isControlClient(conn.client)) continue;
+    if (excludeWs && conn.ws === excludeWs) continue;
+    if (conn.ws.readyState === 1) n += 1;
+  }
+  return n;
+}
+
 function resolveRoomIdForJoin(msg, auth, client) {
   let roomId = msg.room_id || msg.room || null;
   if (client === 'dock' && auth?.account && msg.instance_id) {
+    const key = String(msg.instance_id || 'default').trim() || 'default';
+    const existing = sqlite.peekRoomDock(auth.account.id, key);
+    if (existing) {
+      const room = sqlite.ensureRoomForInstance(
+        auth.account.id,
+        msg.instance_id,
+        msg.instance_label || null
+      );
+      return { roomId: room.id };
+    }
+    const check = assertCanCreateRoom(auth.account);
+    if (!check.ok) {
+      return { error: check.code, message: check.message, quota: check.quota };
+    }
     const room = sqlite.ensureRoomForInstance(
       auth.account.id,
       msg.instance_id,
       msg.instance_label || null
     );
-    roomId = room.id;
+    return { roomId: room.id };
   }
   if (!roomId && client === 'dock' && auth?.account) {
-    const rooms = sqlite.getRoomsForAccount(auth.account.id);
-    if (rooms.length) roomId = rooms[0].id;
+    const roomsForAccount = sqlite.getRoomsForAccount(auth.account.id);
+    if (roomsForAccount.length) roomId = roomsForAccount[0].id;
   }
-  return roomId;
+  return { roomId };
 }
 
 async function handleJoin(ws, meta, msg, authenticateJoin) {
@@ -253,6 +282,13 @@ async function handleJoin(ws, meta, msg, authenticateJoin) {
     }
 
     roomId = resolveRoomIdForJoin(msg, auth, client);
+    if (roomId && typeof roomId === 'object' && roomId.error) {
+      send(ws, { type: 'error', code: roomId.error, message: roomId.message, quota: roomId.quota });
+      return;
+    }
+    if (roomId && typeof roomId === 'object') {
+      roomId = roomId.roomId;
+    }
     if (!roomId) {
       send(ws, { type: 'error', code: 'room_required', message: 'room_id is required' });
       return;
@@ -274,6 +310,19 @@ async function handleJoin(ws, meta, msg, authenticateJoin) {
   if (accountId && room.account_id !== accountId) {
     send(ws, { type: 'error', code: 'room_forbidden', message: 'No access to this room' });
     return;
+  }
+
+  if (isControlClient(client)) {
+    const owner = sqlite.getAccountById(room.account_id);
+    const max = getMaxControlConnections(owner || { subscription_tier: 'starter' });
+    if (countControlConnections(roomId) >= max) {
+      send(ws, {
+        type: 'error',
+        code: 'control_connection_limit',
+        message: `Control connection limit reached (${max} per table). Disconnect another device or upgrade your plan.`,
+      });
+      return;
+    }
   }
 
   if (meta.client === 'dashboard' && meta.accountId) {

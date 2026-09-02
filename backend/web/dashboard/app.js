@@ -4,6 +4,10 @@ import {
   devLogin,
   fetchMe,
   createApiKey,
+  revokeApiKey,
+  fetchGuestLinks,
+  revokeGuestLink,
+  invalidateAllSessions,
   GAME_TYPES,
 } from '../shared/cloud-client.js';
 
@@ -15,6 +19,7 @@ let reconnectTimer = null;
 let reconnectAttempt = 0;
 let lastTablesFingerprint = '';
 let wantLiveFeed = false;
+let lastQuota = null;
 
 function show(id, visible) {
   document.getElementById(id).classList.toggle('hidden', !visible);
@@ -56,7 +61,6 @@ function formatTableCard(room, serverUrl) {
     st.raceInfo ? `${st.raceLabel || 'Race'} ${st.raceInfo}` : null,
     st.gameInfo || null,
   ].filter(Boolean).join(' · ') || 'Match in progress';
-  // Only label extra OBS instances (?instance=foo). "default" / Main table is noise.
   const instanceKey = (room.instance_key || '').trim();
   const showTableCaption = instanceKey && instanceKey !== 'default';
   const tableCaption = showTableCaption
@@ -106,13 +110,93 @@ function renderTableCards(rooms) {
   });
 }
 
+function renderQuota(quota) {
+  lastQuota = quota || null;
+  const el = document.getElementById('quotaSummary');
+  const hint = document.getElementById('apiKeyLimitHint');
+  const createBtn = document.getElementById('createKeyBtn');
+  if (!quota) {
+    if (el) el.textContent = '';
+    if (hint) hint.classList.add('hidden');
+    if (createBtn) createBtn.disabled = false;
+    return;
+  }
+  const { tier, limits, usage } = quota;
+  if (el) {
+    el.textContent =
+      `Plan: ${tier} · API keys ${usage.apiKeys}/${limits.maxApiKeys} · ` +
+      `Tables ${usage.rooms}/${limits.maxRooms} · ` +
+      `Control connections up to ${limits.maxControlConnectionsPerRoom} per table`;
+  }
+  const atKeyLimit = usage.apiKeys >= limits.maxApiKeys;
+  if (createBtn) createBtn.disabled = atKeyLimit;
+  if (hint) {
+    if (atKeyLimit) {
+      hint.textContent = `API key limit reached (${limits.maxApiKeys} on ${tier}). Revoke a key to create another.`;
+      hint.classList.remove('hidden');
+    } else {
+      hint.classList.add('hidden');
+    }
+  }
+}
+
 function renderApiKeys(keys) {
   const keyList = document.getElementById('keyList');
   keyList.innerHTML = '';
   (keys || []).forEach((k) => {
     const li = document.createElement('li');
-    li.textContent = `${k.label} — created ${k.created_at}`;
+    li.className = 'token-list-item';
+    const label = document.createElement('span');
+    label.textContent = `${k.label} — created ${k.created_at}`;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn danger';
+    btn.textContent = 'Revoke';
+    btn.addEventListener('click', async () => {
+      if (!window.confirm(`Revoke API key “${k.label}”? Docks using it will disconnect.`)) return;
+      try {
+        const result = await revokeApiKey(getServerUrl(), getToken(), k.id);
+        if (result.quota) renderQuota(result.quota);
+        await renderDashboard();
+      } catch (err) {
+        setError(err.message);
+      }
+    });
+    li.appendChild(label);
+    li.appendChild(btn);
     keyList.appendChild(li);
+  });
+}
+
+function renderGuestLinks(links) {
+  const list = document.getElementById('guestLinkList');
+  if (!list) return;
+  list.innerHTML = '';
+  if (!(links || []).length) {
+    list.innerHTML = '<li class="hint">No active guest links.</li>';
+    return;
+  }
+  links.forEach((g) => {
+    const li = document.createElement('li');
+    li.className = 'token-list-item';
+    const label = document.createElement('span');
+    label.textContent = `${g.label || 'Guest'} · ${g.room_label || g.room_id} · ${g.created_at}`;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn danger';
+    btn.textContent = 'Revoke';
+    btn.addEventListener('click', async () => {
+      if (!window.confirm('Revoke this guest scorer link?')) return;
+      try {
+        await revokeGuestLink(getServerUrl(), getToken(), g.token);
+        await renderDashboard();
+      } catch (err) {
+        setError(err.message);
+      }
+    });
+    li.appendChild(label);
+    li.appendChild(btn);
+    list.appendChild(li);
   });
 }
 
@@ -208,8 +292,14 @@ async function renderDashboard() {
     show('loginSection', false);
     show('dashboardSection', true);
     document.getElementById('userEmail').textContent = me.account.email;
+    renderQuota(me.quota);
     renderApiKeys(me.api_keys);
-    // Seed from HTTP once, then keep live via dashboard WebSocket.
+    try {
+      const links = await fetchGuestLinks(getServerUrl(), token);
+      renderGuestLinks(links);
+    } catch (_) {
+      renderGuestLinks([]);
+    }
     renderTableCards(me.rooms);
     wantLiveFeed = true;
     clearReconnect();
@@ -256,6 +346,7 @@ document.getElementById('createKeyBtn').addEventListener('click', async () => {
     const created = await createApiKey(getServerUrl(), getToken(), 'Dashboard key');
     document.getElementById('newKeyDisplay').textContent = `New API key (copy now): ${created.key}`;
     show('newKeyDisplay', true);
+    if (created.quota) renderQuota(created.quota);
     await renderDashboard();
   } catch (err) {
     setError(err.message);
@@ -266,6 +357,25 @@ document.getElementById('signOutBtn').addEventListener('click', () => {
   localStorage.removeItem(TOKEN_KEY);
   stopLiveFeed();
   renderDashboard();
+});
+
+document.getElementById('invalidateSessionsBtn')?.addEventListener('click', async () => {
+  if (!window.confirm('Sign out all mobile sessions for this account? You will stay signed in on this dashboard.')) {
+    return;
+  }
+  try {
+    const result = await invalidateAllSessions(getServerUrl(), getToken());
+    if (result.access_token) {
+      localStorage.setItem(TOKEN_KEY, result.access_token);
+    } else {
+      // Google JWT path — this tab stays until refresh; mobiles must re-auth.
+    }
+    setError('');
+    alert('All mobile sessions have been invalidated.');
+    await renderDashboard();
+  } catch (err) {
+    setError(err.message);
+  }
 });
 
 document.getElementById('googleBtn').addEventListener('click', async () => {

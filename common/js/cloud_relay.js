@@ -557,7 +557,11 @@
             return;
         }
         if (data.type === 'error') {
-            if (data.code === 'subscription_required' || data.code === 'invalid_api_key') {
+            if (
+                data.code === 'subscription_required' ||
+                data.code === 'invalid_api_key' ||
+                data.code === 'room_limit'
+            ) {
                 isBlockedByServer = true;
                 blockedReason = data.message;
                 setStorageItem('enabled', 'false');

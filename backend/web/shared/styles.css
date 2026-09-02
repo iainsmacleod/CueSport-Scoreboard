@@ -542,6 +542,20 @@ a.table-card:focus-visible {
   overflow-x: auto;
   font-size: 0.8rem;
 }
+.token-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+.token-list-item .btn {
+  margin: 0;
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  padding: 0.35rem 0.65rem;
+}
 
 /* Mobile snooker foul picker */
 .mobile-modal {

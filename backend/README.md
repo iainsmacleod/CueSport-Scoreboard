@@ -76,11 +76,16 @@ See [`.env.example`](.env.example).
 | `ALLOW_DEV_AUTH` | Enable secret dev-login when Supabase not configured |
 | `DEV_AUTH_SECRET` | Shared secret for dev login (required when dev auth is on) |
 | `DEV_AUTH_ACCOUNT_EMAIL` | Email label for the single self-host account (default `dev@local`) |
+| `TIER_DEFAULT` | Default subscription tier name (`starter`, `pro`, `enterprise`, `selfhost`) |
+| `TIER_LIMITS_JSON` | Optional JSON override of tier caps |
+| `TIER_{TIER}_MAX_API_KEYS` | Per-tier API key cap (e.g. `TIER_STARTER_MAX_API_KEYS`) |
+| `TIER_{TIER}_MAX_ROOMS` | Per-tier table/room cap |
+| `TIER_{TIER}_MAX_CONTROL_CONNECTIONS` | Per-tier mobile+guest connections per table |
 
 ## Supabase setup (production)
 
 1. Create a Supabase project.
-2. Run [`supabase/migrations/001_initial.sql`](supabase/migrations/001_initial.sql) in the SQL editor.
+2. Run [`supabase/migrations/001_initial.sql`](supabase/migrations/001_initial.sql) then [`002_session_epoch_quotas.sql`](supabase/migrations/002_session_epoch_quotas.sql) in the SQL editor.
 3. Enable **Google** provider under Authentication → Providers.
 4. Add redirect URLs: `{PUBLIC_URL}/web/dashboard/`, `{PUBLIC_URL}/auth/callback`.
 5. Set env vars in `.env` and deploy.
@@ -103,7 +108,11 @@ This backend is GPL-licensed alongside the scoreboard. You may run your own inst
 |--------|------|-------------|
 | GET | `/api/config/public` | Client-facing config |
 | POST | `/api/auth/dev-login` | Dev auth (secret → signed token) |
-| GET | `/api/me` | Account, rooms, keys (Bearer token) |
-| POST | `/api/api-keys` | Create API key |
+| GET | `/api/me` | Account, rooms, keys, quota (Bearer token) |
+| POST | `/api/api-keys` | Create API key (tier-limited) |
+| DELETE | `/api/api-keys/:keyId` | Revoke API key |
+| GET | `/api/guest-links` | List guest scorer links |
+| DELETE | `/api/guest-links/:token` | Revoke guest link |
+| POST | `/api/sessions/invalidate-all` | Invalidate mobile sessions (bumps session epoch) |
 | GET | `/api/rooms/:roomId/events` | Match event log |
 | GET | `/api/streams` | Active public streams |

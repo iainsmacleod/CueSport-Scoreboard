@@ -33,6 +33,27 @@ async function verifySupabaseJwt(token) {
   return null;
 }
 
+function sessionsInvalidated(account, jwtIssuedAtSec) {
+  if (!account?.sessions_invalid_after) return false;
+  const cutoff = Date.parse(String(account.sessions_invalid_after).includes('T')
+    ? account.sessions_invalid_after
+    : `${String(account.sessions_invalid_after).replace(' ', 'T')}Z`);
+  if (!Number.isFinite(cutoff)) return false;
+  if (jwtIssuedAtSec == null) return true;
+  return jwtIssuedAtSec * 1000 < cutoff;
+}
+
+function subscriptionRequired(client, account) {
+  if (account.subscription_status === 'active') return null;
+  if (client === 'mobile' || client === 'mobile_guest') {
+    return { error: 'subscription_required', message: 'Mobile control requires an active CueSport Cloud subscription' };
+  }
+  if (!config.allowDevAuth && client === 'dock') {
+    return { error: 'subscription_required', message: 'Dock relay requires an active CueSport Cloud subscription' };
+  }
+  return null;
+}
+
 /**
  * Resolve account from API key or JWT access token.
  * Returns { account, authMethod: 'api_key'|'jwt'|'dev' }
@@ -46,9 +67,8 @@ export async function authenticateJoin({ apiKey, accessToken, roomId, client }) 
     if (roomId && !sqlite.roomBelongsToAccount(roomId, result.account.id)) {
       return { error: 'room_forbidden', message: 'API key does not have access to this room' };
     }
-    if (client === 'mobile' && result.account.subscription_status !== 'active') {
-      return { error: 'subscription_required', message: 'Mobile control requires CueSport Cloud Pro' };
-    }
+    const subErr = subscriptionRequired(client, result.account);
+    if (subErr) return subErr;
     return { account: result.account, authMethod: 'api_key' };
   }
 
@@ -59,14 +79,13 @@ export async function authenticateJoin({ apiKey, accessToken, roomId, client }) 
       }
       const account = resolveDevAccountFromToken(accessToken);
       if (!account) {
-        return { error: 'invalid_token', message: 'Invalid dev token' };
+        return { error: 'invalid_token', message: 'Invalid or expired dev token — sign in again' };
       }
       if (roomId && !sqlite.roomBelongsToAccount(roomId, account.id)) {
         return { error: 'room_forbidden', message: 'No access to this room' };
       }
-      if (client === 'mobile' && account.subscription_status !== 'active') {
-        return { error: 'subscription_required', message: 'Mobile control requires CueSport Cloud Pro' };
-      }
+      const subErr = subscriptionRequired(client, account);
+      if (subErr) return subErr;
       return { account, authMethod: 'dev' };
     }
 
@@ -89,12 +108,15 @@ export async function authenticateJoin({ apiKey, accessToken, roomId, client }) 
       account = ensured.account;
     }
 
+    if (sessionsInvalidated(account, payload.iat)) {
+      return { error: 'invalid_token', message: 'Session revoked — sign in again' };
+    }
+
     if (roomId && !sqlite.roomBelongsToAccount(roomId, account.id)) {
       return { error: 'room_forbidden', message: 'No access to this room' };
     }
-    if (client === 'mobile' && account.subscription_status !== 'active') {
-      return { error: 'subscription_required', message: 'Mobile control requires CueSport Cloud Pro' };
-    }
+    const subErr = subscriptionRequired(client, account);
+    if (subErr) return subErr;
     return { account, authMethod: 'jwt' };
   }
 

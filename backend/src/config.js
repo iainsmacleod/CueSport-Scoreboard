@@ -17,5 +17,6 @@ export const config = {
   allowDevAuth: process.env.ALLOW_DEV_AUTH !== 'false',
   devAuthSecret: process.env.DEV_AUTH_SECRET || '',
   devAuthAccountEmail: process.env.DEV_AUTH_ACCOUNT_EMAIL || 'dev@local',
+  tierDefault: process.env.TIER_DEFAULT || '',
   isSupabase: () => !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY),
 };
