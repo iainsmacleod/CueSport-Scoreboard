@@ -1,5 +1,14 @@
 'use strict';
 
+/**
+ * LEGACY stream-promotion backend (loaded only by `server.js`).
+ *
+ * CueSport Cloud does NOT use this file. Docker and `npm start` run `src/index.js`,
+ * which opens SQLite via `src/db/sqlite.js` using `SQLITE_PATH` (default: data/cuesport.db).
+ *
+ * This module uses `DB_PATH` (default: data/streams.db) — a different schema/file.
+ * Do not point DB_PATH at cuesport.db or you will corrupt the cloud database.
+ */
 const Database = require('better-sqlite3');
 const path = require('path');
 

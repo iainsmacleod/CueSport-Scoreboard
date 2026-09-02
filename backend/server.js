@@ -1,5 +1,10 @@
 'use strict';
 
+/**
+ * LEGACY stream-promotion HTTP/WebSocket server.
+ * CueSport Cloud entrypoint is `src/index.js` (`npm start` / Docker CMD).
+ * This file is not copied into the Docker image and is not started by package.json.
+ */
 const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');

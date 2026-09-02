@@ -17,7 +17,9 @@ Open:
 - **Stream listing:** http://localhost:3000/
 - **WebSocket:** ws://localhost:3000/ws
 
-Default database is **SQLite** at `backend/data/cuesport.db` — no external services required for development.
+Default database is **SQLite** at `backend/data/cuesport.db` — no external services required for development. Path is controlled by **`SQLITE_PATH`** (`src/config.js` → `src/db/sqlite.js`).
+
+> **Note:** Root-level `server.js` / `db.js` are a leftover legacy stream-promotion stack. They use `DB_PATH` → `streams.db` and are **not** used by `npm start` or Docker (`CMD node src/index.js`).
 
 Set `DEV_AUTH_SECRET` in `.env` (see `.env.example`) before using dev sign-in on the dashboard or mobile.
 

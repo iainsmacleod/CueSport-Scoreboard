@@ -1,3 +1,20 @@
+# CueSport Cloud — Docker Compose
+#
+# Copy .env.example → .env and set at least:
+#   PUBLIC_URL=http://localhost:4003
+#   DEV_AUTH_SECRET=...
+#
+# Tier quotas (optional — defaults apply when unset):
+#   TIER_DEFAULT=selfhost          # with ALLOW_DEV_AUTH; else starter
+#   TIER_STARTER_MAX_API_KEYS=1
+#   TIER_STARTER_MAX_ROOMS=2
+#   TIER_STARTER_MAX_CONTROL_CONNECTIONS=5
+#   TIER_LIMITS_JSON={...}         # full catalog override
+# See .env.example for built-in tier caps (starter / pro / enterprise / selfhost).
+#
+# Local live-reload of web assets: copy docker-compose.override.example.yml
+# to docker-compose.override.yml (do not use those mounts in production).
+
 services:
   cuesport-cloud:
     build:
@@ -17,6 +34,9 @@ services:
       PORT: 3000
       HOST: 0.0.0.0
       SQLITE_PATH: /app/data/cuesport.db
+      # Tier / auth vars are read from env_file (.env). Uncomment to force in Compose:
+      # ALLOW_DEV_AUTH: "true"
+      # TIER_DEFAULT: selfhost
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:3000/health"]

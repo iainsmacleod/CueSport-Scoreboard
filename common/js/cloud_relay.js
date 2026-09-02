@@ -356,9 +356,11 @@
                 state.playerSlotMode = 'off';
             }
             state.obsConnected = dockStorage('isConnected', 'false') === 'true';
-            state.canCallGame = window.PlayerStats && typeof window.PlayerStats.canCallGame === 'function'
-                ? window.PlayerStats.canCallGame()
-                : false;
+            // Match control_panel updateCallGameButton: never call early once race is complete.
+            state.canCallGame = !state.gameScoringLocked &&
+                window.PlayerStats &&
+                typeof window.PlayerStats.canCallGame === 'function' &&
+                window.PlayerStats.canCallGame();
             if (!state.gameType) {
                 state.gameType = dockStorage('gameType', 'game1') || 'game1';
             }

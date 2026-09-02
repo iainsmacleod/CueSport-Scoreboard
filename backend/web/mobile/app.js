@@ -382,13 +382,7 @@ function applyState(state) {
   ].filter(Boolean);
   document.getElementById('liveMeta').textContent = metaParts.join(' · ');
 
-  const callBtn = document.getElementById('callMatchBtn');
-  if (callBtn) callBtn.disabled = state.canCallGame === false;
-
-  const resetBtn = document.getElementById('resetScoresBtn');
-  if (resetBtn) {
-    resetBtn.textContent = getResetActionLabel();
-  }
+  syncMatchActionButtons(state);
 
   const replayPanel = document.getElementById('replayPanel');
   if (replayPanel) {
@@ -786,8 +780,59 @@ function wireSnookerFoulModal() {
   document.getElementById('snookerFoulBackdrop')?.addEventListener('click', closeSnookerFoulPicker);
 }
 
-function getResetActionLabel() {
-  return lastState?.gameType === 'game8' ? 'Reset Frame' : 'Reset Rack';
+function getResetActionLabel(state = lastState) {
+  return state?.gameType === 'game8' ? 'Reset Frame' : 'Reset Rack';
+}
+
+/** Same rule as control_panel getRaceTarget / isGameScoringLocked. */
+function getRaceTargetFromState(state) {
+  const raceString = String(state?.raceInfo || '').trim();
+  if (!raceString) return null;
+  const matches = raceString.match(/\d+/g);
+  if (!matches || matches.length === 0) return null;
+  const target = parseInt(matches[matches.length - 1], 10);
+  if (!Number.isFinite(target) || target <= 0) return null;
+  // Snooker Best Of N → first to floor(N/2)+1
+  if (state?.gameType === 'game8') return Math.floor(target / 2) + 1;
+  return target;
+}
+
+function isRaceCompleteFromState(state) {
+  if (!state) return false;
+  const raceTarget = getRaceTargetFromState(state);
+  if (raceTarget === null) return false;
+  const p1 = Number(state.p1Score) || 0;
+  const p2 = Number(state.p2Score) || 0;
+  return p1 >= raceTarget || p2 >= raceTarget;
+}
+
+/**
+ * Match control_panel: one danger button morphs Reset Rack/Frame ↔ End Match.
+ * Call Match only when racks exist and the race is not complete.
+ */
+function syncMatchActionButtons(state) {
+  // Same gate as control_panel isRaceComplete() / isGameScoringLocked()
+  const locked = isRaceCompleteFromState(state);
+  const canCall = !locked && state.canCallGame === true;
+
+  const resetBtn = document.getElementById('resetScoresBtn');
+  if (resetBtn) {
+    if (locked) {
+      resetBtn.textContent = 'End Match';
+      resetBtn.dataset.cmd = 'end_match';
+    } else {
+      resetBtn.textContent = getResetActionLabel(state);
+      resetBtn.dataset.cmd = 'reset_scores';
+    }
+    resetBtn.classList.remove('hidden');
+    resetBtn.disabled = false;
+  }
+
+  const callBtn = document.getElementById('callMatchBtn');
+  if (callBtn) {
+    callBtn.classList.toggle('hidden', !canCall);
+    callBtn.disabled = !canCall;
+  }
 }
 
 const MATCH_CONFIRM_CMDS = new Set(['reset_scores', 'end_match', 'call_match_early']);
@@ -1191,6 +1236,7 @@ function wireSetupPanel() {
 function wireCommands() {
   document.querySelectorAll('[data-cmd]').forEach((el) => {
     el.addEventListener('click', () => {
+      if (el.disabled || el.classList.contains('hidden')) return;
       if (!controlsEnabled()) {
         setError(controlLockMessage());
         return;
