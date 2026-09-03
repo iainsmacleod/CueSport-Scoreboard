@@ -219,13 +219,23 @@
                 performCallGame();
                 return Promise.resolve().then(publishAfterScoring);
             case 'instant_replay':
-                triggerInstantReplay();
-                return Promise.resolve();
+                return Promise.resolve(
+                    typeof triggerInstantReplay === 'function' ? triggerInstantReplay() : undefined
+                ).then(publishAfterScoring);
             case 'toggle_monitoring':
-                triggerReplayMonitoring();
-                return Promise.resolve();
+                return Promise.resolve(
+                    typeof toggleReplayMonitoring === 'function' ? toggleReplayMonitoring() : undefined
+                ).then(publishAfterScoring);
             case 'play_clip':
-                if (payload && payload.index != null) playPreviousReplay(parseInt(payload.index, 10));
+                if (payload && payload.index != null && typeof playPreviousReplay === 'function') {
+                    return Promise.resolve(playPreviousReplay(parseInt(payload.index, 10))).then(publishAfterScoring);
+                }
+                return Promise.resolve();
+            case 'delete_clip':
+                if (payload && payload.index != null && typeof deleteClip === 'function') {
+                    deleteClip(parseInt(payload.index, 10), null, { skipConfirm: true });
+                    return Promise.resolve().then(publishAfterScoring);
+                }
                 return Promise.resolve();
             case 'undo':
                 if (typeof undoLastScoringAction === 'function') {

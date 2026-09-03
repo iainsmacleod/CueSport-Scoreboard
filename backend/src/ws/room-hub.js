@@ -344,6 +344,7 @@ async function handleJoin(ws, meta, msg, authenticateJoin) {
     client,
     accountId: accountId || room.account_id,
     sourceId: meta.sourceId,
+    guestToken: meta.guestToken || null,
   });
 
   const { state, sessionId } = sqlite.getRoomSessionState(roomId);
@@ -525,4 +526,55 @@ export function roomHasConnectedDock(roomId) {
     if (conn.client === 'dock' && conn.ws.readyState === 1) return true;
   }
   return false;
+}
+
+/** Live guest sockets keyed by guest token for a room. */
+export function guestConnectionCounts(roomId) {
+  const counts = {};
+  if (!roomId) return counts;
+  for (const conn of getRoomClients(roomId)) {
+    if (conn.client !== 'mobile_guest' || !conn.guestToken) continue;
+    if (conn.ws.readyState !== 1) continue;
+    counts[conn.guestToken] = (counts[conn.guestToken] || 0) + 1;
+  }
+  return counts;
+}
+
+function kickConnections(match, payload) {
+  const targets = [];
+  for (const [ws, meta] of connections) {
+    if (match(meta)) targets.push(ws);
+  }
+  for (const ws of targets) {
+    send(ws, { type: 'error', ...payload });
+    try { ws.close(); } catch (_) { /* ignore */ }
+  }
+  return targets.length;
+}
+
+/** Close sockets using a revoked guest token. */
+export function kickGuestToken(token) {
+  if (!token) return 0;
+  return kickConnections(
+    (meta) => meta.guestToken === token,
+    { code: 'guest_revoked', message: 'Guest link revoked' },
+  );
+}
+
+/** Disconnect admin mobile and dashboard sockets (not dock or guests). */
+export function kickAccountAdminClients(accountId) {
+  if (!accountId) return 0;
+  return kickConnections(
+    (meta) => meta.accountId === accountId && (meta.client === 'mobile' || meta.client === 'dashboard'),
+    { code: 'session_revoked', message: 'Signed out everywhere' },
+  );
+}
+
+/** Disconnect all guest scorers for an account. */
+export function kickAccountGuestClients(accountId) {
+  if (!accountId) return 0;
+  return kickConnections(
+    (meta) => meta.accountId === accountId && meta.client === 'mobile_guest',
+    { code: 'guest_revoked', message: 'Guest link revoked' },
+  );
 }

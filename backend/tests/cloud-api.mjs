@@ -34,7 +34,26 @@ async function fetchJson(path, options = {}) {
   return { ok: res.ok, status: res.status, body };
 }
 
-function wsJoin({ roomId, client, accessToken, apiKey, timeoutMs = 8000 }) {
+function waitForWsErrorThenClose(ws, timeoutMs = 8000) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('kick timeout')), timeoutMs);
+    let err = null;
+    ws.on('message', (raw) => {
+      try {
+        const data = JSON.parse(raw.toString());
+        if (data.type === 'error') err = data;
+      } catch {
+        /* ignore */
+      }
+    });
+    ws.on('close', () => {
+      clearTimeout(timer);
+      resolve(err || { code: 'closed' });
+    });
+  });
+}
+
+function wsJoin({ roomId, client, accessToken, apiKey, guestToken, timeoutMs = 8000 }) {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(`${WS_BASE}/ws`);
     const timer = setTimeout(() => {
@@ -48,7 +67,13 @@ function wsJoin({ roomId, client, accessToken, apiKey, timeoutMs = 8000 }) {
     });
 
     ws.on('open', () => {
-      const msg = { type: 'join', room_id: roomId, client };
+      const msg = { type: 'join', client };
+      if (guestToken) {
+        msg.guest_token = guestToken;
+        msg.client = 'mobile_guest';
+      } else if (roomId) {
+        msg.room_id = roomId;
+      }
       if (accessToken) msg.access_token = accessToken;
       if (apiKey) msg.api_key = apiKey;
       ws.send(JSON.stringify(msg));
@@ -213,21 +238,39 @@ async function run() {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
     });
-    assert('POST /api/sessions/invalidate-all', invalidated.ok && !!invalidated.body.access_token);
+    assert('POST /api/sessions/invalidate-all', invalidated.ok);
+    assert('Sign Out Everywhere does not keep this session', !invalidated.body.access_token);
     const staleMe = await fetchJson('/api/me', { headers: { Authorization: `Bearer ${token}` } });
     assert('Old token rejected after invalidate', staleMe.status === 401);
-    const tokenFresh = invalidated.body.access_token;
+    const relogin = await fetchJson('/api/auth/dev-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ secret: devSecret }),
+    });
+    let tokenFresh = relogin.body.access_token;
     const meFresh = await fetchJson('/api/me', { headers: { Authorization: `Bearer ${tokenFresh}` } });
-    assert('Fresh token works after invalidate', meFresh.ok);
+    assert('Fresh login works after invalidate', meFresh.ok);
 
-    // WebSocket: mobile dev token (regression for payload.sub crash)
-    let mobileJoin;
+    // Live admin mobile is disconnected (not just token-invalidated)
     try {
-      mobileJoin = await wsJoin({ roomId, client: 'mobile', accessToken: tokenFresh });
-      assert('WS join mobile + dev token', mobileJoin.data.room_id === roomId);
-      mobileJoin.ws.close();
+      const mobileLive = await wsJoin({ roomId, client: 'mobile', accessToken: tokenFresh });
+      assert('WS join mobile + dev token', mobileLive.data.room_id === roomId);
+      const kickedP = waitForWsErrorThenClose(mobileLive.ws);
+      const kickInv = await fetchJson('/api/sessions/invalidate-all', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokenFresh}` },
+      });
+      assert('Sign Out Everywhere ok', kickInv.ok && !kickInv.body.access_token);
+      const kicked = await kickedP;
+      assert('Sign Out Everywhere disconnects mobile WS', kicked.code === 'session_revoked');
+      const relogin2 = await fetchJson('/api/auth/dev-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret: devSecret }),
+      });
+      tokenFresh = relogin2.body.access_token;
     } catch (e) {
-      assert('WS join mobile + dev token', false, e.message);
+      assert('WS join mobile + disconnect on Sign Out Everywhere', false, e.message);
     }
 
     // WebSocket: dock api key
@@ -303,6 +346,32 @@ async function run() {
       dock2.ws.close();
     } else {
       assert('Events persisted', false, 'dock join failed');
+    }
+
+    const guestLink = await fetchJson(`/api/rooms/${roomId}/guest-link`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${tokenFresh}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ label: 'smoke-guest' }),
+    });
+    assert('POST /api/rooms/:roomId/guest-link', guestLink.ok && !!guestLink.body.token);
+    if (guestLink.ok && guestLink.body.token) {
+      try {
+        const guestWs = await wsJoin({ guestToken: guestLink.body.token });
+        assert('WS join guest token', guestWs.data.client === 'mobile_guest');
+        const guestKickedP = waitForWsErrorThenClose(guestWs.ws);
+        const revAll = await fetchJson('/api/guest-links/revoke-all', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${tokenFresh}` },
+        });
+        assert('POST /api/guest-links/revoke-all', revAll.ok && Number(revAll.body.revoked) >= 1);
+        const guestKicked = await guestKickedP;
+        assert('Revoke All Guest Sessions disconnects guests', guestKicked.code === 'guest_revoked');
+      } catch (e) {
+        assert('Guest WS disconnect on revoke-all', false, e.message);
+      }
     }
   }
 

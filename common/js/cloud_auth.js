@@ -74,6 +74,7 @@
     }
 
     function signOutCloud() {
+        if (!window.confirm('Sign out of CueSport Cloud on this dock?')) return;
         if (window.cloudRelay) window.cloudRelay.clearSession();
         const emailEl = document.getElementById('cloudSignedInEmail');
         if (emailEl) emailEl.textContent = '';

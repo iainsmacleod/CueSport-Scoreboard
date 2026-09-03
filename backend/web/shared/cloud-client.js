@@ -207,9 +207,12 @@ export async function revokeApiKey(serverUrl, token, keyId) {
   return res.json();
 }
 
-export async function fetchGuestLinks(serverUrl, token) {
+export async function fetchGuestLinks(serverUrl, token, roomId) {
   const base = serverUrl.replace(/\/$/, '');
-  const res = await fetch(`${base}/api/guest-links`, {
+  const path = roomId
+    ? `/api/rooms/${encodeURIComponent(roomId)}/guest-links`
+    : '/api/guest-links';
+  const res = await fetch(`${base}${path}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error('Failed to load guest links');
@@ -226,6 +229,19 @@ export async function revokeGuestLink(serverUrl, token, guestToken) {
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || 'Failed to revoke guest link');
+  }
+  return res.json();
+}
+
+export async function revokeAllGuestLinks(serverUrl, token) {
+  const base = serverUrl.replace(/\/$/, '');
+  const res = await fetch(`${base}/api/guest-links/revoke-all`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to revoke guest links');
   }
   return res.json();
 }

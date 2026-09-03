@@ -257,6 +257,16 @@ export function listGuestTokensForAccount(accountId) {
   ).all(accountId);
 }
 
+export function listGuestTokensForRoom(roomId, accountId) {
+  return getDb().prepare(
+    `SELECT g.token, g.room_id, g.label, g.created_at, r.label AS room_label
+     FROM room_guest_tokens g
+     JOIN rooms r ON r.id = g.room_id
+     WHERE g.account_id = ? AND g.room_id = ? AND g.revoked_at IS NULL
+     ORDER BY g.created_at DESC`
+  ).all(accountId, roomId);
+}
+
 export function invalidateAllSessions(accountId) {
   getDb().prepare(
     `UPDATE accounts
@@ -410,6 +420,14 @@ export function revokeGuestToken(token, accountId) {
   getDb().prepare(
     `UPDATE room_guest_tokens SET revoked_at = datetime('now') WHERE token = ? AND account_id = ?`
   ).run(token, accountId);
+}
+
+export function revokeAllGuestTokens(accountId) {
+  const result = getDb().prepare(
+    `UPDATE room_guest_tokens SET revoked_at = datetime('now')
+     WHERE account_id = ? AND revoked_at IS NULL`
+  ).run(accountId);
+  return result.changes;
 }
 
 function normalizePlayerName(name) {

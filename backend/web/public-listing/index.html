@@ -15,7 +15,7 @@
       </div>
       <nav class="site-nav">
         <a class="btn" href="/streams">Live Streams</a>
-        <a class="btn primary" href="/dashboard">Sign In</a>
+        <a id="authNavBtn" class="btn primary" href="/dashboard">Sign In</a>
       </nav>
     </div>
   </header>
@@ -55,6 +55,13 @@
     </section>
   </main>
   <script type="module">
+    function syncAuthNav() {
+      const btn = document.getElementById('authNavBtn');
+      if (!btn) return;
+      const signedIn = !!localStorage.getItem('cuesport_token');
+      btn.textContent = signedIn ? 'Dashboard' : 'Sign In';
+    }
+
     async function loadStreams() {
       const res = await fetch('/api/streams');
       const streams = await res.json();
@@ -84,6 +91,7 @@
         list.appendChild(li);
       });
     }
+    syncAuthNav();
     loadStreams();
     setInterval(loadStreams, 15000);
   </script>

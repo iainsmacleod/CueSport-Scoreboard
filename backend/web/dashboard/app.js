@@ -5,11 +5,10 @@ import {
   fetchMe,
   createApiKey,
   revokeApiKey,
-  fetchGuestLinks,
-  revokeGuestLink,
   invalidateAllSessions,
+  revokeAllGuestLinks,
   GAME_TYPES,
-} from '../shared/cloud-client.js';
+} from '../shared/cloud-client.js?v=7.2.3-signout-this-tab';
 
 const TOKEN_KEY = 'cuesport_token';
 const SERVER_KEY = 'cuesport_server';
@@ -168,38 +167,6 @@ function renderApiKeys(keys) {
   });
 }
 
-function renderGuestLinks(links) {
-  const list = document.getElementById('guestLinkList');
-  if (!list) return;
-  list.innerHTML = '';
-  if (!(links || []).length) {
-    list.innerHTML = '<li class="hint">No active guest links.</li>';
-    return;
-  }
-  links.forEach((g) => {
-    const li = document.createElement('li');
-    li.className = 'token-list-item';
-    const label = document.createElement('span');
-    label.textContent = `${g.label || 'Guest'} · ${g.room_label || g.room_id} · ${g.created_at}`;
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'btn danger';
-    btn.textContent = 'Revoke';
-    btn.addEventListener('click', async () => {
-      if (!window.confirm('Revoke this guest scorer link?')) return;
-      try {
-        await revokeGuestLink(getServerUrl(), getToken(), g.token);
-        await renderDashboard();
-      } catch (err) {
-        setError(err.message);
-      }
-    });
-    li.appendChild(label);
-    li.appendChild(btn);
-    list.appendChild(li);
-  });
-}
-
 function setActiveDashTab(which) {
   document.querySelectorAll('.dash-tab').forEach((t) => {
     t.classList.toggle('active', t.dataset.tab === which);
@@ -256,10 +223,10 @@ async function connectLiveFeed() {
     renderTableCards(rooms);
   });
   client.on('error', (e) => {
-    if (e.code === 'invalid_token' || e.code === 'room_forbidden') {
+    if (e.code === 'invalid_token' || e.code === 'room_forbidden' || e.code === 'session_revoked') {
       localStorage.removeItem(TOKEN_KEY);
       stopLiveFeed();
-      setError(e.message || 'Session expired');
+      setError(e.code === 'session_revoked' ? 'Signed out everywhere.' : (e.message || 'Session expired'));
       show('loginSection', true);
       show('dashboardSection', false);
     }
@@ -294,12 +261,6 @@ async function renderDashboard() {
     document.getElementById('userEmail').textContent = me.account.email;
     renderQuota(me.quota);
     renderApiKeys(me.api_keys);
-    try {
-      const links = await fetchGuestLinks(getServerUrl(), token);
-      renderGuestLinks(links);
-    } catch (_) {
-      renderGuestLinks([]);
-    }
     renderTableCards(me.rooms);
     wantLiveFeed = true;
     clearReconnect();
@@ -354,24 +315,37 @@ document.getElementById('createKeyBtn').addEventListener('click', async () => {
 });
 
 document.getElementById('signOutBtn').addEventListener('click', () => {
+  if (!window.confirm('Sign out of this dashboard on this device?')) return;
   localStorage.removeItem(TOKEN_KEY);
   stopLiveFeed();
   renderDashboard();
 });
 
 document.getElementById('invalidateSessionsBtn')?.addEventListener('click', async () => {
-  if (!window.confirm('Sign out all mobile sessions for this account? You will stay signed in on this dashboard.')) {
+  if (!window.confirm('Sign out everywhere? This dashboard, other admin devices, and admin mobile control will be signed out and disconnected. Guest links are not affected.')) {
     return;
   }
   try {
-    const result = await invalidateAllSessions(getServerUrl(), getToken());
-    if (result.access_token) {
-      localStorage.setItem(TOKEN_KEY, result.access_token);
-    } else {
-      // Google JWT path — this tab stays until refresh; mobiles must re-auth.
-    }
+    await invalidateAllSessions(getServerUrl(), getToken());
+  } catch (err) {
+    setError(err.message);
+    return;
+  }
+  localStorage.removeItem(TOKEN_KEY);
+  stopLiveFeed();
+  setError('');
+  renderDashboard();
+});
+
+document.getElementById('revokeAllGuestsBtn')?.addEventListener('click', async () => {
+  if (!window.confirm('Revoke all guest links and disconnect every guest scorer? They will need a new link to reconnect.')) {
+    return;
+  }
+  try {
+    const result = await revokeAllGuestLinks(getServerUrl(), getToken());
     setError('');
-    alert('All mobile sessions have been invalidated.');
+    const n = Number(result.revoked) || 0;
+    alert(n === 1 ? 'Revoked 1 guest link.' : `Revoked ${n} guest links.`);
     await renderDashboard();
   } catch (err) {
     setError(err.message);

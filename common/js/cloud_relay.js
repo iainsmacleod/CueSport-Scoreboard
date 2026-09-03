@@ -356,7 +356,39 @@
                 state.playerSlotMode = 'off';
             }
             state.obsConnected = dockStorage('isConnected', 'false') === 'true';
-            // Match control_panel updateCallGameButton: never call early once race is complete.
+            // Prefer storage; also trust control_panel Monitor / Instant Replay button labels.
+            const monitorBtn = document.getElementById('btnMonitorGame');
+            const instantBtn = document.getElementById('btnReplayClip');
+            const monitoringFromStorage = dockStorage('isMonitoringActive', 'false') === 'true';
+            const monitoringFromUi = !!(
+                (monitorBtn && /stop\s*monitoring/i.test(monitorBtn.textContent || '')) ||
+                (instantBtn && !instantBtn.classList.contains('noShow'))
+            );
+            state.monitoringActive = monitoringFromStorage || monitoringFromUi;
+            state.replayPlaybackActive = typeof isReplayPlaybackActive === 'boolean'
+                ? !!isReplayPlaybackActive
+                : /replay\s*active/i.test((document.getElementById('btnMonitorGame') || {}).textContent || '');
+            // replayHistory is stored without instance prefix (matches control_panel.js)
+            let replayHistory = [];
+            try {
+                const raw = localStorage.getItem('replayHistory');
+                replayHistory = raw ? JSON.parse(raw) : [];
+                if (!Array.isArray(replayHistory)) replayHistory = [];
+            } catch (_) {
+                replayHistory = [];
+            }
+            state.replayClipCount = replayHistory.length;
+            state.replayClips = [0, 1, 2, 3, 4].map(function (i) {
+                if (replayHistory[i]) return true;
+                const clipBtn = document.getElementById('prvReplayClip' + (i + 1));
+                if (!clipBtn) return false;
+                // control_panel sets display to inline-block when the slot has a clip
+                return clipBtn.style.display === 'inline-block' ||
+                    (clipBtn.style.display !== 'none' && !clipBtn.disabled && clipBtn.offsetParent !== null);
+            });
+            if (!state.replayClipCount) {
+                state.replayClipCount = state.replayClips.filter(Boolean).length;
+            }            // Match control_panel updateCallGameButton: never call early once race is complete.
             state.canCallGame = !state.gameScoringLocked &&
                 window.PlayerStats &&
                 typeof window.PlayerStats.canCallGame === 'function' &&
@@ -480,14 +512,41 @@
         });
     }
 
+    /** Sync score snapshot for cloud publish — avoids awaiting OBS getStreamUrl races. */
+    function collectDockScoreSnapshot() {
+        function scoreInt(key) {
+            const n = parseInt(dockStorage(key, '0'), 10);
+            return Number.isFinite(n) ? n : 0;
+        }
+        return {
+            player1Name: dockStorage('p1NameCtrlPanel', '') || '',
+            player2Name: dockStorage('p2NameCtrlPanel', '') || '',
+            p1Score: scoreInt('p1ScoreCtrlPanel'),
+            p2Score: scoreInt('p2ScoreCtrlPanel'),
+            p1Balls: scoreInt('p1BallsCtrlPanel'),
+            p2Balls: scoreInt('p2BallsCtrlPanel'),
+            gameType: dockStorage('gameType', 'game1') || 'game1',
+            raceInfo: dockStorage('raceInfo', '') || '',
+            gameInfo: dockStorage('gameInfo', '') || '',
+            pointBased: dockStorage('pointBased', 'no') || 'no',
+            ballTrackerEnabled: dockStorage('enableBallTracker', 'no') === 'yes',
+            timestamp: new Date().toISOString(),
+        };
+    }
+
     function pushDockStateSoon(delayMs) {
         if (pushStateTimer) clearTimeout(pushStateTimer);
         pushStateTimer = setTimeout(function () {
             pushStateTimer = null;
+            // Prefer direct cloud publish with sync scores. Routing through
+            // streamSharing.sendUpdate() awaits OBS getStreamUrl and often drops
+            // monitoring/clip updates behind in-flight score publishes.
+            if (isJoined) {
+                sendState(collectDockScoreSnapshot());
+                return;
+            }
             if (window.streamSharing && typeof window.streamSharing.sendUpdate === 'function') {
                 window.streamSharing.sendUpdate();
-            } else if (isJoined) {
-                sendState({});
             }
         }, delayMs == null ? 50 : delayMs);
     }
@@ -587,9 +646,9 @@
         if (data.type === 'presence') {
             const clients = data.clients || [];
             for (const fn of presenceHandlers) fn(clients);
-            // When a mobile client joins, refresh room state so it isn't blank
-            if (clients.includes('mobile')) {
-                pushDockStateSoon();
+            // When a mobile/guest client joins, refresh room state so replay/monitoring sync
+            if (clients.includes('mobile') || clients.includes('mobile_guest')) {
+                pushDockStateSoon(0);
             }
             return;
         }

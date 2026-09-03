@@ -2,9 +2,11 @@ import {
   CloudClient,
   devLogin,
   createGuestLink,
+  fetchGuestLinks,
+  revokeGuestLink,
   fetchPlayers,
   GAME_TYPES,
-} from '../shared/cloud-client.js';
+} from '../shared/cloud-client.js?v=7.2.3-guest-room';
 
 const TOKEN_KEY = 'cuesport_token';
 let client = null;
@@ -18,6 +20,7 @@ let isGuestMode = false;
 /** @type {'control' | 'setup' | 'replay' | 'share'} */
 let activeView = 'control';
 let cachedGuestShareUrl = '';
+let cachedGuestShareToken = '';
 let guestSharePromise = null;
 
 function pathContext() {
@@ -85,53 +88,112 @@ function setActiveView(view) {
   show('viewReplay', view === 'replay' && !isGuestMode);
   show('viewShare', view === 'share' && !isGuestMode);
 
-  const toggleBtn = document.getElementById('navToggleSetupBtn');
-  if (toggleBtn) {
-    const showControlLabel = view === 'setup';
-    toggleBtn.dataset.mode = showControlLabel ? 'control' : 'setup';
-    const label = document.getElementById('navToggleSetupLabel');
-    if (label) label.textContent = showControlLabel ? 'Control' : 'Setup';
-    toggleBtn.setAttribute('aria-label', showControlLabel ? 'Control' : 'Setup');
-    toggleBtn.classList.toggle('active', view === 'setup');
+  const controlBtn = document.getElementById('navControlBtn');
+  if (controlBtn) {
+    controlBtn.classList.toggle('active', view === 'control');
+    controlBtn.setAttribute('aria-current', view === 'control' ? 'page' : 'false');
+  }
+  const setupBtn = document.getElementById('navSetupBtn');
+  if (setupBtn) {
+    setupBtn.classList.toggle('active', view === 'setup');
+    setupBtn.setAttribute('aria-current', view === 'setup' ? 'page' : 'false');
   }
   const replayBtn = document.getElementById('navReplayBtn');
-  if (replayBtn) replayBtn.classList.toggle('active', view === 'replay');
+  if (replayBtn) {
+    replayBtn.classList.toggle('active', view === 'replay');
+    replayBtn.setAttribute('aria-current', view === 'replay' ? 'page' : 'false');
+  }
   const shareBtn = document.getElementById('navShareBtn');
-  if (shareBtn) shareBtn.classList.toggle('active', view === 'share');
+  if (shareBtn) {
+    shareBtn.classList.toggle('active', view === 'share');
+    shareBtn.setAttribute('aria-current', view === 'share' ? 'page' : 'false');
+  }
 
   if (view === 'share') {
-    ensureGuestShareLink().catch((err) => setError(err.message || 'Failed to create guest link'));
+    ensureGuestShareLink({ refreshList: true }).catch((err) => setError(err.message || 'Failed to create guest link'));
   }
 }
 
-async function ensureGuestShareLink() {
-  if (cachedGuestShareUrl) {
-    renderShareLink(cachedGuestShareUrl);
-    return cachedGuestShareUrl;
-  }
+function guestUrlFromLink(link) {
+  if (!link) return '';
+  if (link.path) return `${window.location.origin}${link.path}`;
+  if (link.url) return link.url;
+  if (link.token) return `${window.location.origin}/g/${link.token}`;
+  return '';
+}
+
+async function ensureGuestShareLink({ refreshList = false } = {}) {
   if (guestSharePromise) return guestSharePromise;
   const token = localStorage.getItem(TOKEN_KEY);
   if (!roomId || !token) {
     throw new Error('Sign in required to create a public control link');
   }
   const status = document.getElementById('shareStatus');
-  if (status) {
+  if (!cachedGuestShareUrl && status) {
     status.textContent = 'Preparing link…';
     status.classList.remove('hidden');
   }
-  guestSharePromise = createGuestLink(window.location.origin, token, roomId)
-    .then((data) => {
-      const url = data.path
-        ? `${window.location.origin}${data.path}`
-        : data.url;
-      cachedGuestShareUrl = url;
-      renderShareLink(url);
-      return url;
-    })
+  guestSharePromise = (async () => {
+    let links = await fetchGuestLinks(window.location.origin, token, roomId);
+    if (!links.length) {
+      const created = await createGuestLink(window.location.origin, token, roomId);
+      links = await fetchGuestLinks(window.location.origin, token, roomId);
+      if (!links.length) {
+        links = [{ token: created.token, path: created.path, url: created.url, label: created.label, connected: 0 }];
+      }
+    }
+    const chosen = links.find((g) => g.token === cachedGuestShareToken) || links[0];
+    cachedGuestShareToken = chosen.token;
+    cachedGuestShareUrl = guestUrlFromLink(chosen);
+    renderShareLink(cachedGuestShareUrl);
+    renderGuestLinks(links);
+    return cachedGuestShareUrl;
+  })()
     .finally(() => {
       guestSharePromise = null;
     });
   return guestSharePromise;
+}
+
+function renderGuestLinks(links) {
+  const list = document.getElementById('guestLinkList');
+  if (!list) return;
+  list.innerHTML = '';
+  if (!(links || []).length) {
+    list.innerHTML = '<li class="hint">No guest links for this table.</li>';
+    return;
+  }
+  links.forEach((g) => {
+    const li = document.createElement('li');
+    li.className = 'token-list-item';
+    const n = Number(g.connected) || 0;
+    const label = document.createElement('span');
+    const status = n > 0
+      ? `${n} connected`
+      : 'Offline';
+    label.textContent = `${g.label || 'Guest'} · ${g.created_at} · ${status}`;
+    if (g.token === cachedGuestShareToken) li.classList.add('is-current');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn danger';
+    btn.textContent = 'Revoke';
+    btn.addEventListener('click', async () => {
+      if (!window.confirm('Revoke this guest link? Anyone using it will be disconnected.')) return;
+      try {
+        await revokeGuestLink(window.location.origin, localStorage.getItem(TOKEN_KEY), g.token);
+        if (cachedGuestShareToken === g.token) {
+          cachedGuestShareToken = '';
+          cachedGuestShareUrl = '';
+        }
+        await ensureGuestShareLink({ refreshList: true });
+      } catch (err) {
+        setError(err.message);
+      }
+    });
+    li.appendChild(label);
+    li.appendChild(btn);
+    list.appendChild(li);
+  });
 }
 
 function renderShareLink(url) {
@@ -155,22 +217,36 @@ function renderShareLink(url) {
 }
 
 function wireMobileNav() {
-  const toggleBtn = document.getElementById('navToggleSetupBtn');
-  if (toggleBtn) {
-    toggleBtn.addEventListener('click', () => {
-      setActiveView(activeView === 'setup' ? 'control' : 'setup');
-    });
+  const controlBtn = document.getElementById('navControlBtn');
+  if (controlBtn) {
+    controlBtn.addEventListener('click', () => setActiveView('control'));
+  }
+  const setupBtn = document.getElementById('navSetupBtn');
+  if (setupBtn) {
+    setupBtn.addEventListener('click', () => setActiveView('setup'));
   }
   const replayBtn = document.getElementById('navReplayBtn');
   if (replayBtn) {
-    replayBtn.addEventListener('click', () => {
-      setActiveView(activeView === 'replay' ? 'control' : 'replay');
-    });
+    replayBtn.addEventListener('click', () => setActiveView('replay'));
   }
   const shareNavBtn = document.getElementById('navShareBtn');
   if (shareNavBtn) {
-    shareNavBtn.addEventListener('click', () => {
-      setActiveView(activeView === 'share' ? 'control' : 'share');
+    shareNavBtn.addEventListener('click', () => setActiveView('share'));
+  }
+  const newLinkBtn = document.getElementById('shareNewLinkBtn');
+  if (newLinkBtn) {
+    newLinkBtn.addEventListener('click', async () => {
+      if (!window.confirm('Create a new guest link? Existing links stay valid until you revoke them.')) return;
+      try {
+        const token = localStorage.getItem(TOKEN_KEY);
+        if (!roomId || !token) throw new Error('Sign in required to create a public control link');
+        const created = await createGuestLink(window.location.origin, token, roomId);
+        cachedGuestShareToken = created.token;
+        cachedGuestShareUrl = guestUrlFromLink(created);
+        await ensureGuestShareLink();
+      } catch (err) {
+        setError(err.message || 'Failed to create guest link');
+      }
     });
   }
   const copyBtn = document.getElementById('shareCopyBtn');
@@ -383,13 +459,7 @@ function applyState(state) {
   document.getElementById('liveMeta').textContent = metaParts.join(' · ');
 
   syncMatchActionButtons(state);
-
-  const replayPanel = document.getElementById('replayPanel');
-  if (replayPanel) {
-    replayPanel.querySelectorAll('button').forEach((btn) => {
-      btn.disabled = state.obsConnected === false;
-    });
-  }
+  syncReplayPanel(state);
 
   renderBallGrid(state);
 }
@@ -835,12 +905,69 @@ function syncMatchActionButtons(state) {
   }
 }
 
+/**
+ * Match control_panel: Instant Replay only while monitoring; clips only when that slot
+ * exists; Monitor label reflects start/stop / Replay Active.
+ */
+function syncReplayPanel(state) {
+  const monitoring = !!state.monitoringActive;
+  const replayPlaying = !!state.replayPlaybackActive;
+  // Monitoring implies OBS was usable; don't hide clips if obsConnected lagged false.
+  const obsConnected = state.obsConnected === true || monitoring || replayPlaying;
+  const clips = Array.isArray(state.replayClips)
+    ? state.replayClips
+    : Array.from({ length: 5 }, (_, i) => i < (Number(state.replayClipCount) || 0));
+
+  const hint = document.getElementById('replayObsHint');
+  if (hint) hint.classList.toggle('hidden', obsConnected || monitoring || replayPlaying);
+
+  const monitorBtn = document.getElementById('monitorBtn');
+  if (monitorBtn) {
+    if (replayPlaying) {
+      monitorBtn.textContent = 'Replay Active';
+      monitorBtn.classList.remove('monitor-active');
+      monitorBtn.classList.add('replay-active');
+      monitorBtn.disabled = true;
+    } else {
+      monitorBtn.textContent = monitoring ? 'Stop Monitoring' : 'Resume Monitoring';
+      monitorBtn.classList.toggle('monitor-active', monitoring);
+      monitorBtn.classList.remove('replay-active');
+      monitorBtn.disabled = false;
+    }
+  }
+
+  const instantBtn = document.getElementById('instantReplayBtn');
+  if (instantBtn) {
+    // Match control_panel: Instant Replay is tied to monitoring, hidden while a clip plays
+    // (monitoring was stopped for playback).
+    instantBtn.classList.toggle('hidden', !monitoring || replayPlaying);
+    instantBtn.disabled = !monitoring || replayPlaying;
+  }
+
+  const clipsRow = document.getElementById('replayClipsRow');
+  let anyClip = false;
+  document.querySelectorAll('#replayClipsRow .clip-wrap').forEach((wrap) => {
+    const idx = parseInt(wrap.dataset.clipIndex, 10);
+    const has = !!clips[idx];
+    wrap.classList.toggle('hidden', !has);
+    if (has) anyClip = true;
+    const playBtn = wrap.querySelector('[data-cmd="play_clip"]');
+    const clearBtn = wrap.querySelector('.clip-clear');
+    if (playBtn) playBtn.disabled = !has || replayPlaying;
+    if (clearBtn) clearBtn.disabled = !has || replayPlaying;
+  });
+  if (clipsRow) {
+    clipsRow.classList.toggle('hidden', !anyClip);
+  }
+}
+
 const MATCH_CONFIRM_CMDS = new Set(['reset_scores', 'end_match', 'call_match_early']);
 let pendingMatchConfirm = null;
 
-function getMatchActionConfirmCopy(cmd) {
+function getMatchActionConfirmCopy(cmd, opts = {}) {
   const resetLabel = getResetActionLabel();
   const unit = lastState?.gameType === 'game8' ? 'frame' : 'rack';
+  const clipNum = (opts.index != null ? Number(opts.index) : 0) + 1;
   const copy = {
     reset_scores: {
       title: resetLabel,
@@ -857,6 +984,11 @@ function getMatchActionConfirmCopy(cmd) {
       message: 'End this match early and keep completed racks/frames in match history? Scores will clear after saving. Please note, this is not ending the frame, this is the entire match — to complete a frame, score it for the appropriate player.',
       confirm: 'Call Match Early',
     },
+    delete_clip: {
+      title: `Clear Clip ${clipNum}`,
+      message: `Remove Clip ${clipNum} from saved replay history? This cannot be undone from here.`,
+      confirm: 'Clear Clip',
+    },
   };
   return copy[cmd] || { title: 'Confirm', message: 'Are you sure?', confirm: 'Confirm' };
 }
@@ -866,8 +998,8 @@ function closeMatchConfirmModal() {
   document.getElementById('confirmModal')?.classList.add('hidden');
 }
 
-function openMatchConfirmModal(cmd, run) {
-  const cfg = getMatchActionConfirmCopy(cmd);
+function openMatchConfirmModal(cmd, run, opts = {}) {
+  const cfg = getMatchActionConfirmCopy(cmd, opts);
   pendingMatchConfirm = run;
   document.getElementById('confirmModalTitle').textContent = cfg.title;
   document.getElementById('confirmModalMessage').textContent = cfg.message;
@@ -1265,6 +1397,27 @@ function wireCommands() {
   });
 }
 
+function wireReplayClearButtons() {
+  document.querySelectorAll('.clip-clear').forEach((btn) => {
+    btn.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (btn.disabled || btn.closest('.clip-wrap')?.classList.contains('hidden')) return;
+      if (!controlsEnabled()) {
+        setError(controlLockMessage());
+        return;
+      }
+      const index = parseInt(btn.dataset.deleteIndex, 10);
+      if (!Number.isFinite(index)) return;
+      openMatchConfirmModal(
+        'delete_clip',
+        () => sendCmd('delete_clip', { index }),
+        { index }
+      );
+    });
+  });
+}
+
 async function connect() {
   setError('');
   const ctx = pathContext();
@@ -1284,7 +1437,15 @@ async function connect() {
     });
     client.on('state', applyState);
     wireClientLifecycle(client);
-    client.on('error', (e) => setError(e.message || e.code || 'Connection failed'));
+    client.on('error', (e) => {
+      if (e.code === 'guest_revoked' || e.code === 'invalid_guest_token') {
+        show('controlSection', false);
+        showMobileNav(false);
+        setError('This guest link has been revoked.');
+        return;
+      }
+      setError(e.message || e.code || 'Connection failed');
+    });
     try {
       const joined = await client.connect();
       show('loginSection', false);
@@ -1341,13 +1502,16 @@ async function connect() {
   wireClientLifecycle(client);
   client.on('error', (e) => {
     const msg = String(e.message || e.code || '');
-    if (
-      msg.includes('token') ||
-      msg.includes("'sub'") ||
-      e.code === 'room_forbidden' ||
-      e.code === 'invalid_token'
-    ) {
+    if (e.code === 'session_revoked' || e.code === 'invalid_token' || msg.includes('token') || msg.includes("'sub'") || e.code === 'room_forbidden') {
       localStorage.removeItem(TOKEN_KEY);
+    }
+    if (e.code === 'session_revoked') {
+      show('loginSection', true);
+      show('controlSection', false);
+      showMobileNav(false);
+      syncLoginPanel();
+      setError('Signed out everywhere. Sign in again to reconnect.');
+      return;
     }
     if (e.code === 'room_forbidden') {
       setError('This room belongs to another account. Sign in with the dev secret for that account, or open the mobile link from your dashboard.');
@@ -1387,6 +1551,7 @@ GAME_TYPES.forEach((g) => {
 
 document.getElementById('connectBtn')?.addEventListener('click', connect);
 document.getElementById('clearTokenBtn')?.addEventListener('click', () => {
+  if (!window.confirm('Clear saved login on this device? You will need to sign in again to connect.')) return;
   localStorage.removeItem(TOKEN_KEY);
   if (client) {
     try { client.disconnect(); } catch (_) { /* ignore */ }
@@ -1402,6 +1567,7 @@ document.getElementById('clearTokenBtn')?.addEventListener('click', () => {
   syncLoginPanel();
 });
 wireCommands();
+wireReplayClearButtons();
 wireSetupPanel();
 wirePlayerAutocomplete();
 wireMatchConfirmModal();

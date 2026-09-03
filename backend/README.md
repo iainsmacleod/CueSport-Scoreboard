@@ -115,6 +115,7 @@ This backend is GPL-licensed alongside the scoreboard. You may run your own inst
 | DELETE | `/api/api-keys/:keyId` | Revoke API key |
 | GET | `/api/guest-links` | List guest scorer links |
 | DELETE | `/api/guest-links/:token` | Revoke guest link |
-| POST | `/api/sessions/invalidate-all` | Invalidate mobile sessions (bumps session epoch) |
+| POST | `/api/guest-links/revoke-all` | Revoke all guest links and disconnect guests |
+| POST | `/api/sessions/invalidate-all` | Sign out everywhere (invalidate + disconnect admin dashboard and mobile) |
 | GET | `/api/rooms/:roomId/events` | Match event log |
 | GET | `/api/streams` | Active public streams |

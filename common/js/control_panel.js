@@ -26,7 +26,8 @@ let isObsReady = false;
 let isMonitoringActive = getStorageItem('isMonitoringActive') === 'true' || false;
 let isConnected = getStorageItem('isConnected') === 'true' || false;
 let replayHistory = JSON.parse(localStorage.getItem('replayHistory')) || [];
-
+/** True while an Instant Replay / historic clip is playing in OBS (monitor button → Replay Active). */
+let isReplayPlaybackActive = false;
 // function updateTabVisibility() {
 //     // Get the state of the player settings
 //     const player1Enabled = document.getElementById("usePlayer1Setting").checked;
@@ -6324,6 +6325,9 @@ obs.on('MediaInputPlaybackEnded', async ({ inputName }) => {
 			console.error('Error hiding replay source on playback end:', error);
 		}
 	}
+	if (inputName === videoSource) {
+		setReplayPlaybackActive(false);
+	}
 	if (document.getElementById("autoResumeReplayBuffer").checked) {
 		toggleReplayMonitoring();
 	}
@@ -6381,17 +6385,35 @@ obs.on('ConnectionClosed', () => {
 });
 
 // UI helpers
+function setReplayPlaybackActive(active) {
+    isReplayPlaybackActive = !!active;
+    setMonitorButtonText();
+}
+
 function setMonitorButtonText() {
     const btn = document.getElementById('btnMonitorGame');
     if (!btn) return;
-    if (getStorageItem("isMonitoringActive") === "true") {
+    if (isReplayPlaybackActive) {
+        btn.textContent = 'Replay Active';
+        btn.style.backgroundColor = '#e0af68';
+        btn.style.color = '#1a1b26';
+        btn.disabled = true;
+        btn.setAttribute('aria-disabled', 'true');
+    } else if (getStorageItem("isMonitoringActive") === "true") {
         btn.textContent = 'Stop Monitoring';
         btn.style.backgroundColor = 'red';  // red fill for Stop Monitoring
         btn.style.color = 'white';           // optionally set text color for contrast
+        btn.disabled = false;
+        btn.removeAttribute('aria-disabled');
     } else {
         btn.textContent = 'Resume Monitoring';
         btn.style.backgroundColor = 'green'; // green fill for Resume Monitoring
         btn.style.color = 'white';            // optionally set text color
+        btn.disabled = false;
+        btn.removeAttribute('aria-disabled');
+    }
+    if (window.cloudRelay && typeof window.cloudRelay.pushDockStateSoon === 'function') {
+        window.cloudRelay.pushDockStateSoon(0);
     }
 }
 
@@ -6478,7 +6500,8 @@ async function triggerInstantReplay() {
         await obs.call('SaveReplayBuffer');
         const savedPath = await savedPathPromise;
 
-        // Stop monitoring
+        // Stop monitoring — mark playback first so the monitor button shows Replay Active
+        setReplayPlaybackActive(true);
         try {
             const { outputActive } = await obs.call('GetReplayBufferStatus');
             if (outputActive) {
@@ -6532,6 +6555,7 @@ async function triggerInstantReplay() {
             } else {
                 alert(`Failed to play instant replay: ${message}`);
             }
+            setReplayPlaybackActive(false);
         }
 
         // Update instant replay button
@@ -6574,6 +6598,7 @@ async function playPreviousReplay(index) {
     }
 
     try {
+        setReplayPlaybackActive(true);
         const { outputActive } = await obs.call('GetReplayBufferStatus');
         if (outputActive) {
             try {
@@ -6602,6 +6627,7 @@ async function playPreviousReplay(index) {
 	} catch (err) {
 		console.error('Unable to determine active scene for replay playback:', err);
 		alert('Unable to determine the active OBS scene. Please ensure OBS is connected and streaming.');
+		setReplayPlaybackActive(false);
 		return;
 	}
 	await showSource(sceneName, videoSource);
@@ -6630,13 +6656,14 @@ async function playPreviousReplay(index) {
 		if (message.includes('Unable to determine active OBS scene')) {
 			alert('Unable to determine the active OBS scene when playing a replay. Please ensure OBS is connected and a program scene is active.');
 		}
+		setReplayPlaybackActive(false);
     }
     setReplayButtonText();
 }
 
 
 
-function deleteClip(index, event) {
+function deleteClip(index, event, options) {
     // Prevent the event from bubbling up to the play button
     if (event) {
         event.stopPropagation();
@@ -6652,12 +6679,13 @@ function deleteClip(index, event) {
         return;
     }
 
-    // Show confirmation dialog
-    const clipNumber = index + 1;
-    const confirmed = confirm(`Are you sure you want to delete Clip ${clipNumber}?`);
-    
-    if (!confirmed) {
-        return;
+    const skipConfirm = !!(options && options.skipConfirm);
+    if (!skipConfirm) {
+        const clipNumber = index + 1;
+        const confirmed = confirm(`Are you sure you want to delete Clip ${clipNumber}?`);
+        if (!confirmed) {
+            return;
+        }
     }
 
     // Remove the clip from the array
@@ -6671,6 +6699,10 @@ function deleteClip(index, event) {
     // Update button visibility and labels
     updateReplayButtonsVisibility();
     toggleReplayClipsVisibility();
+
+    if (window.cloudRelay && typeof window.cloudRelay.pushDockStateSoon === 'function') {
+        window.cloudRelay.pushDockStateSoon(0);
+    }
 }
 
 function updateReplayButtonsVisibility() {
@@ -6716,11 +6748,17 @@ function updateReplayButtonsVisibility() {
     toggleReplayClipsVisibility();
     const clipsVisible = !document.getElementById("replayClips").classList.contains("noShow");
     document.getElementById("savedPathNote").classList.toggle("noShow", !clipsVisible);
+    if (window.cloudRelay && typeof window.cloudRelay.pushDockStateSoon === 'function') {
+        window.cloudRelay.pushDockStateSoon(0);
+    }
 }
 
 
 // Monitor toggle
 async function toggleReplayMonitoring() {
+    if (isReplayPlaybackActive) {
+        return;
+    }
     //Reconnect to OBS if not connected
     if(!isConnected){
         const reconnected = await obsReConnect();

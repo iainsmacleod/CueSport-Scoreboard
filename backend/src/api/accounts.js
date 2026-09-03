@@ -7,7 +7,7 @@ import {
   validateDevSecret,
 } from '../dev-auth.js';
 import { ensureAccountFromOAuth } from '../ws/auth.js';
-import { roomHasConnectedDock } from '../ws/room-hub.js';
+import { roomHasConnectedDock, guestConnectionCounts, kickGuestToken, kickAccountAdminClients, kickAccountGuestClients } from '../ws/room-hub.js';
 import { config } from '../config.js';
 import {
   assertCanCreateApiKey,
@@ -126,6 +126,21 @@ export async function registerAccountRoutes(app) {
     return { guest_links: sqlite.listGuestTokensForAccount(account.id) };
   });
 
+  app.get('/api/rooms/:roomId/guest-links', async (request, reply) => {
+    const account = await resolveAccountFromRequest(request);
+    if (!account) return reply.code(401).send({ error: 'Unauthorized' });
+    const { roomId } = request.params;
+    if (!sqlite.roomBelongsToAccount(roomId, account.id)) {
+      return reply.code(403).send({ error: 'Forbidden' });
+    }
+    const counts = guestConnectionCounts(roomId);
+    const guest_links = sqlite.listGuestTokensForRoom(roomId, account.id).map((g) => ({
+      ...g,
+      connected: counts[g.token] || 0,
+    }));
+    return { guest_links };
+  });
+
   app.delete('/api/guest-links/:token', async (request, reply) => {
     const account = await resolveAccountFromRequest(request);
     if (!account) return reply.code(401).send({ error: 'Unauthorized' });
@@ -135,7 +150,16 @@ export async function registerAccountRoutes(app) {
       return reply.code(404).send({ error: 'Guest link not found' });
     }
     sqlite.revokeGuestToken(token, account.id);
+    kickGuestToken(token);
     return { ok: true };
+  });
+
+  app.post('/api/guest-links/revoke-all', async (request, reply) => {
+    const account = await resolveAccountFromRequest(request);
+    if (!account) return reply.code(401).send({ error: 'Unauthorized' });
+    const revoked = sqlite.revokeAllGuestTokens(account.id);
+    kickAccountGuestClients(account.id);
+    return { ok: true, revoked };
   });
 
   app.post('/api/rooms', async (request, reply) => {
@@ -192,18 +216,12 @@ export async function registerAccountRoutes(app) {
     const account = await resolveAccountFromRequest(request);
     if (!account) return reply.code(401).send({ error: 'Unauthorized' });
     const updated = sqlite.invalidateAllSessions(account.id);
-    const auth = request.headers.authorization || '';
-    const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-    const body = {
+    kickAccountAdminClients(account.id);
+    return {
       ok: true,
       session_epoch: updated.session_epoch,
       sessions_invalid_after: updated.sessions_invalid_after,
     };
-    // Keep the current dashboard session if it used a signed dev token.
-    if (token.startsWith('dev:') && config.allowDevAuth) {
-      body.access_token = issueDevToken(updated);
-    }
-    return body;
   });
 
   app.get('/api/config/public', async () => ({

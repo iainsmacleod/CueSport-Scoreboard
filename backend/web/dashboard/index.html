@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>CueSport Scoreboard Cloud — Dashboard</title>
-  <link rel="stylesheet" href="/web/shared/styles.css" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=7.2.3-signout-everywhere" />
 </head>
 <body>
   <header class="site-header">
@@ -76,8 +76,11 @@
           <h2>Signed In</h2>
           <p id="userEmail" class="account-email"></p>
           <p id="quotaSummary" class="hint"></p>
-          <button type="button" id="signOutBtn" class="btn">Sign Out</button>
-          <button type="button" id="invalidateSessionsBtn" class="btn secondary">Sign out all mobile sessions</button>
+          <div class="row account-session-actions">
+            <button type="button" id="signOutBtn" class="btn">Sign Out</button>
+            <button type="button" id="invalidateSessionsBtn" class="btn secondary">Sign Out Everywhere</button>
+            <button type="button" id="revokeAllGuestsBtn" class="btn danger">Revoke All Guest Sessions</button>
+          </div>
         </div>
         <div class="panel">
           <h2>API Keys (Self-Host Dock)</h2>
@@ -87,16 +90,11 @@
           <pre id="newKeyDisplay" class="key-display hidden"></pre>
           <ul id="keyList"></ul>
         </div>
-        <div class="panel">
-          <h2>Guest Scorer Links</h2>
-          <p class="hint">Public control links created from mobile Share. Revoke to cut off access immediately.</p>
-          <ul id="guestLinkList"></ul>
-        </div>
       </div>
 
       <p id="error" class="error hidden"></p>
     </section>
   </main>
-  <script type="module" src="/web/dashboard/app.js?v=7.2.3-quotas"></script>
+  <script type="module" src="/web/dashboard/app.js?v=7.2.3-signout-this-tab"></script>
 </body>
 </html>
