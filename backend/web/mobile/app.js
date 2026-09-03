@@ -12,6 +12,8 @@ const TOKEN_KEY = 'cuesport_token';
 let client = null;
 let roomId = '';
 let lastState = {};
+let raceDirty = false;
+let gameInfoDirty = false;
 let syncTimer = null;
 let dockPresent = false;
 
@@ -56,8 +58,6 @@ function syncLoginPanel() {
 function applyGuestUI() {
   const title = document.getElementById('pageTitle');
   if (title) title.textContent = 'CueSport Scoreboard Guest Control';
-  show('loginSection', false);
-  show('controlSection', true);
   ['adminPlayersPanel', 'matchPanel', 'viewReplay', 'viewShare'].forEach((id) => show(id, false));
   document.querySelectorAll('.admin-only').forEach((el) => el.classList.add('hidden'));
   const replayBtn = document.getElementById('navReplayBtn');
@@ -66,7 +66,6 @@ function applyGuestUI() {
   if (shareBtn) shareBtn.classList.add('hidden');
   const dash = document.getElementById('dashboardLink');
   if (dash) dash.classList.add('hidden');
-  showMobileNav(true);
   setActiveView('control');
 }
 
@@ -196,12 +195,29 @@ function renderGuestLinks(links) {
   });
 }
 
+function canNativeShare() {
+  return typeof navigator.share === 'function';
+}
+
+/** Desktop → Copy; phones/tablets with Web Share API → Share. */
+function syncShareActionButtons({ enable = false } = {}) {
+  const copyBtn = document.getElementById('shareCopyBtn');
+  const shareBtn = document.getElementById('shareNativeBtn');
+  const useShare = canNativeShare();
+  if (copyBtn) {
+    copyBtn.classList.toggle('hidden', useShare);
+    if (enable && !useShare) copyBtn.disabled = false;
+  }
+  if (shareBtn) {
+    shareBtn.classList.toggle('hidden', !useShare);
+    if (enable && useShare) shareBtn.disabled = false;
+  }
+}
+
 function renderShareLink(url) {
   const status = document.getElementById('shareStatus');
   const urlEl = document.getElementById('shareUrl');
   const qr = document.getElementById('shareQrImg');
-  const copyBtn = document.getElementById('shareCopyBtn');
-  const shareBtn = document.getElementById('shareNativeBtn');
   if (status) status.classList.add('hidden');
   if (urlEl) {
     urlEl.textContent = url;
@@ -212,8 +228,7 @@ function renderShareLink(url) {
     qr.src = `${base}/api/qr?size=220&margin=2&data=${encodeURIComponent(url)}`;
     qr.classList.remove('hidden');
   }
-  if (copyBtn) copyBtn.disabled = false;
-  if (shareBtn) shareBtn.disabled = false;
+  syncShareActionButtons({ enable: true });
 }
 
 function wireMobileNav() {
@@ -265,28 +280,19 @@ function wireMobileNav() {
   const nativeShareBtn = document.getElementById('shareNativeBtn');
   if (nativeShareBtn) {
     nativeShareBtn.addEventListener('click', async () => {
-      if (!cachedGuestShareUrl) return;
-      if (navigator.share) {
-        try {
-          await navigator.share({
-            title: 'CueSport public control link',
-            text: 'Join as guest scorer',
-            url: cachedGuestShareUrl,
-          });
-        } catch (err) {
-          if (err && err.name !== 'AbortError') setError(err.message || 'Share failed');
-        }
-        return;
-      }
+      if (!cachedGuestShareUrl || !canNativeShare()) return;
       try {
-        await navigator.clipboard.writeText(cachedGuestShareUrl);
-        nativeShareBtn.textContent = 'Link copied';
-        setTimeout(() => { nativeShareBtn.textContent = 'Share link'; }, 1500);
-      } catch (_) {
-        setError('Sharing not supported on this device');
+        await navigator.share({
+          title: 'CueSport public control link',
+          text: 'Join as guest scorer',
+          url: cachedGuestShareUrl,
+        });
+      } catch (err) {
+        if (err && err.name !== 'AbortError') setError(err.message || 'Share failed');
       }
     });
   }
+  syncShareActionButtons();
 }
 
 function setConnectionStatus(kind) {
@@ -319,6 +325,7 @@ function updateControlsLock() {
     if (locked) live.title = controlLockMessage();
     else live.removeAttribute('title');
   }
+  syncSaveIcons();
 }
 
 function wireClientLifecycle(c) {
@@ -334,6 +341,28 @@ function wireClientLifecycle(c) {
 
 function show(id, visible) {
   document.getElementById(id).classList.toggle('hidden', !visible);
+}
+
+function showConnecting() {
+  show('connectingSection', true);
+  show('loginSection', false);
+  show('controlSection', false);
+  showMobileNav(false);
+}
+
+function showLogin() {
+  show('connectingSection', false);
+  show('loginSection', true);
+  show('controlSection', false);
+  showMobileNav(false);
+  syncLoginPanel();
+}
+
+function showControl() {
+  show('connectingSection', false);
+  show('loginSection', false);
+  show('controlSection', true);
+  showMobileNav(true);
 }
 
 function setError(msg) {
@@ -442,11 +471,16 @@ function applyState(state) {
     }
   }
 
-  // Form fields — always sync from dock (including empty)
+  // Form fields — always sync from dock (including empty), unless the user has unsaved edits
   if (state.player1Name != null) document.getElementById('p1Name').value = state.player1Name;
   if (state.player2Name != null) document.getElementById('p2Name').value = state.player2Name;
-  if (state.raceInfo != null) document.getElementById('raceInput').value = state.raceInfo;
-  if (state.gameInfo != null) document.getElementById('gameInfoInput').value = state.gameInfo;
+  if (state.raceInfo != null) {
+    raceDirty = applyCommittedTextField('raceInput', state.raceInfo, raceDirty);
+  }
+  if (state.gameInfo != null) {
+    gameInfoDirty = applyCommittedTextField('gameInfoInput', state.gameInfo, gameInfoDirty);
+  }
+  syncSaveIcons();
   syncSelectFromState('gameTypeSelect', 'gameType', state.gameType);
   syncSetupFieldsFromState(state);
 
@@ -986,7 +1020,7 @@ function getMatchActionConfirmCopy(cmd, opts = {}) {
     },
     delete_clip: {
       title: `Clear Clip ${clipNum}`,
-      message: `Remove Clip ${clipNum} from saved replay history? This cannot be undone from here.`,
+      message: `Remove Clip ${clipNum} from saved replay history? This cannot be undone from here. NOTE: This does not remove the video from the local machine, delete manually to restore space.`,
       confirm: 'Clear Clip',
     },
   };
@@ -1017,6 +1051,41 @@ function wireMatchConfirmModal() {
     closeMatchConfirmModal();
     if (run) run();
   });
+}
+
+function fieldDiffersFromCommitted(el, committed) {
+  if (!el) return false;
+  return String(el.value ?? '').trim() !== String(committed ?? '').trim();
+}
+
+/** Keep local edits while dirty; clear dirty when dock state matches the input. */
+function applyCommittedTextField(inputId, committed, dirty) {
+  const el = document.getElementById(inputId);
+  if (!el) return false;
+  const next = String(committed ?? '');
+  if (!dirty) {
+    el.value = next;
+    return false;
+  }
+  if (String(el.value ?? '').trim() === next.trim()) {
+    el.value = next;
+    return false;
+  }
+  return true;
+}
+
+function syncSaveIcons() {
+  const raceBtn = document.getElementById('saveRaceBtn');
+  const gameBtn = document.getElementById('saveGameInfoBtn');
+  const canSend = controlsEnabled();
+  if (raceBtn) {
+    raceBtn.classList.toggle('save-pending', raceDirty);
+    raceBtn.disabled = !raceDirty || !canSend;
+  }
+  if (gameBtn) {
+    gameBtn.classList.toggle('save-pending', gameInfoDirty);
+    gameBtn.disabled = !gameInfoDirty || !canSend;
+  }
 }
 
 function controlLockMessage() {
@@ -1322,12 +1391,26 @@ function syncSetupFieldsFromState(state) {
 }
 
 function wireSetupPanel() {
+  const raceInput = document.getElementById('raceInput');
+  const gameInfoInput = document.getElementById('gameInfoInput');
+  raceInput?.addEventListener('input', () => {
+    raceDirty = fieldDiffersFromCommitted(raceInput, lastState.raceInfo);
+    syncSaveIcons();
+  });
+  gameInfoInput?.addEventListener('input', () => {
+    gameInfoDirty = fieldDiffersFromCommitted(gameInfoInput, lastState.gameInfo);
+    syncSaveIcons();
+  });
+
   document.getElementById('saveRaceBtn').onclick = () => {
-    sendCmd('set_race', { value: document.getElementById('raceInput').value });
+    if (!raceDirty || !controlsEnabled()) return;
+    sendCmd('set_race', { value: raceInput?.value ?? '' });
   };
   document.getElementById('saveGameInfoBtn').onclick = () => {
-    sendCmd('set_game_info', { value: document.getElementById('gameInfoInput').value });
+    if (!gameInfoDirty || !controlsEnabled()) return;
+    sendCmd('set_game_info', { value: gameInfoInput?.value ?? '' });
   };
+  syncSaveIcons();
 
   const gameTypeSelect = document.getElementById('gameTypeSelect');
   if (gameTypeSelect) {
@@ -1424,6 +1507,7 @@ async function connect() {
   guestToken = ctx.guestToken || '';
   isGuestMode = !!guestToken;
   roomId = ctx.roomId || '';
+  showConnecting();
 
   if (isGuestMode) {
     applyGuestUI();
@@ -1441,6 +1525,7 @@ async function connect() {
       if (e.code === 'guest_revoked' || e.code === 'invalid_guest_token') {
         show('controlSection', false);
         showMobileNav(false);
+        show('connectingSection', false);
         setError('This guest link has been revoked.');
         return;
       }
@@ -1448,9 +1533,7 @@ async function connect() {
     });
     try {
       const joined = await client.connect();
-      show('loginSection', false);
-      show('controlSection', true);
-      showMobileNav(true);
+      showControl();
       setActiveView('control');
       dockPresent = (joined.clients || []).includes('dock');
       if (joined.state && Object.keys(joined.state).length) {
@@ -1458,6 +1541,7 @@ async function connect() {
       }
       setConnectionStatus(dockPresent ? 'connected' : 'waiting');
     } catch (err) {
+      show('connectingSection', false);
       setError(err.message);
       setConnectionStatus('disconnected');
     }
@@ -1465,6 +1549,7 @@ async function connect() {
   }
 
   if (!roomId) {
+    showLogin();
     setError('Room ID missing in URL (/m/{room_id})');
     return;
   }
@@ -1480,10 +1565,12 @@ async function connect() {
       localStorage.setItem(TOKEN_KEY, token);
       syncLoginPanel();
     } catch (err) {
+      showLogin();
       setError(err.message || 'Login failed');
       return;
     }
   } else if (!token) {
+    showLogin();
     setError('Sign in on the dashboard first, or enter the dev auth secret.');
     return;
   }
@@ -1506,18 +1593,17 @@ async function connect() {
       localStorage.removeItem(TOKEN_KEY);
     }
     if (e.code === 'session_revoked') {
-      show('loginSection', true);
-      show('controlSection', false);
-      showMobileNav(false);
-      syncLoginPanel();
+      showLogin();
       setError('Signed out everywhere. Sign in again to reconnect.');
       return;
     }
     if (e.code === 'room_forbidden') {
+      showLogin();
       setError('This room belongs to another account. Sign in with the dev secret for that account, or open the mobile link from your dashboard.');
       return;
     }
     if (e.code === 'control_connection_limit') {
+      showLogin();
       setError(e.message || 'Too many devices controlling this table. Disconnect another phone or upgrade your plan.');
       return;
     }
@@ -1526,9 +1612,7 @@ async function connect() {
 
   try {
     const joined = await client.connect();
-    show('loginSection', false);
-    show('controlSection', true);
-    showMobileNav(true);
+    showControl();
     setActiveView('control');
     dockPresent = (joined.clients || []).includes('dock');
     if (joined.state && Object.keys(joined.state).length) {
@@ -1536,6 +1620,7 @@ async function connect() {
     }
     setConnectionStatus(dockPresent ? 'connected' : 'waiting');
   } catch (err) {
+    showLogin();
     setError(err.message);
     setConnectionStatus('disconnected');
   }
@@ -1560,11 +1645,8 @@ document.getElementById('clearTokenBtn')?.addEventListener('click', () => {
   dockPresent = false;
   setError('');
   setConnectionStatus('disconnected');
-  show('loginSection', true);
-  show('controlSection', false);
-  showMobileNav(false);
+  showLogin();
   setActiveView('control');
-  syncLoginPanel();
 });
 wireCommands();
 wireReplayClearButtons();
@@ -1573,10 +1655,12 @@ wirePlayerAutocomplete();
 wireMatchConfirmModal();
 wireSnookerFoulModal();
 wireMobileNav();
-syncLoginPanel();
 
-if (pathContext().guestToken) {
+const boot = pathContext();
+if (boot.guestToken) {
   connect().catch(() => {});
-} else if (localStorage.getItem(TOKEN_KEY) && pathContext().roomId) {
+} else if (localStorage.getItem(TOKEN_KEY) && boot.roomId) {
   connect().catch(() => {});
+} else {
+  showLogin();
 }

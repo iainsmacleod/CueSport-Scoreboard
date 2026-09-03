@@ -42,6 +42,10 @@ function getToken() {
   return localStorage.getItem(TOKEN_KEY) || '';
 }
 
+function goToMainPage() {
+  window.location.href = '/';
+}
+
 function gameTypeLabel(id) {
   const g = GAME_TYPES.find((x) => x.id === id);
   return g ? g.label : (id || '—');
@@ -226,9 +230,7 @@ async function connectLiveFeed() {
     if (e.code === 'invalid_token' || e.code === 'room_forbidden' || e.code === 'session_revoked') {
       localStorage.removeItem(TOKEN_KEY);
       stopLiveFeed();
-      setError(e.code === 'session_revoked' ? 'Signed out everywhere.' : (e.message || 'Session expired'));
-      show('loginSection', true);
-      show('dashboardSection', false);
+      goToMainPage();
     }
   });
   client.on('close', () => {
@@ -318,7 +320,7 @@ document.getElementById('signOutBtn').addEventListener('click', () => {
   if (!window.confirm('Sign out of this dashboard on this device?')) return;
   localStorage.removeItem(TOKEN_KEY);
   stopLiveFeed();
-  renderDashboard();
+  goToMainPage();
 });
 
 document.getElementById('invalidateSessionsBtn')?.addEventListener('click', async () => {
@@ -333,8 +335,7 @@ document.getElementById('invalidateSessionsBtn')?.addEventListener('click', asyn
   }
   localStorage.removeItem(TOKEN_KEY);
   stopLiveFeed();
-  setError('');
-  renderDashboard();
+  goToMainPage();
 });
 
 document.getElementById('revokeAllGuestsBtn')?.addEventListener('click', async () => {

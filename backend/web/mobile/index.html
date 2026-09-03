@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
   <title>CueSport Scoreboard Cloud Control</title>
-  <link rel="stylesheet" href="/web/shared/styles.css?v=7.2.3-signout-everywhere" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=7.2.3-save-pending" />
 </head>
 <body class="mobile">
   <header>
@@ -33,7 +33,10 @@
     </div>
   </header>
   <main id="app">
-    <section id="loginSection">
+    <section id="connectingSection">
+      <p class="hint">Connecting…</p>
+    </section>
+    <section id="loginSection" class="hidden">
       <p id="loginHint" class="hint">Sign in on the <a href="/dashboard">dashboard</a> first (same browser), or enter your <strong>dev auth secret</strong> once below.</p>
       <div id="devSecretRow">
         <input type="password" id="devSecret" placeholder="Dev auth secret (only if needed)" autocomplete="current-password" />
@@ -130,7 +133,7 @@
           <label for="gameInfoInput">Game Information</label>
           <div class="field-row">
             <input id="gameInfoInput" maxlength="60" />
-            <button type="button" class="icon-btn" id="saveGameInfoBtn" title="Save game info" aria-label="Save game info">
+            <button type="button" class="icon-btn" id="saveGameInfoBtn" title="Save game info" aria-label="Save game info" disabled>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
             </button>
           </div>
@@ -165,7 +168,7 @@
           <label id="raceLabel" for="raceInput">Race</label>
           <div class="field-row">
             <input id="raceInput" maxlength="3" inputmode="numeric" pattern="[0-9]*" />
-            <button type="button" class="icon-btn" id="saveRaceBtn" title="Save race" aria-label="Save race">
+            <button type="button" class="icon-btn" id="saveRaceBtn" title="Save race" aria-label="Save race" disabled>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
             </button>
           </div>
@@ -176,7 +179,7 @@
         <div class="panel" id="replayPanel">
           <h2>Replay</h2>
           <p id="replayObsHint" class="hint hidden">Connect OBS WebSocket on the dock Replay/Share tab to use monitoring and clips.</p>
-          <div class="row equal">
+          <div class="row clips" id="replayMonitorRow">
             <button type="button" class="btn monitor-btn" id="monitorBtn" data-cmd="toggle_monitoring">Monitor Game</button>
             <button type="button" class="btn hidden" id="instantReplayBtn" data-cmd="instant_replay">Instant Replay</button>
           </div>
@@ -217,9 +220,9 @@
             <p id="shareStatus" class="hint">Preparing link…</p>
           </div>
           <p id="shareUrl" class="share-url hidden"></p>
-          <div class="row equal share-actions">
-            <button type="button" id="shareCopyBtn" class="btn" disabled>Copy link</button>
-            <button type="button" id="shareNativeBtn" class="btn primary" disabled>Share link</button>
+          <div class="row share-actions">
+            <button type="button" id="shareCopyBtn" class="btn primary block" disabled>Copy link</button>
+            <button type="button" id="shareNativeBtn" class="btn primary block hidden" disabled>Share link</button>
           </div>
           <h3 class="share-links-heading">Guest links</h3>
           <p class="hint">Each link can be revoked on its own. Live guests still count toward this table’s connection limit, even if they all use the same URL.</p>
@@ -290,6 +293,6 @@
       <div id="snookerFoulTargets" class="snooker-foul-targets"></div>
     </div>
   </div>
-  <script type="module" src="/web/mobile/app.js?v=7.2.3-signout-everywhere"></script>
+  <script type="module" src="/web/mobile/app.js?v=7.2.3-share-device"></script>
 </body>
 </html>

@@ -83,6 +83,12 @@ main { padding: 1rem 1.25rem; max-width: 720px; margin: 0 auto; }
   flex-wrap: nowrap;
   align-items: stretch;
 }
+.row.clips > .btn {
+  width: 100%;
+  /* Match .clip-wrap height (play button stretched to .clip-clear) */
+  min-height: calc(1.25rem + 1.1rem);
+  box-sizing: border-box;
+}
 .clip-wrap {
   display: flex;
   align-items: stretch;
@@ -340,6 +346,14 @@ ul { padding-left: 1.2rem; }
 }
 .icon-btn img { width: 1.5rem; height: 1.5rem; display: block; }
 .icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.icon-btn.save-pending {
+  background: #9ece6a;
+  color: #1a1b26;
+}
+.icon-btn.save-pending:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
 .row.equal { display: flex; flex-wrap: nowrap; gap: 0.4rem; margin: 0.35rem 0; }
 .row.equal .btn { flex: 1; margin: 0; min-width: 0; font-size: 0.85rem; padding: 0.55rem 0.35rem; }
 .row.equal .btn.rack-breaker-inactive { opacity: 0.35; }
