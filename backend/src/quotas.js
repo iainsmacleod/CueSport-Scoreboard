@@ -1,6 +1,10 @@
 import * as sqlite from './db/sqlite.js';
 
-/** Built-in subscription tier caps — override via TIER_LIMITS_JSON or TIER_{TIER}_MAX_* env. */
+/** Built-in subscription tier caps — override via TIER_LIMITS_JSON or TIER_{TIER}_MAX_* env.
+ *  maxApiKeys = OBS Dock Keys
+ *  maxRooms = tables (dock instances) per account
+ *  maxControlConnectionsPerRoom = mobile + guest connections per table
+ */
 const BUILTIN_TIERS = {
   starter: {
     maxApiKeys: 1,
@@ -9,18 +13,18 @@ const BUILTIN_TIERS = {
   },
   pro: {
     maxApiKeys: 3,
-    maxRooms: 5,
-    maxControlConnectionsPerRoom: 10,
+    maxRooms: 2,
+    maxControlConnectionsPerRoom: 5,
   },
   enterprise: {
     maxApiKeys: 10,
-    maxRooms: 20,
-    maxControlConnectionsPerRoom: 20,
+    maxRooms: 2,
+    maxControlConnectionsPerRoom: 5,
   },
   selfhost: {
-    maxApiKeys: 10,
-    maxRooms: 20,
-    maxControlConnectionsPerRoom: 20,
+    maxApiKeys: 1,
+    maxRooms: 2,
+    maxControlConnectionsPerRoom: 5,
   },
 };
 
@@ -84,7 +88,7 @@ const tierCatalog = loadTierCatalog();
 const fallbackTier = (() => {
   const fromEnv = (process.env.TIER_DEFAULT || '').toLowerCase();
   if (fromEnv && tierCatalog[fromEnv]) return fromEnv;
-  // Self-host / dev auth defaults to generous selfhost tier; managed → starter.
+  // Self-host / dev auth defaults to selfhost tier (same caps as starter unless overridden).
   if (process.env.ALLOW_DEV_AUTH !== 'false') return 'selfhost';
   return 'starter';
 })();
@@ -136,7 +140,7 @@ export function assertCanCreateApiKey(account) {
     return {
       ok: false,
       code: 'api_key_limit',
-      message: `API key limit reached (${quota.limits.maxApiKeys} on ${quota.tier} plan). Revoke an unused key or upgrade your plan.`,
+      message: `OBS Dock Key limit reached (${quota.limits.maxApiKeys} on ${quota.tier} plan). Revoke an unused key or upgrade your plan.`,
       quota,
     };
   }

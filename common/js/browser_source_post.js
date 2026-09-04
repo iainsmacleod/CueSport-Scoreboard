@@ -560,6 +560,15 @@ function buildOverlayH2HTable(stats) {
             right: p2Balls
         });
     }
+    const p1Fouls = stats.p1Fouls || 0;
+    const p2Fouls = stats.p2Fouls || 0;
+    if (stats.showFouls && (p1Fouls > 0 || p2Fouls > 0)) {
+        rows.push({
+            label: 'Fouls',
+            left: p1Fouls,
+            right: p2Fouls
+        });
+    }
     const p1Br = stats.p1BreakAndRuns || 0;
     const p2Br = stats.p2BreakAndRuns || 0;
     const p1Tr = stats.p1TableRuns || 0;
@@ -649,6 +658,9 @@ function buildOverlayPlayerTable(stats) {
     }
     if (stats.showBalls && ballsPotted > 0) {
         rows.push({ label: 'Balls Potted', value: ballsPotted });
+    }
+    if (stats.showFouls && (stats.fouls || 0) > 0) {
+        rows.push({ label: 'Fouls', value: stats.fouls });
     }
     if (stats.showBreakAndRun && (stats.breakAndRuns || 0) > 0) {
         rows.push({ label: 'Break & Run', value: stats.breakAndRuns });

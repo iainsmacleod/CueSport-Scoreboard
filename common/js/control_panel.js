@@ -301,6 +301,21 @@ function isPocketScoreGame() {
     return type === "game5" || type === "game6";
 }
 
+/** Straight / Bank / One Pocket — foul deducts 1 from the fouler's ball count. */
+function isBallFoulPenaltyGame() {
+    const type = getActiveGameType();
+    return type === "game4" || type === "game5" || type === "game6";
+}
+
+/** One Pocket: the selected slot is who receives the next scored ball (not always the shooter). */
+function usesScoringPlayerLabel() {
+    return getActiveGameType() === "game6";
+}
+
+function getPlayerSlotRoleLabel() {
+    return usesScoringPlayerLabel() ? "Scoring Player" : "Active Player";
+}
+
 /** 8 / 9 / 10-Ball — potting the game ball awards a rack. */
 function isTrackerRackWinGame() {
     const type = getActiveGameType();
@@ -397,7 +412,7 @@ function resumeRackBreakerAfterPageLoad() {
     }
     const last = getStorageItem("lastRackBreakerSlot");
     // Only restore a previously chosen breaker — never invent one from active player
-    // (that broke Reset Frame/Rack by re-applying a breaker after clearLastKnown).
+    // (that broke Restart Match by re-applying a breaker after clearLastKnown).
     if (last !== "1" && last !== "2") {
         return;
     }
@@ -472,12 +487,13 @@ function syncPlayerSlotPickerUI() {
     if (breakerMode && locked) {
         question.textContent = "End Match to continue";
     } else {
-        question.textContent = breakerMode ? "Breaking Player?" : "Active Player";
+        question.textContent = breakerMode ? "Breaking Player?" : getPlayerSlotRoleLabel();
     }
 
     function setBreakerBtnState(btn, matchLocked) {
         btn.disabled = false;
         btn.classList.remove("rack-breaker-disabled");
+        btn.classList.remove("rack-breaker-current");
         btn.classList.toggle("rack-breaker-match-locked", matchLocked);
         btn.classList.remove("rack-breaker-inactive");
         if (matchLocked) {
@@ -485,14 +501,18 @@ function syncPlayerSlotPickerUI() {
         } else {
             btn.removeAttribute("aria-disabled");
         }
+        btn.removeAttribute("aria-pressed");
     }
 
     function setActivePlayerBtnState(btn, isActiveSlot) {
-        btn.disabled = false;
+        // Current active player cannot be re-selected (avoids false switch/undo/publish events).
+        btn.disabled = !!isActiveSlot;
         btn.classList.remove("rack-breaker-disabled");
         btn.classList.toggle("rack-breaker-inactive", !isActiveSlot);
+        btn.classList.toggle("rack-breaker-current", !!isActiveSlot);
+        btn.setAttribute("aria-pressed", isActiveSlot ? "true" : "false");
         if (isActiveSlot) {
-            btn.removeAttribute("aria-disabled");
+            btn.setAttribute("aria-disabled", "true");
         } else {
             btn.setAttribute("aria-disabled", "false");
         }
@@ -613,10 +633,10 @@ function selectRackBreaker(slot) {
     if (checkbox) {
         checkbox.checked = slot === "1";
     }
-    togglePlayer(slot === "1");
     if (breakerPickUndo && beforeBreakerPick) {
         pushScoringUndo({ type: "breakerPick", slot: slot, before: beforeBreakerPick });
     }
+    togglePlayer(slot === "1", { skipUndo: true, force: true });
     hideRackBreakerPicker();
     syncRackBreakerPlayerToggleVisibility();
     updatePlayerBallControlVisibility();
@@ -757,6 +777,7 @@ const SNOOKER_BALL_META = {
     6: { file: "snooker-pink-small.png", title: "Pink Ball (6-point)", points: 6 },
     7: { file: "snooker-black-small.png", title: "Black Ball (7-point)", points: 7 },
     8: { file: "snooker-gold-small.png", title: "Golden Ball (20-point)", points: 20 },
+    // Slot 9 was a visual gap before Free/Foul lived on the object row; now unused in snooker.
     9: { spacer: true, title: "" },
     10: { file: "snooker-freeball-small.png", title: "Free Ball", points: null },
     11: { file: "foul-small.png", title: "Foul Ball", foul: true }
@@ -976,8 +997,171 @@ function resetSnookerBreakTracking(keepFrameHighs) {
     if (!keepFrameHighs) {
         setSnookerFrameHighBreak("1", 0);
         setSnookerFrameHighBreak("2", 0);
+        clearRackFouls();
     }
 }
+
+/** Per-rack/frame foul counts (all game types). Storage keys retained for snooker compatibility. */
+function getRackFouls(player) {
+    const key = player === "2" ? "snookerFrameFoulsP2" : "snookerFrameFoulsP1";
+    return Math.max(0, parseInt(getStorageItem(key) || "0", 10) || 0);
+}
+
+function setRackFouls(player, value) {
+    if (player !== "1" && player !== "2") {
+        return;
+    }
+    const key = player === "2" ? "snookerFrameFoulsP2" : "snookerFrameFoulsP1";
+    setStorageItem(key, String(Math.max(0, parseInt(value, 10) || 0)));
+    updateRackFoulDisplay();
+}
+
+function clearRackFouls() {
+    setRackFouls("1", 0);
+    setRackFouls("2", 0);
+}
+
+function incrementRackFoul(player) {
+    if (player !== "1" && player !== "2") {
+        return;
+    }
+    setRackFouls(player, getRackFouls(player) + 1);
+}
+
+function shortPlayerLabel(player) {
+    const input = document.getElementById(player === "2" ? "p2Name" : "p1Name");
+    const raw = (input && input.value ? input.value : "").trim();
+    if (!raw) {
+        return player === "2" ? "P2" : "P1";
+    }
+    const first = raw.split(/\s+/)[0];
+    return first.length > 10 ? first.slice(0, 9) + "…" : first;
+}
+
+/** Live rack/frame foul totals on the ball-tracker action row. */
+function updateRackFoulDisplay() {
+    const counter = document.getElementById("rackFoulCounter");
+    if (!counter) {
+        return;
+    }
+    const show = isBallTrackerControlsVisible();
+    counter.classList.toggle("noShow", !show);
+    const heading = document.getElementById("rackFoulHeading");
+    if (heading) {
+        heading.textContent = "Fouls";
+    }
+    const period = isSnooker() ? "frame" : "rack";
+    counter.title = "Fouls this " + period;
+    const p1Name = document.getElementById("rackFoulP1Name");
+    const p2Name = document.getElementById("rackFoulP2Name");
+    const p1Count = document.getElementById("rackFoulP1");
+    const p2Count = document.getElementById("rackFoulP2");
+    const p1Wrap = document.getElementById("rackFoulP1Wrap");
+    const p2Wrap = document.getElementById("rackFoulP2Wrap");
+    if (p1Name) {
+        p1Name.textContent = shortPlayerLabel("1");
+    }
+    if (p2Name) {
+        p2Name.textContent = shortPlayerLabel("2");
+    }
+    if (p1Count) {
+        p1Count.textContent = String(getRackFouls("1"));
+    }
+    if (p2Count) {
+        p2Count.textContent = String(getRackFouls("2"));
+    }
+    const active = getActivePlayerSlot();
+    if (p1Wrap) {
+        p1Wrap.classList.toggle("is-active", active === "1");
+    }
+    if (p2Wrap) {
+        p2Wrap.classList.toggle("is-active", active === "2");
+    }
+    syncBallTrackerActionRowVisibility();
+}
+
+window.getRackFouls = getRackFouls;
+window.updateRackFoulDisplay = updateRackFoulDisplay;
+
+function getSnookerFrameFouls(player) {
+    return getRackFouls(player);
+}
+
+function setSnookerFrameFouls(player, value) {
+    setRackFouls(player, value);
+}
+
+function incrementSnookerFrameFoul(player) {
+    incrementRackFoul(player);
+}
+
+function getRackFoulSnapshot() {
+    return {
+        foulsP1: getRackFouls("1"),
+        foulsP2: getRackFouls("2")
+    };
+}
+
+/** Apply a pool/generic foul: count against fouler, optional −1 ball, hand table to opponent. */
+function applyPoolFoul() {
+    if (isSnookerBallMode() || isGameScoringLocked()) {
+        return false;
+    }
+    if (isRackBreakerBallGridLockEnabled() && !getRackBreakerSlot()) {
+        return false;
+    }
+    if (window.streamSharing && typeof window.streamSharing.invalidatePendingPublishes === "function") {
+        window.streamSharing.invalidatePendingPublishes();
+    }
+
+    const before = captureScoringUndoSnapshot();
+    before.foulsP1 = getRackFouls("1");
+    before.foulsP2 = getRackFouls("2");
+    const active = getActivePlayerSlot();
+    const opponent = active === "1" ? "2" : "1";
+
+    incrementRackFoul(active);
+    // Straight / Bank / One Pocket: −1 from fouler's ball count (may go below 0).
+    // Avoid postScore/postBalls so we do not touch pot career stats or clamp at 0.
+    if (isBallFoulPenaltyGame()) {
+        if (isStraightPool()) {
+            const parsed = parseInt(getStorageItem("p" + active + "ScoreCtrlPanel"), 10);
+            const cur = Number.isFinite(parsed) ? parsed : 0;
+            setPrimaryScoreAbsolute(active, cur - 1, { allowNegative: true });
+        } else {
+            const parsed = parseInt(getStorageItem("p" + active + "BallsCtrlPanel"), 10);
+            const cur = Number.isFinite(parsed) ? parsed : 0;
+            setBallsScoreAbsolute(active, cur - 1);
+        }
+    }
+    pushScoringUndo({
+        type: "foul",
+        foulingPlayer: active,
+        before: before
+    });
+
+    window.__foulApplying = true;
+    try {
+        const nextIsP1 = opponent === "1";
+        const playerToggle = document.getElementById("playerToggleCheckbox");
+        if (playerToggle) {
+            playerToggle.checked = nextIsP1;
+        }
+        togglePlayer(nextIsP1, { skipUndo: true });
+    } finally {
+        window.__foulApplying = false;
+    }
+
+    if (window.streamSharing && typeof window.streamSharing.sendUpdate === "function") {
+        window.streamSharing.sendUpdate();
+    } else if (window.cloudRelay && typeof window.cloudRelay.pushDockStateSoon === "function") {
+        window.cloudRelay.pushDockStateSoon(0);
+    }
+    console.log("Foul counted for player " + active + "; active player → " + opponent);
+    return true;
+}
+
+window.applyPoolFoul = applyPoolFoul;
 
 /** Add pot points to the active player's continuous break and frame high. */
 function addToSnookerBreak(player, points) {
@@ -1031,6 +1215,8 @@ function captureSnookerUndoSnapshot() {
         currentBreak: getSnookerCurrentBreak(),
         frameHighP1: getSnookerFrameHighBreak("1"),
         frameHighP2: getSnookerFrameHighBreak("2"),
+        foulsP1: getSnookerFrameFouls("1"),
+        foulsP2: getSnookerFrameFouls("2"),
         activePlayer: getSnookerActivePlayer(),
         recordedBallPlayer: null
     };
@@ -1043,6 +1229,7 @@ function commitSnookerUndoSnapshot(snapshot, recordedBallPlayer) {
     snapshot.recordedBallPlayer = recordedBallPlayer === "1" || recordedBallPlayer === "2"
         ? recordedBallPlayer
         : null;
+    snapshot.ts = Date.now();
     snookerUndoStack.push(snapshot);
     if (snookerUndoStack.length > SNOOKER_UNDO_STACK_MAX) {
         snookerUndoStack.shift();
@@ -1102,6 +1289,10 @@ function captureScoringUndoSnapshot(options) {
     if (options && options.unfadeBallId) {
         snapshotBallState[options.unfadeBallId] = false;
     }
+    function parseStoredInt(key) {
+        const n = parseInt(getStorageItem(key), 10);
+        return Number.isFinite(n) ? n : 0;
+    }
     return {
         ballState: snapshotBallState,
         pocketOwners: getPocketBallOwners(),
@@ -1109,16 +1300,22 @@ function captureScoringUndoSnapshot(options) {
         rackBreakerSlot: getStorageItem("rackBreakerSlot") || "",
         rackOpponentVisited: getStorageItem("rackOpponentVisited") || "no",
         activePlayer: getActivePlayerSlot(),
-        p1Score: parseInt(getStorageItem("p1ScoreCtrlPanel"), 10) || 0,
-        p2Score: parseInt(getStorageItem("p2ScoreCtrlPanel"), 10) || 0,
-        p1Balls: parseInt(getStorageItem("p1BallsCtrlPanel"), 10) || 0,
-        p2Balls: parseInt(getStorageItem("p2BallsCtrlPanel"), 10) || 0
+        // Use finite parse (not || 0) so foul penalties below 0 survive undo snapshots.
+        p1Score: parseStoredInt("p1ScoreCtrlPanel"),
+        p2Score: parseStoredInt("p2ScoreCtrlPanel"),
+        p1Balls: parseStoredInt("p1BallsCtrlPanel"),
+        p2Balls: parseStoredInt("p2BallsCtrlPanel"),
+        foulsP1: getRackFouls("1"),
+        foulsP2: getRackFouls("2")
     };
 }
 
 function pushScoringUndo(entry) {
     if (!entry || !entry.type) {
         return;
+    }
+    if (entry.ts == null) {
+        entry.ts = Date.now();
     }
     scoringUndoStack.push(entry);
     if (scoringUndoStack.length > SCORING_UNDO_STACK_MAX) {
@@ -1142,11 +1339,13 @@ function discardLastScoringUndoIf(predicate) {
     return last;
 }
 
-function setPrimaryScoreAbsolute(player, value) {
+function setPrimaryScoreAbsolute(player, value, options) {
     if (player !== "1" && player !== "2") {
         return;
     }
-    const next = Math.min(999, Math.max(0, parseInt(value, 10) || 0));
+    const allowNegative = !!(options && options.allowNegative);
+    const min = allowNegative ? -999 : 0;
+    const next = Math.min(999, Math.max(min, parseInt(value, 10) || 0));
     setStorageItem("p" + player + "ScoreCtrlPanel", next);
     setStorageItem("p" + player + "Score", next);
     const input = document.getElementById("p" + player + "Score");
@@ -1185,7 +1384,7 @@ function restoreTrackerFromScoringSnapshot(before) {
     const ballState = before.ballState && typeof before.ballState === "object" ? before.ballState : {};
     setStorageItem("ballState", JSON.stringify(ballState));
     document.querySelectorAll("#ballTrackerDiv .ball").forEach(function (ball) {
-        if (ball.id === "snookerUndoBtn") {
+        if (ball.id === "snookerUndoBtn" || ball.id === "poolFoulBtn") {
             return;
         }
         const faded = !!ballState[ball.id];
@@ -1217,13 +1416,106 @@ function restoreTrackerFromScoringSnapshot(before) {
     if (before.activePlayer === "1" || before.activePlayer === "2") {
         setSnookerActivePlayerFromUndo(before.activePlayer);
     }
+    if (before.foulsP1 != null || before.foulsP2 != null) {
+        setRackFouls("1", before.foulsP1 || 0);
+        setRackFouls("2", before.foulsP2 || 0);
+    }
     syncRackBreakerPickerVisibility();
     syncPlayerSlotPickerUI();
     updateRackBreakerBallLock();
 }
 
+function syncBallTrackerRows() {
+    const objectRow = document.getElementById("ballTrackerObjectRow");
+    const actionRow = document.getElementById("ballTrackerActionRow");
+    const foulRow = document.getElementById("ballTrackerFoulRow");
+    if (!objectRow || !actionRow) {
+        return;
+    }
+    const foulCounter = document.getElementById("rackFoulCounter");
+    const b10 = document.getElementById("ball 10");
+    const b11 = document.getElementById("ball 11");
+    const poolFoul = document.getElementById("poolFoulBtn");
+    const undo = document.getElementById("snookerUndoBtn");
+
+    if (isSnookerBallMode()) {
+        // Object colors stay in the first row; Free / Foul / Undo on the second;
+        // rack/frame foul totals on their own row below.
+        for (let i = 1; i <= 8; i++) {
+            const el = document.getElementById("ball " + i);
+            if (el) {
+                objectRow.appendChild(el);
+            }
+        }
+        const b9 = document.getElementById("ball 9");
+        if (b9) {
+            objectRow.appendChild(b9);
+        }
+        if (b10) {
+            actionRow.appendChild(b10);
+        }
+        if (b11) {
+            actionRow.appendChild(b11);
+        }
+        if (poolFoul) {
+            actionRow.appendChild(poolFoul);
+        }
+        if (undo) {
+            actionRow.appendChild(undo);
+        }
+    } else {
+        // Pool: numbered object balls in order; Foul / Undo on the second row.
+        for (let i = 1; i <= 15; i++) {
+            const el = document.getElementById("ball " + i);
+            if (el) {
+                objectRow.appendChild(el);
+            }
+        }
+        if (poolFoul) {
+            actionRow.appendChild(poolFoul);
+        }
+        if (undo) {
+            actionRow.appendChild(undo);
+        }
+    }
+    if (foulRow && foulCounter) {
+        foulRow.appendChild(foulCounter);
+    }
+    updateRackFoulDisplay();
+    syncBallTrackerActionRowVisibility();
+}
+
+function syncBallTrackerActionRowVisibility() {
+    const actionRow = document.getElementById("ballTrackerActionRow");
+    if (actionRow) {
+        const hasBallControls = Array.prototype.some.call(actionRow.querySelectorAll(".ball"), function (ball) {
+            return !ball.classList.contains("noShow");
+        });
+        actionRow.classList.toggle("has-controls", hasBallControls);
+    }
+    const foulRow = document.getElementById("ballTrackerFoulRow");
+    const foulCounter = document.getElementById("rackFoulCounter");
+    if (foulRow) {
+        const hasFoulCounter = !!(foulCounter && !foulCounter.classList.contains("noShow"));
+        foulRow.classList.toggle("has-controls", hasFoulCounter);
+    }
+}
+
+function syncPoolFoulButtonVisibility() {
+    const btn = document.getElementById("poolFoulBtn");
+    if (!btn) {
+        return;
+    }
+    // Snooker uses ball 11 + foul picker; pool games get a dedicated Foul control.
+    const show = !isSnookerBallMode() && isBallTrackerControlsVisible();
+    btn.classList.toggle("noShow", !show);
+    syncBallTrackerActionRowVisibility();
+}
+
 function updateScoringUndoButton() {
     const btn = document.getElementById("snookerUndoBtn");
+    syncPoolFoulButtonVisibility();
+    updateRackFoulDisplay();
     if (!btn) {
         return;
     }
@@ -1237,12 +1529,13 @@ function updateScoringUndoButton() {
     if (canUndo) {
         btn.removeAttribute("aria-disabled");
         btn.title = isSnookerBallMode() && hasSnookerUndo
-            ? "Undo last pot or foul"
-            : "Undo last scoring action (pots, fouls, breaker)";
+            ? "Undo last pot, foul, or player change"
+            : "Undo last scoring action (pots, fouls, breaker, player change)";
     } else {
         btn.setAttribute("aria-disabled", "true");
         btn.title = "Undo last scoring action";
     }
+    syncBallTrackerActionRowVisibility();
 }
 
 /** @deprecated Use updateScoringUndoButton */
@@ -1286,11 +1579,21 @@ async function undoLastScoringAction() {
     if (btn && (btn.classList.contains("snooker-ball-disabled") || btn.getAttribute("aria-disabled") === "true")) {
         return;
     }
-    if (isSnookerBallMode() && snookerUndoStack.length > 0) {
-        await undoLastSnookerAction();
+    const snookerLast = (isSnookerBallMode() && snookerUndoStack.length)
+        ? snookerUndoStack[snookerUndoStack.length - 1]
+        : null;
+    const scoringLast = scoringUndoStack.length
+        ? scoringUndoStack[scoringUndoStack.length - 1]
+        : null;
+    if (!snookerLast && !scoringLast) {
         return;
     }
-    if (!scoringUndoStack.length) {
+    // Prefer the newest entry across snooker snapshots and typed scoring undos
+    // (e.g. Active Player switch uses scoringUndoStack like other game types).
+    const snookerTs = snookerLast && snookerLast.ts != null ? snookerLast.ts : 0;
+    const scoringTs = scoringLast && scoringLast.ts != null ? scoringLast.ts : 0;
+    if (snookerLast && (!scoringLast || snookerTs >= scoringTs)) {
+        await undoLastSnookerAction();
         return;
     }
     if (window.PlayerStats && typeof window.PlayerStats.flushRackRecordQueue === "function") {
@@ -1333,6 +1636,53 @@ async function applyScoringUndoEntry(entry) {
         syncPlayerSlotPickerUI();
         updateRackBreakerBallLock();
         updateScoringUndoButton();
+        return;
+    }
+    if (entry.type === "playerSwitch") {
+        const before = entry.before || {};
+        setRackOpponentVisited(before.rackOpponentVisited === "yes");
+        setSnookerActivePlayerFromUndo(before.activePlayer === "2" ? "2" : "1");
+        if (isSnookerBallMode() && before.snookerCurrentBreak != null) {
+            setSnookerCurrentBreak(before.snookerCurrentBreak || 0);
+            if (before.snookerPhase) {
+                setSnookerPhase(before.snookerPhase);
+            }
+            setSnookerAfterFreeball(!!before.snookerAfterFreeball);
+            setSnookerFoulAwaitingPlayerChange(!!before.snookerFoulAwaitingPlayerChange);
+            setSnookerFreeBallOffered(!!before.snookerFreeBallOffered);
+            updateSnookerBallAvailability();
+            refreshSnookerOverlayStats();
+        }
+        syncPlayerSlotPickerUI();
+        updateRackBreakerBallLock();
+        updateScoringUndoButton();
+        return;
+    }
+    if (entry.type === "foul") {
+        const before = entry.before || {};
+        setRackFouls("1", before.foulsP1 || 0);
+        setRackFouls("2", before.foulsP2 || 0);
+        if (before.p1Score != null) {
+            setPrimaryScoreAbsolute("1", before.p1Score, { allowNegative: true });
+        }
+        if (before.p2Score != null) {
+            setPrimaryScoreAbsolute("2", before.p2Score, { allowNegative: true });
+        }
+        if (before.p1Balls != null) {
+            setBallsScoreAbsolute("1", before.p1Balls);
+        }
+        if (before.p2Balls != null) {
+            setBallsScoreAbsolute("2", before.p2Balls);
+        }
+        setRackOpponentVisited(before.rackOpponentVisited === "yes");
+        setSnookerActivePlayerFromUndo(before.activePlayer === "2" ? "2" : "1");
+        syncPlayerSlotPickerUI();
+        updateRackBreakerBallLock();
+        updateScoringUndoButton();
+        updateScoreControlAvailability();
+        if (window.PlayerStats && typeof window.PlayerStats.broadcastOverlayStatsIfEnabled === "function") {
+            window.PlayerStats.broadcastOverlayStatsIfEnabled();
+        }
         return;
     }
     if (entry.type === "fade") {
@@ -1490,6 +1840,8 @@ async function undoLastSnookerAction() {
     setSnookerCurrentBreak(snap.currentBreak || 0);
     setSnookerFrameHighBreak("1", snap.frameHighP1 || 0);
     setSnookerFrameHighBreak("2", snap.frameHighP2 || 0);
+    setSnookerFrameFouls("1", snap.foulsP1 || 0);
+    setSnookerFrameFouls("2", snap.foulsP2 || 0);
     if (snap.activePlayer === "1" || snap.activePlayer === "2") {
         setSnookerActivePlayerFromUndo(snap.activePlayer);
     }
@@ -1533,6 +1885,8 @@ function getSnookerFrameBreakSnapshot() {
     return {
         highBreakP1: getSnookerFrameHighBreak("1"),
         highBreakP2: getSnookerFrameHighBreak("2"),
+        foulsP1: getSnookerFrameFouls("1"),
+        foulsP2: getSnookerFrameFouls("2"),
         p1Score: parseInt(getStorageItem("p1BallsCtrlPanel"), 10) || 0,
         p2Score: parseInt(getStorageItem("p2BallsCtrlPanel"), 10) || 0
     };
@@ -1633,12 +1987,12 @@ function updateBallTrackerLockState() {
     }
 }
 
-/** Mid-match reset label: Frame (snooker) or Rack (pool). Race complete → End Match. */
+/** Mid-match reset label (race complete → End Match). */
 function getResetScoreActionLabel() {
-    return isSnooker() ? "Reset Frame" : "Reset Rack";
+    return "Restart Match";
 }
 
-/** Label/style for reset: "Reset Frame/Rack" until race/Best Of is met, then "End Match". Always danger. */
+/** Label/style for reset: "Restart Match" until race/Best Of is met, then "End Match". Always danger. */
 function updateResetScoreButton() {
     const resetBtn = document.getElementById("resetScores");
     if (!resetBtn) {
@@ -2224,18 +2578,10 @@ function applySnookerTrackerLayout() {
             ball.removeAttribute("aria-disabled");
             continue;
         }
-        if (i >= 12) {
+        if (i >= 12 || i === 9) {
+            // 9 was the Free/Foul spacer; action controls are on their own row now.
             ball.classList.add("noShow");
-            continue;
-        }
-        if (i === 9) {
-            ball.classList.remove("noShow");
-            ball.classList.add("snooker-spacer");
-            ball.removeAttribute("title");
-            const img = ball.querySelector("img");
-            if (img) {
-                img.style.display = "none";
-            }
+            ball.classList.remove("snooker-spacer");
             continue;
         }
         ball.classList.remove("noShow");
@@ -2280,6 +2626,7 @@ function applySnookerTrackerLayout() {
         // Leaving snooker layout must also restore pool ball art for the active ball type
         updateControlPanelBallImages(getStorageItem("ballSelection") || "american");
     }
+    syncBallTrackerRows();
 }
 
 function addSnookerPoints(player, delta) {
@@ -2449,6 +2796,8 @@ function applySnookerFoulByKey(foulKey) {
         if (!addSnookerPoints(opponent, points)) {
             return false;
         }
+        // Foul is credited to the player who fouled (active before the switch).
+        incrementSnookerFrameFoul(active);
         // Foul ends the active player's break (foul points are not break points).
         endSnookerBreak();
         // Break ended — next shot can be a red (unless all reds are gone).
@@ -2471,7 +2820,7 @@ function applySnookerFoulByKey(foulKey) {
         if (playerToggle) {
             playerToggle.checked = nextIsP1;
         }
-        togglePlayer(nextIsP1);
+        togglePlayer(nextIsP1, { skipUndo: true });
         applied = true;
         console.log(`Snooker foul (${foulKey}) awarded ${points} to player ${opponent}; active player → ${opponent}`);
     } finally {
@@ -2663,6 +3012,7 @@ async function handleSnookerBallClick(element) {
 
 function updateActivePlayerNameDisplay() {
     syncPlayerSlotPickerUI();
+    updateRackFoulDisplay();
 }
 
 function updateScoreLabels() {
@@ -2791,7 +3141,7 @@ let gameTypeSwitchChain = Promise.resolve();
 
 /**
  * Finalize the open match before leaving a game type:
- * End Match if race/Best Of is complete, Call Match Early if racks/frames exist, else Reset Frame/Rack.
+ * End Match if race/Best Of is complete, Call Match Early if racks/frames exist, else Restart Match.
  * Must run while storage still has the previous gameType.
  */
 function finalizeMatchBeforeGameTypeSwitch() {
@@ -2946,6 +3296,8 @@ function applyGameTypeChange(value, options) {
         document.getElementById("ball 14").classList.remove("noShow");
         document.getElementById("ball 15").classList.remove("noShow");
     }
+    syncPoolFoulButtonVisibility();
+    syncBallTrackerRows();
     bc.postMessage({ gameType: resolved, ballSelection: getStorageItem("ballSelection") });
     updateScoreModeUI();
     updateSnookerUiVisibility();
@@ -3250,6 +3602,8 @@ function useBallTracker() {
         window.streamSharing.sendUpdate();
     }
     syncRackBreakerPickerVisibility();
+    syncPoolFoulButtonVisibility();
+    updateScoringUndoButton();
 }
 
 /**
@@ -3477,7 +3831,8 @@ function togglePot(element) {
         maybeAssignBallSetFromPot(element.id);
     }
 
-    // Bank / One Pocket: tracker pots award a ball to the Active Player;
+    // Bank / One Pocket: tracker pots award a ball to the selected player slot
+    // (One Pocket: Scoring Player — may differ from the shooter);
     // re-enabling deducts from the player who originally received that ball.
     if (isPocketScoreGame()) {
         if (nowFaded) {
@@ -3688,10 +4043,19 @@ function debitPocketBallUnpot(ballId) {
 function creditTrackerRackWin(ballId) {
     const before = captureScoringUndoSnapshot({ unfadeBallId: ballId });
     const player = getActivePlayerSlot();
+    // Capture B&R / TR before clearing breaker state for the next-rack prompt.
+    const rackRunClass = isRackBreakerPromptEnabled()
+        ? getRackRunClassification(player)
+        : null;
     const owners = getPocketBallOwners();
     owners[ballId] = player;
     setPocketBallOwners(owners);
-    postScore("add", player, { skipTrackerReset: true });
+    // Clear breaker before scoring publish paths so mobile never sees "Active Player" mid-rack-reset.
+    if (isRackBreakerPromptEnabled() && !isGameScoringLocked()) {
+        clearRackBreakerState();
+        updateRackBreakerBallLock();
+    }
+    postScore("add", player, { skipTrackerReset: true, rackRunClass: rackRunClass });
     resetBallTrackerKeepingBall(ballId, player);
     setStorageItem("trackerRackWinBall", ballId);
     startTrackerRackWinCooldown(ballId);
@@ -3705,6 +4069,7 @@ function creditTrackerRackWin(ballId) {
         recordedBallPlayer: player
     });
     maybeShowRackBreakerPickerAfterRackChange();
+    publishCloudStateAfterTrackerChange();
 }
 
 /**
@@ -3714,10 +4079,18 @@ function creditTrackerRackLoss(ballId) {
     const before = captureScoringUndoSnapshot({ unfadeBallId: ballId });
     const active = getActivePlayerSlot();
     const opponent = active === "1" ? "2" : "1";
+    // Classification is for the player who receives the rack (opponent).
+    const rackRunClass = isRackBreakerPromptEnabled()
+        ? getRackRunClassification(opponent)
+        : null;
     const owners = getPocketBallOwners();
     owners[ballId] = opponent;
     setPocketBallOwners(owners);
-    postScore("add", opponent, { skipTrackerReset: true });
+    if (isRackBreakerPromptEnabled() && !isGameScoringLocked()) {
+        clearRackBreakerState();
+        updateRackBreakerBallLock();
+    }
+    postScore("add", opponent, { skipTrackerReset: true, rackRunClass: rackRunClass });
     resetBallTrackerKeepingBall(ballId, opponent);
     setStorageItem("trackerRackWinBall", ballId);
     startTrackerRackWinCooldown(ballId);
@@ -3732,6 +4105,7 @@ function creditTrackerRackLoss(ballId) {
         recordedBallPlayer: active
     });
     maybeShowRackBreakerPickerAfterRackChange();
+    publishCloudStateAfterTrackerChange();
 }
 
 /**
@@ -3755,6 +4129,7 @@ function debitTrackerRackWin(ballId) {
         postScore("sub", player, { skipTrackerReset: true });
     }
     maybeShowRackBreakerPickerAfterRackChange();
+    publishCloudStateAfterTrackerChange();
 }
 
 function clearTrackerRackWinPending() {
@@ -3848,6 +4223,7 @@ function releaseEarlyGameBallReject(ballId) {
         setStorageItem("ballState", JSON.stringify(ballState));
         bc.postMessage({ resetBall: ballId });
     }
+    publishCloudStateAfterTrackerChange();
 }
 
 /**
@@ -3874,6 +4250,7 @@ function releaseTrackerRackWinBall(ballId) {
         setStorageItem("ballState", JSON.stringify(ballState));
         bc.postMessage({ resetBall: ballId });
     }
+    publishCloudStateAfterTrackerChange();
 }
 
 /**
@@ -4860,6 +5237,7 @@ function postScore(opt1, player, options) {
     let scoreChanged = false;
     let snookerFrameSnapshot = null;
     const skipTrackerReset = !!(options && options.skipTrackerReset) || isStraightPool();
+    const rackRunClass = options && options.rackRunClass ? options.rackRunClass : null;
 
     if (raceLocked && !isWinner) {
         updateScoreControlAvailability();
@@ -4942,7 +5320,8 @@ function postScore(opt1, player, options) {
     }
 
     // Send update to stream sharing if enabled
-    if (window.streamSharing) {
+    // Tracker rack wins/losses publish after breaker reset — avoid a mid-update snapshot.
+    if (window.streamSharing && !skipTrackerReset) {
         window.streamSharing.sendUpdate();
     }
     if (opt1 === "add" && isSnooker()) {
@@ -4966,7 +5345,7 @@ function postScore(opt1, player, options) {
                     console.error('PlayerStats recordSnookerFrame error:', err);
                 });
             } else {
-                window.PlayerStats.recordRackWin(player).then(function () {
+                window.PlayerStats.recordRackWin(player, rackRunClass ? { rackRunClass: rackRunClass } : undefined).then(function () {
                     return window.PlayerStats.checkMatchCompletion();
                 }).then(function () {
                     updateCallGameButton();
@@ -5192,9 +5571,37 @@ function customLogoSetting2() {
     });
 }
 
-function togglePlayer(isChecked) {
+function togglePlayer(isChecked, options) {
+    const skipUndo = !!(options && options.skipUndo) || !!window.__snookerFoulApplying || !!window.__foulApplying;
+    const force = !!(options && options.force);
     const activePlayer = isChecked;
     const playerSlot = isChecked ? "1" : "2";
+    const prevSlot = getActivePlayerSlot();
+
+    // Re-activating the current player is a no-op (except forced breaker picks).
+    if (!force && prevSlot === playerSlot) {
+        return;
+    }
+
+    // Capture undo before mutating active player / visit / break state.
+    // Snooker uses the same typed playerSwitch entry as other game types.
+    let playerSwitchBefore = null;
+    if (!skipUndo && prevSlot !== playerSlot) {
+        if (isSnookerBallMode() || (isRackBreakerPromptEnabled() && getRackBreakerSlot())) {
+            playerSwitchBefore = {
+                activePlayer: prevSlot,
+                rackOpponentVisited: getStorageItem("rackOpponentVisited") || "no"
+            };
+            if (isSnookerBallMode()) {
+                playerSwitchBefore.snookerCurrentBreak = getSnookerCurrentBreak();
+                playerSwitchBefore.snookerPhase = getSnookerPhase();
+                playerSwitchBefore.snookerAfterFreeball = getSnookerAfterFreeball();
+                playerSwitchBefore.snookerFoulAwaitingPlayerChange = getSnookerFoulAwaitingPlayerChange();
+                playerSwitchBefore.snookerFreeBallOffered = isSnookerFreeBallOffered();
+            }
+        }
+    }
+
     noteRackOpponentVisitForSlot(playerSlot);
     const player = isChecked ? 1 : 2; // Determine active player based on checkbox state
     const useToggleCheckbox = document.getElementById("useToggleSetting");
@@ -5203,7 +5610,7 @@ function togglePlayer(isChecked) {
     } else {
         console.log(`Not changing visual active player indicator UI, due to useToggleSetting being disabled`);
     }
-    setStorageItem("activePlayer", player);
+    setStorageItem("activePlayer", playerSlot);
     setStorageItem("toggleState", activePlayer);
     console.log(`Player ${player} is active`); // Log the active player
     syncPlayerSlotPickerUI();
@@ -5223,6 +5630,15 @@ function togglePlayer(isChecked) {
             updateSnookerBallAvailability();
         }
         updateSnookerUndoButton();
+    }
+    // Manual Active Player change is undoable without reversing pots/points.
+    // Fouls already commit their own snapshot and call togglePlayer with skipUndo.
+    if (playerSwitchBefore) {
+        pushScoringUndo({ type: "playerSwitch", before: playerSwitchBefore });
+    }
+    updateRackFoulDisplay();
+    if (window.cloudRelay && typeof window.cloudRelay.pushDockStateSoon === "function") {
+        window.cloudRelay.pushDockStateSoon(0);
     }
 }
 
@@ -5386,13 +5802,12 @@ function openResetScoresModal(action) {
     const confirmBtn = document.getElementById("resetScoresModalConfirm");
 
     const resetLabel = getResetScoreActionLabel();
-    const unit = isSnooker() ? "frame" : "rack";
     const copy = {
         reset: {
             title: resetLabel,
-            message: "Clear the current " + unit + " scoreline for this match? This cannot be undone from here.",
+            message: "Restart this match and clear all scores? This cannot be undone from here.",
             confirm: resetLabel,
-            fallback: "Click OK to confirm " + resetLabel.toLowerCase()
+            fallback: "Click OK to confirm restart match"
         },
         endMatch: {
             title: "End Match",
@@ -5507,6 +5922,11 @@ function publishCloudStateAfterScoreReset() {
     }
 }
 
+/** Push dock state after tracker rack win / game-ball cooldown so mobile mirrors desktop. */
+function publishCloudStateAfterTrackerChange() {
+    publishCloudStateAfterScoreReset();
+}
+
 function performResetScores(options) {
     const endMatch = !!(options && options.endMatch);
 
@@ -5544,12 +5964,13 @@ function performResetScores(options) {
             resetSnookerSequenceState();
             cancelSnookerFoul();
         }
+        clearRackFouls();
         resetBallTracker();
         resetBallSet();
         clearAllScoringUndoHistory();
 
         if (window.PlayerStats) {
-            // End Match / Call Match Early keeps recorded stats; mid-match Reset Frame/Rack undoes the open session.
+            // End Match / Call Match Early keeps recorded stats; mid-match Restart Match undoes the open session.
             const opts = endMatch ? { endMatch: true } : undefined;
             window.PlayerStats.onResetScores(opts).then(function () {
                 updateScoreControlAvailability();
@@ -5586,6 +6007,9 @@ function resetBallTracker() {
     const ballElements = document.querySelectorAll("#ballTrackerDiv .ball");
 
     ballElements.forEach(function (ball) {
+        if (ball.id === "snookerUndoBtn" || ball.id === "poolFoulBtn") {
+            return;
+        }
         // Remove the 'faded' class to reset the ball
         ball.classList.remove('faded');
         ball.classList.remove('ball-win-cooldown');
@@ -5959,12 +6383,18 @@ async function connectWebSocket() {
         updateReplayButtonsVisibility();
         updateReplaySourceSettingsVisibility();
         console.log('OBS WebSocket: Connected and authenticated');
+        if (window.cloudRelay && typeof window.cloudRelay.pushDockStateSoon === 'function') {
+            window.cloudRelay.pushDockStateSoon(0);
+        }
     } catch (err) {
         console.error('Failed to connect:', err);
         const toggle = document.getElementById('websocketToggle');
         if (toggle) toggle.checked = false;
         setStorageItem('websocketEnabled', 'false');
         updateWebSocketToggle();
+        if (window.cloudRelay && typeof window.cloudRelay.pushDockStateSoon === 'function') {
+            window.cloudRelay.pushDockStateSoon(0);
+        }
         alert('Failed to connect. Is OBS running and WebSocket enabled? Check your OBS settings.\n\nDetails: ' + (err.message || err.toString()));
         // Show modal if connection fails due to configuration
         openWebSocketSettingsModal();
@@ -5993,6 +6423,9 @@ async function disconnectWebSocket() {
         }
         
         console.log('Disconnected from OBS WebSocket');
+        if (window.cloudRelay && typeof window.cloudRelay.pushDockStateSoon === 'function') {
+            window.cloudRelay.pushDockStateSoon(0);
+        }
     } catch (err) {
         console.error('Failed to disconnect:', err);
         alert('Failed to disconnect: ' + (err.message || err.toString()));

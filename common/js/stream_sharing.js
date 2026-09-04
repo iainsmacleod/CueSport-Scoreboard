@@ -572,16 +572,41 @@
     }
     
     // Update stream promotion toggle state
+    function canUseStreamPromotion() {
+        return !isBlockedByServer && !!isObsStreaming;
+    }
+
     function updateStreamPromotionToggle() {
         const toggle = document.getElementById('streamPromotionToggle');
         if (!toggle) return;
-        
+
+        const usable = canUseStreamPromotion();
+        toggle.disabled = !usable;
         // Update toggle state based on connection status
         toggle.checked = isEnabled && (isConnected || isAuthenticated);
+
+        const switchLabel = toggle.closest('label.switch, label.toggle');
+        if (switchLabel) {
+            switchLabel.classList.toggle('toggle-disabled', !usable);
+            if (isBlockedByServer) {
+                switchLabel.title = blockedReason || 'Stream promotion is blocked';
+            } else if (!isObsStreaming) {
+                switchLabel.title = 'OBS must be live streaming to promote your stream';
+            } else {
+                switchLabel.removeAttribute('title');
+            }
+        }
+
+        const section = document.getElementById('streamSharingLabel');
+        const header = section && section.closest('.section-header-with-controls');
+        if (header) {
+            header.classList.toggle('stream-promotion-unavailable', !usable);
+        }
     }
     
     // Update stream sharing UI visibility based on streaming state
     function updateStreamSharingVisibility() {
+        updateStreamPromotionToggle();
         const section = document.getElementById('streamSharingLabel');
         if (!section) return;
         
@@ -595,6 +620,8 @@
         // Walk through siblings to find stream sharing controls
         const streamElements = [];
         streamElements.push(section);
+        const switchLabel = document.querySelector('#streamPromotionToggle')?.closest('label.switch, label.toggle');
+        if (switchLabel) streamElements.push(switchLabel);
         
         // Find elements by their IDs (legacy elements that may not exist anymore)
         const apiKeyField = document.getElementById('streamApiKey');
@@ -706,6 +733,17 @@
     function toggleStreamPromotion() {
         const toggle = document.getElementById('streamPromotionToggle');
         if (!toggle) return;
+
+        if (toggle.disabled || !canUseStreamPromotion()) {
+            toggle.checked = isEnabled && (isConnected || isAuthenticated);
+            updateStreamPromotionToggle();
+            if (isBlockedByServer) {
+                alert(`Stream sharing is blocked:\n${blockedReason || 'API key is blocked by administrator'}`);
+            } else if (!isObsStreaming) {
+                alert('OBS must be streaming to share your game data.');
+            }
+            return;
+        }
         
         if (isBlockedByServer) {
             toggle.checked = false;

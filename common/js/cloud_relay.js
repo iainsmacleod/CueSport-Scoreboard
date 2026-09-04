@@ -23,6 +23,108 @@
     let commandHandlers = [];
     let stateHandlers = [];
     let presenceHandlers = [];
+    let hadControlClient = false;
+    /** request_id -> { resolve, reject, timer } for stats over WebSocket */
+    const pendingStats = new Map();
+
+    /** Enable players, score display, and Ball Scoring when mobile/guest first joins. */
+    function ensureBallScoringForMobileControl() {
+        try {
+            let changed = false;
+
+            function enablePlayerIfNeeded(slot) {
+                const key = 'usePlayer' + slot;
+                if (dockStorage(key, 'no') === 'yes') {
+                    return;
+                }
+                const cb = document.getElementById('usePlayer' + slot + 'Setting');
+                if (cb) {
+                    cb.checked = true;
+                }
+                if (typeof playerSetting === 'function') {
+                    playerSetting(slot);
+                } else if (typeof window.setStorageItem === 'function') {
+                    window.setStorageItem(key, 'yes');
+                }
+                changed = true;
+            }
+
+            enablePlayerIfNeeded(1);
+            enablePlayerIfNeeded(2);
+
+            const bothPlayers =
+                dockStorage('usePlayer1', 'no') === 'yes' &&
+                dockStorage('usePlayer2', 'no') === 'yes';
+            if (!bothPlayers) {
+                return changed;
+            }
+
+            // Score Display is required for Ball Scoring / mobile score controls.
+            if (dockStorage('scoreDisplay', 'yes') !== 'yes') {
+                const scoreCb = document.getElementById('scoreDisplay');
+                if (scoreCb) {
+                    scoreCb.disabled = false;
+                    scoreCb.checked = true;
+                }
+                if (typeof scoreDisplaySetting === 'function') {
+                    scoreDisplaySetting();
+                } else if (typeof window.setStorageItem === 'function') {
+                    window.setStorageItem('scoreDisplay', 'yes');
+                    if (typeof syncScoreDisplayDependentUI === 'function') {
+                        syncScoreDisplayDependentUI();
+                    }
+                }
+                changed = true;
+            } else {
+                const scoreCb = document.getElementById('scoreDisplay');
+                if (scoreCb) {
+                    scoreCb.disabled = false;
+                    if (!scoreCb.checked) {
+                        scoreCb.checked = true;
+                        if (typeof scoreDisplaySetting === 'function') {
+                            scoreDisplaySetting();
+                        }
+                        changed = true;
+                    }
+                }
+            }
+
+            if (dockStorage('enableBallTracker', 'no') === 'yes') {
+                if (changed) {
+                    console.log('CueSport Cloud: enabled players/score display for mobile/guest control');
+                }
+                return changed;
+            }
+
+            const checkbox = document.getElementById('ballTrackerCheckbox');
+            if (checkbox) {
+                checkbox.disabled = false;
+                checkbox.checked = true;
+            }
+            if (typeof useBallTracker === 'function') {
+                useBallTracker();
+            } else if (typeof window.setStorageItem === 'function') {
+                window.setStorageItem('enableBallTracker', 'yes');
+            }
+            console.log('CueSport Cloud: enabled players, score display, and Ball Scoring for mobile/guest control');
+            return true;
+        } catch (err) {
+            console.error('CueSport Cloud: failed to enable scoring prerequisites for mobile:', err);
+            return false;
+        }
+    }
+
+    function handlePresenceForControlClients(clients) {
+        const list = Array.isArray(clients) ? clients : [];
+        const hasControl = list.includes('mobile') || list.includes('mobile_guest');
+        if (hasControl && !hadControlClient) {
+            ensureBallScoringForMobileControl();
+        }
+        hadControlClient = hasControl;
+        if (hasControl) {
+            pushDockStateSoon(0);
+        }
+    }
 
     function instanceKey(key) {
         const instanceId = new URLSearchParams(window.location.search).get('instance') || '';
@@ -261,7 +363,23 @@
         const balls = [];
         if (tracker) {
             tracker.querySelectorAll('.ball').forEach(function (el) {
-                if (el.id === 'snookerUndoBtn') return;
+                if (el.id === 'snookerUndoBtn' || el.id === 'poolFoulBtn') {
+                    // Always include the pool foul control for mobile (not an object ball).
+                    if (el.id === 'poolFoulBtn') {
+                        balls.push({
+                            id: el.id,
+                            file: imageFileName(el.querySelector('img')),
+                            title: 'Foul',
+                            hidden: el.classList.contains('noShow'),
+                            faded: false,
+                            disabled: el.classList.contains('snooker-ball-disabled') ||
+                                el.getAttribute('aria-disabled') === 'true',
+                            foul: true,
+                            freeball: false,
+                        });
+                    }
+                    return;
+                }
                 const img = el.querySelector('img');
                 const hidden = el.classList.contains('noShow') ||
                     el.classList.contains('snooker-spacer') ||
@@ -312,6 +430,12 @@
             canUndo: !undoDisabled && visible,
             balls: balls,
             snookerFoulTargets: snookerFoulTargets,
+            foulsP1: typeof window.getRackFouls === 'function'
+                ? window.getRackFouls('1')
+                : Math.max(0, parseInt(dockStorage('snookerFrameFoulsP1', '0') || '0', 10) || 0),
+            foulsP2: typeof window.getRackFouls === 'function'
+                ? window.getRackFouls('2')
+                : Math.max(0, parseInt(dockStorage('snookerFrameFoulsP2', '0') || '0', 10) || 0),
         };
     }
 
@@ -356,6 +480,8 @@
                 state.playerSlotMode = 'off';
             }
             state.obsConnected = dockStorage('isConnected', 'false') === 'true';
+            // "Enable Replay and Promotion Function" toggle (persists across reconnects).
+            state.replayEnabled = dockStorage('websocketEnabled', 'false') === 'true' || state.obsConnected;
             // Prefer storage; also trust control_panel Monitor / Instant Replay button labels.
             const monitorBtn = document.getElementById('btnMonitorGame');
             const instantBtn = document.getElementById('btnReplayClip');
@@ -604,6 +730,35 @@
         }
     }
 
+    /**
+     * Account stats over the authenticated room WebSocket (no HTTP/CORS).
+     * Preferred for OBS docks loaded from file://.
+     */
+    function requestStats(limit) {
+        return new Promise(function (resolve, reject) {
+            if (!isCloudConnected()) {
+                reject(new Error('Not connected to CueSport Cloud'));
+                return;
+            }
+            const requestId = 'stats_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
+            const timer = setTimeout(function () {
+                pendingStats.delete(requestId);
+                reject(new Error('Stats request timed out'));
+            }, 15000);
+            pendingStats.set(requestId, { resolve: resolve, reject: reject, timer: timer });
+            const ok = sendRaw({
+                type: 'stats',
+                request_id: requestId,
+                limit: limit || 5000,
+            });
+            if (!ok) {
+                clearTimeout(timer);
+                pendingStats.delete(requestId);
+                reject(new Error('WebSocket not open'));
+            }
+        });
+    }
+
     function handleMessage(data) {
         if (data.type === 'joined') {
             isJoined = true;
@@ -617,7 +772,32 @@
             pushDockStateSoon();
             return;
         }
+        if (data.type === 'stats') {
+            const pending = data.request_id ? pendingStats.get(data.request_id) : null;
+            if (pending) {
+                clearTimeout(pending.timer);
+                pendingStats.delete(data.request_id);
+                if (data.ok === false) {
+                    pending.reject(new Error(data.error || 'Stats failed'));
+                } else {
+                    pending.resolve({
+                        players: Array.isArray(data.players) ? data.players : [],
+                        matches: Array.isArray(data.matches) ? data.matches : [],
+                        summary: data.summary || null,
+                        tables: Array.isArray(data.tables) ? data.tables : [],
+                    });
+                }
+            }
+            return;
+        }
         if (data.type === 'error') {
+            if (pendingStats.size) {
+                for (const pending of pendingStats.values()) {
+                    clearTimeout(pending.timer);
+                    pending.reject(new Error(data.message || data.code || 'Cloud error'));
+                }
+                pendingStats.clear();
+            }
             if (
                 data.code === 'subscription_required' ||
                 data.code === 'invalid_api_key' ||
@@ -630,7 +810,8 @@
                 updateCloudUI();
             }
             console.error('cloudRelay error:', data.code, data.message);
-            if (typeof alert === 'function') {
+            // unknown_type is often a version skew (e.g. new dock vs old server) — don't alert.
+            if (data.code !== 'unknown_type' && typeof alert === 'function') {
                 alert(`CueSport Cloud: ${data.message || data.code}`);
             }
             return;
@@ -646,10 +827,8 @@
         if (data.type === 'presence') {
             const clients = data.clients || [];
             for (const fn of presenceHandlers) fn(clients);
-            // When a mobile/guest client joins, refresh room state so replay/monitoring sync
-            if (clients.includes('mobile') || clients.includes('mobile_guest')) {
-                pushDockStateSoon(0);
-            }
+            // When a mobile/guest client joins, enable Ball Scoring if needed and refresh state.
+            handlePresenceForControlClients(clients);
             return;
         }
         // Legacy auth
@@ -670,6 +849,7 @@
         ws = null;
         isConnected = false;
         isJoined = false;
+        hadControlClient = false;
         updateCloudUI();
     }
 
@@ -704,6 +884,9 @@
         setStorageItem('accessToken', '');
         setStorageItem('apiKey', '');
         setStorageItem('roomId', '');
+        setStorageItem('signedInEmail', '');
+        setStorageItem('enabled', 'false');
+        isEnabled = false;
         disconnect();
     }
 
@@ -717,22 +900,15 @@
             else statusEl.textContent = 'Off';
         }
         if (toggle) toggle.checked = isEnabled;
+        // Notify listeners (e.g. stats) of cloud connection state change
+        try { window.dispatchEvent(new CustomEvent('cloudRelayStateChange', { detail: { connected: isCloudConnected(), enabled: isEnabled } })); } catch (_) {}
         const emailEl = document.getElementById('cloudSignedInEmail');
+        const statusSep = document.getElementById('cloudStatusSep');
         if (emailEl) {
             const email = getStorageItem('signedInEmail') || '';
-            const room = getRoomId();
-            const inst = getInstanceKey();
-            const parts = [];
-            if (email) parts.push(`Signed in: ${email}`);
-            if (room) parts.push(`Table: ${inst}${room ? '' : ''}`);
-            emailEl.textContent = parts.join(' · ');
-        }
-        const roomEl = document.getElementById('cloudRoomIdDisplay');
-        if (roomEl) {
-            const room = getRoomId();
-            roomEl.textContent = room
-                ? `Room ${room.slice(0, 8)}… (${getInstanceKey()})`
-                : `Auto table: ${getInstanceKey()}`;
+            emailEl.textContent = email ? `Signed in: ${email}` : '';
+            emailEl.classList.toggle('noShow', !email);
+            if (statusSep) statusSep.classList.toggle('noShow', !email);
         }
     }
 
@@ -755,6 +931,7 @@
         sendState,
         sendCommand,
         sendSession,
+        requestStats,
         setEnabled,
         isConnected: isCloudConnected,
         isEnabled: isCloudEnabled,
@@ -768,10 +945,13 @@
         invalidatePendingState,
         get replaying() { return replaying; },
         hasCredentials,
+        ensureBallScoringForMobileControl,
         init,
         updateCloudUI,
         getServerUrl,
         getRoomId,
+        getAccessToken,
+        getApiKey,
     };
 
     if (document.readyState === 'loading') {

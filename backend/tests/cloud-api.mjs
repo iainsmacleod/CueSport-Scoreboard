@@ -188,6 +188,10 @@ async function run() {
     if (keyRes.ok) {
       assert('POST /api/api-keys', keyRes.body.key?.length === 32);
       apiKey = keyRes.body.key;
+      const viewRes = await fetchJson(`/api/api-keys/${keyRes.body.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      assert('GET /api/api-keys/:keyId', viewRes.ok && viewRes.body.key === apiKey);
     } else {
       assert('POST /api/api-keys at limit or ok', keyRes.status === 403 && keyRes.body.code === 'api_key_limit');
       // Need a key for dock tests — create by revoking one first
@@ -339,10 +343,131 @@ async function run() {
         state: { player1Name: 'A', player2Name: 'B', p1Score: 1, p2Score: 0, gameType: 'game1' },
       }));
       await sleep(200);
+      dock2.ws.send(JSON.stringify({
+        type: 'session',
+        room_id: roomId,
+        action: 'end',
+        payload: { matchId: 'smoke-match', winnerSlot: '1', scores: { p1: 5, p2: 2 }, reason: 'race_complete' },
+      }));
+      await sleep(200);
       const events = await fetchJson(`/api/rooms/${roomId}/events?limit=5`, {
         headers: { Authorization: `Bearer ${tokenFresh}` },
       });
       assert('Events persisted', events.ok && Array.isArray(events.body) && events.body.length > 0);
+
+      const statsUnauth = await fetchJson('/api/stats');
+      assert('GET /api/stats unauthorized', statsUnauth.status === 401);
+      const stats = await fetchJson('/api/stats', {
+        headers: { Authorization: `Bearer ${tokenFresh}` },
+      });
+      assert('GET /api/stats', stats.ok && Array.isArray(stats.body.players) && Array.isArray(stats.body.matches));
+      const editable = (stats.body.matches || []).find((m) => m.startEventId && m.status === 'completed');
+      if (editable) {
+        const patched = await fetchJson(`/api/stats/matches/${editable.startEventId}`, {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${tokenFresh}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            player1Name: 'Alice',
+            player2Name: 'Bob',
+            gameType: 'game1',
+            scores: { p1: 3, p2: 7 },
+          }),
+        });
+        assert('PATCH /api/stats/matches/:id', patched.ok && patched.body.ok === true);
+        const patchedWithExtras = await fetchJson(`/api/stats/matches/${editable.startEventId}`, {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${tokenFresh}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            player1Name: 'Alice',
+            player2Name: 'Bob',
+            gameType: 'game1',
+            scores: { p1: 3, p2: 7 },
+            breakAndRunsP1: 1,
+            breakAndRunsP2: 0,
+            tableRunsP1: 0,
+            tableRunsP2: 2,
+            ballsP1: 12,
+            ballsP2: 18,
+          }),
+        });
+        assert('PATCH match extras', patchedWithExtras.ok && patchedWithExtras.body.ok === true);
+        const statsAfterExtras = await fetchJson('/api/stats', {
+          headers: { Authorization: `Bearer ${tokenFresh}` },
+        });
+        const updatedMatch = (statsAfterExtras.body.matches || []).find((m) => m.startEventId === editable.startEventId);
+        assert(
+          'Stats include B&R / TR / balls',
+          !!updatedMatch &&
+            updatedMatch.breakAndRunsP1 === 1 &&
+            updatedMatch.tableRunsP2 === 2 &&
+            updatedMatch.ballsP2 === 18
+        );
+        assert(
+          'Winner derived from scores',
+          !!updatedMatch && updatedMatch.winnerSlot === '2'
+        );
+
+        const snookerExtras = await fetchJson(`/api/stats/matches/${editable.startEventId}`, {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${tokenFresh}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            player1Name: 'Alice',
+            player2Name: 'Bob',
+            gameType: 'game8',
+            scores: { p1: 3, p2: 2 },
+            highestBreakP1: 42,
+            highestBreakP2: 28,
+            foulsP1: 4,
+            foulsP2: 1,
+            ballsP1: 20,
+            ballsP2: 15,
+          }),
+        });
+        assert('PATCH snooker foul extras', snookerExtras.ok && snookerExtras.body.ok === true);
+        const statsAfterSnooker = await fetchJson('/api/stats', {
+          headers: { Authorization: `Bearer ${tokenFresh}` },
+        });
+        const snookerMatch = (statsAfterSnooker.body.matches || []).find((m) => m.startEventId === editable.startEventId);
+        assert(
+          'Stats include snooker fouls',
+          !!snookerMatch &&
+            snookerMatch.gameType === 'game8' &&
+            snookerMatch.foulsP1 === 4 &&
+            snookerMatch.foulsP2 === 1 &&
+            snookerMatch.highestBreakP1 === 42
+        );
+        const alicePlayer = (statsAfterSnooker.body.players || []).find((p) => p.name === 'Alice');
+        assert(
+          'Player rollup includes fouls',
+          !!alicePlayer && alicePlayer.fouls === 4,
+          alicePlayer ? String(alicePlayer.fouls) : 'missing'
+        );
+        const renamed = await fetchJson('/api/stats/players', {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${tokenFresh}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ from: 'Alice', to: 'Alicia' }),
+        });
+        assert('PATCH /api/stats/players', renamed.ok && renamed.body.updated >= 1);
+        const deleted = await fetchJson(`/api/stats/matches/${editable.startEventId}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${tokenFresh}` },
+        });
+        assert('DELETE /api/stats/matches/:id', deleted.ok && deleted.body.ok === true);
+      } else {
+        assert('PATCH /api/stats/matches/:id', false, 'no completed match to edit');
+      }
       dock2.ws.close();
     } else {
       assert('Events persisted', false, 'dock join failed');

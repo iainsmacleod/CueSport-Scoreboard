@@ -10,7 +10,7 @@ Display player names, race and game info, racks (and balls where needed), logos,
 
 *Best viewed as a **1920×1080** browser source*
 
-**Current version: 7.2.2**
+**Current version: 8.0.0**
 
 </div>
 
@@ -315,9 +315,10 @@ The OBS **dock remains the scoring authority**. Mobile and guest clients send co
 - **Stats-safe relay** — mobile commands invoke the same dock functions as the control panel (`postScore`, `selectRackBreaker`, etc.)
 - **Live dashboard** — account WebSocket pushes table list updates when docks connect, disconnect, or publish state (no polling)
 - **Connection gating** — mobile/guest controls pause when the dock is offline or the cloud socket is down, so the UI does not drift out of sync
-- **Match confirmations** — Reset Rack/Frame, End Match, and Call Match require confirmation on mobile (danger-styled buttons)
-- **Cloud event log** — commands and sessions stored for future stats dashboards
-- **Google sign-in** (hosted) or **dev auth secret / API key** (self-host) in the Replay/Share tab
+- **Match confirmations** — Restart Match, End Match, and Call Match require confirmation on mobile (danger-styled buttons)
+- **Cloud match stats** — completed dock races sync to the account (`session:start` / `session:end`); the dashboard **Stats** tab shows a leaderboard, recent matches, player detail (rename across history, edit/delete matches), and extras (B&R / TR, highest break, longest run, balls). Local dock stats keep a rolling **30-day** window; cloud history is unbounded. When cloud is connected, dock import/export/clear for stats are disabled — manage history on the dashboard.
+- **Game Info** — optional dock Game Information text is stored on cloud matches and shown in the dashboard Info column (preferred over room/table labels for match context)
+- **Google sign-in** (hosted) or **OBS Dock Key** (self-host) via CueSport Cloud **Connection settings** (⚙) in Replay/Share
 
 ### Quick start (self-host)
 
@@ -338,7 +339,7 @@ docker compose up -d --build
 ```
 
 1. Open **http://localhost:3000/dashboard** (or **:4003** with Docker) and **dev sign-in** with your `DEV_AUTH_SECRET`.
-2. In OBS **Replay/Share**, open **CueSport Cloud → Self-host settings** → server URL, room ID, and API key.
+2. In OBS **Replay/Share**, open **CueSport Cloud → Connection settings (⚙)** → **Self-hosting** → Server URL and OBS Dock Key.
 3. Enable the **CueSport Cloud** toggle on the dock.
 4. On your phone, open **http://localhost:3000/m/{room_id}** — if you already signed in on the dashboard in the same browser, tap **Connect**; on a new device, enter the dev secret once (it is saved for next time).
 5. Optional: from mobile **Share**, create a **guest link** (`/g/{token}`) for helpers who should not change names, game type, or end the match.
@@ -349,7 +350,7 @@ See [`backend/README.md`](backend/README.md) for Supabase/Google OAuth productio
 
 | | Hosted | Self-host |
 |---|--------|-----------|
-| Auth | Sign in with Google in dock + dashboard | Dev secret on dashboard; API key + server URL in dock |
+| Auth | Sign in with Google via dock Connection settings + dashboard | Dev secret on dashboard; OBS Dock Key + server URL in dock Connection settings → Self-hosting |
 | Backend | `cuesports.macleod.systems` | Your own `backend/` deployment |
 | Cost | Optional paid tier (later) | Free (you run the server) |
 
@@ -413,8 +414,8 @@ Import / Export / Clear live on the Stats tab next to **Player Stats** (not insi
 ### Overlay stats (Controls tab + Stats tab)
 
 - **P1 Stats** / **P2 Stats** / **H2H Stats** (Controls tab) — one mode at a time; click again to hide. Off by default. Overlay figures are **scoped to the current game type** (e.g. Snooker H2H ignores 8-Ball history).
-- **Overlay Stats Display** (Stats tab) — pick a **game type**, then choose which rows appear on those overlay panels. Available toggles include **Matches Won**, **Racks / Frames W/L**, **Win Streak**, **Current Break / Run**, **Possible Break**, **Difference**, **Points Remaining**, **Highest Break / Longest Run**, **Balls Potted**, **Break & Run**, and **Table Run** (only options that apply to the selected game type are shown). Defaults to the game type in play; changing this selector does not change scoring. Unchecked stats are **hidden on the overlay** but still recorded in match history. Toggles persist across refresh.
-- Individual panels: **Matches Won** (with win %), **Rack W/L** / **Frame W/L** (with win %), optional **Highest Break** (Snooker) or **Longest Run** (Straight Pool), optional **Balls Potted** (8 / 9 / 10 with Ball Scoring, Bank, One Pocket, Custom point-based, Snooker), **Break & Run** / **Table Run** (8 / 9 / 10), **Win Streak**, and live Snooker fields (**Current Break**, **Possible Break**, **Difference**, **Points Remaining**) when enabled.
+- **Overlay Stats Display** (Stats tab) — pick a **game type**, then choose which rows appear on those overlay panels. Available toggles include **Matches Won**, **Racks / Frames W/L**, **Win Streak**, **Current Break / Run**, **Possible Break**, **Difference**, **Points Remaining**, **Highest Break** (Snooker), **Longest Run** (Straight), **Balls Potted**, **Break & Run**, and **Table Run** (only options that apply to the selected game type are shown). Defaults to the game type in play; changing this selector does not change scoring. Unchecked stats are **hidden on the overlay** but still recorded in match history. Toggles persist across refresh.
+- Individual panels: **Matches Won** (with win %), **Rack W/L** / **Frame W/L** (with win %), optional **Highest Break** (Snooker) or **Longest Run** (Straight Pool) as separate stats, optional **Balls Potted** (8 / 9 / 10 with Ball Scoring, Bank, One Pocket, Custom point-based, Snooker), **Break & Run** / **Table Run** (8 / 9 / 10), **Win Streak**, and live Snooker fields (**Current Break**, **Possible Break**, **Difference**, **Points Remaining**) when enabled.
 - **Highest Break** / **Longest Run** and **Balls Potted** on P1/P2 overlays are **match-scoped** for the current pending match (not career totals). They survive a control-panel refresh via the pending session.
 - H2H: comparison table with player names in the header, stat labels centered in the middle (**Matches Won**, **Racks/Frames Won**, etc.), and each player's value centered under their name. Optional **Highest Break** / **Longest Run** and **Balls Potted** rows when relevant for the active game type. Live unfinished racks/frames count toward H2H rack/frame totals as soon as both players are named (including **0–0** at the start of a match); **Matches Won** still requires a completed match.
 - **Balls Potted** appears for 8 / 9 / 10 (Ball Scoring pots), dual-score games, and Snooker. It is a **count**, not a win/loss record.
@@ -549,7 +550,7 @@ From the project root:
 python -m http.server 8765
 ```
 
-Open `http://localhost:8765/tests/smoke_test.html` and click **Run all tests**. Coverage includes core wiring and version; Setup (**Game Selection** / **Game Information**, player details, game-variant option integrity); dock **zoom** and **tab** persistence; Stats tab restore; **Manual Adjustments** layout (chosen ball placement, player-tracking block visibility); Show Scores / Ball Scoring preference handling; Stats tab (Player Stats, Import / Export / Clear, per-game overlay visibility toggles); **OverlayVisibility** (stats toggles through initial build, broadcast rebuild, and Snooker live publish); overlay mode toggles and payload sync; stats APIs and match history; live H2H / in-progress match editing; **Breaking Player?** / **Active Player** (all game types with Ball Scoring on, section hidden when off, race-complete lock, player switching, International Red/Yellow auto-assign); Snooker (frames/points, Golden Ball, fouls, Free Ball, undo stack, scoring lock, overlay Display Balls rules); Ball Scoring rack wins (8/9/10-ball, Straight 14.1 re-rack, Bank/One Pocket); **Call Match Early** modal copy; replay clip delete note; and related UI labels.
+Open `http://localhost:8765/tests/smoke_test.html` and click **Run all tests**. Coverage includes core wiring and version; Setup (**Game Selection** / **Game Information**, player details, game-variant option integrity); dock **zoom** and **tab** persistence; Stats tab restore; **Manual Adjustments** layout (chosen ball placement, player-tracking block visibility); Show Scores / Ball Scoring preference handling; Stats tab (Player Stats, Import / Export / Clear, per-game overlay visibility toggles); **OverlayVisibility** (stats toggles through initial build, broadcast rebuild, and Snooker live publish); overlay mode toggles and payload sync; stats APIs and match history; live H2H / in-progress match editing; **Breaking Player?** / **Active Player** (all game types with Ball Scoring on, section hidden when off, race-complete lock, player switching, International Red/Yellow auto-assign); Snooker (frames/points, Golden Ball, fouls, Free Ball, undo stack, scoring lock, overlay Display Balls rules); Ball Scoring rack wins (8/9/10-ball including **Break & Run** / **Table Run** rack flags and career totals, Straight 14.1 re-rack, Bank/One Pocket); **Call Match Early** modal copy; replay clip delete note; and related UI labels.
 
 **CueSport Cloud** (requires `backend` running on port 3000 or 4003):
 
@@ -561,7 +562,7 @@ Open `http://localhost:8765/tests/smoke_test.html` and click **Run all tests**. 
 
 ## Release notes
 
-Versioned changelogs and screenshot tooling live in [`docs/release-notes/`](docs/release-notes/). README screenshots are in [`docs/readme/images/`](docs/readme/images/) (regenerate with [`docs/readme/capture-screenshots.mjs`](docs/readme/capture-screenshots.mjs)). Run `docs/release-notes/create-release.ps1 -Version 7.2.2` (requires [GitHub CLI](https://cli.github.com/)) to refresh release-note captures and open a **draft** GitHub release.
+Versioned changelogs and screenshot tooling live in [`docs/release-notes/`](docs/release-notes/). README screenshots are in [`docs/readme/images/`](docs/readme/images/) (regenerate with [`docs/readme/capture-screenshots.mjs`](docs/readme/capture-screenshots.mjs)). Run `docs/release-notes/create-release.ps1 -Version 8.0.0` (requires [GitHub CLI](https://cli.github.com/)) to refresh release-note captures and open a **draft** GitHub release.
 
 ---
 

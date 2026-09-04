@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
   <title>CueSport Scoreboard Cloud Control</title>
-  <link rel="stylesheet" href="/web/shared/styles.css?v=7.2.3-save-pending" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.0.0.1" />
 </head>
 <body class="mobile">
   <header>
@@ -58,6 +58,18 @@
           </div>
           <div class="live-ball-section hidden" id="ballGridPanel">
             <p id="ballGridHint" class="ball-grid-hint hidden"></p>
+            <div id="rackFoulCounter" class="rack-foul-counter hidden" aria-live="polite" title="Fouls this rack or frame">
+              <span class="rack-foul-heading">Fouls</span>
+              <span class="rack-foul-player" id="rackFoulP1Wrap">
+                <span class="rack-foul-name" id="rackFoulP1Name">P1</span>
+                <span class="rack-foul-count" id="rackFoulP1">0</span>
+              </span>
+              <span class="rack-foul-sep" aria-hidden="true">·</span>
+              <span class="rack-foul-player" id="rackFoulP2Wrap">
+                <span class="rack-foul-name" id="rackFoulP2Name">P2</span>
+                <span class="rack-foul-count" id="rackFoulP2">0</span>
+              </span>
+            </div>
             <div id="ballGrid" class="ball-grid ball-grid-live"></div>
           </div>
           <div class="live-score-controls">
@@ -104,11 +116,10 @@
           </div>
           <div class="panel live-inline-panel" id="matchPanel">
             <div class="row equal">
-              <button class="btn danger" id="resetScoresBtn" data-cmd="reset_scores">Reset Rack</button>
+              <button class="btn danger" id="resetScoresBtn" data-cmd="reset_scores">Restart Match</button>
               <button class="btn danger hidden" id="callMatchBtn" data-cmd="call_match_early">Call Match</button>
             </div>
           </div>
-          <div id="syncHint" class="sync-hint hidden">Updating…</div>
         </div>
       </div>
 
@@ -253,7 +264,7 @@
       </svg>
       <span>Setup</span>
     </button>
-    <button type="button" id="navReplayBtn" class="mobile-nav-btn admin-only" aria-label="Replay">
+    <button type="button" id="navReplayBtn" class="mobile-nav-btn admin-only hidden" aria-label="Replay">
       <svg class="mobile-nav-icon" viewBox="0 0 24 24" aria-hidden="true">
         <path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
       </svg>
@@ -293,6 +304,6 @@
       <div id="snookerFoulTargets" class="snooker-foul-targets"></div>
     </div>
   </div>
-  <script type="module" src="/web/mobile/app.js?v=7.2.3-share-device"></script>
+  <script type="module" src="/web/mobile/app.js?v=8.0.0.4"></script>
 </body>
 </html>

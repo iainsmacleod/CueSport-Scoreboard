@@ -5,8 +5,8 @@
  * functions the OBS UI uses. Mobile is a thin remote — scoring rules stay on the dock.
  */
 (function () {
-    function isSnookerFoulBallId(ballId) {
-        return ballId === 'ball 11';
+    function isFoulBallId(ballId) {
+        return ballId === 'ball 11' || ballId === 'poolFoulBtn';
     }
 
     /** Drop stale in-flight snapshots, then publish authoritative dock state. */
@@ -84,18 +84,31 @@
                     selectRackBreaker(String(payload.slot));
                 }
                 return Promise.resolve().then(publishAfterScoring);
-            case 'toggle_active_player':
+            case 'toggle_active_player': {
+                const targetSlot = payload && payload.isP1 === false ? '2' : '1';
+                if (typeof getActivePlayerSlot === 'function' &&
+                    typeof isPlayerSlotPickerBreakerMode === 'function' &&
+                    !isPlayerSlotPickerBreakerMode() &&
+                    getActivePlayerSlot() === targetSlot) {
+                    return Promise.resolve();
+                }
                 if (typeof onPlayerSlotButton === 'function') {
-                    onPlayerSlotButton(payload && payload.isP1 === false ? '2' : '1');
+                    onPlayerSlotButton(targetSlot);
                 } else if (payload && typeof payload.isP1 === 'boolean') {
                     togglePlayer(payload.isP1);
                 }
                 return Promise.resolve().then(publishAfterScoring);
+            }
             case 'player_slot':
                 if (payload && payload.slot) {
                     const slot = String(payload.slot);
                     const breakerPick = payload.mode === 'breaker' ||
                         (typeof isPlayerSlotPickerBreakerMode === 'function' && isPlayerSlotPickerBreakerMode());
+                    if (!breakerPick &&
+                        typeof getActivePlayerSlot === 'function' &&
+                        getActivePlayerSlot() === slot) {
+                        return Promise.resolve();
+                    }
                     if (breakerPick && typeof selectRackBreaker === 'function') {
                         selectRackBreaker(slot);
                     } else if (typeof onPlayerSlotButton === 'function') {
@@ -186,7 +199,7 @@
             case 'toggle_pot':
             case 'snooker_ball': {
                 const ballId = payload && payload.ballId;
-                if (isSnookerFoulBallId(ballId)) {
+                if (isFoulBallId(ballId)) {
                     return Promise.resolve();
                 }
                 const el = ballId ? document.getElementById(ballId) : null;
@@ -207,6 +220,14 @@
                     ? applySnookerFoulByKey
                     : (typeof window.applySnookerFoulByKey === 'function' ? window.applySnookerFoulByKey : null);
                 if (apply) apply(String(payload.foulKey));
+                return Promise.resolve();
+            }
+            case 'pool_foul': {
+                if (typeof applyPoolFoul === 'function') {
+                    applyPoolFoul();
+                } else if (typeof window.applyPoolFoul === 'function') {
+                    window.applyPoolFoul();
+                }
                 return Promise.resolve();
             }
             case 'reset_scores':

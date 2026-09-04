@@ -6,7 +6,7 @@ import {
   revokeGuestLink,
   fetchPlayers,
   GAME_TYPES,
-} from '../shared/cloud-client.js?v=7.2.3-guest-room';
+} from '../shared/cloud-client.js?v=8.0.0';
 
 const TOKEN_KEY = 'cuesport_token';
 let client = null;
@@ -14,13 +14,14 @@ let roomId = '';
 let lastState = {};
 let raceDirty = false;
 let gameInfoDirty = false;
-let syncTimer = null;
 let dockPresent = false;
 
 let guestToken = '';
 let isGuestMode = false;
 /** @type {'control' | 'setup' | 'replay' | 'share'} */
 let activeView = 'control';
+/** Only auto-open Setup once per connection when names still look like defaults. */
+let initialViewChosen = false;
 let cachedGuestShareUrl = '';
 let cachedGuestShareToken = '';
 let guestSharePromise = null;
@@ -66,7 +67,6 @@ function applyGuestUI() {
   if (shareBtn) shareBtn.classList.add('hidden');
   const dash = document.getElementById('dashboardLink');
   if (dash) dash.classList.add('hidden');
-  setActiveView('control');
 }
 
 function showMobileNav(visible) {
@@ -76,15 +76,32 @@ function showMobileNav(visible) {
   document.body.classList.toggle('has-mobile-nav', !!visible);
 }
 
+function isReplayEnabled(state = lastState) {
+  return !!(state && state.replayEnabled);
+}
+
+function syncReplayNavVisibility(state = lastState) {
+  if (isGuestMode) return;
+  const enabled = isReplayEnabled(state);
+  const replayBtn = document.getElementById('navReplayBtn');
+  if (replayBtn) {
+    replayBtn.classList.toggle('hidden', !enabled);
+  }
+  if (!enabled && activeView === 'replay') {
+    setActiveView('control');
+  }
+}
+
 function setActiveView(view) {
   if (view !== 'control' && view !== 'setup' && view !== 'replay' && view !== 'share') {
     view = 'control';
   }
   if (isGuestMode && (view === 'replay' || view === 'share')) view = 'control';
+  if (view === 'replay' && !isReplayEnabled()) view = 'control';
   activeView = view;
   show('viewControl', view === 'control');
   show('viewSetup', view === 'setup');
-  show('viewReplay', view === 'replay' && !isGuestMode);
+  show('viewReplay', view === 'replay' && !isGuestMode && isReplayEnabled());
   show('viewShare', view === 'share' && !isGuestMode);
 
   const controlBtn = document.getElementById('navControlBtn');
@@ -99,6 +116,7 @@ function setActiveView(view) {
   }
   const replayBtn = document.getElementById('navReplayBtn');
   if (replayBtn) {
+    replayBtn.classList.toggle('hidden', isGuestMode || !isReplayEnabled());
     replayBtn.classList.toggle('active', view === 'replay');
     replayBtn.setAttribute('aria-current', view === 'replay' ? 'page' : 'false');
   }
@@ -111,6 +129,37 @@ function setActiveView(view) {
   if (view === 'share') {
     ensureGuestShareLink({ refreshList: true }).catch((err) => setError(err.message || 'Failed to create guest link'));
   }
+}
+
+/** Empty or placeholder dock names → send user to Setup first. */
+function isDefaultPlayerName(name) {
+  const n = String(name || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!n) return true;
+  return (
+    n === 'player 1' ||
+    n === 'player 2' ||
+    n === 'player1' ||
+    n === 'player2' ||
+    n === 'p1' ||
+    n === 'p2' ||
+    n === 'player/team 1' ||
+    n === 'player/team 2' ||
+    n === 'player / team 1' ||
+    n === 'player / team 2'
+  );
+}
+
+function needsMatchSetup(state) {
+  if (!state || typeof state !== 'object') return true;
+  return isDefaultPlayerName(state.player1Name) || isDefaultPlayerName(state.player2Name);
+}
+
+/** Pick Control vs Setup once when the first usable dock state arrives. */
+function maybeChooseInitialView(state) {
+  if (initialViewChosen) return;
+  if (!state || typeof state !== 'object' || !Object.keys(state).length) return;
+  initialViewChosen = true;
+  setActiveView(needsMatchSetup(state) ? 'setup' : 'control');
 }
 
 function guestUrlFromLink(link) {
@@ -348,6 +397,7 @@ function showConnecting() {
   show('loginSection', false);
   show('controlSection', false);
   showMobileNav(false);
+  initialViewChosen = false;
 }
 
 function showLogin() {
@@ -355,6 +405,7 @@ function showLogin() {
   show('loginSection', true);
   show('controlSection', false);
   showMobileNav(false);
+  initialViewChosen = false;
   syncLoginPanel();
 }
 
@@ -375,14 +426,6 @@ function setError(msg) {
   });
 }
 
-function setSyncing(on) {
-  show('syncHint', !!on);
-  if (syncTimer) clearTimeout(syncTimer);
-  if (on) {
-    syncTimer = setTimeout(() => show('syncHint', false), 4000);
-  }
-}
-
 function gameTypeLabel(id) {
   const g = GAME_TYPES.find((x) => x.id === id);
   return g ? g.label : (id || '—');
@@ -397,10 +440,10 @@ function applyState(state) {
   }
   const prevTs = lastState.timestamp;
   lastState = state;
-  setSyncing(false);
   if (state.timestamp && state.timestamp !== prevTs) {
     lastBallGridKey = '';
   }
+  maybeChooseInitialView(state);
 
   const p1Name = state.player1Name != null && state.player1Name !== '' ? state.player1Name : 'P1';
   const p2Name = state.player2Name != null && state.player2Name !== '' ? state.player2Name : 'P2';
@@ -451,23 +494,32 @@ function applyState(state) {
     } else if (slotMode === 'breaker') {
       slotQuestion.textContent = 'Breaking Player?';
     } else {
-      slotQuestion.textContent = 'Active Player';
+      // One Pocket: pots credit the selected Scoring Player (may not be the shooter).
+      slotQuestion.textContent = state.gameType === 'game6' ? 'Scoring Player' : 'Active Player';
     }
   }
   if (slotP1 && slotP2) {
     slotP1.textContent = p1Name || 'P1';
     slotP2.textContent = p2Name || 'P2';
-    slotP1.classList.remove('selected', 'rack-breaker-match-locked', 'rack-breaker-inactive');
-    slotP2.classList.remove('selected', 'rack-breaker-match-locked', 'rack-breaker-inactive');
+    slotP1.classList.remove('selected', 'rack-breaker-match-locked', 'rack-breaker-inactive', 'rack-breaker-current');
+    slotP2.classList.remove('selected', 'rack-breaker-match-locked', 'rack-breaker-inactive', 'rack-breaker-current');
+    slotP1.disabled = false;
+    slotP2.disabled = false;
     if (slotMode === 'breaker' || slotMode === 'match_locked') {
       slotP1.classList.toggle('rack-breaker-match-locked', slotMode === 'match_locked');
       slotP2.classList.toggle('rack-breaker-match-locked', slotMode === 'match_locked');
+      // Keep clickable when match-locked so tap can open End Match (same as dock).
     } else {
       // Active (or off): highlight current player — names live here now.
+      // Current active player cannot be re-selected (avoids false switch events).
       slotP1.classList.toggle('selected', active === '1');
       slotP2.classList.toggle('selected', active === '2');
       slotP1.classList.toggle('rack-breaker-inactive', active !== '1');
       slotP2.classList.toggle('rack-breaker-inactive', active !== '2');
+      slotP1.classList.toggle('rack-breaker-current', active === '1');
+      slotP2.classList.toggle('rack-breaker-current', active === '2');
+      slotP1.disabled = active === '1';
+      slotP2.disabled = active === '2';
     }
   }
 
@@ -494,6 +546,7 @@ function applyState(state) {
 
   syncMatchActionButtons(state);
   syncReplayPanel(state);
+  syncReplayNavVisibility(state);
 
   renderBallGrid(state);
 }
@@ -579,15 +632,24 @@ function isBreakerPromptGame(state) {
 /** Match control_panel: lock balls until rackBreakerSlot is set for this frame. */
 function inferAwaitingBreaker(state) {
   if (!state || state.gameScoringLocked) return false;
-  const slot = String(state.rackBreakerSlot || '');
-  if (slot === '1' || slot === '2') return false;
   if (state.awaitingBreaker === true) return true;
   if (state.ballGrid && state.ballGrid.awaitingBreaker === true) return true;
+  const slot = String(state.rackBreakerSlot || '');
+  if (slot === '1' || slot === '2') return false;
+  if (state.playerSlotMode === 'breaker') return true;
+  if (state.playerSlotMode === 'active' || state.playerSlotMode === 'off' || state.playerSlotMode === 'match_locked') {
+    return false;
+  }
   return isBreakerPromptGame(state);
 }
 
 function inferPlayerSlotMode(state) {
   if (!isBreakerPromptGame(state)) return 'off';
+  const dockMode = state.playerSlotMode;
+  if (dockMode === 'breaker' || dockMode === 'match_locked' || dockMode === 'active' || dockMode === 'off') {
+    return dockMode;
+  }
+  if (state.breakerPromptVisible === true) return state.gameScoringLocked ? 'match_locked' : 'breaker';
   const slot = String(state.rackBreakerSlot || '');
   if (slot === '1' || slot === '2') return 'active';
   if (state.gameScoringLocked) return 'match_locked';
@@ -701,17 +763,60 @@ function appendUndoButton(grid, { canUndo, title }) {
   grid.appendChild(btn);
 }
 
+function shortMobilePlayerLabel(name, fallback) {
+  const raw = String(name || '').trim();
+  if (!raw) return fallback;
+  const first = raw.split(/\s+/)[0];
+  return first.length > 10 ? `${first.slice(0, 9)}…` : first;
+}
+
+function updateMobileRackFoulDisplay(state) {
+  const counter = document.getElementById('rackFoulCounter');
+  if (!counter) return;
+  const snapshot = state && state.ballGrid;
+  const show = isBallScoringOn(state) || !!(snapshot && snapshot.visible);
+  counter.classList.toggle('hidden', !show);
+  if (!show) return;
+  const foulsP1 = Number(
+    snapshot && snapshot.foulsP1 != null ? snapshot.foulsP1 : state.foulsP1
+  ) || 0;
+  const foulsP2 = Number(
+    snapshot && snapshot.foulsP2 != null ? snapshot.foulsP2 : state.foulsP2
+  ) || 0;
+  const p1NameEl = document.getElementById('rackFoulP1Name');
+  const p2NameEl = document.getElementById('rackFoulP2Name');
+  const p1Count = document.getElementById('rackFoulP1');
+  const p2Count = document.getElementById('rackFoulP2');
+  const p1Wrap = document.getElementById('rackFoulP1Wrap');
+  const p2Wrap = document.getElementById('rackFoulP2Wrap');
+  // Same fields as score rows / player-slot buttons (not p1Name/p2Name).
+  if (p1NameEl) {
+    p1NameEl.textContent = shortMobilePlayerLabel(state.player1Name, 'P1');
+  }
+  if (p2NameEl) {
+    p2NameEl.textContent = shortMobilePlayerLabel(state.player2Name, 'P2');
+  }
+  if (p1Count) p1Count.textContent = String(foulsP1);
+  if (p2Count) p2Count.textContent = String(foulsP2);
+  const active = String(state.activePlayer || '1');
+  if (p1Wrap) p1Wrap.classList.toggle('is-active', active === '1');
+  if (p2Wrap) p2Wrap.classList.toggle('is-active', active === '2');
+  const period = state.gameType === 'game8' ? 'frame' : 'rack';
+  counter.title = `Fouls this ${period}`;
+}
+
 function renderBallGrid(state) {
   const panel = document.getElementById('ballGridPanel');
   const grid = document.getElementById('ballGrid');
   const hint = document.getElementById('ballGridHint');
   const snapshot = state.ballGrid;
+  updateMobileRackFoulDisplay(state);
   const awaiting = inferAwaitingBreaker(state);
   const locked = !!(state.gameScoringLocked || (snapshot && snapshot.locked));
   const canUndo = state.canUndo === true || (snapshot && snapshot.canUndo === true);
   const undoTitle = snapshot && snapshot.snooker
-    ? 'Undo last pot or foul'
-    : 'Undo last scoring action (pots, fouls, breaker)';
+    ? 'Undo last pot, foul, or player change'
+    : 'Undo last scoring action (pots, fouls, breaker, player change)';
   const useSnapshot = !!(snapshot && Array.isArray(snapshot.balls) && snapshot.balls.length);
   const ballSig = useSnapshot
     ? snapshot.balls.map((b) => `${b.id}:${b.file || ''}:${b.disabled ? 1 : 0}:${b.faded ? 1 : 0}:${b.hidden ? 1 : 0}:${b.clicked ? 1 : 0}`).join('|')
@@ -728,6 +833,9 @@ function renderBallGrid(state) {
     ballScoringEnabled: state.ballScoringEnabled,
     gameType: state.gameType,
     rackBreakerSlot: state.rackBreakerSlot,
+    foulsP1: snapshot && snapshot.foulsP1 != null ? snapshot.foulsP1 : state.foulsP1,
+    foulsP2: snapshot && snapshot.foulsP2 != null ? snapshot.foulsP2 : state.foulsP2,
+    activePlayer: state.activePlayer,
     ts: state.timestamp,
   });
   if (key === lastBallGridKey) return;
@@ -763,24 +871,41 @@ function renderBallGrid(state) {
   }
 
   if (useSnapshot) {
+    let hasPoolFoul = false;
     snapshot.balls.forEach((b) => {
       if (b.hidden) return;
       // Foul is the only local UI exception (dock modal cannot run on the phone).
       // Free ball, colors, reds, and pool pots all go through dock handlers.
-      const isFoul = b.foul === true || b.id === 'ball 11';
+      const isFoul = b.foul === true || b.id === 'ball 11' || b.id === 'poolFoulBtn';
+      if (isFoul && !snapshot.snooker) hasPoolFoul = true;
       appendBallButton(grid, {
         src: resolveBallImageSrc(state, b.id, b.file),
         title: b.title,
-        faded: !!b.faded || !!(state.ballState && state.ballState[b.id]),
+        // Prefer dock DOM snapshot — ballState can lag a rack-win reset over the wire.
+        faded: !!b.faded,
         disabled: !!b.disabled || locked,
         awaiting,
         cooldown: !!b.cooldown,
         clicked: !!b.clicked,
         extraClass: b.freeball ? 'freeball-btn' : '',
-        action: isFoul ? 'open_foul_picker' : (snapshot.snooker ? 'snooker_ball' : 'toggle_pot'),
+        action: isFoul
+          ? (snapshot.snooker ? 'open_foul_picker' : 'pool_foul')
+          : (snapshot.snooker ? 'snooker_ball' : 'toggle_pot'),
         payload: { ballId: b.id },
       });
     });
+    // Older docks / hidden poolFoulBtn: still expose Foul on mobile for pool games.
+    if (!snapshot.snooker && !hasPoolFoul) {
+      appendBallButton(grid, {
+        src: `${BALL_IMG}/foul-small.png`,
+        title: 'Foul',
+        faded: false,
+        disabled: locked,
+        awaiting,
+        action: 'pool_foul',
+        payload: { ballId: 'poolFoulBtn' },
+      });
+    }
     appendUndoButton(grid, { canUndo, title: undoTitle });
     return;
   }
@@ -806,6 +931,15 @@ function renderBallGrid(state) {
       payload: { ballId: id },
     });
   }
+  appendBallButton(grid, {
+    src: `${BALL_IMG}/foul-small.png`,
+    title: 'Foul',
+    faded: false,
+    disabled: locked,
+    awaiting,
+    action: 'pool_foul',
+    payload: { ballId: 'poolFoulBtn' },
+  });
   appendUndoButton(grid, { canUndo, title: undoTitle });
 }
 
@@ -885,7 +1019,7 @@ function wireSnookerFoulModal() {
 }
 
 function getResetActionLabel(state = lastState) {
-  return state?.gameType === 'game8' ? 'Reset Frame' : 'Reset Rack';
+  return 'Restart Match';
 }
 
 /** Same rule as control_panel getRaceTarget / isGameScoringLocked. */
@@ -911,7 +1045,7 @@ function isRaceCompleteFromState(state) {
 }
 
 /**
- * Match control_panel: one danger button morphs Reset Rack/Frame ↔ End Match.
+ * Match control_panel: one danger button morphs Restart Match ↔ End Match.
  * Call Match only when racks exist and the race is not complete.
  */
 function syncMatchActionButtons(state) {
@@ -1000,12 +1134,11 @@ let pendingMatchConfirm = null;
 
 function getMatchActionConfirmCopy(cmd, opts = {}) {
   const resetLabel = getResetActionLabel();
-  const unit = lastState?.gameType === 'game8' ? 'frame' : 'rack';
   const clipNum = (opts.index != null ? Number(opts.index) : 0) + 1;
   const copy = {
     reset_scores: {
       title: resetLabel,
-      message: `Clear the current ${unit} scoreline for this match? This cannot be undone from here.`,
+      message: 'Restart this match and clear all scores? This cannot be undone from here.',
       confirm: resetLabel,
     },
     end_match: {
@@ -1099,10 +1232,8 @@ function sendCmd(action, payload) {
     setError(controlLockMessage());
     return;
   }
-  setSyncing(true);
   const sent = client.sendCommand(action, payload);
   if (!sent) {
-    setSyncing(false);
     setError('Failed to send command — check connection');
   }
 }
@@ -1534,10 +1665,12 @@ async function connect() {
     try {
       const joined = await client.connect();
       showControl();
-      setActiveView('control');
       dockPresent = (joined.clients || []).includes('dock');
       if (joined.state && Object.keys(joined.state).length) {
         applyState(joined.state);
+      } else {
+        setActiveView('setup');
+        initialViewChosen = false;
       }
       setConnectionStatus(dockPresent ? 'connected' : 'waiting');
     } catch (err) {
@@ -1613,10 +1746,13 @@ async function connect() {
   try {
     const joined = await client.connect();
     showControl();
-    setActiveView('control');
     dockPresent = (joined.clients || []).includes('dock');
     if (joined.state && Object.keys(joined.state).length) {
       applyState(joined.state);
+    } else {
+      // No dock state yet — start on Setup so names/game info can be prepared.
+      setActiveView('setup');
+      initialViewChosen = false;
     }
     setConnectionStatus(dockPresent ? 'connected' : 'waiting');
   } catch (err) {

@@ -203,6 +203,20 @@ export async function registerAccountRoutes(app) {
     };
   });
 
+  app.get('/api/api-keys/:keyId', async (request, reply) => {
+    const account = await resolveAccountFromRequest(request);
+    if (!account) return reply.code(401).send({ error: 'Unauthorized' });
+    const { keyId } = request.params;
+    const key = sqlite.getApiKeyPlaintext(keyId, account.id);
+    if (!key) {
+      return reply.code(404).send({
+        error: 'API key not found or was created before viewable keys. Create a new key to view it later.',
+        code: 'api_key_not_viewable',
+      });
+    }
+    return { id: keyId, key };
+  });
+
   app.delete('/api/api-keys/:keyId', async (request, reply) => {
     const account = await resolveAccountFromRequest(request);
     if (!account) return reply.code(401).send({ error: 'Unauthorized' });
@@ -236,6 +250,14 @@ export async function registerAccountRoutes(app) {
 async function resolveAccountFromRequest(request) {
   const auth = request.headers.authorization || '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+
+  // API key auth (self-host / dock REST calls)
+  const apiKeyHeader = request.headers['x-api-key'] || '';
+  if (!token && apiKeyHeader) {
+    const result = sqlite.findAccountByApiKey(apiKeyHeader);
+    return result ? result.account : null;
+  }
+
   if (!token) return null;
 
   if (token.startsWith('dev:')) {

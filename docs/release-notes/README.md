@@ -31,9 +31,9 @@ In another terminal:
 ```bash
 cd docs/release-notes
 npm install
-node capture-screenshots.mjs --version 7.2.0
-git add 7.2.0/images/
-git commit -m "Update 7.2.0 release note screenshots"
+node capture-screenshots.mjs --version 8.0.0
+git add 8.0.0/images/
+git commit -m "Update 8.0.0 release note screenshots"
 ```
 
 Output: `docs/release-notes/<version>/images/*.png`
@@ -43,7 +43,7 @@ Output: `docs/release-notes/<version>/images/*.png`
 Requires [GitHub CLI](https://cli.github.com/) (`gh`) authenticated.
 
 ```powershell
-.\docs\release-notes\create-release.ps1 -Version 7.2.0
+.\docs\release-notes\create-release.ps1 -Version 8.0.0
 ```
 
 Or manually:

@@ -15,27 +15,27 @@ for more information about Salotto please visit https://salotto.app
 <html>
 
 <head>
-    <link rel="stylesheet" href="./common/css/control_panel/dark.css?v=7.2.2" />
-    <link rel="stylesheet" href="./common/css/control_panel/yami.css?v=7.2.2" />
-    <link rel="stylesheet" href="./common/css/control_panel/acri.css?v=7.2.2" />
-    <link rel="stylesheet" href="./common/css/control_panel/grey.css?v=7.2.2" />
-    <link rel="stylesheet" href="./common/css/control_panel/light.css?v=7.2.2" />
-    <link rel="stylesheet" href="./common/css/control_panel/rachni.css?v=7.2.2" />
-    <link rel="stylesheet" href="./common/css/control_panel/required.css?v=7.2.2" />
+    <link rel="stylesheet" href="./common/css/control_panel/dark.css?v=8.0.0" />
+    <link rel="stylesheet" href="./common/css/control_panel/yami.css?v=8.0.0" />
+    <link rel="stylesheet" href="./common/css/control_panel/acri.css?v=8.0.0" />
+    <link rel="stylesheet" href="./common/css/control_panel/grey.css?v=8.0.0" />
+    <link rel="stylesheet" href="./common/css/control_panel/light.css?v=8.0.0" />
+    <link rel="stylesheet" href="./common/css/control_panel/rachni.css?v=8.0.0" />
+    <link rel="stylesheet" href="./common/css/control_panel/required.css?v=8.0.0.4" />
     <script>
         //---------------------------------------------------------------------------------------------
-        var versionNum = "7.2.2";
+        var versionNum = "8.0.0";
         //---------------------------------------------------------------------------------------------
     </script>
-    <script src="./common/js/obs-websocket-js.js?v=7.2.2"></script>
-    <script src="./common/js/jquery.js?v=7.2.2"></script>
-    <script src="./common/js/cloud_relay.js?v=7.2.3-replay-active"></script>
-    <script src="./common/js/stream_sharing.js?v=7.2.3-foul-sync"></script>
-    <script src="./common/js/player_stats.js?v=7.2.2"></script>
-    <script src="./common/js/control_panel.js?v=7.2.3-replay-active"></script>
-    <script src="./common/js/cloud_commands.js?v=7.2.3-replay-sync"></script>
-    <script src="./common/js/cloud_auth.js?v=7.2.3-confirm-signout"></script>
-    <script src="hotkeys.js?v=7.2.2"></script>
+    <script src="./common/js/obs-websocket-js.js?v=8.0.0"></script>
+    <script src="./common/js/jquery.js?v=8.0.0"></script>
+    <script src="./common/js/cloud_relay.js?v=8.0.0.4"></script>
+    <script src="./common/js/stream_sharing.js?v=8.0.0"></script>
+    <script src="./common/js/player_stats.js?v=8.0.0.4"></script>
+    <script src="./common/js/control_panel.js?v=8.0.0.9"></script>
+    <script src="./common/js/cloud_commands.js?v=8.0.0.1"></script>
+    <script src="./common/js/cloud_auth.js?v=8.0.0"></script>
+    <script src="hotkeys.js?v=8.0.0"></script>
 
     <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
 </head>
@@ -221,6 +221,7 @@ for more information about Salotto please visit https://salotto.app
             </div>
             <!-- Ball Scoring -->
             <div class="ballTracker noShow" id="ballTrackerDiv">
+                <div class="ball-tracker-row ball-tracker-object-row" id="ballTrackerObjectRow">
                 <div class="ball" id="ball 1" onclick="togglePot(this)" title="Ball 1"><img src="./common/images/1ball_small.png">
                 </div>
                 <div class="ball" id="ball 2" onclick="togglePot(this)" title="Ball 2"><img src="./common/images/2ball_small.png">
@@ -251,9 +252,30 @@ for more information about Salotto please visit https://salotto.app
                         src="./common/images/14ball_small.png"></div>
                 <div class="ball" id="ball 15" onclick="togglePot(this)" title="Ball 15"><img
                         src="./common/images/15ball_small.png"></div>
+                </div>
+                <div class="ball-tracker-row ball-tracker-action-row" id="ballTrackerActionRow">
+                <div class="ball noShow" id="poolFoulBtn" onclick="applyPoolFoul()" title="Foul">
+                    <img src="./common/images/foul-small.png" alt="Foul">
+                </div>
                 <div class="ball snooker-undo-ball noShow" id="snookerUndoBtn" onclick="undoLastScoringAction()"
                     title="Undo last scoring action" aria-disabled="true">
                     <img src="./common/images/undo-small.png" alt="Undo">
+                </div>
+                </div>
+                <div class="ball-tracker-row ball-tracker-foul-row" id="ballTrackerFoulRow">
+                <div class="rack-foul-counter noShow" id="rackFoulCounter" aria-live="polite"
+                    title="Fouls this rack or frame">
+                    <span class="rack-foul-heading" id="rackFoulHeading">Fouls</span>
+                    <span class="rack-foul-player" id="rackFoulP1Wrap">
+                        <span class="rack-foul-name" id="rackFoulP1Name">P1</span>
+                        <span class="rack-foul-count" id="rackFoulP1">0</span>
+                    </span>
+                    <span class="rack-foul-sep" aria-hidden="true">&#183;</span>
+                    <span class="rack-foul-player" id="rackFoulP2Wrap">
+                        <span class="rack-foul-name" id="rackFoulP2Name">P2</span>
+                        <span class="rack-foul-count" id="rackFoulP2">0</span>
+                    </span>
+                </div>
                 </div>
             </div>
             </div>
@@ -315,7 +337,7 @@ for more information about Salotto please visit https://salotto.app
             </div>
             <div class="column button-row" id="scoreEditing">
                 <div class="hover obs28 button danger-btn" id="resetScores" onclick="resetScores()">
-                    Reset Rack
+                    Restart Match
                 </div>
                 <div class="tooltip noShow" id="callGameWrap">
                     <div class="hover obs28 button danger-btn" id="callGame" onclick="callGameScores()">
@@ -518,9 +540,36 @@ for more information about Salotto please visit https://salotto.app
         </div> <!-- Images Tab-->
         <!-- Replay Settings Tab -->
         <div id="ReplaySettings" class="tabcontent">
-            <!-- Enable Sharing and Replay Settings Section -->
+            <!-- CueSport Cloud Section -->
             <div class="section-header-with-controls">
-                <span id="replaySettingsLabel">Enable Sharing and Replay Settings</span>
+                <span id="cloudRelayLabel">
+                    CueSport Cloud (<a href="https://cuesports.macleod.systems" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: underline;">remote control + stats</a>)
+                </span>
+                <div class="section-controls">
+                    <button class="settings-cog-btn" id="cloudSelfHostCog" onclick="openCloudConnectionModal()" title="Connection settings">
+                        &#x2699;
+                    </button>
+                    <label class="switch toggle">
+                        <input type="checkbox" id="cloudRelayToggle" onchange="toggleCloudRelay()" />
+                        <span class="slider_round"></span>
+                    </label>
+                </div>
+            </div>
+            <div class="column form-rows" style="margin-bottom: 10px;">
+                <div class="form-row cloud-meta-row" id="cloudMetaRow">
+                    <div class="field cloud-stats-cta" id="cloudStatsCtaRow" style="display: none;">
+                        <span>Cloud Statistics Enabled &mdash;</span>
+                        <a href="#" onclick="document.getElementById('statsTab').click(); return false;">View in Stats tab</a>
+                    </div>
+                    <div class="field cloud-status" id="cloudStatusRow">
+                        <span id="cloudSignedInEmail" class="noShow"></span><span id="cloudStatusSep" class="noShow">&nbsp;|&nbsp;</span><span>Status: <span id="cloudRelayStatus">Off</span></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Enable Replay and Promotion Function Section -->
+            <div class="section-header-with-controls">
+                <span id="replaySettingsLabel">Enable Replay and Promotion Function</span>
                 <div class="section-controls">
                     <button class="settings-cog-btn" id="websocketSettingsCog" onclick="openWebSocketSettingsModal()" title="WebSocket Settings">
                         &#x2699;
@@ -531,67 +580,9 @@ for more information about Salotto please visit https://salotto.app
                     </label>
                 </div>
             </div>
-            
-            <!-- CueSport Cloud Section -->
-            <div class="section-header-with-controls">
-                <span id="cloudRelayLabel">
-                    CueSport Cloud (<a href="https://cuesports.macleod.systems" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: underline;">remote control + stats</a>)
-                </span>
-                <div class="section-controls">
-                    <button class="settings-cog-btn" id="cloudSelfHostCog" onclick="openCloudSelfHostModal()" title="Self-host settings">
-                        &#x2699;
-                    </button>
-                    <label class="switch toggle">
-                        <input type="checkbox" id="cloudRelayToggle" onchange="toggleCloudRelay()" />
-                        <span class="slider_round"></span>
-                    </label>
-                </div>
-            </div>
-            <div class="column form-rows" style="margin-bottom: 10px;">
-                <div class="form-row">
-                    <div class="field">
-                        <div class="hover obs28 button" onclick="signInWithGoogle()">Sign in with Google</div>
-                    </div>
-                    <div class="field">
-                        <div class="hover obs28 button" onclick="signOutCloud()">Sign out</div>
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="field">
-                        <span id="cloudSignedInEmail" style="font-size: 0.85em;"></span>
-                        &nbsp;|&nbsp;Status: <span id="cloudRelayStatus">Off</span>
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="field">
-                        <span id="cloudRoomIdDisplay" style="font-size: 0.85em; opacity: 0.9;"></span>
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="field">
-                        <a href="#" onclick="openCloudSelfHostModal(); return false;" style="font-size: 0.85em;">Self-host settings (server URL + API key)</a>
-                    </div>
-                </div>
-            </div>
 
-            <!-- Stream Promotion Section -->
-            <div class="section-header-with-controls">
-                <span id="streamSharingLabel">
-                    Stream Promotion — public listing (<a href="https://cuesports.macleod.systems/streams" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: underline;">live streams page</a>; only while OBS is streaming)
-                </span>
-                <div class="section-controls">
-                    <button class="settings-cog-btn" id="streamPromotionSettingsCog" onclick="openStreamPromotionSettingsModal()" title="Stream Promotion Settings">
-                        &#x2699;
-                    </button>
-                    <label class="switch toggle">
-                        <input type="checkbox" id="streamPromotionToggle" onchange="toggleStreamPromotion()" />
-                        <span class="slider_round"></span>
-                    </label>
-                </div>
-            </div>
-            
             <div class="column form-rows">
-                <div class="section-header" id="replaySettingsLabel">Replay Source Settings</div>
+                <div class="section-header" id="replaySourceSettingsLabel">Replay Source Settings</div>
                 <div class="form-row">
                     <div class="field">
                         <label>Media Source Name *: </label>
@@ -619,12 +610,28 @@ for more information about Salotto please visit https://salotto.app
                     </div>
                 </div>
             </div>
+
+            <!-- Stream Promotion Section -->
+            <div class="section-header-with-controls">
+                <span id="streamSharingLabel">
+                    Promote Live Stream (<a href="https://cuesports.macleod.systems/streams" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: underline;">cuesports.macleod.systems</a>)
+                </span>
+                <div class="section-controls">
+                    <button class="settings-cog-btn" id="streamPromotionSettingsCog" onclick="openStreamPromotionSettingsModal()" title="Promote Live Stream settings">
+                        &#x2699;
+                    </button>
+                    <label class="switch toggle">
+                        <input type="checkbox" id="streamPromotionToggle" onchange="toggleStreamPromotion()" />
+                        <span class="slider_round"></span>
+                    </label>
+                </div>
+            </div>
             
             <!-- WebSocket Settings Modal -->
             <div id="websocketSettingsModal" class="modal">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h2>Enable Sharing and Replay Settings</h2>
+                        <h2>Enable Replay and Promotion Function</h2>
                         <span class="modal-close" onclick="closeWebSocketSettingsModal()">&times;</span>
                     </div>
                     <div class="modal-body">
@@ -664,7 +671,7 @@ for more information about Salotto please visit https://salotto.app
             <div id="streamPromotionSettingsModal" class="modal">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h2>Stream Promotion</h2>
+                        <h2>Promote Live Stream</h2>
                         <span class="modal-close" onclick="closeStreamPromotionSettingsModal()">&times;</span>
                     </div>
                     <div class="modal-body">
@@ -684,34 +691,56 @@ for more information about Salotto please visit https://salotto.app
                 </div>
             </div>
 
-            <!-- CueSport Cloud Self-Host Modal -->
-            <div id="cloudSelfHostModal" class="modal">
+            <!-- CueSport Cloud Connection Modal -->
+            <div id="cloudConnectionModal" class="modal">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h2>CueSport Cloud — Self-host</h2>
-                        <span class="modal-close" onclick="closeCloudSelfHostModal()">&times;</span>
+                        <h2>CueSport Cloud — Connection</h2>
+                        <span class="modal-close" onclick="closeCloudConnectionModal()">&times;</span>
                     </div>
                     <div class="modal-body">
-                        <p style="font-size: 0.9em; opacity: 0.9; margin-bottom: 0.75rem;">
-                            Each OBS dock URL <code>?instance=</code> gets its own table room automatically when Cloud connects. Copy the API key from your dashboard.
-                        </p>
-                        <div class="form-row">
-                            <div class="field">
-                                <label for="cloudServerUrlModal">Server URL:</label>
-                                <input type="text" id="cloudServerUrlModal" placeholder="http://localhost:3000" style="width: 100%;" />
+                        <div id="cloudManagedPane">
+                            <p style="font-size: 0.9em; opacity: 0.9; margin-bottom: 0.75rem;">
+                                Sign in to the managed CueSport Cloud service, then enable the CueSport Cloud toggle to connect this dock.
+                            </p>
+                            <div class="form-row">
+                                <div class="field">
+                                    <div class="hover obs28 button" onclick="signInWithGoogle()">Sign in with Google</div>
+                                </div>
+                            </div>
+                            <div class="form-row" style="margin-top: 0.75rem;">
+                                <div class="field">
+                                    <a href="#" id="cloudShowSelfHostLink" onclick="showCloudSelfHostPane(); return false;" style="font-size: 0.85em;">Self-hosting</a>
+                                </div>
                             </div>
                         </div>
-                        <div class="form-row">
-                            <div class="field">
-                                <label for="cloudApiKeyModal">API key (self-host only):</label>
-                                <input type="text" id="cloudApiKeyModal" placeholder="32-char hex key" style="width: 100%;" />
+                        <div id="cloudSelfHostPane" class="noShow">
+                            <p style="font-size: 0.9em; opacity: 0.9; margin-bottom: 0.75rem;">
+                                Each OBS dock URL <code>?instance=</code> gets its own table room automatically when Cloud connects. Copy the OBS Dock Key from your dashboard.
+                            </p>
+                            <div class="form-row">
+                                <div class="field">
+                                    <label for="cloudServerUrlModal">Server URL:</label>
+                                    <input type="text" id="cloudServerUrlModal" placeholder="http://localhost:3000" style="width: 100%;" />
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="field">
+                                    <label for="cloudApiKeyModal">OBS Dock Key:</label>
+                                    <input type="text" id="cloudApiKeyModal" placeholder="32-char hex key" style="width: 100%;" />
+                                </div>
+                            </div>
+                            <div class="form-row" style="margin-top: 0.75rem;">
+                                <div class="field">
+                                    <a href="#" id="cloudShowManagedLink" onclick="showCloudManagedPane(); return false;" style="font-size: 0.85em;">Managed service subscription?</a>
+                                </div>
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer">
                         <div class="modal-footer-buttons">
-                            <button class="modal-save-btn hover obs28 button" onclick="saveCloudSelfHostSettings()">Save</button>
-                            <button class="modal-cancel-btn hover obs28 button" onclick="closeCloudSelfHostModal()">Cancel</button>
+                            <button id="cloudConnectionSaveBtn" class="modal-save-btn hover obs28 button noShow" onclick="saveCloudSelfHostSettings()">Save</button>
+                            <button class="modal-cancel-btn hover obs28 button" onclick="closeCloudConnectionModal()">Close</button>
                         </div>
                     </div>
                 </div>
@@ -735,7 +764,7 @@ for more information about Salotto please visit https://salotto.app
                 </div>
                 <input type="file" id="statsImportFile" accept=".json,application/json" class="noShow" onchange="handleStatsImportFile(this)" />
             </div>
-            <p class="stats-hint">Export creates a backup file. Import replaces all current statistics after confirmation. Clear permanently deletes statistics history and resets the current game (names, race/game info, and scoreline).</p>
+            <p class="stats-hint" id="statsActionHint">Export creates a backup file. Import replaces all current statistics after confirmation. Clear permanently deletes statistics history and resets the current game (names, race/game info, and scoreline).</p>
             <div class="section-header">Overlay Stats Display</div>
             <p class="stats-tab-help">Choose which stats appear on the P1 / P2 / H2H overlay panels for the selected game type.</p>
             <div class="stats-visibility-toolbar">
@@ -867,6 +896,7 @@ for more information about Salotto please visit https://salotto.app
                 <span class="modal-close" onclick="closeStatsModal()">&times;</span>
             </div>
             <div class="modal-body stats-modal-body">
+                <div id="statsCloudBanner" class="stats-cloud-banner noShow"></div>
                 <div class="stats-tab-bar">
                     <button type="button" class="stats-tab-btn hover obs28 button active" data-tab="leaderboard" onclick="switchStatsTab('leaderboard')">Board</button>
                     <button type="button" class="stats-tab-btn hover obs28 button" data-tab="detail" onclick="switchStatsTab('detail')">Player</button>
@@ -968,6 +998,17 @@ for more information about Salotto please visit https://salotto.app
                         <input type="text" id="statsMatchGameInfo" maxlength="60" placeholder="Optional — league, event, notes…" />
                     </div>
                 </div>
+                <div id="statsMatchCloudScoresRow" class="form-row stats-match-form-row noShow">
+                    <div class="field">
+                        <label for="statsMatchScoreP1" id="statsMatchScoreP1Label">Score (P1):</label>
+                        <input type="number" id="statsMatchScoreP1" min="0" max="999" value="0" />
+                    </div>
+                    <div class="field">
+                        <label for="statsMatchScoreP2" id="statsMatchScoreP2Label">Score (P2):</label>
+                        <input type="number" id="statsMatchScoreP2" min="0" max="999" value="0" />
+                    </div>
+                </div>
+                <div id="statsMatchLocalRacksBlock">
                 <div class="stats-match-score-summary" id="statsMatchScoreSummary">Match: 0 – 0</div>
                 <div class="stats-match-racks-editor-wrap">
                     <div class="stats-match-racks-editor-header">
@@ -977,6 +1018,45 @@ for more information about Salotto please visit https://salotto.app
                     </div>
                     <div id="statsMatchRacksEditor" class="stats-match-racks-editor"></div>
                 </div>
+                </div>
+                <div id="statsMatchExtrasHb" class="form-row stats-match-form-row noShow">
+                    <div class="field">
+                        <label for="statsMatchHbP1" id="statsMatchHbP1Label">Highest break (P1):</label>
+                        <input type="number" id="statsMatchHbP1" min="0" max="999" value="0" />
+                    </div>
+                    <div class="field">
+                        <label for="statsMatchHbP2" id="statsMatchHbP2Label">Highest break (P2):</label>
+                        <input type="number" id="statsMatchHbP2" min="0" max="999" value="0" />
+                    </div>
+                </div>
+                <div id="statsMatchExtrasHr" class="form-row stats-match-form-row noShow">
+                    <div class="field">
+                        <label for="statsMatchHrP1" id="statsMatchHrP1Label">Longest run (P1):</label>
+                        <input type="number" id="statsMatchHrP1" min="0" max="999" value="0" />
+                    </div>
+                    <div class="field">
+                        <label for="statsMatchHrP2" id="statsMatchHrP2Label">Longest run (P2):</label>
+                        <input type="number" id="statsMatchHrP2" min="0" max="999" value="0" />
+                    </div>
+                </div>
+                <div id="statsMatchExtrasRuns" class="form-row stats-match-form-row noShow">
+                    <div class="field">
+                        <label for="statsMatchBrP1" id="statsMatchBrP1Label">Break &amp; Run (P1):</label>
+                        <input type="number" id="statsMatchBrP1" min="0" max="999" value="0" />
+                    </div>
+                    <div class="field">
+                        <label for="statsMatchBrP2" id="statsMatchBrP2Label">Break &amp; Run (P2):</label>
+                        <input type="number" id="statsMatchBrP2" min="0" max="999" value="0" />
+                    </div>
+                    <div class="field">
+                        <label for="statsMatchTrP1" id="statsMatchTrP1Label">Table Run (P1):</label>
+                        <input type="number" id="statsMatchTrP1" min="0" max="999" value="0" />
+                    </div>
+                    <div class="field">
+                        <label for="statsMatchTrP2" id="statsMatchTrP2Label">Table Run (P2):</label>
+                        <input type="number" id="statsMatchTrP2" min="0" max="999" value="0" />
+                    </div>
+                </div>
                 <div id="statsMatchBallsRow" class="form-row stats-match-form-row noShow">
                     <div class="field">
                         <label for="statsMatchBallsP1" id="statsMatchBallsP1Label">Balls potted (P1, optional):</label>
@@ -985,6 +1065,16 @@ for more information about Salotto please visit https://salotto.app
                     <div class="field">
                         <label for="statsMatchBallsP2" id="statsMatchBallsP2Label">Balls potted (P2, optional):</label>
                         <input type="number" id="statsMatchBallsP2" min="0" max="999" value="0" />
+                    </div>
+                </div>
+                <div id="statsMatchExtrasFouls" class="form-row stats-match-form-row noShow">
+                    <div class="field">
+                        <label for="statsMatchFoulsP1" id="statsMatchFoulsP1Label">Fouls (P1):</label>
+                        <input type="number" id="statsMatchFoulsP1" min="0" max="999" value="0" />
+                    </div>
+                    <div class="field">
+                        <label for="statsMatchFoulsP2" id="statsMatchFoulsP2Label">Fouls (P2):</label>
+                        <input type="number" id="statsMatchFoulsP2" min="0" max="999" value="0" />
                     </div>
                 </div>
             </div>
@@ -1111,7 +1201,7 @@ for more information about Salotto please visit https://salotto.app
         </div>
     </div>
 
-    <script src="./common/js/control_panel_post.js?v=7.2.2"></script>
+    <script src="./common/js/control_panel_post.js?v=8.0.0"></script>
     <script>
         //////////////////// HotKey scripts
 

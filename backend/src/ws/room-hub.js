@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import * as sqlite from '../db/sqlite.js';
+import { getAccountStats } from '../stats/account-stats.js';
 import {
   assertCanCreateRoom,
   getMaxControlConnections,
@@ -157,6 +158,8 @@ async function handleMessage(ws, meta, msg) {
       return handleState(ws, meta, msg);
     case 'session':
       return handleSession(ws, meta, msg);
+    case 'stats':
+      return handleStats(ws, meta, msg);
     case 'disconnect':
       return ws.close();
     // Legacy compat shim for old stream_sharing clients
@@ -166,6 +169,31 @@ async function handleMessage(ws, meta, msg) {
       return handleLegacyUpdate(ws, meta, msg);
     default:
       send(ws, { type: 'error', code: 'unknown_type', message: `Unknown message type: ${msg.type}` });
+  }
+}
+
+/** Dock/mobile account stats over WS (avoids browser CORS from file:// OBS docks). */
+function handleStats(ws, meta, msg) {
+  const requestId = msg.request_id || null;
+  if (!meta.accountId) {
+    send(ws, { type: 'stats', request_id: requestId, ok: false, error: 'Unauthorized' });
+    return;
+  }
+  if (meta.client === 'mobile_guest') {
+    send(ws, { type: 'stats', request_id: requestId, ok: false, error: 'Forbidden' });
+    return;
+  }
+  try {
+    const limit = Math.min(Math.max(parseInt(msg.limit || 5000, 10) || 5000, 1), 10000);
+    const stats = getAccountStats(meta.accountId, limit);
+    send(ws, { type: 'stats', request_id: requestId, ok: true, ...stats });
+  } catch (err) {
+    send(ws, {
+      type: 'stats',
+      request_id: requestId,
+      ok: false,
+      error: err?.message || 'Stats failed',
+    });
   }
 }
 

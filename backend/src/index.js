@@ -32,6 +32,36 @@ function sendWebHtml(reply, relativePath) {
 
 const app = Fastify({ logger: true });
 
+// Dock control panel often loads from file:// or a different host than the API.
+function applyCorsHeaders(request, reply) {
+  const origin = request.headers.origin;
+  if (origin) {
+    reply.header('Access-Control-Allow-Origin', origin);
+    reply.header('Access-Control-Allow-Credentials', 'true');
+    reply.header('Vary', 'Origin');
+  } else {
+    reply.header('Access-Control-Allow-Origin', '*');
+  }
+  reply.header('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
+  reply.header(
+    'Access-Control-Allow-Headers',
+    'Authorization, Content-Type, X-Api-Key, X-Requested-With'
+  );
+}
+
+app.addHook('onRequest', async (request, reply) => {
+  applyCorsHeaders(request, reply);
+  if (request.method === 'OPTIONS') {
+    return reply.code(204).send();
+  }
+});
+
+// Ensure preflight always succeeds even when no matching route exists.
+app.options('/*', async (request, reply) => {
+  applyCorsHeaders(request, reply);
+  return reply.code(204).send();
+});
+
 await app.register(fastifyWebsocket);
 
 await app.register(fastifyStatic, {

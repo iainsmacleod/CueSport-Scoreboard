@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>CueSport Scoreboard Cloud — Dashboard</title>
-  <link rel="stylesheet" href="/web/shared/styles.css?v=7.2.3-signout-everywhere" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.0.0" />
 </head>
 <body>
   <header class="site-header">
@@ -60,9 +60,105 @@
       </div>
 
       <div id="tabStats" class="dash-tab-panel hidden">
-        <div class="panel">
-          <h2>Player Stats (Cloud Sync)</h2>
-          <p class="hint">Coming soon: sync roster and match history from local IndexedDB to your account, with search and filters.</p>
+        <div id="statsOverview" class="panel">
+          <h2>Match Stats</h2>
+          <p class="hint">Completed matches recorded from CueSport Cloud docks. Server history is not limited to 30 days. Click a player to view and edit their matches.</p>
+          <div id="statsSummary" class="stats-summary"></div>
+          <div class="stats-toolbar">
+            <label class="stats-filter">
+              Player
+              <div class="autocomplete-wrapper">
+                <input id="statsPlayerSearch" type="search" placeholder="Search or pick a player" maxlength="20" autocomplete="off" />
+                <div id="statsPlayerAutocomplete" class="autocomplete-list hidden"></div>
+              </div>
+            </label>
+            <button type="button" id="statsRefreshBtn" class="btn">Refresh</button>
+          </div>
+          <p id="statsStatus" class="hint"></p>
+          <div class="stats-subtabs" role="tablist" aria-label="Stats views">
+            <button type="button" class="stats-subtab active" role="tab" aria-selected="true" data-stats-panel="leaderboard">Leaderboard</button>
+            <button type="button" class="stats-subtab" role="tab" aria-selected="false" data-stats-panel="matches">Recent matches</button>
+          </div>
+          <div id="statsPanelLeaderboard" class="stats-subpanel" role="tabpanel">
+            <div class="stats-table-wrap">
+              <table class="dash-stats-table">
+                <thead>
+                  <tr>
+                    <th>Pos</th>
+                    <th>Player</th>
+                    <th>Matches W/L</th>
+                    <th>Win %</th>
+                    <th>Racks W/L</th>
+                    <th>Last played</th>
+                  </tr>
+                </thead>
+                <tbody id="statsLeaderboardBody"></tbody>
+              </table>
+            </div>
+          </div>
+          <div id="statsPanelMatches" class="stats-subpanel hidden" role="tabpanel">
+            <div class="stats-table-wrap">
+              <table class="dash-stats-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Info</th>
+                    <th>Game</th>
+                    <th>Match</th>
+                    <th>Score</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="statsMatchesBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div id="statsPlayerDetail" class="panel hidden">
+          <button type="button" id="statsPlayerBackBtn" class="btn">Back to leaderboard</button>
+          <h2 id="statsPlayerTitle">Player</h2>
+          <div id="statsPlayerSummary" class="stats-summary"></div>
+          <div class="stats-toolbar" id="statsPlayerToolbar">
+            <form id="statsPlayerRenameForm" class="stats-player-rename">
+              <label class="stats-filter">
+                Display name
+                <input id="statsPlayerRenameInput" type="text" maxlength="20" autocomplete="off" />
+              </label>
+              <button type="submit" class="btn">Rename across all matches</button>
+            </form>
+            <p class="hint">Renames this player everywhere in match history and the cloud roster.</p>
+            <label class="stats-filter">
+              Opponent
+              <select id="statsPlayerOpponentFilter">
+                <option value="">All opponents</option>
+              </select>
+            </label>
+            <label class="stats-filter">
+              Game
+              <select id="statsPlayerGameFilter">
+                <option value="">All games</option>
+              </select>
+            </label>
+          </div>
+          <h3 class="stats-section-title">Matches</h3>
+          <div class="stats-table-wrap">
+            <table class="dash-stats-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Info</th>
+                  <th>Game</th>
+                  <th>Opponent</th>
+                  <th>Score</th>
+                  <th>Result</th>
+                  <th>Extras</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="statsPlayerMatchesBody"></tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -82,7 +178,8 @@
           <p class="hint">Paste into OBS → Replay/Share → CueSport Cloud self-host settings. Room/table ID is assigned automatically per instance.</p>
           <button id="createKeyBtn" class="btn">Create API Key</button>
           <p id="apiKeyLimitHint" class="hint hidden"></p>
-          <pre id="newKeyDisplay" class="key-display hidden"></pre>
+          <pre id="newKeyDisplay" class="key-display hidden" role="button" tabindex="0" title="Click to copy API key" aria-label="API key — click to copy"></pre>
+          <p id="keyCopyNotice" class="copy-notice hidden" aria-live="polite"></p>
           <ul id="keyList"></ul>
         </div>
       </div>
@@ -90,6 +187,114 @@
       <p id="error" class="error hidden"></p>
     </section>
   </main>
-  <script type="module" src="/web/dashboard/app.js?v=7.2.3-signout-home"></script>
+  <div id="statsMatchModal" class="dash-modal hidden" role="dialog" aria-modal="true" aria-labelledby="statsMatchModalTitle">
+    <div class="dash-modal-card panel">
+      <h2 id="statsMatchModalTitle">Edit match</h2>
+      <form id="statsMatchForm">
+        <input type="hidden" id="statsMatchEventId" />
+        <label class="stats-filter">
+          Player 1
+          <div class="autocomplete-wrapper">
+            <input id="statsMatchP1" type="text" maxlength="20" required autocomplete="off" />
+            <div id="statsMatchP1Autocomplete" class="autocomplete-list hidden"></div>
+          </div>
+        </label>
+        <label class="stats-filter">
+          Player 2
+          <div class="autocomplete-wrapper">
+            <input id="statsMatchP2" type="text" maxlength="20" required autocomplete="off" />
+            <div id="statsMatchP2Autocomplete" class="autocomplete-list hidden"></div>
+          </div>
+        </label>
+        <label class="stats-filter">
+          Game
+          <select id="statsMatchGameType"></select>
+        </label>
+        <label class="stats-filter">
+          Game / other info
+          <input id="statsMatchGameInfo" type="text" maxlength="60" placeholder="Optional — league, event, notes…" />
+        </label>
+        <div class="stats-toolbar">
+          <label class="stats-filter">
+            <span id="statsMatchScoreP1Label">P1 score</span>
+            <input id="statsMatchScoreP1" type="number" min="0" max="999" required />
+          </label>
+          <label class="stats-filter">
+            <span id="statsMatchScoreP2Label">P2 score</span>
+            <input id="statsMatchScoreP2" type="number" min="0" max="999" required />
+          </label>
+        </div>
+        <label class="stats-filter">
+          Date
+          <input id="statsMatchDate" type="date" />
+        </label>
+        <div id="statsMatchExtrasHb" class="stats-toolbar hidden">
+          <label class="stats-filter">
+            <span id="statsMatchHbP1Label">Highest break P1</span>
+            <input id="statsMatchHbP1" type="number" min="0" max="999" />
+          </label>
+          <label class="stats-filter">
+            <span id="statsMatchHbP2Label">Highest break P2</span>
+            <input id="statsMatchHbP2" type="number" min="0" max="999" />
+          </label>
+        </div>
+        <div id="statsMatchExtrasHr" class="stats-toolbar hidden">
+          <label class="stats-filter">
+            <span id="statsMatchHrP1Label">Longest run P1</span>
+            <input id="statsMatchHrP1" type="number" min="0" max="999" />
+          </label>
+          <label class="stats-filter">
+            <span id="statsMatchHrP2Label">Longest run P2</span>
+            <input id="statsMatchHrP2" type="number" min="0" max="999" />
+          </label>
+        </div>
+        <div id="statsMatchExtrasRuns" class="stats-toolbar hidden">
+          <label class="stats-filter">
+            <span id="statsMatchBrP1Label">B&amp;R P1</span>
+            <input id="statsMatchBrP1" type="number" min="0" max="999" />
+          </label>
+          <label class="stats-filter">
+            <span id="statsMatchBrP2Label">B&amp;R P2</span>
+            <input id="statsMatchBrP2" type="number" min="0" max="999" />
+          </label>
+          <label class="stats-filter">
+            <span id="statsMatchTrP1Label">TR P1</span>
+            <input id="statsMatchTrP1" type="number" min="0" max="999" />
+          </label>
+          <label class="stats-filter">
+            <span id="statsMatchTrP2Label">TR P2</span>
+            <input id="statsMatchTrP2" type="number" min="0" max="999" />
+          </label>
+        </div>
+        <div id="statsMatchExtrasBalls" class="stats-toolbar hidden">
+          <label class="stats-filter">
+            <span id="statsMatchBallsP1Label">Balls potted P1</span>
+            <input id="statsMatchBallsP1" type="number" min="0" max="999" />
+          </label>
+          <label class="stats-filter">
+            <span id="statsMatchBallsP2Label">Balls potted P2</span>
+            <input id="statsMatchBallsP2" type="number" min="0" max="999" />
+          </label>
+        </div>
+        <div id="statsMatchExtrasFouls" class="stats-toolbar hidden">
+          <label class="stats-filter">
+            <span id="statsMatchFoulsP1Label">Fouls P1</span>
+            <input id="statsMatchFoulsP1" type="number" min="0" max="999" />
+          </label>
+          <label class="stats-filter">
+            <span id="statsMatchFoulsP2Label">Fouls P2</span>
+            <input id="statsMatchFoulsP2" type="number" min="0" max="999" />
+          </label>
+        </div>
+        <p id="statsMatchError" class="error hidden"></p>
+        <div class="stats-toolbar">
+              <button type="submit" id="statsMatchSaveBtn" class="btn primary" disabled>Save</button>
+          <button type="button" id="statsMatchCancelBtn" class="btn">Cancel</button>
+          <button type="button" id="statsMatchDeleteBtn" class="btn danger">Delete</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <script type="module" src="/web/dashboard/app.js?v=8.0.0"></script>
 </body>
 </html>

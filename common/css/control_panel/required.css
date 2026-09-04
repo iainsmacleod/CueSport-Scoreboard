@@ -774,6 +774,19 @@ select.dropdown option,
 
 #ballTrackerDiv {
 	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	gap: 4px;
+	width: 100%;
+	max-width: 100%;
+	box-sizing: border-box;
+	padding: 2px 0;
+	clear: both;
+}
+
+.ball-tracker-row {
+	display: flex;
 	flex-flow: row nowrap;
 	justify-content: center;
 	align-items: center;
@@ -781,8 +794,83 @@ select.dropdown option,
 	width: 100%;
 	max-width: 100%;
 	box-sizing: border-box;
-	padding: 2px 0;
-	clear: both;
+}
+
+.ball-tracker-action-row {
+	gap: 8px;
+	min-height: 0;
+}
+
+.ball-tracker-action-row:not(.has-controls) {
+	display: none;
+}
+
+.ball-tracker-foul-row {
+	justify-content: center;
+	min-height: 0;
+	padding-top: 2px;
+}
+
+.ball-tracker-foul-row:not(.has-controls) {
+	display: none;
+}
+
+.rack-foul-counter {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	flex: 0 0 auto;
+	padding: 4px 0;
+	min-height: 0;
+	box-sizing: border-box;
+	font-size: 12px;
+	line-height: 1.2;
+	/* Inherit theme text color (div white / light-theme black) */
+	white-space: nowrap;
+	user-select: none;
+}
+
+.rack-foul-heading {
+	font-weight: 700;
+	letter-spacing: 0.02em;
+	opacity: 0.75;
+	text-transform: uppercase;
+	font-size: 10px;
+}
+
+.rack-foul-player {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 4px;
+}
+
+.rack-foul-name {
+	max-width: 7em;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	opacity: 0.8;
+}
+
+.rack-foul-count {
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+	min-width: 0.9em;
+	text-align: center;
+}
+
+.rack-foul-sep {
+	opacity: 0.45;
+	font-weight: 700;
+}
+
+.rack-foul-player.is-active .rack-foul-name,
+.rack-foul-player.is-active .rack-foul-count {
+	opacity: 1;
+}
+
+.rack-foul-player:not(.is-active) {
+	opacity: 0.55;
 }
 
 #ballTrackerDiv .ball:not(.noShow) {
@@ -825,6 +913,24 @@ select.dropdown option,
 	align-items: center;
 	column-gap: 50px;
 	width: 100%;
+}
+
+.cloud-meta-row {
+	column-gap: 12px;
+	font-size: 0.85em;
+}
+
+.cloud-meta-row .cloud-stats-cta {
+	justify-content: flex-start;
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.cloud-meta-row .cloud-status {
+	justify-content: flex-end;
+	margin-left: auto;
+	flex: 0 0 auto;
+	white-space: nowrap;
 }
 
 .field {
@@ -953,6 +1059,11 @@ select.dropdown option,
 	opacity: 0.35;
 }
 
+.rack-breaker-btn.rack-breaker-current:disabled {
+	opacity: 1;
+	cursor: default;
+}
+
 #ballTrackerDiv .ball.snooker-spacer {
 	visibility: hidden;
 	pointer-events: none;
@@ -1076,7 +1187,7 @@ select.dropdown option,
 	left: 0;
 	right: 0;
 	bottom: 0;
-	background-color: #cc8181;
+	background-color: #e57373; /* Off = red */
 	transition: .4s;
 	border-radius: 26px;
 }
@@ -1112,11 +1223,33 @@ select.dropdown option,
 }
 
 input:checked+.slider_round {
-	background-color: #2196F3;
+	background-color: #4caf50; /* On = green */
 }
 
 input:checked+.slider_round:before {
 	transform: translateX(26px);
+}
+
+/* Disabled toggles (e.g. Promote Stream when OBS is not streaming) */
+.toggle.toggle-disabled,
+label.switch.toggle-disabled {
+	cursor: not-allowed;
+	opacity: 0.55;
+}
+
+.toggle input:disabled + .slider_round,
+.toggle.toggle-disabled .slider_round {
+	background-color: #757575;
+	cursor: not-allowed;
+}
+
+.toggle input:disabled:checked + .slider_round {
+	background-color: #81c784;
+	cursor: not-allowed;
+}
+
+.section-header-with-controls.stream-promotion-unavailable .settings-cog-btn {
+	opacity: 1; /* keep settings reachable */
 }
 
 /* Rounded sliders */
@@ -1345,7 +1478,8 @@ input:checked+.slider_round:before {
 }
 
 #websocketSettingsModal .modal-body .form-row,
-#streamPromotionSettingsModal .modal-body .form-row {
+#streamPromotionSettingsModal .modal-body .form-row,
+#cloudConnectionModal .modal-body .form-row {
 	display: flex;
 	flex-direction: column;
 	align-items: stretch;
@@ -1357,7 +1491,8 @@ input:checked+.slider_round:before {
 }
 
 #websocketSettingsModal .modal-body .form-row .field,
-#streamPromotionSettingsModal .modal-body .form-row .field {
+#streamPromotionSettingsModal .modal-body .form-row .field,
+#cloudConnectionModal .modal-body .form-row .field {
 	display: flex;
 	flex-direction: column;
 	align-items: flex-start;
@@ -1368,7 +1503,8 @@ input:checked+.slider_round:before {
 }
 
 #websocketSettingsModal .modal-body .form-row .field label,
-#streamPromotionSettingsModal .modal-body .form-row .field label {
+#streamPromotionSettingsModal .modal-body .form-row .field label,
+#cloudConnectionModal .modal-body .form-row .field label {
 	display: block;
 	margin-bottom: 5px;
 	width: 100%;
@@ -1377,7 +1513,8 @@ input:checked+.slider_round:before {
 }
 
 #websocketSettingsModal .modal-body .form-row .field input,
-#streamPromotionSettingsModal .modal-body .form-row .field input {
+#streamPromotionSettingsModal .modal-body .form-row .field input,
+#cloudConnectionModal .modal-body .form-row .field input {
 	width: 100%;
 	box-sizing: border-box;
 	flex-shrink: 0;
@@ -1468,16 +1605,7 @@ input:checked+.slider_round:before {
 	min-width: 100px;
 }
 
-/* Toggle states for connection status */
-#websocketToggle:checked + .slider_round,
-#streamPromotionToggle:checked + .slider_round {
-	background-color: #4caf50; /* Green when connected */
-}
-
-#websocketToggle:not(:checked) + .slider_round,
-#streamPromotionToggle:not(:checked) + .slider_round {
-	background-color: #cc8181; /* Gray/red when disconnected */
-}
+/* Toggle states: on = green, off = red (see .slider_round / input:checked+.slider_round) */
 
 /* Player autocomplete */
 #player1Details .autocomplete-wrapper,
@@ -1617,6 +1745,16 @@ input:checked+.slider_round:before {
 #statsModal .stats-modal-body > * {
 	flex: 0 0 auto;
 	align-self: stretch;
+}
+
+.stats-cloud-banner {
+	padding: 6px 10px;
+	margin-bottom: 6px;
+	font-size: 0.85em;
+	border-radius: 4px;
+	background: rgba(255, 255, 255, 0.06);
+	color: #ccc;
+	text-align: center;
 }
 
 #statsModal .stats-modal-body .stats-tab-bar,

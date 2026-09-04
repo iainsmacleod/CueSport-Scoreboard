@@ -254,6 +254,12 @@ window.onload = function () {
 	if (getStorageItem("snookerFrameHighBreakP2") === null) {
 		setStorageItem("snookerFrameHighBreakP2", "0");
 	}
+	if (getStorageItem("snookerFrameFoulsP1") === null) {
+		setStorageItem("snookerFrameFoulsP1", "0");
+	}
+	if (getStorageItem("snookerFrameFoulsP2") === null) {
+		setStorageItem("snookerFrameFoulsP2", "0");
+	}
 
 	// Update label text based on initial ball type
 	const redLabel = document.querySelector('label[for="p1colorRed"] span');
@@ -734,14 +740,14 @@ if (p2BallsInput) {
 }
 document.getElementById("pointBased").checked = getStorageItem("pointBased") === "yes";
 syncGameTypeSelect(getStoredGameType());
-if (getStoredGameType() === "game3") {
+if (getStoredGameType() === "game2") {
 	document.getElementById("ball 10").classList.add("noShow");
 	document.getElementById("ball 11").classList.add("noShow");
 	document.getElementById("ball 12").classList.add("noShow");
 	document.getElementById("ball 13").classList.add("noShow");
 	document.getElementById("ball 14").classList.add("noShow");
 	document.getElementById("ball 15").classList.add("noShow");
-} else if (getStoredGameType() === "game4") {
+} else if (getStoredGameType() === "game3") {
 	document.getElementById("ball 10").classList.remove("noShow");
 	document.getElementById("ball 11").classList.add("noShow");
 	document.getElementById("ball 12").classList.add("noShow");
@@ -755,6 +761,12 @@ if (getStoredGameType() === "game3") {
 	document.getElementById("ball 13").classList.remove("noShow");
 	document.getElementById("ball 14").classList.remove("noShow");
 	document.getElementById("ball 15").classList.remove("noShow");
+}
+if (typeof syncPoolFoulButtonVisibility === "function") {
+	syncPoolFoulButtonVisibility();
+}
+if (typeof syncBallTrackerRows === "function") {
+	syncBallTrackerRows();
 }
 document.getElementById("raceInfoTxt").value = getStorageItem("raceInfo");
 document.getElementById("gameInfoTxt").value = getStorageItem("gameInfo");

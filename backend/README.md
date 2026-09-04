@@ -40,7 +40,7 @@ Web UI and ball images are **baked into the Docker image** at build time. Only `
 
 **Local live reload** (optional): copy `docker-compose.override.example.yml` to `docker-compose.override.yml` to mount `backend/web` and `common/images` from your repo. Do **not** use those mounts on a production server unless the full repo paths exist on the host — an empty mount hides the image files and causes `ENOENT` on `/m/...`.
 
-In the OBS dock **Self-host settings**, use server URL `http://localhost:4003` (or your public hostname).
+In the OBS dock **Connection settings** (⚙) → **Self-hosting**, use server URL `http://localhost:4003` (or your public hostname).
 
 To publish an image (from repo root — includes `common/images` ball assets):
 
@@ -58,7 +58,7 @@ docker build -f backend/Dockerfile -t cuesport-cloud:latest .
 
 ### Self-host (API key)
 
-1. Open **Self-host settings** in the dock.
+1. Open **Connection settings** (⚙) → **Self-hosting** in the dock.
 2. Set **Server URL** (e.g. `http://localhost:3000`).
 3. Create an account on the dashboard (dev login) and copy **Room ID** + **API key**.
 4. Paste into the dock and enable cloud relay.
@@ -79,10 +79,19 @@ See [`.env.example`](.env.example).
 | `DEV_AUTH_SECRET` | Shared secret for dev login (required when dev auth is on) |
 | `DEV_AUTH_ACCOUNT_EMAIL` | Email label for the single self-host account (default `dev@local`) |
 | `TIER_DEFAULT` | Default subscription tier name (`starter`, `pro`, `enterprise`, `selfhost`) |
-| `TIER_LIMITS_JSON` | Optional JSON override of tier caps |
-| `TIER_{TIER}_MAX_API_KEYS` | Per-tier API key cap (e.g. `TIER_STARTER_MAX_API_KEYS`) |
-| `TIER_{TIER}_MAX_ROOMS` | Per-tier table/room cap |
+| `TIER_LIMITS_JSON` | Optional JSON override of the full tier catalog |
+| `TIER_{TIER}_MAX_API_KEYS` | Per-tier OBS Dock Key cap (e.g. `TIER_STARTER_MAX_API_KEYS`) |
+| `TIER_{TIER}_MAX_ROOMS` | Per-tier table (dock instance) cap |
 | `TIER_{TIER}_MAX_CONTROL_CONNECTIONS` | Per-tier mobile+guest connections per table |
+
+Built-in defaults (all overridable via the env vars above):
+
+| Tier | OBS Dock Keys | Tables | Mobile + guest / table |
+|------|---------------|--------|------------------------|
+| `starter` | 1 | 2 | 5 |
+| `pro` | 3 | 2 | 5 |
+| `enterprise` | 10 | 2 | 5 |
+| `selfhost` | 1 | 2 | 5 |
 
 ## Supabase setup (production)
 
@@ -112,10 +121,16 @@ This backend is GPL-licensed alongside the scoreboard. You may run your own inst
 | POST | `/api/auth/dev-login` | Dev auth (secret → signed token) |
 | GET | `/api/me` | Account, rooms, keys, quota (Bearer token) |
 | POST | `/api/api-keys` | Create API key (tier-limited) |
+| GET | `/api/api-keys/:keyId` | View API key plaintext (account owner) |
 | DELETE | `/api/api-keys/:keyId` | Revoke API key |
 | GET | `/api/guest-links` | List guest scorer links |
 | DELETE | `/api/guest-links/:token` | Revoke guest link |
 | POST | `/api/guest-links/revoke-all` | Revoke all guest links and disconnect guests |
 | POST | `/api/sessions/invalidate-all` | Sign out everywhere (invalidate + disconnect admin dashboard and mobile) |
 | GET | `/api/rooms/:roomId/events` | Match event log |
+| GET | `/api/stats` | Account match stats (players, matches, summary) |
+| PATCH | `/api/stats/matches/:startEventId` | Edit a completed match (scores, names, extras; winner derived from scores) |
+| DELETE | `/api/stats/matches/:startEventId` | Delete a completed match |
+| PATCH | `/api/stats/players` | Rename a player across all match history + roster |
+| GET | `/api/players` | Account player roster (autocomplete) |
 | GET | `/api/streams` | Active public streams |

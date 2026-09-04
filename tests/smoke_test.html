@@ -307,7 +307,7 @@
 
             // --- Core ---
             assert('Core', 'PlayerStats loaded', !!cp.PlayerStats);
-            assert('Core', 'Version 7.2.2', cp.versionNum === '7.2.2', cp.versionNum);
+            assert('Core', 'Version 8.0.0', cp.versionNum === '8.0.0', cp.versionNum);
             assert('Core', 'Stats modal present', !!cp.document.getElementById('statsModal'));
             assert('Core', 'Stats tab present', !!cp.document.getElementById('StatsSettings'));
             assert('Core', 'Stats tab restore uses statsTab button',
@@ -452,9 +452,16 @@
             assert('Cloud', 'signInWithGoogle exposed', typeof cp.signInWithGoogle === 'function');
             assert('Cloud', 'toggleCloudRelay exposed', typeof cp.toggleCloudRelay === 'function');
             assert('Cloud', 'cloudRelayToggle in DOM', !!cp.document.getElementById('cloudRelayToggle'));
-            assert('Cloud', 'cloudSelfHostModal in DOM', !!cp.document.getElementById('cloudSelfHostModal'));
+            assert('Cloud', 'cloudConnectionModal in DOM', !!cp.document.getElementById('cloudConnectionModal'));
+            assert('Cloud', 'cloudManagedPane in DOM', !!cp.document.getElementById('cloudManagedPane'));
+            assert('Cloud', 'cloudSelfHostPane in DOM', !!cp.document.getElementById('cloudSelfHostPane'));
+            assert('Cloud', 'openCloudConnectionModal exposed', typeof cp.openCloudConnectionModal === 'function');
+            assert('Cloud', 'OBS Dock Key label present',
+                (cp.document.querySelector('label[for="cloudApiKeyModal"]')?.textContent || '').indexOf('OBS Dock Key') !== -1);
             assert('Cloud', 'cloudRelayStatus in DOM', !!cp.document.getElementById('cloudRelayStatus'));
             assert('Cloud', 'cloudRelay.hasCredentials fn', typeof cp.cloudRelay.hasCredentials === 'function');
+            assert('Cloud', 'cloudRelay.ensureBallScoringForMobileControl fn',
+                typeof cp.cloudRelay.ensureBallScoringForMobileControl === 'function');
             assert('Cloud', 'cloudRelay.sendSession fn', typeof cp.cloudRelay.sendSession === 'function');
             assert('Cloud', 'cloudRelay.sendCommand fn', typeof cp.cloudRelay.sendCommand === 'function');
             assert('Cloud', 'cloudCommands.runCommand fn', typeof cp.cloudCommands.runCommand === 'function');
@@ -470,6 +477,62 @@
                     cp.setStorageItem('gameType', orig || 'game1');
                     return dual && primary && secondary;
                 })());
+
+            // Mobile join should enable both players, Score Display, and Ball Scoring when needed.
+            (function () {
+                const savedTracker = cp.getStorageItem('enableBallTracker');
+                const savedScoreDisplay = cp.getStorageItem('scoreDisplay');
+                const savedP1 = cp.getStorageItem('usePlayer1');
+                const savedP2 = cp.getStorageItem('usePlayer2');
+                cp.setStorageItem('usePlayer1', 'no');
+                cp.setStorageItem('usePlayer2', 'no');
+                const p1Cb = cp.document.getElementById('usePlayer1Setting');
+                const p2Cb = cp.document.getElementById('usePlayer2Setting');
+                if (p1Cb) p1Cb.checked = false;
+                if (p2Cb) p2Cb.checked = false;
+                if (typeof cp.playerSetting === 'function') {
+                    cp.playerSetting(1);
+                    cp.playerSetting(2);
+                }
+                cp.setStorageItem('scoreDisplay', 'no');
+                const scoreCb = cp.document.getElementById('scoreDisplay');
+                if (scoreCb) {
+                    scoreCb.checked = false;
+                    scoreCb.disabled = true;
+                }
+                cp.setStorageItem('enableBallTracker', 'no');
+                const trackerCb = cp.document.getElementById('ballTrackerCheckbox');
+                if (trackerCb) {
+                    trackerCb.disabled = true;
+                    trackerCb.checked = false;
+                }
+                const didEnable = cp.cloudRelay.ensureBallScoringForMobileControl();
+                assert('Cloud', 'Mobile control enables both players, score display, and Ball Scoring',
+                    didEnable === true &&
+                    cp.getStorageItem('usePlayer1') === 'yes' &&
+                    cp.getStorageItem('usePlayer2') === 'yes' &&
+                    cp.getStorageItem('scoreDisplay') === 'yes' &&
+                    cp.getStorageItem('enableBallTracker') === 'yes');
+                const alreadyOn = cp.cloudRelay.ensureBallScoringForMobileControl();
+                assert('Cloud', 'Mobile scoring prerequisites enable is idempotent', alreadyOn === false);
+                cp.setStorageItem('enableBallTracker', savedTracker || 'no');
+                cp.setStorageItem('scoreDisplay', savedScoreDisplay || 'yes');
+                cp.setStorageItem('usePlayer1', savedP1 || 'yes');
+                cp.setStorageItem('usePlayer2', savedP2 || 'yes');
+                if (p1Cb) p1Cb.checked = (savedP1 || 'yes') === 'yes';
+                if (p2Cb) p2Cb.checked = (savedP2 || 'yes') === 'yes';
+                if (typeof cp.playerSetting === 'function') {
+                    cp.playerSetting(1);
+                    cp.playerSetting(2);
+                }
+                if (scoreCb) {
+                    scoreCb.disabled = false;
+                    scoreCb.checked = (savedScoreDisplay || 'yes') === 'yes';
+                }
+                if (typeof cp.scoreDisplaySetting === 'function') cp.scoreDisplaySetting();
+                if (trackerCb) trackerCb.checked = (savedTracker || 'no') === 'yes';
+                if (typeof cp.useBallTracker === 'function') cp.useBallTracker();
+            })();
 
             const cloudPrefix = (cp.INSTANCE_ID ? cp.INSTANCE_ID + '_' : '') + 'cloudRelay_';
             cp.localStorage.removeItem(cloudPrefix + 'roomId');
@@ -1263,6 +1326,41 @@
             cp.postBalls('add', '1');
             assert('Scoring', 'Recover from foul', parseInt(cp.getStorageItem('p1BallsCtrlPanel'), 10) === 0);
 
+            // Pool foul button: count + auto player switch + undo restores player
+            await ensurePlayableScoringState(cp);
+            cp.setStorageItem('activePlayer', '1');
+            const pToggle = cp.document.getElementById('playerToggleCheckbox');
+            if (pToggle) pToggle.checked = true;
+            cp.setStorageItem('snookerFrameFoulsP1', '0');
+            cp.setStorageItem('snookerFrameFoulsP2', '0');
+            assert('Scoring', 'Pool foul applies', cp.applyPoolFoul() === true);
+            assert('Scoring', 'Pool foul counted for active player',
+                parseInt(cp.getStorageItem('snookerFrameFoulsP1'), 10) === 1,
+                cp.getStorageItem('snookerFrameFoulsP1'));
+            assert('Scoring', 'Pool foul switches to opponent',
+                String(cp.getStorageItem('activePlayer')) === '2',
+                String(cp.getStorageItem('activePlayer')));
+            await cp.undoLastScoringAction();
+            await sleep(50);
+            assert('Scoring', 'Undo pool foul restores player',
+                String(cp.getStorageItem('activePlayer')) === '1',
+                String(cp.getStorageItem('activePlayer')));
+            assert('Scoring', 'Undo pool foul clears count',
+                parseInt(cp.getStorageItem('snookerFrameFoulsP1'), 10) === 0,
+                cp.getStorageItem('snookerFrameFoulsP1'));
+            // Re-foul to verify action-row counter UI
+            assert('Scoring', 'Pool foul applies for counter UI', cp.applyPoolFoul() === true);
+            assert('Scoring', 'Rack foul counter shows P1 foul',
+                (cp.document.getElementById('rackFoulP1') || {}).textContent === '1',
+                (cp.document.getElementById('rackFoulP1') || {}).textContent);
+            assert('Scoring', 'Rack foul counter visible on foul row',
+                cp.document.getElementById('rackFoulCounter') &&
+                !cp.document.getElementById('rackFoulCounter').classList.contains('noShow') &&
+                cp.document.getElementById('ballTrackerFoulRow') &&
+                cp.document.getElementById('ballTrackerFoulRow').classList.contains('has-controls'));
+            await cp.undoLastScoringAction();
+            await sleep(50);
+
             if (bs.handlers && bs.handlers.balls) {
                 bs.handlers.balls({ player: '1', balls: -3 });
                 const ballsEl = bs.document.getElementById('player1Balls');
@@ -1743,6 +1841,28 @@
                 cp.togglePlayer(true);
             }
 
+            // Bank foul: −1 from fouler's balls (may go below 0) + hand table to opponent
+            cp.setStorageItem('p1BallsCtrlPanel', 0);
+            cp.setStorageItem('p1Balls', 0);
+            if (pocketP1Balls) { pocketP1Balls.value = '0'; }
+            cp.setStorageItem('activePlayer', '1');
+            if (pocketToggle) { pocketToggle.checked = true; }
+            cp.setStorageItem('snookerFrameFoulsP1', '0');
+            cp.setStorageItem('snookerFrameFoulsP2', '0');
+            assert('Pocket', 'Bank foul applies', cp.applyPoolFoul() === true);
+            assert('Pocket', 'Bank foul deducts ball below zero',
+                parseInt(cp.getStorageItem('p1BallsCtrlPanel'), 10) === -1,
+                cp.getStorageItem('p1BallsCtrlPanel'));
+            assert('Pocket', 'Bank foul switches player',
+                String(cp.getStorageItem('activePlayer')) === '2');
+            await cp.undoLastScoringAction();
+            await sleep(50);
+            assert('Pocket', 'Undo bank foul restores balls',
+                parseInt(cp.getStorageItem('p1BallsCtrlPanel'), 10) === 0,
+                cp.getStorageItem('p1BallsCtrlPanel'));
+            assert('Pocket', 'Undo bank foul restores player',
+                String(cp.getStorageItem('activePlayer')) === '1');
+
             // First to 8 wins the rack
             for (let i = 1; i <= 8; i++) {
                 cp.togglePot(cp.document.getElementById('ball ' + i));
@@ -1770,6 +1890,16 @@
             await cp.gameType('game6');
             await sleep(100);
             assert('Pocket', 'One Pocket is pocket score game', cp.isPocketScoreGame() === true);
+            cp.document.getElementById('ballTrackerCheckbox').checked = true;
+            cp.useBallTracker();
+            await sleep(50);
+            if (typeof cp.selectRackBreaker === 'function') {
+                cp.selectRackBreaker('1');
+            }
+            cp.syncPlayerSlotPickerUI();
+            assert('Pocket', 'One Pocket uses Scoring Player label',
+                (cp.document.getElementById('playerSlotQuestion').textContent || '').indexOf('Scoring Player') !== -1,
+                cp.document.getElementById('playerSlotQuestion').textContent);
 
             // --- Breaking player on Straight / Bank / One Pocket / Custom ---
             cp.document.getElementById('gameTypeSelect').value = 'game5';
@@ -1921,13 +2051,27 @@
             assert('RackWin', 'Active Player mode after breaker chosen',
                 (cp.document.getElementById('playerSlotQuestion').textContent || '').indexOf('Active Player') !== -1 &&
                 !cp.document.getElementById('rackBreakerP1Btn').classList.contains('rack-breaker-inactive') &&
-                cp.document.getElementById('rackBreakerP2Btn').classList.contains('rack-breaker-inactive'));
+                cp.document.getElementById('rackBreakerP1Btn').disabled &&
+                cp.document.getElementById('rackBreakerP2Btn').classList.contains('rack-breaker-inactive') &&
+                !cp.document.getElementById('rackBreakerP2Btn').disabled);
+            const stackBeforeSameClickRaw = cp.getStorageItem('scoringUndoStack');
+            let stackBeforeSameClickLen = 0;
+            try { stackBeforeSameClickLen = JSON.parse(stackBeforeSameClickRaw || '[]').length; } catch (e) { stackBeforeSameClickLen = 0; }
+            cp.onPlayerSlotButton('1');
+            await sleep(20);
+            let stackAfterSameClickLen = 0;
+            try { stackAfterSameClickLen = JSON.parse(cp.getStorageItem('scoringUndoStack') || '[]').length; } catch (e) { stackAfterSameClickLen = 0; }
+            assert('RackWin', 'Re-clicking active player is a no-op',
+                cp.getActivePlayerSlot() === '1' &&
+                stackAfterSameClickLen === stackBeforeSameClickLen);
             cp.onPlayerSlotButton('2');
             await sleep(30);
             assert('RackWin', 'Switch active player via button',
                 cp.getActivePlayerSlot() === '2' &&
                 !cp.document.getElementById('rackBreakerP2Btn').classList.contains('rack-breaker-inactive') &&
-                cp.document.getElementById('rackBreakerP1Btn').classList.contains('rack-breaker-inactive'));
+                cp.document.getElementById('rackBreakerP2Btn').disabled &&
+                cp.document.getElementById('rackBreakerP1Btn').classList.contains('rack-breaker-inactive') &&
+                !cp.document.getElementById('rackBreakerP1Btn').disabled);
             cp.onPlayerSlotButton('1');
             await sleep(30);
             assert('RackWin', 'Balls enabled after breaker chosen',
@@ -2165,7 +2309,7 @@
             assert('RackWin', 'Win on Break awards rack on first-ball 8',
                 parseInt(cp.getStorageItem('p1ScoreCtrlPanel'), 10) === 2);
 
-            // Break and run vs table run
+            // Break and run vs table run (8-Ball — must survive breaker clear before recordRackWin)
             const brP1 = await cp.PlayerStats.ensurePlayer(tag + '_BR_A');
             const brP2 = await cp.PlayerStats.ensurePlayer(tag + '_BR_B');
             cp.document.getElementById('p1Name').value = brP1.name;
@@ -2185,6 +2329,12 @@
             await sleep(30);
             cp.togglePot(cp.document.getElementById('ball 8'));
             await sleep(600);
+            await cp.PlayerStats.flushRackRecordQueue();
+            let brPending = cp.PlayerStats.getActivePendingMatch();
+            let brLastRack = brPending && brPending.racks && brPending.racks[brPending.racks.length - 1];
+            assert('RackWin', '8-Ball B&R flag on rack entry',
+                !!(brLastRack && brLastRack.breakAndRun && !brLastRack.tableRun),
+                brLastRack && JSON.stringify(brLastRack));
             let brStats = await cp.PlayerStats.getPlayer(brP1.id);
             assert('RackWin', 'Break and run recorded when breaker runs out',
                 brStats && (brStats.stats.byGameType.game1.breakAndRuns || 0) >= 1,
@@ -2197,10 +2347,24 @@
             await sleep(30);
             cp.togglePot(cp.document.getElementById('ball 8'));
             await sleep(200);
+            await cp.PlayerStats.flushRackRecordQueue();
+            brPending = cp.PlayerStats.getActivePendingMatch();
+            brLastRack = brPending && brPending.racks && brPending.racks[brPending.racks.length - 1];
+            assert('RackWin', '8-Ball TR flag on rack entry',
+                !!(brLastRack && brLastRack.tableRun && !brLastRack.breakAndRun),
+                brLastRack && JSON.stringify(brLastRack));
             brStats = await cp.PlayerStats.getPlayer(brP1.id);
             assert('RackWin', 'Table run recorded after opponent visit',
                 brStats && (brStats.stats.byGameType.game1.tableRuns || 0) >= 1,
                 brStats && JSON.stringify(brStats.stats.byGameType.game1));
+            const cloudExtras8 = cp.PlayerStats.buildCloudMatchExtras
+                ? cp.PlayerStats.buildCloudMatchExtras(brPending)
+                : null;
+            if (cloudExtras8) {
+                assert('RackWin', 'Cloud extras include 8-Ball B&R / TR',
+                    cloudExtras8.breakAndRunsP1 >= 1 && cloudExtras8.tableRunsP1 >= 1,
+                    JSON.stringify(cloudExtras8));
+            }
 
             cp.performResetScores({ endMatch: true });
             await sleep(100);
@@ -2270,6 +2434,45 @@
             assert('RackWin', 'Early Game Ball on allows early 9 win',
                 parseInt(cp.getStorageItem('p1ScoreCtrlPanel'), 10) === 1);
 
+            // 9-Ball B&R / TR (early out path)
+            const br9P1 = await cp.PlayerStats.ensurePlayer(tag + '_BR9_A');
+            const br9P2 = await cp.PlayerStats.ensurePlayer(tag + '_BR9_B');
+            cp.document.getElementById('p1Name').value = br9P1.name;
+            cp.document.getElementById('p2Name').value = br9P2.name;
+            cp.document.getElementById('p1Name').setAttribute('data-player-id', br9P1.id);
+            cp.document.getElementById('p2Name').setAttribute('data-player-id', br9P2.id);
+            cp.postNames();
+            await sleep(200);
+            cp.setStorageItem('p1ScoreCtrlPanel', 0);
+            cp.setStorageItem('p2ScoreCtrlPanel', 0);
+            cp.document.getElementById('p1Score').value = '0';
+            cp.document.getElementById('p2Score').value = '0';
+            cp.resetBallTracker();
+            cp.document.getElementById('earlyGameBallCheckbox').checked = true;
+            cp.earlyGameBallToggle();
+            cp.selectRackBreaker('1');
+            await sleep(30);
+            cp.togglePot(cp.document.getElementById('ball 9'));
+            await sleep(600);
+            await cp.PlayerStats.flushRackRecordQueue();
+            let br9Stats = await cp.PlayerStats.getPlayer(br9P1.id);
+            assert('RackWin', '9-Ball break and run recorded',
+                br9Stats && (br9Stats.stats.byGameType.game2.breakAndRuns || 0) >= 1,
+                br9Stats && JSON.stringify(br9Stats.stats.byGameType.game2));
+            cp.selectRackBreaker('1');
+            await sleep(30);
+            cp.togglePlayer(false);
+            await sleep(30);
+            cp.togglePlayer(true);
+            await sleep(30);
+            cp.togglePot(cp.document.getElementById('ball 9'));
+            await sleep(200);
+            await cp.PlayerStats.flushRackRecordQueue();
+            br9Stats = await cp.PlayerStats.getPlayer(br9P1.id);
+            assert('RackWin', '9-Ball table run recorded after opponent visit',
+                br9Stats && (br9Stats.stats.byGameType.game2.tableRuns || 0) >= 1,
+                br9Stats && JSON.stringify(br9Stats.stats.byGameType.game2));
+
             cp.document.getElementById('gameTypeSelect').value = 'game3';
             await cp.gameType('game3');
             await sleep(100);
@@ -2296,6 +2499,46 @@
             await sleep(100);
             assert('RackWin', 'Potting 10 awards a rack with Early Game Ball on',
                 parseInt(cp.getStorageItem('p1ScoreCtrlPanel'), 10) === 1);
+
+            // 10-Ball B&R / TR (early out path)
+            const br10P1 = await cp.PlayerStats.ensurePlayer(tag + '_BR10_A');
+            const br10P2 = await cp.PlayerStats.ensurePlayer(tag + '_BR10_B');
+            cp.document.getElementById('p1Name').value = br10P1.name;
+            cp.document.getElementById('p2Name').value = br10P2.name;
+            cp.document.getElementById('p1Name').setAttribute('data-player-id', br10P1.id);
+            cp.document.getElementById('p2Name').setAttribute('data-player-id', br10P2.id);
+            cp.postNames();
+            await sleep(200);
+            cp.setStorageItem('p1ScoreCtrlPanel', 0);
+            cp.setStorageItem('p2ScoreCtrlPanel', 0);
+            cp.document.getElementById('p1Score').value = '0';
+            cp.document.getElementById('p2Score').value = '0';
+            cp.resetBallTracker();
+            cp.document.getElementById('earlyGameBallCheckbox').checked = true;
+            cp.earlyGameBallToggle();
+            cp.selectRackBreaker('1');
+            await sleep(30);
+            cp.togglePot(cp.document.getElementById('ball 10'));
+            await sleep(600);
+            await cp.PlayerStats.flushRackRecordQueue();
+            let br10Stats = await cp.PlayerStats.getPlayer(br10P1.id);
+            assert('RackWin', '10-Ball break and run recorded',
+                br10Stats && (br10Stats.stats.byGameType.game3.breakAndRuns || 0) >= 1,
+                br10Stats && JSON.stringify(br10Stats.stats.byGameType.game3));
+            cp.selectRackBreaker('1');
+            await sleep(30);
+            cp.togglePlayer(false);
+            await sleep(30);
+            cp.togglePlayer(true);
+            await sleep(30);
+            cp.togglePot(cp.document.getElementById('ball 10'));
+            await sleep(200);
+            await cp.PlayerStats.flushRackRecordQueue();
+            br10Stats = await cp.PlayerStats.getPlayer(br10P1.id);
+            assert('RackWin', '10-Ball table run recorded after opponent visit',
+                br10Stats && (br10Stats.stats.byGameType.game3.tableRuns || 0) >= 1,
+                br10Stats && JSON.stringify(br10Stats.stats.byGameType.game3));
+
             cp.document.getElementById('earlyGameBallCheckbox').checked = false;
             cp.earlyGameBallToggle();
 
@@ -2420,8 +2663,8 @@
 
             const resetBtn = cp.document.getElementById('resetScores');
             cp.updateScoreControlAvailability();
-            assert('Snooker', 'Mid-match Reset Frame label',
-                resetBtn && resetBtn.textContent.trim() === 'Reset Frame', resetBtn && resetBtn.textContent);
+            assert('Snooker', 'Mid-match Restart Match label',
+                resetBtn && resetBtn.textContent.trim() === 'Restart Match', resetBtn && resetBtn.textContent);
             assert('Snooker', 'Reset button danger style',
                 resetBtn && resetBtn.classList.contains('danger-btn'));
 
@@ -2447,8 +2690,8 @@
             cp.document.getElementById('p1Score').value = '0';
             cp.setStorageItem('p1ScoreCtrlPanel', 0);
             cp.updateScoreControlAvailability();
-            assert('Snooker', 'Below goal returns to Reset Frame',
-                resetBtn.textContent.trim() === 'Reset Frame');
+            assert('Snooker', 'Below goal returns to Restart Match',
+                resetBtn.textContent.trim() === 'Restart Match');
 
             const goldCheckbox = cp.document.getElementById('snookerGoldCheckbox');
             assert('Snooker', 'Golden Ball label',
@@ -2552,7 +2795,9 @@
             }
             assert('Snooker', 'Active name shows P1',
                 !cp.document.getElementById('rackBreakerP1Btn').classList.contains('rack-breaker-inactive') &&
+                cp.document.getElementById('rackBreakerP1Btn').disabled &&
                 cp.document.getElementById('rackBreakerP2Btn').classList.contains('rack-breaker-inactive') &&
+                !cp.document.getElementById('rackBreakerP2Btn').disabled &&
                 (cp.document.getElementById('rackBreakerP1Btn').textContent || '') === snP1.name,
                 cp.document.getElementById('rackBreakerP1Btn').textContent);
             if (toggle) {
@@ -2562,14 +2807,17 @@
             }
             assert('Snooker', 'Active name shows P2',
                 !cp.document.getElementById('rackBreakerP2Btn').classList.contains('rack-breaker-inactive') &&
+                cp.document.getElementById('rackBreakerP2Btn').disabled &&
                 cp.document.getElementById('rackBreakerP1Btn').classList.contains('rack-breaker-inactive') &&
+                !cp.document.getElementById('rackBreakerP1Btn').disabled &&
                 (cp.document.getElementById('rackBreakerP2Btn').textContent || '') === snP2.name,
                 cp.document.getElementById('rackBreakerP2Btn').textContent);
             cp.onPlayerSlotButton('1');
             await sleep(50);
             assert('Snooker', 'onPlayerSlotButton switches to P1',
                 cp.getActivePlayerSlot() === '1' &&
-                !cp.document.getElementById('rackBreakerP1Btn').classList.contains('rack-breaker-inactive'));
+                !cp.document.getElementById('rackBreakerP1Btn').classList.contains('rack-breaker-inactive') &&
+                cp.document.getElementById('rackBreakerP1Btn').disabled);
             if (toggle) {
                 toggle.checked = true;
                 cp.togglePlayer(true);
@@ -2672,6 +2920,9 @@
             assert('Snooker', 'Foul awards 7 to opponent',
                 parseInt(cp.getStorageItem('p2BallsCtrlPanel'), 10) === p2BeforeFoul + 7,
                 cp.getStorageItem('p2BallsCtrlPanel'));
+            assert('Snooker', 'Foul counted against fouling player',
+                parseInt(cp.getStorageItem('snookerFrameFoulsP1'), 10) === 1,
+                cp.getStorageItem('snookerFrameFoulsP1'));
             assert('Snooker', 'Foul auto-switches active player to opponent',
                 String(cp.getStorageItem('activePlayer')) === '2',
                 String(cp.getStorageItem('activePlayer')));
@@ -2704,6 +2955,9 @@
             assert('Snooker', 'Undo reverses foul points',
                 parseInt(cp.getStorageItem('p2BallsCtrlPanel'), 10) === p2BeforeFoul,
                 cp.getStorageItem('p2BallsCtrlPanel'));
+            assert('Snooker', 'Undo clears foul count',
+                parseInt(cp.getStorageItem('snookerFrameFoulsP1'), 10) === 0,
+                cp.getStorageItem('snookerFrameFoulsP1'));
             assert('Snooker', 'Undo restores active player after foul',
                 String(cp.getStorageItem('activePlayer')) === '1',
                 String(cp.getStorageItem('activePlayer')));
@@ -2737,18 +2991,42 @@
                 String(cp.getStorageItem('activePlayer')) === '2',
                 String(cp.getStorageItem('activePlayer')));
 
-            // Player change keeps undo history
-            const stackBeforeToggleRaw = cp.getStorageItem('snookerUndoStack');
+            // Manual Active Player change is undoable without reversing pots/points.
+            // Snooker uses the same typed playerSwitch scoring-undo entry as other game types.
+            const stackBeforeToggleRaw = cp.getStorageItem('scoringUndoStack');
             let stackBeforeToggleLen = 0;
             try { stackBeforeToggleLen = JSON.parse(stackBeforeToggleRaw || '[]').length; } catch (e) { stackBeforeToggleLen = 0; }
-            // togglePlayer(true) → P1; foul left P2 active, so switch away and back keeps stack
+            const p1PtsBeforeSwitch = parseInt(cp.getStorageItem('p1BallsCtrlPanel'), 10) || 0;
+            const p2PtsBeforeSwitch = parseInt(cp.getStorageItem('p2BallsCtrlPanel'), 10) || 0;
+            assert('Snooker', 'P2 active before manual player switch',
+                String(cp.getStorageItem('activePlayer')) === '2');
+            // togglePlayer(true) → P1; foul left P2 active
             cp.togglePlayer(true);
             await sleep(30);
             let stackAfterToggleLen = 0;
-            try { stackAfterToggleLen = JSON.parse(cp.getStorageItem('snookerUndoStack') || '[]').length; } catch (e) { stackAfterToggleLen = 0; }
-            assert('Snooker', 'Active player change keeps undo stack',
-                stackAfterToggleLen === stackBeforeToggleLen && stackAfterToggleLen > 0,
-                stackBeforeToggleLen + ' → ' + stackAfterToggleLen);
+            let lastSwitchType = null;
+            try {
+                const arr = JSON.parse(cp.getStorageItem('scoringUndoStack') || '[]');
+                stackAfterToggleLen = arr.length;
+                lastSwitchType = arr.length ? arr[arr.length - 1].type : null;
+            } catch (e) { stackAfterToggleLen = 0; }
+            assert('Snooker', 'Active player change pushes undo entry',
+                stackAfterToggleLen === stackBeforeToggleLen + 1 && lastSwitchType === 'playerSwitch',
+                stackBeforeToggleLen + ' → ' + stackAfterToggleLen + ' type=' + lastSwitchType);
+            assert('Snooker', 'Manual switch moves active player to P1',
+                String(cp.getStorageItem('activePlayer')) === '1');
+            assert('Snooker', 'Manual switch does not change points',
+                (parseInt(cp.getStorageItem('p1BallsCtrlPanel'), 10) || 0) === p1PtsBeforeSwitch &&
+                (parseInt(cp.getStorageItem('p2BallsCtrlPanel'), 10) || 0) === p2PtsBeforeSwitch);
+            await cp.undoLastScoringAction();
+            await sleep(30);
+            assert('Snooker', 'Undo player change restores P2 active',
+                String(cp.getStorageItem('activePlayer')) === '2',
+                String(cp.getStorageItem('activePlayer')));
+            assert('Snooker', 'Undo player change does not deduct points',
+                (parseInt(cp.getStorageItem('p1BallsCtrlPanel'), 10) || 0) === p1PtsBeforeSwitch &&
+                (parseInt(cp.getStorageItem('p2BallsCtrlPanel'), 10) || 0) === p2PtsBeforeSwitch,
+                'p1=' + cp.getStorageItem('p1BallsCtrlPanel') + ' p2=' + cp.getStorageItem('p2BallsCtrlPanel'));
 
             // Re-apply a single foul so later frame-award assertions stay valid
             cp.clearSnookerFreeBallOfferState();
@@ -2763,6 +3041,18 @@
             assert('Snooker', 'Foul re-applied for frame award path',
                 parseInt(cp.getStorageItem('p2BallsCtrlPanel'), 10) === p2BeforeFoul + 7,
                 cp.getStorageItem('p2BallsCtrlPanel'));
+            // One undo reverses foul points + auto player switch (no separate player-switch entry).
+            await cp.undoLastScoringAction();
+            await sleep(30);
+            assert('Snooker', 'Foul undo is atomic (points + player)',
+                (parseInt(cp.getStorageItem('p2BallsCtrlPanel'), 10) || 0) === p2BeforeFoul &&
+                String(cp.getStorageItem('activePlayer')) === '1');
+            // Re-apply foul again for frame award path
+            cp.clearSnookerFreeBallOfferState();
+            cp.setStorageItem('activePlayer', '1');
+            cp.openSnookerFoulPicker();
+            cp.selectSnookerFoul(foulBlack);
+            await sleep(50);
 
             // Frame award clears both players' points
             const framesBefore = parseInt(cp.getStorageItem('p1ScoreCtrlPanel'), 10) || 0;
@@ -3205,7 +3495,7 @@
                     bs.document.getElementById('ballTracker').style.display === 'none');
             }
 
-            // Reset Frame (mid-match) clears frames + points via in-page confirm modal
+            // Restart Match (mid-match) clears frames + points via in-page confirm modal
             cp.setStorageItem('p1ScoreCtrlPanel', 2);
             cp.setStorageItem('p2ScoreCtrlPanel', 1);
             cp.document.getElementById('p1Score').value = '2';
@@ -3214,16 +3504,21 @@
             cp.setStorageItem('p2BallsCtrlPanel', 9);
             if (p1BallsEl) { p1BallsEl.value = '14'; }
             if (p2BallsEl) { p2BallsEl.value = '9'; }
+            cp.setStorageItem('snookerFrameFoulsP1', '3');
+            cp.setStorageItem('snookerFrameFoulsP2', '2');
+            if (typeof cp.updateRackFoulDisplay === 'function') {
+                cp.updateRackFoulDisplay();
+            }
             cp.updateScoreControlAvailability();
-            assert('Snooker', 'Mid-match button is Reset Frame before clear',
-                resetBtn.textContent.trim() === 'Reset Frame');
+            assert('Snooker', 'Mid-match button is Restart Match before clear',
+                resetBtn.textContent.trim() === 'Restart Match');
             cp.resetScores();
             await sleep(50);
             const resetModal = cp.document.getElementById('resetScoresModal');
-            assert('Snooker', 'Reset Frame opens confirm modal',
+            assert('Snooker', 'Restart Match opens confirm modal',
                 resetModal && cp.getComputedStyle(resetModal).display !== 'none');
-            assert('Snooker', 'Reset modal title',
-                (cp.document.getElementById('resetScoresModalTitle').textContent || '') === 'Reset Frame');
+            assert('Snooker', 'Restart Match modal title',
+                (cp.document.getElementById('resetScoresModalTitle').textContent || '') === 'Restart Match');
             cp.cancelResetScores();
             await sleep(50);
             assert('Snooker', 'Cancel leaves scores unchanged',
@@ -3232,13 +3527,16 @@
             await sleep(50);
             cp.confirmResetScores();
             await sleep(300);
-            assert('Snooker', 'Reset Frame clears frames',
+            assert('Snooker', 'Restart Match clears frames',
                 parseInt(cp.getStorageItem('p1ScoreCtrlPanel'), 10) === 0 &&
                 parseInt(cp.getStorageItem('p2ScoreCtrlPanel'), 10) === 0);
-            assert('Snooker', 'Reset Frame clears points',
+            assert('Snooker', 'Restart Match clears points',
                 parseInt(cp.getStorageItem('p1BallsCtrlPanel'), 10) === 0 &&
                 parseInt(cp.getStorageItem('p2BallsCtrlPanel'), 10) === 0);
-            assert('Snooker', 'Reset Frame button stays danger',
+            assert('Snooker', 'Restart Match clears foul counts',
+                parseInt(cp.getStorageItem('snookerFrameFoulsP1'), 10) === 0 &&
+                parseInt(cp.getStorageItem('snookerFrameFoulsP2'), 10) === 0);
+            assert('Snooker', 'Restart Match button stays danger',
                 resetBtn.classList.contains('danger-btn'));
 
             // Restore gold; leave panel on 8-Ball
@@ -3257,10 +3555,10 @@
             cp.document.getElementById('p2Score').value = '0';
             cp.updateScoreControlAvailability();
             const resetAfter = cp.document.getElementById('resetScores');
-            assert('Snooker', 'Non-snooker mid-race is Reset Rack',
-                resetAfter && resetAfter.textContent.trim() === 'Reset Rack',
+            assert('Snooker', 'Non-snooker mid-race is Restart Match',
+                resetAfter && resetAfter.textContent.trim() === 'Restart Match',
                 resetAfter && resetAfter.textContent);
-            assert('Snooker', 'Non-snooker Reset Rack is danger',
+            assert('Snooker', 'Non-snooker Restart Match is danger',
                 resetAfter && resetAfter.classList.contains('danger-btn'));
 
             cp.document.getElementById('p1Score').value = '5';

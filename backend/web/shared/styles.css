@@ -166,7 +166,47 @@ input, select {
 .ball-grid-live {
   justify-content: center;
 }
-.sync-hint { margin-top: 0.35rem; font-size: 0.75rem; color: #7aa2f7; }
+.rack-foul-counter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.55rem;
+  margin: 0 0 0.45rem;
+  font-size: 0.85rem;
+  line-height: 1.2;
+  opacity: 0.95;
+}
+.rack-foul-counter.hidden { display: none; }
+.rack-foul-heading {
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+}
+.rack-foul-player {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+}
+.rack-foul-name {
+  max-width: 6.5em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.85;
+}
+.rack-foul-count {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 0.9em;
+  text-align: center;
+}
+.rack-foul-sep { opacity: 0.45; font-weight: 700; }
+.rack-foul-player.is-active .rack-foul-name,
+.rack-foul-player.is-active .rack-foul-count { opacity: 1; }
+.rack-foul-player:not(.is-active) { opacity: 0.55; }
 .dev-login { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #414868; }
 code { font-size: 0.8rem; word-break: break-all; }
 ul { padding-left: 1.2rem; }
@@ -357,6 +397,10 @@ ul { padding-left: 1.2rem; }
 .row.equal { display: flex; flex-wrap: nowrap; gap: 0.4rem; margin: 0.35rem 0; }
 .row.equal .btn { flex: 1; margin: 0; min-width: 0; font-size: 0.85rem; padding: 0.55rem 0.35rem; }
 .row.equal .btn.rack-breaker-inactive { opacity: 0.35; }
+.row.equal .btn.rack-breaker-current:disabled {
+  opacity: 1;
+  cursor: default;
+}
 .row.equal .btn.rack-breaker-match-locked { opacity: 0.55; }
 .ball-grid {
   display: flex;
@@ -543,12 +587,19 @@ ul { padding-left: 1.2rem; }
 }
 .account-session-actions {
   margin: 0.25rem 0 0.75rem;
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  gap: 0.75rem;
 }
 .account-session-actions .btn {
   margin: 0;
 }
 .account-session-actions .btn.secondary {
   margin-top: 0;
+}
+#tabAccount .panel .account-session-actions .btn {
+  margin-right: 0;
+  margin-bottom: 0;
 }
 #tabAccount .panel .btn {
   margin-right: 0.5rem;
@@ -583,7 +634,6 @@ a.table-card:focus-visible {
 .table-status.online { color: #9ece6a; opacity: 1; }
 .table-players { margin: 0.15rem 0; font-weight: 600; }
 .table-score { margin: 0; font-size: 1.15rem; font-weight: 700; }
-.table-caption { font-size: 0.75rem; opacity: 0.65; margin: 0.45rem 0 0; }
 .user-email { opacity: 0.9; margin-bottom: 0.25rem; }
 .key-display {
   background: #1a1b26;
@@ -591,6 +641,27 @@ a.table-card:focus-visible {
   border-radius: 6px;
   overflow-x: auto;
   font-size: 0.8rem;
+  cursor: pointer;
+  user-select: all;
+  border: 1px solid transparent;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.key-display:hover,
+.key-display:focus-visible {
+  border-color: #7aa2f7;
+  background: #1f2335;
+  outline: none;
+}
+.copy-notice {
+  margin: 0.35rem 0 0.5rem;
+  font-size: 0.85rem;
+  color: #9ece6a;
+}
+.token-list-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-shrink: 0;
+  flex-wrap: wrap;
 }
 .token-list-item {
   display: flex;
@@ -806,4 +877,165 @@ body.controls-locked #snookerFoulModal {
 .token-list-item .btn {
   flex-shrink: 0;
   margin: 0;
+}
+.stats-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  margin: 0 0 0.85rem;
+}
+#statsPlayerSummary.stats-summary {
+  grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+}
+.stats-summary-card {
+  background: #1a1b26;
+  border: 1px solid #292e42;
+  border-radius: 8px;
+  padding: 0.65rem 0.7rem;
+  text-align: center;
+}
+.stats-summary-card strong {
+  display: block;
+  font-size: 1.25rem;
+  color: #7aa2f7;
+}
+.stats-summary-card span {
+  font-size: 0.75rem;
+  opacity: 0.75;
+}
+.stats-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  align-items: flex-end;
+  margin-bottom: 0.75rem;
+}
+.stats-player-rename {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  align-items: flex-end;
+}
+.stats-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.75rem;
+  opacity: 0.95;
+}
+.stats-filter select,
+.stats-filter input {
+  min-width: 10rem;
+  background: #1a1b26;
+  color: #c0caf5;
+  border: 1px solid #414868;
+  border-radius: 6px;
+  padding: 0.4rem 0.5rem;
+}
+.stats-filter .autocomplete-wrapper {
+  min-width: 12rem;
+}
+.stats-filter .autocomplete-wrapper input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.stats-section-title {
+  margin: 1rem 0 0.45rem;
+  font-size: 0.95rem;
+}
+.stats-subtabs {
+  display: flex;
+  gap: 0.35rem;
+  margin: 0.85rem 0 0.65rem;
+}
+.stats-subtab {
+  flex: 1;
+  padding: 0.45rem 0.65rem;
+  border: none;
+  border-radius: 6px;
+  background: #414868;
+  color: #c0caf5;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.stats-subtab.active {
+  background: #7aa2f7;
+  color: #1a1b26;
+}
+.stats-subpanel.hidden {
+  display: none;
+}
+.stats-pos {
+  width: 2.5rem;
+  opacity: 0.8;
+  font-variant-numeric: tabular-nums;
+}
+.stats-table-wrap {
+  overflow-x: auto;
+}
+.dash-stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.dash-stats-table th,
+.dash-stats-table td {
+  text-align: left;
+  padding: 0.4rem 0.45rem;
+  border-bottom: 1px solid #292e42;
+}
+.dash-stats-table th {
+  font-size: 0.75rem;
+  opacity: 0.75;
+  font-weight: 600;
+}
+.dash-stats-empty {
+  text-align: center;
+  opacity: 0.7;
+}
+.stats-winner {
+  font-weight: 700;
+  color: #9ece6a;
+}
+.dash-stats-table tbody tr:nth-child(even) {
+  background: rgba(65, 72, 104, 0.35);
+}
+.dash-stats-table tbody tr.stats-row-clickable {
+  cursor: pointer;
+}
+.dash-stats-table tbody tr.stats-row-clickable:hover {
+  background: #292e42;
+}
+.dash-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 1.25rem 1rem;
+  background: rgba(0, 0, 0, 0.55);
+  overflow: auto;
+}
+.dash-modal.hidden {
+  display: none;
+}
+.dash-modal-card {
+  width: min(28rem, 100%);
+  margin-top: 1.5rem;
+}
+.dash-modal-card h2 {
+  margin-bottom: 0.85rem;
+}
+.dash-modal-card .stats-filter {
+  width: 100%;
+  margin-bottom: 0.65rem;
+}
+.dash-modal-card .stats-filter input,
+.dash-modal-card .stats-filter select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }

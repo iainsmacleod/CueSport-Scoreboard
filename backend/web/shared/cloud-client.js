@@ -150,6 +150,65 @@ export async function fetchMe(serverUrl, token) {
   return res.json();
 }
 
+export async function fetchAccountStats(serverUrl, token) {
+  const base = serverUrl.replace(/\/$/, '');
+  const res = await fetch(`${base}/api/stats`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to load stats');
+  }
+  return res.json();
+}
+
+export async function updateAccountMatch(serverUrl, token, startEventId, payload) {
+  const base = serverUrl.replace(/\/$/, '');
+  const res = await fetch(`${base}/api/stats/matches/${encodeURIComponent(startEventId)}`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to update match');
+  }
+  return res.json();
+}
+
+export async function deleteAccountMatch(serverUrl, token, startEventId) {
+  const base = serverUrl.replace(/\/$/, '');
+  const res = await fetch(`${base}/api/stats/matches/${encodeURIComponent(startEventId)}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to delete match');
+  }
+  return res.json();
+}
+
+export async function renameAccountPlayer(serverUrl, token, from, to) {
+  const base = serverUrl.replace(/\/$/, '');
+  const res = await fetch(`${base}/api/stats/players`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ from, to }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to rename player');
+  }
+  return res.json();
+}
+
 export async function fetchPlayers(serverUrl, token, query = '', limit = 8) {
   const base = serverUrl.replace(/\/$/, '');
   const params = new URLSearchParams();
@@ -176,6 +235,18 @@ export async function createApiKey(serverUrl, token, label) {
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || err.message || 'Failed to create API key');
+  }
+  return res.json();
+}
+
+export async function fetchApiKey(serverUrl, token, keyId) {
+  const base = serverUrl.replace(/\/$/, '');
+  const res = await fetch(`${base}/api/api-keys/${encodeURIComponent(keyId)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || err.message || 'Failed to load API key');
   }
   return res.json();
 }

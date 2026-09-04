@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS api_keys (
   id TEXT PRIMARY KEY,
   account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
   key_hash TEXT NOT NULL,
+  key_plaintext TEXT,
   label TEXT NOT NULL DEFAULT 'Default',
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   revoked_at TEXT
@@ -105,6 +106,13 @@ function ensureAccountColumns(database) {
   }
 }
 
+function ensureApiKeyColumns(database) {
+  const cols = new Set(tableColumns(database, 'api_keys'));
+  if (!cols.has('key_plaintext')) {
+    database.exec('ALTER TABLE api_keys ADD COLUMN key_plaintext TEXT');
+  }
+}
+
 export function getDb() {
   if (!db) {
     const dir = path.dirname(config.sqlitePath);
@@ -116,6 +124,7 @@ export function getDb() {
     db.pragma('foreign_keys = ON');
     db.exec(SCHEMA);
     ensureAccountColumns(db);
+    ensureApiKeyColumns(db);
   }
   return db;
 }
@@ -170,8 +179,8 @@ export function createApiKey(accountId, label = 'Default') {
   const plaintext = generateApiKeyPlaintext();
   const id = uuidv4();
   database.prepare(
-    `INSERT INTO api_keys (id, account_id, key_hash, label) VALUES (?, ?, ?, ?)`
-  ).run(id, accountId, hashApiKey(plaintext), label);
+    `INSERT INTO api_keys (id, account_id, key_hash, key_plaintext, label) VALUES (?, ?, ?, ?, ?)`
+  ).run(id, accountId, hashApiKey(plaintext), plaintext, label);
   return { id, plaintext };
 }
 
@@ -223,8 +232,28 @@ export function getRoomsForAccount(accountId) {
 
 export function getApiKeysForAccount(accountId) {
   return getDb().prepare(
-    `SELECT id, label, created_at, revoked_at FROM api_keys WHERE account_id = ? AND revoked_at IS NULL ORDER BY created_at`
-  ).all(accountId);
+    `SELECT id, label, created_at, revoked_at,
+            CASE WHEN key_plaintext IS NOT NULL AND length(key_plaintext) > 0 THEN 1 ELSE 0 END AS viewable
+     FROM api_keys WHERE account_id = ? AND revoked_at IS NULL ORDER BY created_at`
+  ).all(accountId).map((row) => ({
+    id: row.id,
+    label: row.label,
+    created_at: row.created_at,
+    revoked_at: row.revoked_at,
+    viewable: !!row.viewable,
+  }));
+}
+
+/** Returns plaintext key for the account owner, or null if missing/revoked/legacy. */
+export function getApiKeyPlaintext(keyId, accountId) {
+  const row = getDb().prepare(
+    `SELECT key_plaintext FROM api_keys
+     WHERE id = ? AND account_id = ? AND revoked_at IS NULL`
+  ).get(keyId, accountId);
+  if (!row || !row.key_plaintext) {
+    return null;
+  }
+  return row.key_plaintext;
 }
 
 export function countActiveApiKeys(accountId) {
@@ -292,6 +321,59 @@ export function getMatchEvents(roomId, limit = 100) {
     ...row,
     payload: JSON.parse(row.payload || '{}'),
   }));
+}
+
+/** Newest session start/end events across all rooms for an account (then reversed for pairing). */
+export function getAccountSessionEvents(accountId, limit = 5000) {
+  const cap = Math.min(Math.max(parseInt(limit, 10) || 5000, 1), 10000);
+  return getDb().prepare(
+    `SELECT e.id, e.room_id, e.session_id, e.event_type, e.payload, e.created_at,
+            r.label AS room_label,
+            d.instance_key, d.label AS dock_label
+     FROM match_events e
+     JOIN rooms r ON r.id = e.room_id
+     LEFT JOIN room_docks d ON d.room_id = e.room_id
+     WHERE r.account_id = ?
+       AND e.event_type IN ('session:start', 'session:end')
+     ORDER BY e.created_at DESC
+     LIMIT ?`
+  ).all(accountId, cap).map((row) => ({
+    ...row,
+    payload: JSON.parse(row.payload || '{}'),
+  }));
+}
+
+export function getMatchEventById(id) {
+  if (!id) return null;
+  const row = getDb().prepare('SELECT * FROM match_events WHERE id = ?').get(id);
+  if (!row) return null;
+  return { ...row, payload: JSON.parse(row.payload || '{}') };
+}
+
+export function updateMatchEvent(id, { payload, createdAt } = {}) {
+  if (createdAt) {
+    getDb().prepare(
+      'UPDATE match_events SET payload = ?, created_at = ? WHERE id = ?'
+    ).run(JSON.stringify(payload || {}), createdAt, id);
+  } else {
+    getDb().prepare(
+      'UPDATE match_events SET payload = ? WHERE id = ?'
+    ).run(JSON.stringify(payload || {}), id);
+  }
+}
+
+export function deleteMatchEvents(ids) {
+  const list = (ids || []).filter(Boolean);
+  if (!list.length) return 0;
+  const stmt = getDb().prepare('DELETE FROM match_events WHERE id = ?');
+  const tx = getDb().transaction((eventIds) => {
+    let n = 0;
+    for (const eventId of eventIds) {
+      n += stmt.run(eventId).changes;
+    }
+    return n;
+  });
+  return tx(list);
 }
 
 export function upsertLiveStream(roomId, streamUrl, state) {
@@ -473,6 +555,7 @@ export function seedAccountPlayersFromSessions(accountId) {
 
 export function searchAccountPlayers(accountId, query, limit = 8) {
   seedAccountPlayersFromSessions(accountId);
+  syncAccountPlayersFromMatchEvents(accountId);
   const max = Math.min(Math.max(parseInt(limit, 10) || 8, 1), 250);
   const normalized = normalizePlayerName(query);
   if (!normalized) {
@@ -493,4 +576,39 @@ export function searchAccountPlayers(accountId, query, limit = 8) {
        name COLLATE NOCASE ASC
      LIMIT ?`
   ).all(accountId, like, like, normalized, `${normalized}%`, max);
+}
+
+/** Pull player names from recorded session:start events into the roster. */
+export function syncAccountPlayersFromMatchEvents(accountId) {
+  if (!accountId) return;
+  const rows = getDb().prepare(
+    `SELECT e.payload
+     FROM match_events e
+     JOIN rooms r ON r.id = e.room_id
+     WHERE r.account_id = ?
+       AND e.event_type = 'session:start'`
+  ).all(accountId);
+  for (const row of rows) {
+    let payload = {};
+    try {
+      payload = JSON.parse(row.payload || '{}');
+    } catch {
+      payload = {};
+    }
+    if (payload.player1) upsertAccountPlayer(accountId, payload.player1);
+    if (payload.player2) upsertAccountPlayer(accountId, payload.player2);
+  }
+}
+
+/** Rename a roster entry (and drop the old key). Match event payloads are updated separately. */
+export function renameAccountPlayerRoster(accountId, fromName, toName) {
+  if (!accountId) return;
+  const fromNorm = normalizePlayerName(fromName);
+  const toDisplay = truncatePlayerName(toName);
+  const toNorm = normalizePlayerName(toDisplay);
+  if (!fromNorm || !toNorm) return;
+  getDb().prepare(
+    'DELETE FROM account_players WHERE account_id = ? AND name_normalized = ?'
+  ).run(accountId, fromNorm);
+  upsertAccountPlayer(accountId, toDisplay);
 }
