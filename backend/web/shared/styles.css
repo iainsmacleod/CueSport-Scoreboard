@@ -634,6 +634,15 @@ a.table-card:focus-visible {
 .table-status.online { color: #9ece6a; opacity: 1; }
 .table-players { margin: 0.15rem 0; font-weight: 600; }
 .table-score { margin: 0; font-size: 1.15rem; font-weight: 700; }
+.table-score-current {
+  margin-top: 0.15rem;
+  font-size: 1rem;
+  font-weight: 600;
+  opacity: 0.92;
+}
+.table-score-primary {
+  margin-top: 0.1rem;
+}
 .user-email { opacity: 0.9; margin-bottom: 0.25rem; }
 .key-display {
   background: #1a1b26;

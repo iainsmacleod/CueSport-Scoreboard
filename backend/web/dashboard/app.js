@@ -140,9 +140,15 @@ function formatTableCard(room, serverUrl) {
   const p1 = st.player1Name || 'P1';
   const p2 = st.player2Name || 'P2';
   const dual = st.dualScoreMode || st.gameType === 'game8';
-  const scoreLine = dual
-    ? `${st.p1Balls ?? 0} – ${st.p2Balls ?? 0} pts · ${st.p1Score ?? 0}–${st.p2Score ?? 0} ${st.primaryScoreLabel || 'frames'}`
-    : `${st.p1Score ?? 0} – ${st.p2Score ?? 0}`;
+  const primaryLabel = st.primaryScoreLabel || (st.gameType === 'game8' ? 'Frames' : 'Racks');
+  const secondaryRaw = st.secondaryScoreLabel || (st.gameType === 'game8' ? 'Points' : 'Balls');
+  const secondaryLabel = /^points?$/i.test(String(secondaryRaw).trim())
+    ? 'Current Point'
+    : secondaryRaw;
+  const scoreHtml = dual
+    ? `<p class="table-score table-score-current">${st.p1Balls ?? 0} – ${st.p2Balls ?? 0} ${secondaryLabel}</p>` +
+      `<p class="table-score table-score-primary">${st.p1Score ?? 0}–${st.p2Score ?? 0} ${primaryLabel}</p>`
+    : `<p class="table-score">${st.p1Score ?? 0} – ${st.p2Score ?? 0}</p>`;
   const matchTitle = [
     gameTypeLabel(st.gameType),
     st.raceInfo ? `${st.raceLabel || 'Race'} ${st.raceInfo}` : null,
@@ -154,10 +160,10 @@ function formatTableCard(room, serverUrl) {
   card.className = 'table-card panel';
   card.href = controlUrl;
   card.innerHTML = `
-    <p class="table-status online">Dock online</p>
+    <p class="table-status online">OBS Dock Connected</p>
     <h3>${matchTitle}</h3>
     <p class="table-players">${p1} vs ${p2}</p>
-    <p class="table-score">${scoreLine}</p>
+    ${scoreHtml}
   `;
   return card;
 }
