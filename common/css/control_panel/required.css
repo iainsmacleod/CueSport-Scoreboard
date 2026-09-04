@@ -686,29 +686,73 @@ select.dropdown option,
 }
 
 #scoreInfoP1,
-#scoreInfoP1Balls,
-#scoreInfoP2,
-#scoreInfoP2Balls {
-	flex-wrap: nowrap;
-	justify-content: space-between;
+#scoreInfoP2 {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
 	align-items: center;
-	gap: 16px;
+	column-gap: 12px;
+	justify-content: stretch;
 }
 
-#scoreInfoP1 label,
-#scoreInfoP1Balls label,
-#scoreInfoP2 label,
-#scoreInfoP2Balls label {
-	flex: 0 1 auto;
+/* Dual score: name | racks (center) | balls */
+#scoreInfoP1:has(.score-secondary:not(.noShow)),
+#scoreInfoP2:has(.score-secondary:not(.noShow)) {
+	grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+}
+
+#scoreInfoP1 .score-player-name,
+#scoreInfoP2 .score-player-name {
+	justify-self: start;
+	min-width: 0;
+	font-weight: bold;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+#scoreInfoP1 .score-primary,
+#scoreInfoP2 .score-primary {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	justify-self: end;
+	flex: 0 0 auto;
+	min-width: 0;
+}
+
+#scoreInfoP1:has(.score-secondary:not(.noShow)) .score-primary,
+#scoreInfoP2:has(.score-secondary:not(.noShow)) .score-primary {
+	justify-self: center;
+}
+
+#scoreInfoP1 .score-metric-label,
+#scoreInfoP2 .score-metric-label {
+	flex: 0 0 auto;
 	min-width: 0;
 	text-align: left;
+	font-weight: bold;
+	opacity: 0.9;
+	white-space: nowrap;
 }
 
 #scoreInfoP1 .score-control,
-#scoreInfoP1Balls .score-control,
-#scoreInfoP2 .score-control,
-#scoreInfoP2Balls .score-control {
+#scoreInfoP2 .score-control {
 	flex: 0 0 auto;
+}
+
+#scoreInfoP1 .score-secondary,
+#scoreInfoP2 .score-secondary {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	justify-self: end;
+	flex: 0 0 auto;
+	min-width: 0;
+}
+
+#scoreInfoP1 .score-secondary.noShow,
+#scoreInfoP2 .score-secondary.noShow {
+	display: none !important;
 }
 
 .ball-set-row {

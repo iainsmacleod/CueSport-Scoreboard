@@ -172,7 +172,7 @@ input, select {
   justify-content: center;
   flex-wrap: wrap;
   gap: 0.4rem 0.55rem;
-  margin: 0 0 0.45rem;
+  margin: 0.45rem 0 0;
   font-size: 0.85rem;
   line-height: 1.2;
   opacity: 0.95;

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
   <title>CueSport Scoreboard Cloud Control</title>
-  <link rel="stylesheet" href="/web/shared/styles.css?v=8.0.0.1" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.0.0.2" />
 </head>
 <body class="mobile">
   <header>
@@ -58,6 +58,7 @@
           </div>
           <div class="live-ball-section hidden" id="ballGridPanel">
             <p id="ballGridHint" class="ball-grid-hint hidden"></p>
+            <div id="ballGrid" class="ball-grid ball-grid-live"></div>
             <div id="rackFoulCounter" class="rack-foul-counter hidden" aria-live="polite" title="Fouls this rack or frame">
               <span class="rack-foul-heading">Fouls</span>
               <span class="rack-foul-player" id="rackFoulP1Wrap">
@@ -70,7 +71,6 @@
                 <span class="rack-foul-count" id="rackFoulP2">0</span>
               </span>
             </div>
-            <div id="ballGrid" class="ball-grid ball-grid-live"></div>
           </div>
           <div class="live-score-controls">
             <div id="dualScoresPanel" class="hidden">

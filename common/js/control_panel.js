@@ -3017,19 +3017,34 @@ function updateActivePlayerNameDisplay() {
 
 function updateScoreLabels() {
     const suffix = getPrimaryScoreSuffix();
+    const secondary = getSecondaryScoreSuffix();
     const p1Name = (document.getElementById("p1Name")?.value || "").trim();
     const p2Name = (document.getElementById("p2Name")?.value || "").trim();
+    const p1NameEl = document.getElementById("p1ScorePlayerName");
+    const p2NameEl = document.getElementById("p2ScorePlayerName");
+    const p1ScoreLabel = document.getElementById("p1ScoreLabel");
+    const p2ScoreLabel = document.getElementById("p2ScoreLabel");
     const p1BallsLabel = document.getElementById("p1BallsLabel");
     const p2BallsLabel = document.getElementById("p2BallsLabel");
 
-    document.getElementById("p1ScoreLabel").innerHTML = (p1Name || "Player/Team 1") + " - " + suffix;
-    document.getElementById("p2ScoreLabel").innerHTML = (p2Name || "Player/Team 2") + " - " + suffix;
-
+    if (p1NameEl) {
+        p1NameEl.textContent = p1Name || "Player/Team 1";
+    }
+    if (p2NameEl) {
+        p2NameEl.textContent = p2Name || "Player/Team 2";
+    }
+    // Metric labels only — player name lives in .score-player-name for dual-score rows.
+    if (p1ScoreLabel) {
+        p1ScoreLabel.textContent = suffix;
+    }
+    if (p2ScoreLabel) {
+        p2ScoreLabel.textContent = suffix;
+    }
     if (p1BallsLabel) {
-        p1BallsLabel.innerHTML = (p1Name || "Player/Team 1") + " - " + getSecondaryScoreSuffix();
+        p1BallsLabel.textContent = secondary;
     }
     if (p2BallsLabel) {
-        p2BallsLabel.innerHTML = (p2Name || "Player/Team 2") + " - " + getSecondaryScoreSuffix();
+        p2BallsLabel.textContent = secondary;
     }
     updateActivePlayerNameDisplay();
     updateRackBreakerPickerLabels();

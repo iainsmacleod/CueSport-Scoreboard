@@ -21,7 +21,7 @@ for more information about Salotto please visit https://salotto.app
     <link rel="stylesheet" href="./common/css/control_panel/grey.css?v=8.0.0" />
     <link rel="stylesheet" href="./common/css/control_panel/light.css?v=8.0.0" />
     <link rel="stylesheet" href="./common/css/control_panel/rachni.css?v=8.0.0" />
-    <link rel="stylesheet" href="./common/css/control_panel/required.css?v=8.0.0.4" />
+    <link rel="stylesheet" href="./common/css/control_panel/required.css?v=8.0.0.6" />
     <script>
         //---------------------------------------------------------------------------------------------
         var versionNum = "8.0.0";
@@ -32,7 +32,7 @@ for more information about Salotto please visit https://salotto.app
     <script src="./common/js/cloud_relay.js?v=8.0.0.4"></script>
     <script src="./common/js/stream_sharing.js?v=8.0.0"></script>
     <script src="./common/js/player_stats.js?v=8.0.0.4"></script>
-    <script src="./common/js/control_panel.js?v=8.0.0.9"></script>
+    <script src="./common/js/control_panel.js?v=8.0.0.10"></script>
     <script src="./common/js/cloud_commands.js?v=8.0.0.1"></script>
     <script src="./common/js/cloud_auth.js?v=8.0.0"></script>
     <script src="hotkeys.js?v=8.0.0"></script>
@@ -299,40 +299,46 @@ for more information about Salotto please visit https://salotto.app
                     <span>Open Table</span>
                 </label>
             </div>
-            <div class="column" id="scoreInfoP1">
-                <label id="p1ScoreLabel" for="sendP1ScoreSub">Player/Team 1 - Racks</label>
-                <div class="score-control">
-                    <button id="sendP1ScoreSub" onclick="postScore('sub','1')">-</button>
-                    <input type="text" pattern="[0-9]" inputmode="numeric" min="0" max="999" maxlength="3" id="p1Score"
-                        placeholder="0" />
-                    <button id="sendP1Score" onclick="postScore('add','1')">+</button>
+            <div class="column score-info-row" id="scoreInfoP1">
+                <span class="score-player-name" id="p1ScorePlayerName">Player/Team 1</span>
+                <div class="score-primary">
+                    <label class="score-metric-label" id="p1ScoreLabel" for="sendP1ScoreSub">Racks</label>
+                    <div class="score-control" id="p1ScoreControl">
+                        <button id="sendP1ScoreSub" onclick="postScore('sub','1')">-</button>
+                        <input type="text" pattern="[0-9]" inputmode="numeric" min="0" max="999" maxlength="3" id="p1Score"
+                            placeholder="0" />
+                        <button id="sendP1Score" onclick="postScore('add','1')">+</button>
+                    </div>
+                </div>
+                <div class="score-secondary noShow" id="scoreInfoP1Balls">
+                    <label class="score-metric-label" id="p1BallsLabel" for="sendP1BallsSub">Balls</label>
+                    <div class="score-control">
+                        <button id="sendP1BallsSub" onclick="postBalls('sub','1')">-</button>
+                        <input type="text" inputmode="numeric" min="-999" max="999" maxlength="4" id="p1Balls"
+                            placeholder="0" />
+                        <button id="sendP1Balls" onclick="postBalls('add','1')">+</button>
+                    </div>
                 </div>
             </div>
-            <div class="column noShow" id="scoreInfoP1Balls">
-                <label id="p1BallsLabel" for="sendP1BallsSub">Player/Team 1 - Balls</label>
-                <div class="score-control">
-                    <button id="sendP1BallsSub" onclick="postBalls('sub','1')">-</button>
-                    <input type="text" inputmode="numeric" min="-999" max="999" maxlength="4" id="p1Balls"
-                        placeholder="0" />
-                    <button id="sendP1Balls" onclick="postBalls('add','1')">+</button>
+            <div class="column score-info-row" id="scoreInfoP2">
+                <span class="score-player-name" id="p2ScorePlayerName">Player/Team 2</span>
+                <div class="score-primary">
+                    <label class="score-metric-label" id="p2ScoreLabel" for="sendP2ScoreSub">Racks</label>
+                    <div class="score-control" id="p2ScoreControl">
+                        <button id="sendP2ScoreSub" onclick="postScore('sub','2')">-</button>
+                        <input type="text" pattern="[0-9]" inputmode="numeric" min="0" max="999" maxlength="3" id="p2Score"
+                            placeholder="0" />
+                        <button id="sendP2Score" onclick="postScore('add','2')">+</button>
+                    </div>
                 </div>
-            </div>
-            <div class="column" id="scoreInfoP2">
-                <label id="p2ScoreLabel" for="sendP2Score">Player/Team 2 - Racks</label>
-                <div class="score-control">
-                    <button id="sendP2ScoreSub" onclick="postScore('sub','2')">-</button>
-                    <input type="text" pattern="[0-9]" inputmode="numeric" min="0" max="999" maxlength="3" id="p2Score"
-                        placeholder="0" />
-                    <button id="sendP2Score" onclick="postScore('add','2')">+</button>
-                </div>
-            </div>
-            <div class="column noShow" id="scoreInfoP2Balls">
-                <label id="p2BallsLabel" for="sendP2BallsSub">Player/Team 2 - Balls</label>
-                <div class="score-control">
-                    <button id="sendP2BallsSub" onclick="postBalls('sub','2')">-</button>
-                    <input type="text" inputmode="numeric" min="-999" max="999" maxlength="4" id="p2Balls"
-                        placeholder="0" />
-                    <button id="sendP2Balls" onclick="postBalls('add','2')">+</button>
+                <div class="score-secondary noShow" id="scoreInfoP2Balls">
+                    <label class="score-metric-label" id="p2BallsLabel" for="sendP2BallsSub">Balls</label>
+                    <div class="score-control">
+                        <button id="sendP2BallsSub" onclick="postBalls('sub','2')">-</button>
+                        <input type="text" inputmode="numeric" min="-999" max="999" maxlength="4" id="p2Balls"
+                            placeholder="0" />
+                        <button id="sendP2Balls" onclick="postBalls('add','2')">+</button>
+                    </div>
                 </div>
             </div>
             <div class="column button-row" id="scoreEditing">
