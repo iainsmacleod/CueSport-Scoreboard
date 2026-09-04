@@ -2257,6 +2257,19 @@ label.switch.toggle-disabled {
 	background: #a40000;
 }
 
+#resetScores.danger-btn.disabled,
+#resetScores.danger-btn[aria-disabled="true"] {
+	opacity: 0.4;
+	cursor: not-allowed;
+	pointer-events: none;
+	box-shadow: none;
+}
+
+#resetScores.danger-btn.disabled:hover,
+#resetScores.danger-btn[aria-disabled="true"]:hover {
+	background: #8b0000;
+}
+
 #scoreEditing {
 	display: flex;
 	flex-wrap: wrap;

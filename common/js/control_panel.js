@@ -640,6 +640,7 @@ function selectRackBreaker(slot) {
     hideRackBreakerPicker();
     syncRackBreakerPlayerToggleVisibility();
     updatePlayerBallControlVisibility();
+    updateResetScoreButton();
     if (window.streamSharing && typeof window.streamSharing.sendUpdate === 'function') {
         window.streamSharing.sendUpdate();
     }
@@ -1992,6 +1993,37 @@ function getResetScoreActionLabel() {
     return "Restart Match";
 }
 
+/**
+ * Fresh match start: no racks/frames, no balls/points, no fouls, no breaker.
+ * Restart Match has nothing to clear — disable it. End Match stays available when race is complete.
+ */
+function isMatchFreshStart() {
+    if (isRaceComplete()) {
+        return false;
+    }
+    function storedScore(key) {
+        const n = parseInt(getStorageItem(key), 10);
+        return Number.isFinite(n) ? n : 0;
+    }
+    if (storedScore("p1ScoreCtrlPanel") !== 0 || storedScore("p2ScoreCtrlPanel") !== 0) {
+        return false;
+    }
+    if (storedScore("p1BallsCtrlPanel") !== 0 || storedScore("p2BallsCtrlPanel") !== 0) {
+        return false;
+    }
+    if (getRackFouls("1") > 0 || getRackFouls("2") > 0) {
+        return false;
+    }
+    if (getRackBreakerSlot()) {
+        return false;
+    }
+    return true;
+}
+
+function canResetOrEndMatch() {
+    return !isMatchFreshStart();
+}
+
 /** Label/style for reset: "Restart Match" until race/Best Of is met, then "End Match". Always danger. */
 function updateResetScoreButton() {
     const resetBtn = document.getElementById("resetScores");
@@ -2003,7 +2035,18 @@ function updateResetScoreButton() {
     // Danger class owns color; clear any leftover inline race-complete green.
     resetBtn.style.backgroundColor = "";
     resetBtn.style.color = "";
+    const enabled = canResetOrEndMatch();
+    resetBtn.classList.toggle("disabled", !enabled);
+    resetBtn.setAttribute("aria-disabled", enabled ? "false" : "true");
+    if (enabled) {
+        resetBtn.removeAttribute("tabindex");
+    } else {
+        resetBtn.setAttribute("tabindex", "-1");
+    }
 }
+
+window.isMatchFreshStart = isMatchFreshStart;
+window.canResetOrEndMatch = canResetOrEndMatch;
 
 /** Show Call Match Early when racks/frames exist and the race is not yet complete. */
 function updateCallGameButton() {
@@ -5860,6 +5903,9 @@ function openResetScoresModal(action) {
 }
 
 function resetScores() {
+    if (!canResetOrEndMatch()) {
+        return;
+    }
     openResetScoresModal(isRaceComplete() ? "endMatch" : "reset");
 }
 
@@ -6482,6 +6528,21 @@ function openWebSocketSettingsModal() {
                 toggleBtn.classList.add('hidden');
             }
         }
+    }
+
+    function submitWebSocketSettingsOnEnter(event) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            saveWebSocketSettings();
+        }
+    }
+    if (addressInput && !addressInput.dataset.enterBound) {
+        addressInput.addEventListener('keydown', submitWebSocketSettingsOnEnter);
+        addressInput.dataset.enterBound = '1';
+    }
+    if (passwordInput && !passwordInput.dataset.enterBound) {
+        passwordInput.addEventListener('keydown', submitWebSocketSettingsOnEnter);
+        passwordInput.dataset.enterBound = '1';
     }
     
     modal.style.display = 'block';

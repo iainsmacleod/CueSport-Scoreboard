@@ -1227,7 +1227,7 @@ document.getElementById('statsMatchModal')?.addEventListener('click', (event) =>
   if (event.target.id === 'statsMatchModal') closeMatchModal();
 });
 
-document.getElementById('devLoginBtn').addEventListener('click', async () => {
+async function submitDevLogin() {
   setError('');
   const secret = document.getElementById('devSecret').value;
   if (!secret) return setError('Dev auth secret required');
@@ -1248,11 +1248,21 @@ document.getElementById('devLoginBtn').addEventListener('click', async () => {
   } finally {
     btn.disabled = false;
   }
+}
+
+document.getElementById('devLoginBtn').addEventListener('click', () => {
+  submitDevLogin();
+});
+document.getElementById('devSecret')?.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    submitDevLogin();
+  }
 });
 
 document.getElementById('createKeyBtn').addEventListener('click', async () => {
   try {
-    const created = await createApiKey(getServerUrl(), getToken(), 'Dashboard key');
+    const created = await createApiKey(getServerUrl(), getToken(), 'OBS Dock Key');
     showApiKeyDisplay(created.key);
     if (created.quota) renderQuota(created.quota);
     await renderDashboard();

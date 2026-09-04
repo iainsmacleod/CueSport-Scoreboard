@@ -231,9 +231,15 @@
                 return Promise.resolve();
             }
             case 'reset_scores':
+                if (typeof window.canResetOrEndMatch === 'function' && !window.canResetOrEndMatch()) {
+                    return Promise.resolve();
+                }
                 performResetScores();
                 return Promise.resolve().then(publishAfterScoring);
             case 'end_match':
+                if (typeof window.canResetOrEndMatch === 'function' && !window.canResetOrEndMatch()) {
+                    return Promise.resolve();
+                }
                 performResetScores({ endMatch: true });
                 return Promise.resolve().then(publishAfterScoring);
             case 'call_match_early':

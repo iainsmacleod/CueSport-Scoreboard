@@ -416,6 +416,61 @@ function showControl() {
   showMobileNav(true);
 }
 
+/** True when the failure means the saved admin login should be discarded. */
+function shouldClearSavedLogin(err) {
+  const code = err?.code || '';
+  const msg = String(err?.message || err || '');
+  if (
+    code === 'session_revoked' ||
+    code === 'invalid_token' ||
+    code === 'room_forbidden' ||
+    code === 'connect_timeout' ||
+    code === 'connection_closed' ||
+    code === 'websocket_error' ||
+    code === 'auth_required'
+  ) {
+    return true;
+  }
+  return /token|sign in|session revoked|unauthorized|expired/i.test(msg);
+}
+
+function reloginMessage(err) {
+  const code = err?.code || '';
+  if (code === 'session_revoked') {
+    return 'Signed out everywhere. Sign in again to reconnect.';
+  }
+  if (code === 'room_forbidden') {
+    return 'This room belongs to another account. Sign in with the dev secret for that account, or open the mobile link from your dashboard.';
+  }
+  if (code === 'control_connection_limit') {
+    return err.message || 'Too many devices controlling this table. Disconnect another phone or upgrade your plan.';
+  }
+  if (code === 'invalid_token' || code === 'auth_required') {
+    return 'Saved login expired. Sign in again to reconnect.';
+  }
+  if (code === 'connect_timeout' || code === 'connection_closed' || code === 'websocket_error') {
+    return 'Couldn\'t connect — saved login was cleared. Sign in again to retry.';
+  }
+  return err?.message || err?.code || 'Connection failed. Sign in again.';
+}
+
+/**
+ * Leave Connecting/Control, optionally wipe cuesport_token, and show login with a reason.
+ * Used for revoke, expired token, and hung connect recovery.
+ */
+function forceRelogin(reason, { clearToken = true } = {}) {
+  if (clearToken) localStorage.removeItem(TOKEN_KEY);
+  if (client) {
+    try { client.disconnect(); } catch (_) { /* ignore */ }
+    client = null;
+  }
+  dockPresent = false;
+  setConnectionStatus('disconnected');
+  showLogin();
+  setError(reason || '');
+  syncLoginPanel();
+}
+
 function setError(msg) {
   const text = msg || '';
   ['loginError', 'error'].forEach((id) => {
@@ -1052,6 +1107,15 @@ function syncMatchActionButtons(state) {
   // Same gate as control_panel isRaceComplete() / isGameScoringLocked()
   const locked = isRaceCompleteFromState(state);
   const canCall = !locked && state.canCallGame === true;
+  // Prefer dock flag; fall back to local score/breaker heuristics.
+  const canReset = state.canResetScores != null
+    ? state.canResetScores === true
+    : (locked ||
+      (Number(state.p1Score) || 0) !== 0 ||
+      (Number(state.p2Score) || 0) !== 0 ||
+      (Number(state.p1Balls) || 0) !== 0 ||
+      (Number(state.p2Balls) || 0) !== 0 ||
+      !!(state.rackBreakerSlot));
 
   const resetBtn = document.getElementById('resetScoresBtn');
   if (resetBtn) {
@@ -1063,7 +1127,7 @@ function syncMatchActionButtons(state) {
       resetBtn.dataset.cmd = 'reset_scores';
     }
     resetBtn.classList.remove('hidden');
-    resetBtn.disabled = false;
+    resetBtn.disabled = !canReset;
   }
 
   const callBtn = document.getElementById('callMatchBtn');
@@ -1657,6 +1721,7 @@ async function connect() {
         show('controlSection', false);
         showMobileNav(false);
         show('connectingSection', false);
+        setConnectionStatus('disconnected');
         setError('This guest link has been revoked.');
         return;
       }
@@ -1675,8 +1740,12 @@ async function connect() {
       setConnectionStatus(dockPresent ? 'connected' : 'waiting');
     } catch (err) {
       show('connectingSection', false);
-      setError(err.message);
       setConnectionStatus('disconnected');
+      if (err?.code === 'guest_revoked' || err?.code === 'invalid_guest_token') {
+        setError('This guest link has been revoked.');
+      } else {
+        setError(err.message || 'Connection failed');
+      }
     }
     return;
   }
@@ -1690,6 +1759,7 @@ async function connect() {
   let token = localStorage.getItem(TOKEN_KEY);
   const secretEl = document.getElementById('devSecret');
   const secret = secretEl ? secretEl.value.trim() : '';
+  const issuedFreshToken = !!secret;
 
   if (secret) {
     try {
@@ -1698,8 +1768,7 @@ async function connect() {
       localStorage.setItem(TOKEN_KEY, token);
       syncLoginPanel();
     } catch (err) {
-      showLogin();
-      setError(err.message || 'Login failed');
+      forceRelogin(err.message || 'Login failed', { clearToken: true });
       return;
     }
   } else if (!token) {
@@ -1721,23 +1790,24 @@ async function connect() {
   client.on('state', applyState);
   wireClientLifecycle(client);
   client.on('error', (e) => {
-    const msg = String(e.message || e.code || '');
-    if (e.code === 'session_revoked' || e.code === 'invalid_token' || msg.includes('token') || msg.includes("'sub'") || e.code === 'room_forbidden') {
-      localStorage.removeItem(TOKEN_KEY);
-    }
     if (e.code === 'session_revoked') {
-      showLogin();
-      setError('Signed out everywhere. Sign in again to reconnect.');
+      forceRelogin(reloginMessage(e), { clearToken: true });
       return;
     }
-    if (e.code === 'room_forbidden') {
-      showLogin();
-      setError('This room belongs to another account. Sign in with the dev secret for that account, or open the mobile link from your dashboard.');
+    if (e.code === 'invalid_token' || e.code === 'room_forbidden' || e.code === 'auth_required') {
+      forceRelogin(reloginMessage(e), { clearToken: true });
       return;
     }
     if (e.code === 'control_connection_limit') {
+      // Keep token — user can disconnect another device and retry.
+      if (client) {
+        try { client.disconnect(); } catch (_) { /* ignore */ }
+        client = null;
+      }
+      dockPresent = false;
+      setConnectionStatus('disconnected');
       showLogin();
-      setError(e.message || 'Too many devices controlling this table. Disconnect another phone or upgrade your plan.');
+      setError(reloginMessage(e));
       return;
     }
     setError(e.message || e.code || 'Connection failed');
@@ -1756,9 +1826,24 @@ async function connect() {
     }
     setConnectionStatus(dockPresent ? 'connected' : 'waiting');
   } catch (err) {
-    showLogin();
-    setError(err.message);
-    setConnectionStatus('disconnected');
+    if (err?.code === 'control_connection_limit') {
+      if (client) {
+        try { client.disconnect(); } catch (_) { /* ignore */ }
+        client = null;
+      }
+      dockPresent = false;
+      setConnectionStatus('disconnected');
+      showLogin();
+      setError(reloginMessage(err));
+      return;
+    }
+    // Freshly issued token + transient network: keep token so Connect can retry.
+    // Stale auto-connect / auth failures: wipe so login can succeed.
+    const clearToken = shouldClearSavedLogin(err) && !(
+      issuedFreshToken &&
+      (err?.code === 'connect_timeout' || err?.code === 'connection_closed' || err?.code === 'websocket_error')
+    );
+    forceRelogin(reloginMessage(err), { clearToken });
   }
 }
 
@@ -1771,17 +1856,15 @@ GAME_TYPES.forEach((g) => {
 });
 
 document.getElementById('connectBtn')?.addEventListener('click', connect);
+document.getElementById('devSecret')?.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    connect();
+  }
+});
 document.getElementById('clearTokenBtn')?.addEventListener('click', () => {
   if (!window.confirm('Clear saved login on this device? You will need to sign in again to connect.')) return;
-  localStorage.removeItem(TOKEN_KEY);
-  if (client) {
-    try { client.disconnect(); } catch (_) { /* ignore */ }
-    client = null;
-  }
-  dockPresent = false;
-  setError('');
-  setConnectionStatus('disconnected');
-  showLogin();
+  forceRelogin('', { clearToken: true });
   setActiveView('control');
 });
 wireCommands();
@@ -1794,9 +1877,15 @@ wireMobileNav();
 
 const boot = pathContext();
 if (boot.guestToken) {
-  connect().catch(() => {});
+  connect().catch((err) => {
+    show('connectingSection', false);
+    setConnectionStatus('disconnected');
+    setError(err?.message || 'Connection failed');
+  });
 } else if (localStorage.getItem(TOKEN_KEY) && boot.roomId) {
-  connect().catch(() => {});
+  connect().catch((err) => {
+    forceRelogin(reloginMessage(err), { clearToken: shouldClearSavedLogin(err) });
+  });
 } else {
   showLogin();
 }

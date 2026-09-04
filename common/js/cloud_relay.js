@@ -519,6 +519,9 @@
                 window.PlayerStats &&
                 typeof window.PlayerStats.canCallGame === 'function' &&
                 window.PlayerStats.canCallGame();
+            state.canResetScores = typeof window.canResetOrEndMatch === 'function'
+                ? window.canResetOrEndMatch()
+                : true;
             if (!state.gameType) {
                 state.gameType = dockStorage('gameType', 'game1') || 'game1';
             }

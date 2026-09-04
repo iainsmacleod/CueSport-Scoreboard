@@ -32,9 +32,47 @@ export class CloudClient {
     if (this.handlers[event]) this.handlers[event].push(fn);
   }
 
-  connect() {
+  connect(options = {}) {
+    const timeoutMs = Number.isFinite(options.timeoutMs) ? options.timeoutMs : 10000;
     return new Promise((resolve, reject) => {
-      this.ws = new WebSocket(this.wsUrl());
+      let settled = false;
+      let timeoutId = null;
+
+      const finish = (fn, value) => {
+        if (settled) return;
+        settled = true;
+        if (timeoutId != null) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+        fn(value);
+      };
+
+      const fail = (code, message) => {
+        const err = new Error(message || code || 'Connection failed');
+        err.code = code || 'connection_failed';
+        finish(reject, err);
+      };
+
+      try {
+        this.ws = new WebSocket(this.wsUrl());
+      } catch (err) {
+        fail('websocket_error', err.message || 'WebSocket error');
+        return;
+      }
+
+      timeoutId = setTimeout(() => {
+        try {
+          if (this.ws) {
+            this.ws.onclose = null;
+            this.ws.close();
+          }
+        } catch (_) { /* ignore */ }
+        this.ws = null;
+        this.connected = false;
+        fail('connect_timeout', 'Connection timed out — check your network and sign in again.');
+      }, timeoutMs);
+
       this.ws.onopen = () => {
         const msg = { type: 'join', client: this.client };
         if (this.guestToken) {
@@ -64,7 +102,7 @@ export class CloudClient {
             this.handlers.state.forEach((fn) => fn(data.state));
           }
           this.handlers.joined.forEach((fn) => fn(data));
-          resolve(data);
+          finish(resolve, data);
         } else if (data.type === 'state') {
           this.lastState = data.state || {};
           this.handlers.state.forEach((fn) => fn(this.lastState));
@@ -72,18 +110,23 @@ export class CloudClient {
           this.handlers.tables.forEach((fn) => fn(data.rooms || []));
         } else if (data.type === 'error') {
           this.handlers.error.forEach((fn) => fn(data));
-          if (!this.connected) reject(new Error(data.message || data.code));
+          if (!this.connected) {
+            fail(data.code || 'connection_failed', data.message || data.code || 'Connection failed');
+          }
         } else if (data.type === 'presence') {
           this.handlers.presence.forEach((fn) => fn(data.clients || []));
         }
       };
       this.ws.onerror = () => {
-        if (!this.connected) reject(new Error('WebSocket error'));
+        if (!this.connected) fail('websocket_error', 'WebSocket error');
       };
       this.ws.onclose = () => {
         const wasConnected = this.connected;
         this.connected = false;
         this.handlers.close.forEach((fn) => fn({ wasConnected }));
+        if (!wasConnected && !settled) {
+          fail('connection_closed', 'Connection closed before login completed.');
+        }
       };
     });
   }
@@ -104,7 +147,10 @@ export class CloudClient {
   disconnect() {
     if (this.ws) {
       this.ws.onclose = null;
-      this.ws.close();
+      this.ws.onerror = null;
+      this.ws.onmessage = null;
+      this.ws.onopen = null;
+      try { this.ws.close(); } catch (_) { /* ignore */ }
     }
     this.ws = null;
     this.connected = false;

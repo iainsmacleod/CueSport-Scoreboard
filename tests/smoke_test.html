@@ -3538,6 +3538,9 @@
                 parseInt(cp.getStorageItem('snookerFrameFoulsP2'), 10) === 0);
             assert('Snooker', 'Restart Match button stays danger',
                 resetBtn.classList.contains('danger-btn'));
+            assert('Snooker', 'Fresh start disables Restart Match',
+                resetBtn.classList.contains('disabled') ||
+                resetBtn.getAttribute('aria-disabled') === 'true');
 
             // Restore gold; leave panel on 8-Ball
             cp.setStorageItem('snookerGoldEnabled', prevSnookerGold);
