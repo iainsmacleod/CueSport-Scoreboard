@@ -139,13 +139,15 @@ function refreshAccessToken(refreshToken, clientIP) {
 
 function revokeSession(token) {
     try {
-        const decoded = jwt.decode(token);
+        // Must verify the signature — jwt.decode() alone lets anyone forge a sessionId
+        // and delete another user's session. Allow expired tokens so logout still works.
+        const decoded = jwt.verify(token, JWT_SECRET, { ignoreExpiration: true });
         if (decoded && decoded.sessionId) {
             activeSessions.delete(decoded.sessionId);
             return true;
         }
     } catch (error) {
-        // Ignore
+        // Invalid / forged token — do not touch the session store
     }
     return false;
 }
