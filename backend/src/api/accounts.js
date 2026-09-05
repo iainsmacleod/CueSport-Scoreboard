@@ -194,11 +194,11 @@ export async function registerAccountRoutes(app) {
       });
     }
     const { label } = request.body || {};
-    const created = sqlite.createApiKey(account.id, label || 'API Key');
+    const created = sqlite.createApiKey(account.id, label);
     return {
       id: created.id,
       key: created.plaintext,
-      label: label || 'API Key',
+      label: created.label,
       quota: getAccountQuota(account),
     };
   });

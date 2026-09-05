@@ -86,12 +86,14 @@
     function applyLoginResult(data) {
         if (!window.cloudRelay || !data) return;
         setConnectionMode('managed');
-        setStored('accessToken', data.access_token || '');
-        setStored('roomId', data.room?.id || '');
         setStored('signedInEmail', data.account?.email || '');
         // Managed OAuth uses access token; drop self-host key so toggle uses the session.
-        setStored('apiKey', '');
-        if (data.api_key) setStored('apiKey', data.api_key);
+        window.cloudRelay.setCredentials({
+            serverUrl: 'https://cuesports.macleod.systems',
+            accessToken: data.access_token || '',
+            roomId: data.room?.id || '',
+            apiKey: data.api_key || '',
+        });
         window.cloudRelay.updateCloudUI();
         closeCloudConnectionModal();
         alert(`Signed in as ${data.account?.email || 'user'}. Enable CueSport Cloud to connect.`);
@@ -126,7 +128,8 @@
         const managedUrl = 'https://cuesports.macleod.systems';
         setStored('serverUrl', managedUrl);
         if (window.cloudRelay) {
-            window.cloudRelay.setCredentials({ serverUrl: managedUrl });
+            // Drop self-host dock key so Managed mode cannot keep joining with a stale key.
+            window.cloudRelay.setCredentials({ serverUrl: managedUrl, apiKey: '' });
         }
         syncConnectionPaneUI('managed');
     }
@@ -181,7 +184,7 @@
             return;
         }
         setConnectionMode('selfhost');
-        // Self-host uses dock key; clear managed session token so join uses the key.
+        // Self-host uses dock key; clear managed session token / room so join uses the key only.
         window.cloudRelay.setCredentials({
             serverUrl: serverUrl || undefined,
             apiKey: apiKey || undefined,

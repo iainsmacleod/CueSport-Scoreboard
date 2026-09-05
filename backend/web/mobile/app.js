@@ -6,7 +6,7 @@ import {
   revokeGuestLink,
   fetchPlayers,
   GAME_TYPES,
-} from '../shared/cloud-client.js?v=8.0.0.1';
+} from '../shared/cloud-client.js?v=8.0.0.3';
 
 const TOKEN_KEY = 'cuesport_token';
 let client = null;
@@ -15,6 +15,16 @@ let lastState = {};
 let raceDirty = false;
 let gameInfoDirty = false;
 let dockPresent = false;
+/** Keep trying to stay joined (admin or guest) until sign-out / revoke. */
+let wantConnection = false;
+let reconnectTimer = null;
+let reconnectAttempt = 0;
+let reconnectInFlight = false;
+/** Bumps on every connect attempt so superseded joins cannot clear the reconnect UI. */
+let connectEpoch = 0;
+let connectionHiddenAt = 0;
+/** Ignore pageshow/visibility ensureConnection until the first boot connect is kicked off. */
+let bootConnectStarted = false;
 
 let guestToken = '';
 let isGuestMode = false;
@@ -361,9 +371,87 @@ function setConnectionStatus(kind) {
   updateControlsLock();
 }
 
+function connectionIsOpen() {
+  return !!(client && typeof client.isOpen === 'function' && client.isOpen());
+}
+
+function clearReconnectTimer() {
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+}
+
+function setReconnectBanner(visible, message) {
+  const banner = document.getElementById('reconnectBanner');
+  const text = document.getElementById('reconnectBannerText');
+  if (!banner) return;
+  if (text && message) text.textContent = message;
+  banner.classList.toggle('hidden', !visible);
+}
+
+function scheduleReconnect() {
+  if (!wantConnection) return;
+  clearReconnectTimer();
+  const delay = Math.min(10000, 800 * (2 ** Math.min(reconnectAttempt, 4)));
+  reconnectAttempt += 1;
+  reconnectTimer = setTimeout(() => {
+    reconnectQuiet().catch(() => {});
+  }, delay);
+}
+
+/**
+ * Soft reconnect without bouncing back to the Connecting splash when possible.
+ * Not a poll — only runs on close, visibility return, online, or Reconnect tap.
+ */
+async function reconnectQuiet(options = {}) {
+  if (!wantConnection || reconnectInFlight) return;
+  const force = !!(options && options.force);
+  if (!force && connectionIsOpen()) {
+    setReconnectBanner(false);
+    return;
+  }
+  reconnectInFlight = true;
+  setReconnectBanner(true, 'Reconnecting…');
+  try {
+    await connect({ quiet: true });
+    if (!wantConnection) return;
+    if (connectionIsOpen()) {
+      reconnectAttempt = 0;
+      setReconnectBanner(false);
+      return;
+    }
+    // Join resolved but socket already gone (race / deploy) — keep CTA visible.
+    setReconnectBanner(true, 'Connection lost — tap Reconnect');
+    scheduleReconnect();
+  } catch (err) {
+    if (!wantConnection) return;
+    if (shouldClearSavedLogin(err)) {
+      forceRelogin(reloginMessage(err), { clearToken: true });
+      return;
+    }
+    setReconnectBanner(true, 'Connection lost — tap Reconnect');
+    scheduleReconnect();
+  } finally {
+    reconnectInFlight = false;
+  }
+}
+
+function ensureConnection(options = {}) {
+  if (!wantConnection) return;
+  const force = !!(options && options.force);
+  if (!force && connectionIsOpen()) {
+    setReconnectBanner(false);
+    return;
+  }
+  clearReconnectTimer();
+  reconnectAttempt = 0;
+  reconnectQuiet({ force: true }).catch(() => {});
+}
+
 /** Controls require a live cloud socket AND a dock in the room. */
 function controlsEnabled() {
-  return !!(client && client.connected && dockPresent);
+  return !!(connectionIsOpen() && dockPresent);
 }
 
 function updateControlsLock() {
@@ -380,12 +468,18 @@ function updateControlsLock() {
 
 function wireClientLifecycle(c) {
   c.on('presence', (clients) => {
+    if (client !== c) return;
     dockPresent = (clients || []).includes('dock');
     setConnectionStatus(dockPresent ? 'connected' : 'waiting');
   });
   c.on('close', () => {
+    if (client !== c) return;
     dockPresent = false;
     setConnectionStatus('disconnected');
+    if (wantConnection) {
+      setReconnectBanner(true, 'Connection lost — tap Reconnect');
+      scheduleReconnect();
+    }
   });
 }
 
@@ -417,22 +511,31 @@ function showControl() {
   showMobileNav(true);
 }
 
-/** True when the failure means the saved admin login should be discarded. */
+/** Auth failures that require discarding the saved admin login. */
 function shouldClearSavedLogin(err) {
   const code = err?.code || '';
-  const msg = String(err?.message || err || '');
   if (
     code === 'session_revoked' ||
     code === 'invalid_token' ||
     code === 'room_forbidden' ||
-    code === 'connect_timeout' ||
-    code === 'connection_closed' ||
-    code === 'websocket_error' ||
     code === 'auth_required'
   ) {
     return true;
   }
-  return /token|sign in|session revoked|unauthorized|expired/i.test(msg);
+  const msg = String(err?.message || err || '');
+  // Network / timeout must NOT clear the token — that breaks mobile resume.
+  if (isTransientConnectError(err)) return false;
+  return /session revoked|unauthorized|invalid token|expired token/i.test(msg);
+}
+
+function isTransientConnectError(err) {
+  const code = err?.code || '';
+  return (
+    code === 'connect_timeout' ||
+    code === 'connection_closed' ||
+    code === 'websocket_error' ||
+    code === 'connection_failed'
+  );
 }
 
 function reloginMessage(err) {
@@ -449,10 +552,24 @@ function reloginMessage(err) {
   if (code === 'invalid_token' || code === 'auth_required') {
     return 'Saved login expired. Sign in again to reconnect.';
   }
-  if (code === 'connect_timeout' || code === 'connection_closed' || code === 'websocket_error') {
-    return 'Couldn\'t connect — saved login was cleared. Sign in again to retry.';
+  if (isTransientConnectError(err)) {
+    return 'Couldn\'t connect — check your network and tap Reconnect.';
   }
   return err?.message || err?.code || 'Connection failed. Sign in again.';
+}
+
+/** Keep the control shell + reconnect CTA; never wipe the token. */
+function stayConnectedWithRetry(message) {
+  wantConnection = true;
+  dockPresent = false;
+  setConnectionStatus('disconnected');
+  show('connectingSection', false);
+  show('loginSection', false);
+  show('controlSection', true);
+  showMobileNav(true);
+  setReconnectBanner(true, message || 'Connection lost — tap Reconnect');
+  setError('');
+  scheduleReconnect();
 }
 
 /**
@@ -460,6 +577,9 @@ function reloginMessage(err) {
  * Used for revoke, expired token, and hung connect recovery.
  */
 function forceRelogin(reason, { clearToken = true } = {}) {
+  wantConnection = false;
+  clearReconnectTimer();
+  setReconnectBanner(false);
   if (clearToken) localStorage.removeItem(TOKEN_KEY);
   if (client) {
     try { client.disconnect(); } catch (_) { /* ignore */ }
@@ -474,12 +594,17 @@ function forceRelogin(reason, { clearToken = true } = {}) {
 
 function setError(msg) {
   const text = msg || '';
-  ['loginError', 'error'].forEach((id) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.textContent = text;
-    el.classList.toggle('hidden', !text);
-  });
+  const onLogin = !document.getElementById('loginSection')?.classList.contains('hidden');
+  const loginErr = document.getElementById('loginError');
+  const pageErr = document.getElementById('error');
+  if (loginErr) {
+    loginErr.textContent = onLogin ? text : '';
+    loginErr.classList.toggle('hidden', !onLogin || !text);
+  }
+  if (pageErr) {
+    pageErr.textContent = onLogin ? '' : text;
+    pageErr.classList.toggle('hidden', onLogin || !text);
+  }
 }
 
 function gameTypeLabel(id) {
@@ -595,8 +720,7 @@ function applyState(state) {
   const metaParts = [
     gameTypeLabel(state.gameType),
     state.raceInfo ? `${state.raceLabel || 'Race'} ${state.raceInfo}` : null,
-    dual ? `${primaryLabel} + ${secondaryLabel}` : null,
-    state.ballScoringEnabled ? 'Ball scoring on' : null,
+    (state.gameInfo || '').trim() || null,
   ].filter(Boolean);
   document.getElementById('liveMeta').textContent = metaParts.join(' · ');
 
@@ -855,8 +979,53 @@ function updateMobileRackFoulDisplay(state) {
   const active = String(state.activePlayer || '1');
   if (p1Wrap) p1Wrap.classList.toggle('is-active', active === '1');
   if (p2Wrap) p2Wrap.classList.toggle('is-active', active === '2');
-  const period = state.gameType === 'game8' ? 'frame' : 'rack';
+  const snooker = !!(snapshot && snapshot.snooker) || state.gameType === 'game8';
+  const period = snooker ? 'frame' : 'rack';
   counter.title = `Fouls this ${period}`;
+
+  const statsRow = document.getElementById('rackSnookerStatsRow');
+  const breakGroup = document.getElementById('rackBreakGroup');
+  const statsSep = document.getElementById('rackSnookerStatsSep');
+  const ptsValue = document.getElementById('rackPointsRemainingValue');
+  const breakLabel = document.getElementById('rackCurrentBreakLabel');
+  const breakBallsEl = document.getElementById('rackBreakBalls');
+  const currentBreak = Number(
+    snapshot && snapshot.snookerCurrentBreak != null
+      ? snapshot.snookerCurrentBreak
+      : state.snookerCurrentBreak
+  ) || 0;
+  const pointsRemaining = Number(
+    snapshot && snapshot.snookerPointsRemaining != null
+      ? snapshot.snookerPointsRemaining
+      : state.snookerPointsRemaining
+  ) || 0;
+  const breakBalls = (
+    snapshot && Array.isArray(snapshot.snookerBreakBalls)
+      ? snapshot.snookerBreakBalls
+      : (Array.isArray(state.snookerBreakBalls) ? state.snookerBreakBalls : [])
+  );
+  const showBreak = snooker && currentBreak > 0;
+  if (statsRow) statsRow.classList.toggle('hidden', !snooker);
+  if (breakGroup) breakGroup.classList.toggle('hidden', !showBreak);
+  if (statsSep) statsSep.classList.toggle('hidden', !showBreak);
+  if (ptsValue && snooker) ptsValue.textContent = String(pointsRemaining);
+  if (breakLabel) breakLabel.textContent = `Break ${currentBreak}`;
+  if (breakBallsEl) {
+    breakBallsEl.innerHTML = '';
+    if (showBreak) {
+      breakBalls.forEach((ball) => {
+        if (!ball || !(ball.count > 0)) return;
+        const el = document.createElement('span');
+        el.className = 'rack-break-ball';
+        el.style.setProperty('--break-ball-color', ball.color || '#90a4ae');
+        el.dataset.ball = ball.key || '';
+        el.title = `${ball.key || 'ball'} × ${ball.count}`;
+        el.setAttribute('aria-label', `${ball.key || 'ball'} potted ${ball.count} times`);
+        el.textContent = String(ball.count);
+        breakBallsEl.appendChild(el);
+      });
+    }
+  }
 }
 
 function renderBallGrid(state) {
@@ -1285,7 +1454,7 @@ function syncSaveIcons() {
 }
 
 function controlLockMessage() {
-  if (!client || !client.connected) return 'Not connected to cloud — controls are paused';
+  if (!connectionIsOpen()) return 'Not connected to cloud — controls are paused';
   if (!dockPresent) return 'Waiting for dock — controls are paused';
   return 'Controls are paused';
 }
@@ -1695,13 +1864,23 @@ function wireReplayClearButtons() {
   });
 }
 
-async function connect() {
+async function connect(options = {}) {
+  const quiet = !!(options && options.quiet);
+  const epoch = ++connectEpoch;
   setError('');
   const ctx = pathContext();
   guestToken = ctx.guestToken || '';
   isGuestMode = !!guestToken;
   roomId = ctx.roomId || '';
-  showConnecting();
+  wantConnection = true;
+  if (quiet) {
+    setReconnectBanner(true, 'Reconnecting…');
+  } else {
+    showConnecting();
+    setReconnectBanner(false);
+  }
+
+  const isCurrent = () => epoch === connectEpoch;
 
   if (isGuestMode) {
     applyGuestUI();
@@ -1716,7 +1895,11 @@ async function connect() {
     client.on('state', applyState);
     wireClientLifecycle(client);
     client.on('error', (e) => {
+      if (!isCurrent()) return;
       if (e.code === 'guest_revoked' || e.code === 'invalid_guest_token') {
+        wantConnection = false;
+        clearReconnectTimer();
+        setReconnectBanner(false);
         show('controlSection', false);
         showMobileNav(false);
         show('connectingSection', false);
@@ -1728,6 +1911,7 @@ async function connect() {
     });
     try {
       const joined = await client.connect();
+      if (!isCurrent()) return;
       showControl();
       dockPresent = (joined.clients || []).includes('dock');
       if (joined.state && Object.keys(joined.state).length) {
@@ -1737,19 +1921,31 @@ async function connect() {
         initialViewChosen = false;
       }
       setConnectionStatus(dockPresent ? 'connected' : 'waiting');
+      reconnectAttempt = 0;
+      if (connectionIsOpen()) setReconnectBanner(false);
+      else setReconnectBanner(true, 'Connection lost — tap Reconnect');
     } catch (err) {
+      if (!isCurrent()) throw err;
       show('connectingSection', false);
       setConnectionStatus('disconnected');
       if (err?.code === 'guest_revoked' || err?.code === 'invalid_guest_token') {
+        wantConnection = false;
+        clearReconnectTimer();
+        setReconnectBanner(false);
         setError('This guest link has been revoked.');
-      } else {
-        setError(err.message || 'Connection failed');
+        return;
       }
+      if (quiet) {
+        setReconnectBanner(true, 'Connection lost — tap Reconnect');
+        throw err;
+      }
+      setError(err.message || 'Connection failed');
     }
     return;
   }
 
   if (!roomId) {
+    wantConnection = false;
     showLogin();
     setError('Room ID missing in URL (/m/{room_id})');
     return;
@@ -1758,19 +1954,21 @@ async function connect() {
   let token = localStorage.getItem(TOKEN_KEY);
   const secretEl = document.getElementById('devSecret');
   const secret = secretEl ? secretEl.value.trim() : '';
-  const issuedFreshToken = !!secret;
 
   if (secret) {
     try {
       const data = await devLogin(window.location.origin, secret);
+      if (!isCurrent()) return;
       token = data.access_token;
       localStorage.setItem(TOKEN_KEY, token);
       syncLoginPanel();
     } catch (err) {
+      if (!isCurrent()) return;
       forceRelogin(err.message || 'Login failed', { clearToken: true });
       return;
     }
   } else if (!token) {
+    wantConnection = false;
     showLogin();
     setError('Sign in on the dashboard first, or enter the dev auth secret.');
     return;
@@ -1789,6 +1987,7 @@ async function connect() {
   client.on('state', applyState);
   wireClientLifecycle(client);
   client.on('error', (e) => {
+    if (!isCurrent()) return;
     if (e.code === 'session_revoked') {
       forceRelogin(reloginMessage(e), { clearToken: true });
       return;
@@ -1799,12 +1998,15 @@ async function connect() {
     }
     if (e.code === 'control_connection_limit') {
       // Keep token — user can disconnect another device and retry.
+      wantConnection = false;
+      clearReconnectTimer();
       if (client) {
         try { client.disconnect(); } catch (_) { /* ignore */ }
         client = null;
       }
       dockPresent = false;
       setConnectionStatus('disconnected');
+      setReconnectBanner(false);
       showLogin();
       setError(reloginMessage(e));
       return;
@@ -1814,35 +2016,52 @@ async function connect() {
 
   try {
     const joined = await client.connect();
+    if (!isCurrent()) return;
     showControl();
     dockPresent = (joined.clients || []).includes('dock');
     if (joined.state && Object.keys(joined.state).length) {
       applyState(joined.state);
-    } else {
+    } else if (!quiet) {
       // No dock state yet — start on Setup so names/game info can be prepared.
       setActiveView('setup');
       initialViewChosen = false;
     }
     setConnectionStatus(dockPresent ? 'connected' : 'waiting');
+    reconnectAttempt = 0;
+    if (connectionIsOpen()) setReconnectBanner(false);
+    else {
+      setReconnectBanner(true, 'Connection lost — tap Reconnect');
+      scheduleReconnect();
+    }
   } catch (err) {
+    if (!isCurrent()) throw err;
     if (err?.code === 'control_connection_limit') {
+      wantConnection = false;
+      clearReconnectTimer();
       if (client) {
         try { client.disconnect(); } catch (_) { /* ignore */ }
         client = null;
       }
       dockPresent = false;
       setConnectionStatus('disconnected');
+      setReconnectBanner(false);
       showLogin();
       setError(reloginMessage(err));
       return;
     }
-    // Freshly issued token + transient network: keep token so Connect can retry.
-    // Stale auto-connect / auth failures: wipe so login can succeed.
-    const clearToken = shouldClearSavedLogin(err) && !(
-      issuedFreshToken &&
-      (err?.code === 'connect_timeout' || err?.code === 'connection_closed' || err?.code === 'websocket_error')
-    );
-    forceRelogin(reloginMessage(err), { clearToken });
+    if (quiet) {
+      // Transient drops must not wipe the saved login.
+      dockPresent = false;
+      setConnectionStatus('disconnected');
+      setReconnectBanner(true, 'Connection lost — tap Reconnect');
+      throw err;
+    }
+    // Network blips: keep token and offer Reconnect (do not bounce to login).
+    if (isTransientConnectError(err) && localStorage.getItem(TOKEN_KEY)) {
+      stayConnectedWithRetry('Connection lost — tap Reconnect');
+      return;
+    }
+    forceRelogin(reloginMessage(err), { clearToken: shouldClearSavedLogin(err) });
   }
 }
 
@@ -1866,6 +2085,32 @@ document.getElementById('clearTokenBtn')?.addEventListener('click', () => {
   forceRelogin('', { clearToken: true });
   setActiveView('control');
 });
+document.getElementById('reconnectBtn')?.addEventListener('click', () => {
+  ensureConnection({ force: true });
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    connectionHiddenAt = Date.now();
+    return;
+  }
+  if (!wantConnection || !bootConnectStarted) return;
+  const awayMs = connectionHiddenAt ? Date.now() - connectionHiddenAt : 0;
+  connectionHiddenAt = 0;
+  // Event-driven only: force a fresh join after a long background (zombie sockets).
+  ensureConnection({ force: awayMs >= 15000 || !connectionIsOpen() });
+});
+
+window.addEventListener('pageshow', (ev) => {
+  if (!wantConnection || !bootConnectStarted) return;
+  if (ev.persisted) ensureConnection({ force: true });
+  else if (!document.hidden) ensureConnection();
+});
+
+window.addEventListener('online', () => {
+  if (wantConnection && bootConnectStarted) ensureConnection({ force: true });
+});
+
 wireCommands();
 wireReplayClearButtons();
 wireSetupPanel();
@@ -1874,17 +2119,24 @@ wireMatchConfirmModal();
 wireSnookerFoulModal();
 wireMobileNav();
 
+function startBootConnect(message) {
+  wantConnection = true;
+  bootConnectStarted = true;
+  show('connectingSection', false);
+  show('loginSection', false);
+  show('controlSection', true);
+  showMobileNav(true);
+  setConnectionStatus('disconnected');
+  setReconnectBanner(true, message || 'Connecting…');
+  ensureConnection({ force: true });
+}
+
 const boot = pathContext();
 if (boot.guestToken) {
-  connect().catch((err) => {
-    show('connectingSection', false);
-    setConnectionStatus('disconnected');
-    setError(err?.message || 'Connection failed');
-  });
+  startBootConnect('Connecting…');
 } else if (localStorage.getItem(TOKEN_KEY) && boot.roomId) {
-  connect().catch((err) => {
-    forceRelogin(reloginMessage(err), { clearToken: shouldClearSavedLogin(err) });
-  });
+  // Single entry point — avoids racing pageshow against a parallel quiet connect.
+  startBootConnect('Connecting…');
 } else {
   showLogin();
 }

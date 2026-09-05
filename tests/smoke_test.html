@@ -368,9 +368,9 @@
                 (cp.document.getElementById('player2DetailLabel').textContent || '').indexOf('Player/Team 2') !== -1);
             assert('Core', 'Setup Game Selection header',
                 (cp.document.getElementById('gameDetailLabel').textContent || '').trim() === 'Game Selection');
-            assert('Core', 'Setup Game Information header',
-                (cp.document.getElementById('gameInformationLabel').textContent || '').trim() === 'Game Information');
-            assert('Core', 'Game Information precedes race fields',
+            assert('Core', 'Setup Event Information header',
+                (cp.document.getElementById('gameInformationLabel').textContent || '').trim() === 'Event Information');
+            assert('Core', 'Event Information precedes race fields',
                 cp.document.getElementById('raceInfoTxt').closest('.setup-info-row')
                     .previousElementSibling === cp.document.getElementById('gameInformationLabel'));
             assert('Core', 'Ball tracker uses single panel div',

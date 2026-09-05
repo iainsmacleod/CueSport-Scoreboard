@@ -148,6 +148,20 @@ export function summarizeAccountStats(events) {
     }
 
     const result = resolveMatchResult(ep.winnerSlot, ep.scores);
+    const startedAt = start.created_at;
+    const completedAt = end ? end.created_at : null;
+    let durationSeconds = Number(ep.durationSeconds);
+    if (!Number.isFinite(durationSeconds) || durationSeconds < 0) {
+      durationSeconds = null;
+      if (startedAt && completedAt) {
+        const startMs = Date.parse(String(startedAt).includes('T') ? startedAt : String(startedAt).replace(' ', 'T') + 'Z');
+        const endMs = Date.parse(String(completedAt).includes('T') ? completedAt : String(completedAt).replace(' ', 'T') + 'Z');
+        if (Number.isFinite(startMs) && Number.isFinite(endMs) && endMs >= startMs) {
+          durationSeconds = Math.round((endMs - startMs) / 1000);
+        }
+      }
+    }
+    const racks = Array.isArray(ep.racks) ? ep.racks : [];
     const match = {
       id: start.payload?.sessionId || start.session_id || start.id,
       startEventId: start.id,
@@ -158,11 +172,13 @@ export function summarizeAccountStats(events) {
       player2Name: p2Name,
       gameType,
       gameInfo: String(ep.gameInfo != null ? ep.gameInfo : (sp.gameInfo || '')).trim(),
-      startedAt: start.created_at,
-      completedAt: end ? end.created_at : null,
+      startedAt,
+      completedAt,
+      durationSeconds,
       status: end ? 'completed' : 'active',
       winnerSlot: result.isDraw ? 'draw' : result.winnerSlot,
       scores: ep.scores || null,
+      racks,
       reason: ep.reason || null,
       ...extras,
     };

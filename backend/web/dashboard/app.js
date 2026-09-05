@@ -14,7 +14,7 @@ import {
   invalidateAllSessions,
   revokeAllGuestLinks,
   GAME_TYPES,
-} from '../shared/cloud-client.js?v=8.0.0.1';
+} from '../shared/cloud-client.js?v=8.0.0.2';
 
 const TOKEN_KEY = 'cuesport_token';
 const SERVER_KEY = 'cuesport_server';
@@ -219,7 +219,7 @@ function renderQuota(quota) {
   const { tier, limits, usage } = quota;
   if (el) {
     el.textContent =
-      `Plan: ${tier} · OBS Dock Keys ${usage.apiKeys}/${limits.maxApiKeys} · ` +
+      `Plan: ${tier} · Dock seats (keys) ${usage.apiKeys}/${limits.maxApiKeys} · ` +
       `Tables ${usage.rooms}/${limits.maxRooms} · ` +
       `Mobile/guest up to ${limits.maxControlConnectionsPerRoom} per table`;
   }
@@ -227,7 +227,7 @@ function renderQuota(quota) {
   if (createBtn) createBtn.disabled = atKeyLimit;
   if (hint) {
     if (atKeyLimit) {
-      hint.textContent = `OBS Dock Key limit reached (${limits.maxApiKeys} on ${tier}). Revoke a key to create another.`;
+      hint.textContent = `Dock key limit reached (${limits.maxApiKeys} on ${tier}). Each key connects one dock — revoke an unused key to create another.`;
       hint.classList.remove('hidden');
     } else {
       hint.classList.add('hidden');
@@ -330,9 +330,89 @@ function formatStatsTime(value) {
   });
 }
 
-/** Recent matches date cell: date on first line, time below. */
+function formatMatchDuration(startedAt, completedAt, durationSeconds) {
+  let secs = Number(durationSeconds);
+  if (!Number.isFinite(secs) || secs < 0) {
+    secs = computeDurationSeconds(startedAt, completedAt);
+  }
+  return formatDurationSeconds(secs);
+}
+
+function parseIsoMs(iso) {
+  if (!iso) return NaN;
+  const raw = String(iso);
+  const normalized = raw.includes('T') ? raw : raw.replace(' ', 'T') + (raw.includes('Z') || raw.includes('+') ? '' : 'Z');
+  const ms = Date.parse(normalized);
+  return Number.isFinite(ms) ? ms : NaN;
+}
+
+function computeDurationSeconds(startedAt, endedAt) {
+  const startMs = parseIsoMs(startedAt);
+  const endMs = parseIsoMs(endedAt);
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < startMs) return null;
+  return Math.round((endMs - startMs) / 1000);
+}
+
+function formatDurationSeconds(durationSeconds) {
+  let secs = Number(durationSeconds);
+  if (!Number.isFinite(secs) || secs < 0) return '';
+  secs = Math.round(secs);
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return s ? `${m}m ${s}s` : `${m}m`;
+  return `${s}s`;
+}
+
+function enrichRacksWithDuration(match) {
+  const racks = Array.isArray(match && match.racks) ? match.racks : [];
+  let prevEnd = match && match.startedAt;
+  return racks.map((r) => {
+    const copy = { ...(r || {}) };
+    const hasDur = Number.isFinite(Number(copy.durationSeconds)) && Number(copy.durationSeconds) >= 0;
+    if (!hasDur) {
+      const start = copy.startedAt || prevEnd;
+      const end = copy.timestamp;
+      const dur = computeDurationSeconds(start, end);
+      if (dur != null) {
+        if (!copy.startedAt && start) copy.startedAt = start;
+        copy.durationSeconds = dur;
+      }
+    }
+    prevEnd = copy.timestamp || copy.startedAt || prevEnd;
+    return copy;
+  });
+}
+
+function sumRackDurationSeconds(match) {
+  let sum = 0;
+  let any = false;
+  enrichRacksWithDuration(match).forEach((r) => {
+    const dur = Number(r.durationSeconds);
+    if (Number.isFinite(dur) && dur >= 0) {
+      sum += dur;
+      any = true;
+    }
+  });
+  return any ? sum : null;
+}
+
+function getMatchDurationSeconds(match) {
+  if (!match) return null;
+  let secs = Number(match.durationSeconds);
+  if (Number.isFinite(secs) && secs >= 0) return secs;
+  secs = computeDurationSeconds(match.startedAt, match.completedAt);
+  if (secs != null) return secs;
+  return sumRackDurationSeconds(match);
+}
+
+/** Recent matches date cell: date on first line, time (+ duration) below. */
 function matchDateCellHtml(value, options = {}) {
   const inProgress = !!options.inProgress;
+  const duration = !inProgress
+    ? formatMatchDuration(options.startedAt, options.completedAt, options.durationSeconds)
+    : '';
   if (!value && !inProgress) {
     return '<span class="stats-match-date">—</span>';
   }
@@ -345,11 +425,12 @@ function matchDateCellHtml(value, options = {}) {
   }
   const dateStr = formatStatsDate(value);
   const timeStr = formatStatsTime(value);
-  if (!timeStr) {
+  const secondLine = [timeStr, duration].filter(Boolean).join(' · ');
+  if (!secondLine) {
     return `<span class="stats-match-date">${escapeHtml(dateStr)}</span>`;
   }
   return `<span class="stats-match-date">${escapeHtml(dateStr)}</span>` +
-    `<span class="stats-match-time">${escapeHtml(timeStr)}</span>`;
+    `<span class="stats-match-time">${escapeHtml(secondLine)}</span>`;
 }
 
 function winPct(won, lost, drawn = 0) {
@@ -578,14 +659,135 @@ function matchPairHtml(m) {
   return `${p1} vs ${p2}`;
 }
 
+function rackWinnerName(m, rack) {
+  const slot = rack && rack.winnerSlot != null ? String(rack.winnerSlot) : '';
+  if (slot === '1') return m.player1Name || 'Player 1';
+  if (slot === '2') return m.player2Name || 'Player 2';
+  return '—';
+}
+
+/** Dock-equivalent per-rack/frame breakdown for cloud matches. */
+function renderMatchRackBreakdown(m, options = {}) {
+  const timedRacks = enrichRacksWithDuration(m);
+  if (!timedRacks.length) return '';
+  const viewerKey = options.viewerPlayerKey
+    ? String(options.viewerPlayerKey).toLowerCase()
+    : '';
+  const p1Key = String(m.player1Name || '').toLowerCase();
+  const p2Key = String(m.player2Name || '').toLowerCase();
+  const viewerIsP1 = viewerKey && viewerKey === p1Key;
+  const viewerIsP2 = viewerKey && viewerKey === p2Key;
+  const hasViewer = viewerIsP1 || viewerIsP2;
+  const isSnooker = m.gameType === 'game8';
+  const isStraight = m.gameType === 'game4';
+  const p1Name = escapeHtml(m.player1Name || 'Player 1');
+  const p2Name = escapeHtml(m.player2Name || 'Player 2');
+  const unit = isSnooker ? 'Frames' : 'Racks';
+
+  const durationCell = (r) => formatDurationSeconds(r.durationSeconds) || '—';
+  const durationFooter = () => {
+    const playingLabel = formatDurationSeconds(sumRackDurationSeconds(m));
+    const matchLabel = formatDurationSeconds(getMatchDurationSeconds(m));
+    if (!playingLabel && !matchLabel) return '';
+    const parts = [];
+    if (playingLabel) parts.push(`${unit} total ${playingLabel}`);
+    if (matchLabel && matchLabel !== playingLabel) parts.push(`Match ${matchLabel}`);
+    else if (matchLabel && !playingLabel) parts.push(`Match ${matchLabel}`);
+    return `<div class="stats-match-duration-footer">${escapeHtml(parts.join(' · '))}</div>`;
+  };
+
+  let header = '';
+  let rows = '';
+  if (isSnooker) {
+    header = hasViewer
+      ? '<tr><th>#</th><th>Points</th><th>HB</th><th>Fouls</th><th>Result</th><th>Duration</th></tr>'
+      : `<tr><th>#</th><th>Points</th><th>HB ${p1Name}</th><th>HB ${p2Name}</th><th>Fouls ${p1Name}</th><th>Fouls ${p2Name}</th><th>Winner</th><th>Duration</th></tr>`;
+    rows = timedRacks.map((r) => {
+      const num = r.rackNumber || '';
+      const fs = r.frameScore || { p1: 0, p2: 0 };
+      const hb1 = Number(r.highestBreakP1) || 0;
+      const hb2 = Number(r.highestBreakP2) || 0;
+      const f1 = Number(r.foulsP1) || 0;
+      const f2 = Number(r.foulsP2) || 0;
+      const dur = durationCell(r);
+      if (!hasViewer) {
+        return `<tr><td>${num}</td><td>${fs.p1}–${fs.p2}</td><td>${hb1}</td><td>${hb2}</td><td>${f1}</td><td>${f2}</td><td>${escapeHtml(rackWinnerName(m, r))}</td><td>${dur}</td></tr>`;
+      }
+      const pts = viewerIsP1 ? `${fs.p1}–${fs.p2}` : `${fs.p2}–${fs.p1}`;
+      const hb = viewerIsP1 ? `${hb1}–${hb2}` : `${hb2}–${hb1}`;
+      const fouls = viewerIsP1 ? `${f1}–${f2}` : `${f2}–${f1}`;
+      const slot = r.winnerSlot != null ? String(r.winnerSlot) : '';
+      let result = '—';
+      if (slot === '1' || slot === '2') {
+        const won = (slot === '1' && viewerIsP1) || (slot === '2' && viewerIsP2);
+        result = won ? 'Won' : 'Lost';
+      }
+      return `<tr><td>${num}</td><td>${pts}</td><td>${hb}</td><td>${fouls}</td><td>${result}</td><td>${dur}</td></tr>`;
+    }).join('');
+  } else if (isStraight) {
+    header = hasViewer
+      ? '<tr><th>#</th><th>Run</th><th>Result</th><th>Duration</th></tr>'
+      : `<tr><th>#</th><th>Run ${p1Name}</th><th>Run ${p2Name}</th><th>Winner</th><th>Duration</th></tr>`;
+    rows = timedRacks.map((r) => {
+      const num = r.rackNumber || '';
+      const hb1 = Number(r.highestRunP1 != null ? r.highestRunP1 : r.highestBreakP1) || 0;
+      const hb2 = Number(r.highestRunP2 != null ? r.highestRunP2 : r.highestBreakP2) || 0;
+      const dur = durationCell(r);
+      if (!hasViewer) {
+        return `<tr><td>${num}</td><td>${hb1}</td><td>${hb2}</td><td>${escapeHtml(rackWinnerName(m, r))}</td><td>${dur}</td></tr>`;
+      }
+      const run = viewerIsP1 ? `${hb1}–${hb2}` : `${hb2}–${hb1}`;
+      const slot = r.winnerSlot != null ? String(r.winnerSlot) : '';
+      let result = '—';
+      if (slot === '1' || slot === '2') {
+        const won = (slot === '1' && viewerIsP1) || (slot === '2' && viewerIsP2);
+        result = won ? 'Won' : 'Lost';
+      }
+      return `<tr><td>${num}</td><td>${run}</td><td>${result}</td><td>${dur}</td></tr>`;
+    }).join('');
+  } else {
+    header = hasViewer
+      ? '<tr><th>#</th><th>Result</th><th>Duration</th></tr>'
+      : '<tr><th>#</th><th>Winner</th><th>Duration</th></tr>';
+    rows = timedRacks.map((r) => {
+      const num = r.rackNumber || '';
+      const dur = durationCell(r);
+      if (!hasViewer) {
+        return `<tr><td>${num}</td><td>${escapeHtml(rackWinnerName(m, r))}</td><td>${dur}</td></tr>`;
+      }
+      const slot = r.winnerSlot != null ? String(r.winnerSlot) : '';
+      let result = '—';
+      if (slot === '1' || slot === '2') {
+        const won = (slot === '1' && viewerIsP1) || (slot === '2' && viewerIsP2);
+        result = won ? 'Won' : 'Lost';
+      }
+      return `<tr><td>${num}</td><td>${result}</td><td>${dur}</td></tr>`;
+    }).join('');
+  }
+
+  return `<div class="stats-match-racks-wrap">
+    <table class="stats-table stats-rack-detail-table"><thead>${header}</thead><tbody>${rows}</tbody></table>
+    ${durationFooter()}
+  </div>`;
+}
+
+function matchDateOptions(m, inProgress) {
+  return {
+    inProgress,
+    startedAt: m.startedAt,
+    completedAt: m.completedAt,
+    durationSeconds: getMatchDurationSeconds(m),
+  };
+}
+
 function matchOverviewRow(m) {
   const inProgress = isMatchInProgress(m);
   const actions = inProgress
     ? '<span class="stats-match-live-badge">Live</span>'
     : `<button type="button" class="btn" data-edit-match="${escapeHtml(m.startEventId)}">Edit</button>`;
-  return `
+  const main = `
     <tr class="${inProgress ? 'stats-match-in-progress' : ''}">
-      <td class="stats-match-when">${matchDateCellHtml(m.startedAt || m.completedAt, { inProgress })}</td>
+      <td class="stats-match-when">${matchDateCellHtml(m.completedAt || m.startedAt, matchDateOptions(m, inProgress))}</td>
       <td>${escapeHtml(m.gameInfo || '—')}</td>
       <td>${escapeHtml(gameTypeLabel(m.gameType))}</td>
       <td>${matchPairHtml(m)}</td>
@@ -593,6 +795,11 @@ function matchOverviewRow(m) {
       <td>${actions}</td>
     </tr>
   `;
+  const breakdown = renderMatchRackBreakdown(m);
+  const detail = breakdown
+    ? `<tr class="stats-match-racks-row"><td colspan="6">${breakdown}</td></tr>`
+    : '';
+  return main + detail;
 }
 
 function playerMatches(playerKey, options = {}) {
@@ -714,41 +921,41 @@ function renderPlayerDetail() {
   }
   if (!body) return;
   if (!matches.length) {
-    body.innerHTML = '<tr><td colspan="8" class="dash-stats-empty">No matches for this filter.</td></tr>';
+    body.innerHTML = '<tr><td colspan="5" class="dash-stats-empty">No matches for this filter.</td></tr>';
     return;
   }
   body.innerHTML = matches.map((m) => {
     const isP1 = String(m.player1Name || '').toLowerCase() === selectedPlayerKey;
     const opponent = isP1 ? m.player2Name : m.player1Name;
     const inProgress = isMatchInProgress(m);
-    let result = '—';
-    if (inProgress) {
-      result = 'In progress';
-    } else {
-      const outcome = resolveMatchResult(m);
-      if (outcome.winnerSlot === '1' || outcome.winnerSlot === '2') {
-        const won = (outcome.winnerSlot === '1' && isP1) || (outcome.winnerSlot === '2' && !isP1);
-        result = won ? 'Win' : 'Loss';
-      } else if (outcome.isDraw) {
-        result = 'Draw';
-      }
-    }
+    const own = isP1 ? (m.scores?.p1 ?? 0) : (m.scores?.p2 ?? 0);
+    const opp = isP1 ? (m.scores?.p2 ?? 0) : (m.scores?.p1 ?? 0);
+    const scoreText = inProgress && !m.scores ? 'In progress' : `${own} - ${opp}`;
     const actions = inProgress
       ? '<span class="stats-match-live-badge">Live</span>'
       : `<button type="button" class="btn" data-edit-match="${escapeHtml(m.startEventId)}">Edit</button>`;
-    return `
+    const main = `
       <tr class="${inProgress ? 'stats-match-in-progress' : ''}">
-        <td class="stats-match-when">${matchDateCellHtml(m.startedAt || m.completedAt, { inProgress })}</td>
-        <td>${escapeHtml(m.gameInfo || '—')}</td>
-        <td>${escapeHtml(gameTypeLabel(m.gameType))}</td>
+        <td class="stats-match-when">${matchDateCellHtml(m.completedAt || m.startedAt, matchDateOptions(m, inProgress))}</td>
         <td>${escapeHtml(opponent)}</td>
-        <td>${escapeHtml(scoreLine(m))}</td>
-        <td>${result}</td>
-        <td>${escapeHtml(inProgress ? '—' : matchExtrasLabel(m))}</td>
+        <td>${formatMatchGameCellHtml(m)}</td>
+        <td>${escapeHtml(scoreText)}</td>
         <td>${actions}</td>
       </tr>
     `;
+    const breakdown = renderMatchRackBreakdown(m, { viewerPlayerKey: selectedPlayerKey });
+    const detail = breakdown
+      ? `<tr class="stats-match-racks-row"><td colspan="5">${breakdown}</td></tr>`
+      : '';
+    return main + detail;
   }).join('');
+}
+
+function formatMatchGameCellHtml(m) {
+  const label = escapeHtml(gameTypeLabel(m.gameType));
+  const info = String(m.gameInfo || '').trim();
+  if (!info) return label;
+  return `${label}<div class="stats-match-game-info">${escapeHtml(info)}</div>`;
 }
 
 function findMatchByStartId(startEventId) {
@@ -766,65 +973,28 @@ function dateInputValue(value) {
   return `${y}-${m}-${day}`;
 }
 
-function showsHighestBreakFields(gameType) {
-  return gameType === 'game8';
-}
-
-function showsHighestRunFields(gameType) {
-  return gameType === 'game4';
-}
-
-function showsRunOutFields(gameType) {
-  return gameType === 'game1' || gameType === 'game2' || gameType === 'game3';
-}
-
 function showsBallsFields(gameType) {
   return gameType === 'game1' || gameType === 'game2' || gameType === 'game3' ||
     gameType === 'game5' || gameType === 'game6' || gameType === 'game7' || gameType === 'game8';
 }
 
-function showsFoulsFields(gameType) {
-  return true;
-}
-
 function syncMatchExtrasVisibility(gameType) {
   const gt = gameType || document.getElementById('statsMatchGameType')?.value || 'game1';
-  document.getElementById('statsMatchExtrasHb')?.classList.toggle('hidden', !showsHighestBreakFields(gt));
-  document.getElementById('statsMatchExtrasHr')?.classList.toggle('hidden', !showsHighestRunFields(gt));
-  document.getElementById('statsMatchExtrasRuns')?.classList.toggle('hidden', !showsRunOutFields(gt));
   document.getElementById('statsMatchExtrasBalls')?.classList.toggle('hidden', !showsBallsFields(gt));
-  document.getElementById('statsMatchExtrasFouls')?.classList.toggle('hidden', !showsFoulsFields(gt));
-}
-
-function matchExtrasLabel(m) {
-  const parts = [];
-  if (showsHighestBreakFields(m.gameType)) {
-    const hb1 = Number(m.highestBreakP1) || 0;
-    const hb2 = Number(m.highestBreakP2) || 0;
-    if (hb1 || hb2) parts.push(`HB ${hb1}/${hb2}`);
-  }
-  if (showsHighestRunFields(m.gameType)) {
-    const hr1 = Number(m.highestRunP1) || 0;
-    const hr2 = Number(m.highestRunP2) || 0;
-    if (hr1 || hr2) parts.push(`Run ${hr1}/${hr2}`);
-  }
-  if (showsRunOutFields(m.gameType)) {
-    const br = (Number(m.breakAndRunsP1) || 0) + (Number(m.breakAndRunsP2) || 0);
-    const tr = (Number(m.tableRunsP1) || 0) + (Number(m.tableRunsP2) || 0);
-    if (br) parts.push(`B&R ${br}`);
-    if (tr) parts.push(`TR ${tr}`);
-  }
-  if (showsBallsFields(m.gameType)) {
-    const b1 = Number(m.ballsP1) || 0;
-    const b2 = Number(m.ballsP2) || 0;
-    if (b1 || b2) parts.push(`Balls ${b1}/${b2}`);
-  }
-  if (showsFoulsFields(m.gameType)) {
-    const f1 = Number(m.foulsP1) || 0;
-    const f2 = Number(m.foulsP2) || 0;
-    if (f1 || f2) parts.push(`Fouls ${f1}/${f2}`);
-  }
-  return parts.length ? parts.join(' · ') : '—';
+  const p1 = matchModalPlayerName('1') || matchEditPlayerNames.p1 || 'P1';
+  const p2 = matchModalPlayerName('2') || matchEditPlayerNames.p2 || 'P2';
+  const setLabel = (id, text) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  };
+  setLabel('statsMatchBallsP1Label', `Balls potted · ${p1}`);
+  setLabel('statsMatchBallsP2Label', `Balls potted · ${p2}`);
+  const word = gt === 'game8' ? 'Frame' : 'Rack';
+  const words = gt === 'game8' ? 'Frames' : 'Racks';
+  const label = document.getElementById('statsMatchRacksEditorLabel');
+  const addBtn = document.getElementById('statsMatchAddRackBtn');
+  if (label) label.textContent = words;
+  if (addBtn) addBtn.textContent = `Add ${word}`;
 }
 
 function fillMatchGameTypes() {
@@ -858,33 +1028,189 @@ function matchModalPlayerName(slot) {
 }
 
 function syncMatchModalPlayerLabels() {
-  const p1 = matchModalPlayerName('1') || 'P1';
-  const p2 = matchModalPlayerName('2') || 'P2';
-  const setLabel = (id, text) => {
-    const el = document.getElementById(id);
-    if (el) el.textContent = text;
+  matchEditPlayerNames = {
+    p1: matchModalPlayerName('1') || 'Player 1',
+    p2: matchModalPlayerName('2') || 'Player 2',
   };
-  setLabel('statsMatchScoreP1Label', `${p1} score`);
-  setLabel('statsMatchScoreP2Label', `${p2} score`);
-  setLabel('statsMatchHbP1Label', `Highest break · ${p1}`);
-  setLabel('statsMatchHbP2Label', `Highest break · ${p2}`);
-  setLabel('statsMatchHrP1Label', `Longest run · ${p1}`);
-  setLabel('statsMatchHrP2Label', `Longest run · ${p2}`);
-  setLabel('statsMatchBrP1Label', `B&R · ${p1}`);
-  setLabel('statsMatchBrP2Label', `B&R · ${p2}`);
-  setLabel('statsMatchTrP1Label', `TR · ${p1}`);
-  setLabel('statsMatchTrP2Label', `TR · ${p2}`);
-  setLabel('statsMatchBallsP1Label', `Balls potted · ${p1}`);
-  setLabel('statsMatchBallsP2Label', `Balls potted · ${p2}`);
-  setLabel('statsMatchFoulsP1Label', `Fouls · ${p1}`);
-  setLabel('statsMatchFoulsP2Label', `Fouls · ${p2}`);
+  syncMatchExtrasVisibility(document.getElementById('statsMatchGameType')?.value || 'game1');
+  updateDashMatchScoreSummary();
 }
 
 let matchModalBaseline = null;
+let matchEditPlayerNames = { p1: 'Player 1', p2: 'Player 2' };
 
 function numField(id) {
   const n = Number(document.getElementById(id)?.value);
   return Number.isFinite(n) && n >= 0 ? n : 0;
+}
+
+function clampDashScore(value) {
+  const n = parseInt(value, 10);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return Math.min(n, 999);
+}
+
+function readRackExtraFieldsFromRow(row) {
+  const entry = {};
+  const pts1 = row.querySelector('.stats-rack-pts-p1');
+  const hb1 = row.querySelector('.stats-rack-hb-p1');
+  const hr1 = row.querySelector('.stats-rack-hr-p1');
+  if (pts1) {
+    entry.frameScore = {
+      p1: clampDashScore(pts1.value),
+      p2: clampDashScore(row.querySelector('.stats-rack-pts-p2')?.value),
+    };
+  }
+  if (hb1) {
+    entry.highestBreakP1 = clampDashScore(hb1.value);
+    entry.highestBreakP2 = clampDashScore(row.querySelector('.stats-rack-hb-p2')?.value);
+  }
+  const fouls1 = row.querySelector('.stats-rack-fouls-p1');
+  if (fouls1) {
+    entry.foulsP1 = clampDashScore(fouls1.value);
+    entry.foulsP2 = clampDashScore(row.querySelector('.stats-rack-fouls-p2')?.value);
+  }
+  if (hr1) {
+    entry.highestRunP1 = clampDashScore(hr1.value);
+    entry.highestRunP2 = clampDashScore(row.querySelector('.stats-rack-hr-p2')?.value);
+  }
+  return entry;
+}
+
+function collectDashMatchRacksFromEditor() {
+  const editor = document.getElementById('statsMatchRacksEditor');
+  if (!editor) return [];
+  const racks = [];
+  editor.querySelectorAll('tr.stats-rack-edit-row').forEach((row) => {
+    const winnerId = row.querySelector('.stats-rack-winner')?.value || '';
+    if (!winnerId) return;
+    const entry = { winnerId };
+    Object.assign(entry, readRackExtraFieldsFromRow(row));
+    racks.push(entry);
+  });
+  return racks;
+}
+
+function preserveDashRackEditorRows() {
+  const editor = document.getElementById('statsMatchRacksEditor');
+  const preserved = [];
+  editor?.querySelectorAll('tr.stats-rack-edit-row').forEach((row) => {
+    const entry = { winnerId: row.querySelector('.stats-rack-winner')?.value || '' };
+    Object.assign(entry, readRackExtraFieldsFromRow(row));
+    preserved.push(entry);
+  });
+  return preserved;
+}
+
+function updateDashMatchScoreSummary() {
+  const summary = document.getElementById('statsMatchScoreSummary');
+  if (!summary) return;
+  const racks = collectDashMatchRacksFromEditor();
+  let p1 = 0;
+  let p2 = 0;
+  racks.forEach((r) => {
+    if (r.winnerId === '1') p1 += 1;
+    else if (r.winnerId === '2') p2 += 1;
+  });
+  summary.textContent = `Match: ${matchEditPlayerNames.p1 || 'Player 1'} ${p1} – ${p2} ${matchEditPlayerNames.p2 || 'Player 2'}`;
+}
+
+function renderDashMatchRacksEditor(racks) {
+  const editor = document.getElementById('statsMatchRacksEditor');
+  if (!editor) return;
+  const gameType = document.getElementById('statsMatchGameType')?.value || 'game1';
+  const isSnooker = gameType === 'game8';
+  const isStraight = gameType === 'game4';
+  syncMatchExtrasVisibility(gameType);
+  const list = Array.isArray(racks) ? racks.slice() : [];
+  const word = gameType === 'game8' ? 'Frame' : 'Rack';
+  const words = gameType === 'game8' ? 'frames' : 'racks';
+  if (!list.length) {
+    editor.innerHTML = `<p class="hint">No ${words} yet. Use Add ${word}.</p>`;
+    updateDashMatchScoreSummary();
+    return;
+  }
+  const p1 = escapeHtml(matchEditPlayerNames.p1 || 'Player 1');
+  const p2 = escapeHtml(matchEditPlayerNames.p2 || 'Player 2');
+  let html = '<table class="stats-table stats-rack-edit-table"><thead><tr><th>#</th><th>Winner</th>';
+  if (isSnooker) {
+    html += `<th>Pts ${p1}</th><th>Pts ${p2}</th><th>HB ${p1}</th><th>HB ${p2}</th>`;
+  } else if (isStraight) {
+    html += `<th>Run ${p1}</th><th>Run ${p2}</th>`;
+  }
+  html += `<th>Fouls ${p1}</th><th>Fouls ${p2}</th><th></th></tr></thead><tbody>`;
+  list.forEach((r, index) => {
+    let winnerSlot = '';
+    const slot = r.winnerSlot != null ? String(r.winnerSlot) : '';
+    if (slot === '1' || r.winnerId === '1' || r.winnerId === 1) winnerSlot = '1';
+    else if (slot === '2' || r.winnerId === '2' || r.winnerId === 2) winnerSlot = '2';
+    const fs = r.frameScore || {};
+    html += `<tr class="stats-rack-edit-row"><td>${index + 1}</td><td>
+      <select class="stats-rack-winner">
+        <option value="">—</option>
+        <option value="1"${winnerSlot === '1' ? ' selected' : ''}>${p1}</option>
+        <option value="2"${winnerSlot === '2' ? ' selected' : ''}>${p2}</option>
+      </select></td>`;
+    if (isSnooker) {
+      html += `<td><input type="number" class="stats-rack-pts-p1" min="0" max="999" value="${clampDashScore(fs.p1)}" /></td>
+        <td><input type="number" class="stats-rack-pts-p2" min="0" max="999" value="${clampDashScore(fs.p2)}" /></td>
+        <td><input type="number" class="stats-rack-hb-p1" min="0" max="999" value="${clampDashScore(r.highestBreakP1)}" /></td>
+        <td><input type="number" class="stats-rack-hb-p2" min="0" max="999" value="${clampDashScore(r.highestBreakP2)}" /></td>`;
+    } else if (isStraight) {
+      html += `<td><input type="number" class="stats-rack-hr-p1" min="0" max="999" value="${clampDashScore(r.highestRunP1 != null ? r.highestRunP1 : r.highestBreakP1)}" /></td>
+        <td><input type="number" class="stats-rack-hr-p2" min="0" max="999" value="${clampDashScore(r.highestRunP2 != null ? r.highestRunP2 : r.highestBreakP2)}" /></td>`;
+    }
+    html += `<td><input type="number" class="stats-rack-fouls-p1" min="0" max="999" value="${clampDashScore(r.foulsP1)}" /></td>
+      <td><input type="number" class="stats-rack-fouls-p2" min="0" max="999" value="${clampDashScore(r.foulsP2)}" /></td>
+      <td><button type="button" class="btn danger stats-rack-del-btn">Del</button></td></tr>`;
+  });
+  html += '</tbody></table>';
+  editor.innerHTML = html;
+  editor.querySelectorAll('.stats-rack-winner').forEach((el) => {
+    el.addEventListener('change', () => {
+      updateDashMatchScoreSummary();
+      syncMatchModalSaveEnabled();
+    });
+  });
+  editor.querySelectorAll('input').forEach((el) => {
+    el.addEventListener('input', syncMatchModalSaveEnabled);
+  });
+  editor.querySelectorAll('.stats-rack-del-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      btn.closest('tr')?.remove();
+      renderDashMatchRacksEditor(preserveDashRackEditorRows());
+      syncMatchModalSaveEnabled();
+    });
+  });
+  updateDashMatchScoreSummary();
+}
+
+function serializeDashEditorRacksForCloud(editorRacks) {
+  return (editorRacks || []).map((r, index) => {
+    const slot = r.winnerId === '1' ? '1' : (r.winnerId === '2' ? '2' : null);
+    if (!slot) return null;
+    const out = {
+      rackNumber: index + 1,
+      winnerSlot: slot,
+      foulsP1: clampDashScore(r.foulsP1),
+      foulsP2: clampDashScore(r.foulsP2),
+    };
+    if (r.frameScore) {
+      out.frameScore = {
+        p1: clampDashScore(r.frameScore.p1),
+        p2: clampDashScore(r.frameScore.p2),
+      };
+    }
+    if (r.highestBreakP1 != null || r.highestBreakP2 != null) {
+      out.highestBreakP1 = clampDashScore(r.highestBreakP1);
+      out.highestBreakP2 = clampDashScore(r.highestBreakP2);
+    }
+    if (r.highestRunP1 != null || r.highestRunP2 != null) {
+      out.highestRunP1 = clampDashScore(r.highestRunP1);
+      out.highestRunP2 = clampDashScore(r.highestRunP2);
+    }
+    return out;
+  }).filter(Boolean);
 }
 
 function readMatchModalSnapshot() {
@@ -893,21 +1219,10 @@ function readMatchModalSnapshot() {
     player2Name: matchModalPlayerName('2'),
     gameType: document.getElementById('statsMatchGameType')?.value || 'game1',
     gameInfo: (document.getElementById('statsMatchGameInfo')?.value || '').trim(),
-    scoreP1: numField('statsMatchScoreP1'),
-    scoreP2: numField('statsMatchScoreP2'),
     date: document.getElementById('statsMatchDate')?.value || '',
-    hbP1: numField('statsMatchHbP1'),
-    hbP2: numField('statsMatchHbP2'),
-    hrP1: numField('statsMatchHrP1'),
-    hrP2: numField('statsMatchHrP2'),
-    brP1: numField('statsMatchBrP1'),
-    brP2: numField('statsMatchBrP2'),
-    trP1: numField('statsMatchTrP1'),
-    trP2: numField('statsMatchTrP2'),
     ballsP1: numField('statsMatchBallsP1'),
     ballsP2: numField('statsMatchBallsP2'),
-    foulsP1: numField('statsMatchFoulsP1'),
-    foulsP2: numField('statsMatchFoulsP2'),
+    racks: serializeDashEditorRacksForCloud(collectDashMatchRacksFromEditor()),
   };
 }
 
@@ -931,23 +1246,15 @@ function openMatchModal(startEventId) {
   document.getElementById('statsMatchP2').value = match.player2Name || '';
   document.getElementById('statsMatchGameType').value = match.gameType || 'game1';
   document.getElementById('statsMatchGameInfo').value = match.gameInfo || '';
-  document.getElementById('statsMatchScoreP1').value = match.scores?.p1 ?? 0;
-  document.getElementById('statsMatchScoreP2').value = match.scores?.p2 ?? 0;
   document.getElementById('statsMatchDate').value = dateInputValue(match.completedAt || match.startedAt);
-  document.getElementById('statsMatchHbP1').value = match.highestBreakP1 || 0;
-  document.getElementById('statsMatchHbP2').value = match.highestBreakP2 || 0;
-  document.getElementById('statsMatchHrP1').value = match.highestRunP1 || 0;
-  document.getElementById('statsMatchHrP2').value = match.highestRunP2 || 0;
-  document.getElementById('statsMatchBrP1').value = match.breakAndRunsP1 || 0;
-  document.getElementById('statsMatchBrP2').value = match.breakAndRunsP2 || 0;
-  document.getElementById('statsMatchTrP1').value = match.tableRunsP1 || 0;
-  document.getElementById('statsMatchTrP2').value = match.tableRunsP2 || 0;
   document.getElementById('statsMatchBallsP1').value = match.ballsP1 || 0;
   document.getElementById('statsMatchBallsP2').value = match.ballsP2 || 0;
-  document.getElementById('statsMatchFoulsP1').value = match.foulsP1 || 0;
-  document.getElementById('statsMatchFoulsP2').value = match.foulsP2 || 0;
+  matchEditPlayerNames = {
+    p1: match.player1Name || 'Player 1',
+    p2: match.player2Name || 'Player 2',
+  };
+  renderDashMatchRacksEditor(match.racks || []);
   syncMatchExtrasVisibility(match.gameType || 'game1');
-  syncMatchModalPlayerLabels();
   setMatchModalError('');
   matchModalBaseline = readMatchModalSnapshot();
   syncMatchModalSaveEnabled();
@@ -963,29 +1270,31 @@ async function saveMatchModal(event) {
   const p2 = document.getElementById('statsMatchP2').value.trim();
   const dateVal = document.getElementById('statsMatchDate').value;
   const gameType = document.getElementById('statsMatchGameType').value;
+  const editorRacks = collectDashMatchRacksFromEditor();
+  if (!editorRacks.length) {
+    setMatchModalError('Add at least one rack/frame with a winner.');
+    return;
+  }
+  const scores = { p1: 0, p2: 0 };
+  editorRacks.forEach((r) => {
+    if (r.winnerId === '1') scores.p1 += 1;
+    else if (r.winnerId === '2') scores.p2 += 1;
+  });
+  if (scores.p1 === scores.p2) {
+    setMatchModalError('Frame/rack wins must differ — only decisive matches are recorded.');
+    return;
+  }
   try {
     await updateAccountMatch(getServerUrl(), getToken(), startEventId, {
       player1Name: p1,
       player2Name: p2,
       gameType,
       gameInfo: document.getElementById('statsMatchGameInfo').value.trim(),
-      scores: {
-        p1: document.getElementById('statsMatchScoreP1').value,
-        p2: document.getElementById('statsMatchScoreP2').value,
-      },
+      scores,
+      racks: serializeDashEditorRacksForCloud(editorRacks),
       completedAt: dateVal ? `${dateVal}T12:00:00.000Z` : undefined,
-      highestBreakP1: document.getElementById('statsMatchHbP1').value,
-      highestBreakP2: document.getElementById('statsMatchHbP2').value,
-      highestRunP1: document.getElementById('statsMatchHrP1').value,
-      highestRunP2: document.getElementById('statsMatchHrP2').value,
-      breakAndRunsP1: document.getElementById('statsMatchBrP1').value,
-      breakAndRunsP2: document.getElementById('statsMatchBrP2').value,
-      tableRunsP1: document.getElementById('statsMatchTrP1').value,
-      tableRunsP2: document.getElementById('statsMatchTrP2').value,
       ballsP1: document.getElementById('statsMatchBallsP1').value,
       ballsP2: document.getElementById('statsMatchBallsP2').value,
-      foulsP1: document.getElementById('statsMatchFoulsP1').value,
-      foulsP2: document.getElementById('statsMatchFoulsP2').value,
     });
     closeMatchModal();
     await loadAccountStats(true);
@@ -1054,6 +1363,23 @@ function scheduleLiveReconnect() {
   reconnectTimer = setTimeout(() => {
     connectLiveFeed().catch(() => {});
   }, delay);
+}
+
+function liveFeedIsOpen() {
+  return !!(dashClient && typeof dashClient.isOpen === 'function' && dashClient.isOpen());
+}
+
+/**
+ * Reconnect the dashboard live feed after mobile backgrounding / network drops.
+ * Mobile browsers often leave a zombie socket (connected=true, no onclose).
+ */
+function ensureLiveFeed(options = {}) {
+  if (!wantLiveFeed || !getToken()) return;
+  const force = !!(options && options.force);
+  if (!force && liveFeedIsOpen()) return;
+  clearReconnect();
+  reconnectAttempt = 0;
+  connectLiveFeed().catch(() => {});
 }
 
 async function connectLiveFeed() {
@@ -1345,7 +1671,16 @@ document.getElementById('statsMatchForm')?.addEventListener('change', syncMatchM
 document.getElementById('statsMatchCancelBtn')?.addEventListener('click', closeMatchModal);
 document.getElementById('statsMatchDeleteBtn')?.addEventListener('click', deleteMatchFromModal);
 document.getElementById('statsMatchGameType')?.addEventListener('change', (event) => {
+  const preserved = preserveDashRackEditorRows();
+  renderDashMatchRacksEditor(preserved.length ? preserved : collectDashMatchRacksFromEditor());
   syncMatchExtrasVisibility(event.target.value);
+  syncMatchModalSaveEnabled();
+});
+document.getElementById('statsMatchAddRackBtn')?.addEventListener('click', () => {
+  const preserved = preserveDashRackEditorRows();
+  preserved.push({ winnerId: '' });
+  renderDashMatchRacksEditor(preserved);
+  syncMatchModalSaveEnabled();
 });
 document.getElementById('statsMatchModal')?.addEventListener('click', (event) => {
   if (event.target.id === 'statsMatchModal') closeMatchModal();
@@ -1418,7 +1753,7 @@ document.getElementById('clearSavedLoginBtn')?.addEventListener('click', () => {
 
 document.getElementById('createKeyBtn').addEventListener('click', async () => {
   try {
-    const created = await createApiKey(getServerUrl(), getToken(), 'OBS Dock Key');
+    const created = await createApiKey(getServerUrl(), getToken());
     showApiKeyDisplay(created.key);
     if (created.quota) renderQuota(created.quota);
     await renderDashboard();
@@ -1484,12 +1819,29 @@ document.getElementById('googleBtn').addEventListener('click', async () => {
   }
 });
 
+let liveFeedHiddenAt = 0;
+
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && wantLiveFeed && getToken() && (!dashClient || !dashClient.connected)) {
-    clearReconnect();
-    reconnectAttempt = 0;
-    connectLiveFeed().catch(() => {});
+  if (document.hidden) {
+    liveFeedHiddenAt = Date.now();
+    return;
   }
+  const awayMs = liveFeedHiddenAt ? Date.now() - liveFeedHiddenAt : 0;
+  liveFeedHiddenAt = 0;
+  // After ~15s away, sockets are often dead without onclose — force a fresh join.
+  ensureLiveFeed({ force: awayMs >= 15000 });
+});
+
+window.addEventListener('pageshow', (ev) => {
+  if (ev.persisted) {
+    ensureLiveFeed({ force: true });
+  } else if (!document.hidden) {
+    ensureLiveFeed();
+  }
+});
+
+window.addEventListener('online', () => {
+  ensureLiveFeed({ force: true });
 });
 
 if (window.location.search.includes('auth=callback') || window.location.hash.includes('access_token')) {

@@ -21,7 +21,7 @@ for more information about Salotto please visit https://salotto.app
     <link rel="stylesheet" href="./common/css/control_panel/grey.css?v=8.0.0" />
     <link rel="stylesheet" href="./common/css/control_panel/light.css?v=8.0.0" />
     <link rel="stylesheet" href="./common/css/control_panel/rachni.css?v=8.0.0" />
-    <link rel="stylesheet" href="./common/css/control_panel/required.css?v=8.0.0.7" />
+    <link rel="stylesheet" href="./common/css/control_panel/required.css?v=8.0.0.10" />
     <script>
         //---------------------------------------------------------------------------------------------
         var versionNum = "8.0.0";
@@ -29,12 +29,12 @@ for more information about Salotto please visit https://salotto.app
     </script>
     <script src="./common/js/obs-websocket-js.js?v=8.0.0"></script>
     <script src="./common/js/jquery.js?v=8.0.0"></script>
-    <script src="./common/js/cloud_relay.js?v=8.0.0.6"></script>
+    <script src="./common/js/cloud_relay.js?v=8.0.0.10"></script>
     <script src="./common/js/stream_sharing.js?v=8.0.0"></script>
-    <script src="./common/js/player_stats.js?v=8.0.0.9"></script>
-    <script src="./common/js/control_panel.js?v=8.0.0.19"></script>
+    <script src="./common/js/player_stats.js?v=8.0.0.15"></script>
+    <script src="./common/js/control_panel.js?v=8.0.0.23"></script>
     <script src="./common/js/cloud_commands.js?v=8.0.0.3"></script>
-    <script src="./common/js/cloud_auth.js?v=8.0.0"></script>
+    <script src="./common/js/cloud_auth.js?v=8.0.0.1"></script>
     <script src="hotkeys.js?v=8.0.0"></script>
 
     <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
@@ -112,14 +112,14 @@ for more information about Salotto please visit https://salotto.app
                     </select>
                 </div>
             </div>
-            <div class="section-header" id="gameInformationLabel">Game Information</div>
+            <div class="section-header" id="gameInformationLabel">Event Information</div>
             <div class="column setup-info-row">
                 <div class="setup-info-pair">
                     <text id="raceInfo">Race Info:</text>
                     <input type="text" id="raceInfoTxt" maxlength="3" pattern="\d*" inputmode="numeric" />
                 </div>
                 <div class="setup-info-pair setup-info-pair--grow">
-                    <text>Game/Other Info:</text>
+                    <text>Event Info:</text>
                     <input type="text" id="gameInfoTxt" placeholder="" maxlength="60" />
                 </div>
             </div>
@@ -265,16 +265,29 @@ for more information about Salotto please visit https://salotto.app
                 <div class="ball-tracker-row ball-tracker-foul-row" id="ballTrackerFoulRow">
                 <div class="rack-foul-counter noShow" id="rackFoulCounter" aria-live="polite"
                     title="Fouls this rack or frame">
-                    <span class="rack-foul-heading" id="rackFoulHeading">Fouls</span>
-                    <span class="rack-foul-player" id="rackFoulP1Wrap">
-                        <span class="rack-foul-name" id="rackFoulP1Name">P1</span>
-                        <span class="rack-foul-count" id="rackFoulP1">0</span>
-                    </span>
-                    <span class="rack-foul-sep" aria-hidden="true">&#183;</span>
-                    <span class="rack-foul-player" id="rackFoulP2Wrap">
-                        <span class="rack-foul-name" id="rackFoulP2Name">P2</span>
-                        <span class="rack-foul-count" id="rackFoulP2">0</span>
-                    </span>
+                    <div class="rack-stat-row noShow" id="rackSnookerStatsRow">
+                        <span class="rack-break-group" id="rackBreakGroup">
+                            <span class="rack-foul-heading" id="rackCurrentBreakLabel">Break 0</span>
+                            <div class="rack-break-balls" id="rackBreakBalls" aria-label="Balls in current break"></div>
+                        </span>
+                        <span class="rack-foul-sep" id="rackSnookerStatsSep" aria-hidden="true">|</span>
+                        <span class="rack-remaining-group">
+                            <span class="rack-foul-heading">Remaining</span>
+                            <span class="rack-stat-value" id="rackPointsRemainingValue">0</span>
+                        </span>
+                    </div>
+                    <div class="rack-stat-row" id="rackFoulRow">
+                        <span class="rack-foul-heading" id="rackFoulHeading">Fouls</span>
+                        <span class="rack-foul-player" id="rackFoulP1Wrap">
+                            <span class="rack-foul-name" id="rackFoulP1Name">P1</span>
+                            <span class="rack-foul-count" id="rackFoulP1">0</span>
+                        </span>
+                        <span class="rack-foul-sep" aria-hidden="true">&#183;</span>
+                        <span class="rack-foul-player" id="rackFoulP2Wrap">
+                            <span class="rack-foul-name" id="rackFoulP2Name">P2</span>
+                            <span class="rack-foul-count" id="rackFoulP2">0</span>
+                        </span>
+                    </div>
                 </div>
                 </div>
             </div>
@@ -770,7 +783,7 @@ for more information about Salotto please visit https://salotto.app
                 </div>
                 <input type="file" id="statsImportFile" accept=".json,application/json" class="noShow" onchange="handleStatsImportFile(this)" />
             </div>
-            <p class="stats-hint" id="statsActionHint">Export creates a backup file. Import replaces all current statistics after confirmation. Clear permanently deletes statistics history and resets the current game (names, race/game info, and scoreline).</p>
+            <p class="stats-hint" id="statsActionHint">Export creates a backup file. Import replaces all current statistics after confirmation. Clear permanently deletes statistics history and resets the current game (names, race/event info, and scoreline).</p>
             <div class="section-header">Overlay Stats Display</div>
             <p class="stats-tab-help">Choose which stats appear on the P1 / P2 / H2H overlay panels for the selected game type.</p>
             <div class="stats-visibility-toolbar">
@@ -1000,7 +1013,7 @@ for more information about Salotto please visit https://salotto.app
                 </div>
                 <div class="form-row">
                     <div class="field stats-match-game-info-field">
-                        <label for="statsMatchGameInfo">Game / other info:</label>
+                        <label for="statsMatchGameInfo">Event Info:</label>
                         <input type="text" id="statsMatchGameInfo" maxlength="60" placeholder="Optional — league, event, notes…" />
                     </div>
                 </div>

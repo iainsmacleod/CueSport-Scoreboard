@@ -84,14 +84,15 @@ See [`.env.example`](.env.example).
 | `TIER_{TIER}_MAX_ROOMS` | Per-tier table (dock instance) cap |
 | `TIER_{TIER}_MAX_CONTROL_CONNECTIONS` | Per-tier mobile+guest connections per table |
 
-Built-in defaults (all overridable via the env vars above):
+Built-in defaults (all overridable via the env vars above).
+**One OBS Dock Key = one live dock connection** (create a separate key per table and paste into each dock):
 
-| Tier | OBS Dock Keys | Tables | Mobile + guest / table |
-|------|---------------|--------|------------------------|
-| `starter` | 1 | 2 | 5 |
-| `pro` | 3 | 2 | 5 |
-| `enterprise` | 10 | 2 | 5 |
-| `selfhost` | 1 | 2 | 5 |
+| Tier | Dock keys (seats) | Tables | Mobile + guest / table |
+|------|-------------------|--------|------------------------|
+| `starter` | 2 | 2 | 5 |
+| `pro` | 3 | 3 | 5 |
+| `enterprise` | 10 | 10 | 5 |
+| `selfhost` | 2 | 2 | 5 |
 
 ## Supabase setup (production)
 

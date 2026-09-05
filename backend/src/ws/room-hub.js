@@ -50,6 +50,34 @@ function send(ws, message) {
   }
 }
 
+/**
+ * Option A: one OBS Dock Key may only have one live dock WebSocket.
+ * Returns existing dock connection meta using this key, if any.
+ */
+function findDockUsingApiKey(keyId, excludeWs = null) {
+  if (!keyId) return null;
+  for (const [ws, meta] of connections) {
+    if (excludeWs && ws === excludeWs) continue;
+    // Match on apiKeyId alone so in-flight joins (client not set yet) still hold the seat.
+    if (meta.apiKeyId !== keyId) continue;
+    if (ws.readyState === 1) return { ws, meta };
+  }
+  return null;
+}
+
+const API_KEY_IN_USE_MESSAGE =
+  'This OBS Dock Key is already in use by another dock. Create a new key in Account settings on the Cloud dashboard and paste it into this dock.';
+
+/**
+ * If this key already has a live dock, return an error for the incoming join.
+ * Does not disconnect the existing dock (avoids disrupting an active match/stats).
+ */
+function apiKeyDockSeatConflict(keyId, incomingWs) {
+  if (!keyId) return null;
+  if (!findDockUsingApiKey(keyId, incomingWs)) return null;
+  return { error: 'api_key_in_use', message: API_KEY_IN_USE_MESSAGE };
+}
+
 function buildDashboardRooms(accountId) {
   return sqlite.getRoomsWithLiveState(accountId).map((room) => ({
     ...room,
@@ -94,7 +122,7 @@ function notifyAccountTables(accountId, { immediate = false } = {}) {
 
 export function handleConnection(ws) {
   const sourceId = uuidv4();
-  connections.set(ws, { roomId: null, client: null, accountId: null, sourceId });
+  connections.set(ws, { roomId: null, client: null, accountId: null, sourceId, apiKeyId: null });
 
   ws.on('message', async (raw) => {
     let msg;
@@ -227,9 +255,14 @@ function resolveRoomIdForJoin(msg, auth, client) {
       );
       return { roomId: room.id };
     }
-    const check = assertCanCreateRoom(auth.account);
-    if (!check.ok) {
-      return { error: check.code, message: check.message, quota: check.quota };
+    // Creating a new table counts against quota — reclaiming an unmapped
+    // signup room (Default Room with no room_docks) does not.
+    const canClaimOrphan = !!sqlite.findUnmappedRoom(auth.account.id);
+    if (!canClaimOrphan) {
+      const check = assertCanCreateRoom(auth.account);
+      if (!check.ok) {
+        return { error: check.code, message: check.message, quota: check.quota };
+      }
     }
     const room = sqlite.ensureRoomForInstance(
       auth.account.id,
@@ -309,6 +342,17 @@ async function handleJoin(ws, meta, msg, authenticateJoin) {
       return;
     }
 
+    // Option A: one key = one dock. Reject if another dock already holds this key.
+    if (client === 'dock' && auth.authMethod === 'api_key' && auth.keyId) {
+      const conflict = apiKeyDockSeatConflict(auth.keyId, ws);
+      if (conflict) {
+        send(ws, { type: 'error', code: conflict.error, message: conflict.message });
+        return;
+      }
+      meta.apiKeyId = auth.keyId;
+      meta.client = 'dock';
+    }
+
     roomId = resolveRoomIdForJoin(msg, auth, client);
     if (roomId && typeof roomId === 'object' && roomId.error) {
       send(ws, { type: 'error', code: roomId.error, message: roomId.message, quota: roomId.quota });
@@ -373,6 +417,7 @@ async function handleJoin(ws, meta, msg, authenticateJoin) {
     accountId: accountId || room.account_id,
     sourceId: meta.sourceId,
     guestToken: meta.guestToken || null,
+    apiKeyId: meta.apiKeyId || null,
   });
 
   const { state, sessionId } = sqlite.getRoomSessionState(roomId);
@@ -539,6 +584,15 @@ async function handleLegacyAuth(ws, meta, msg, authenticateJoin) {
     send(ws, { type: 'auth', status: auth.error === 'invalid_api_key' ? 'blocked' : 'error', message: auth.message });
     return;
   }
+  if (auth.authMethod === 'api_key' && auth.keyId) {
+    const conflict = apiKeyDockSeatConflict(auth.keyId, ws);
+    if (conflict) {
+      send(ws, { type: 'auth', status: 'blocked', message: conflict.message });
+      return;
+    }
+    meta.apiKeyId = auth.keyId;
+    meta.client = 'dock';
+  }
   const accountRooms = sqlite.getRoomsForAccount(auth.account.id);
   if (accountRooms.length === 0) {
     send(ws, { type: 'auth', status: 'error', message: 'No room configured' });
@@ -548,7 +602,13 @@ async function handleLegacyAuth(ws, meta, msg, authenticateJoin) {
   meta.accountId = auth.account.id;
   meta.client = 'dock';
   meta.roomId = meta.legacyRoomId;
-  getRoomClients(meta.legacyRoomId).add({ ws, client: 'dock', accountId: auth.account.id, sourceId: meta.sourceId });
+  getRoomClients(meta.legacyRoomId).add({
+    ws,
+    client: 'dock',
+    accountId: auth.account.id,
+    sourceId: meta.sourceId,
+    apiKeyId: meta.apiKeyId || null,
+  });
   send(ws, { type: 'auth', status: 'success' });
   notifyAccountTables(auth.account.id, { immediate: true });
 }

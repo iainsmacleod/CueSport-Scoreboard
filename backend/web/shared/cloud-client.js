@@ -32,6 +32,11 @@ export class CloudClient {
     if (this.handlers[event]) this.handlers[event].push(fn);
   }
 
+  /** True when the socket is actually OPEN (not a stale connected flag after backgrounding). */
+  isOpen() {
+    return !!(this.ws && this.ws.readyState === 1 && this.connected);
+  }
+
   connect(options = {}) {
     const timeoutMs = Number.isFinite(options.timeoutMs) ? options.timeoutMs : 10000;
     return new Promise((resolve, reject) => {
@@ -41,6 +46,7 @@ export class CloudClient {
       const finish = (fn, value) => {
         if (settled) return;
         settled = true;
+        this._connectFail = null;
         if (timeoutId != null) {
           clearTimeout(timeoutId);
           timeoutId = null;
@@ -53,6 +59,9 @@ export class CloudClient {
         err.code = code || 'connection_failed';
         finish(reject, err);
       };
+
+      // So disconnect()/a newer connect can abort a hung join without waiting for timeout.
+      this._connectFail = fail;
 
       try {
         this.ws = new WebSocket(this.wsUrl());
@@ -145,6 +154,12 @@ export class CloudClient {
   }
 
   disconnect() {
+    if (typeof this._connectFail === 'function') {
+      try {
+        this._connectFail('connection_closed', 'Connection superseded.');
+      } catch (_) { /* ignore */ }
+      this._connectFail = null;
+    }
     if (this.ws) {
       this.ws.onclose = null;
       this.ws.onerror = null;

@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS api_keys (
   account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
   key_hash TEXT NOT NULL,
   key_plaintext TEXT,
-  label TEXT NOT NULL DEFAULT 'Default',
+  label TEXT NOT NULL DEFAULT 'OBS Dock Key 1',
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   revoked_at TEXT
 );
@@ -111,6 +111,11 @@ function ensureApiKeyColumns(database) {
   if (!cols.has('key_plaintext')) {
     database.exec('ALTER TABLE api_keys ADD COLUMN key_plaintext TEXT');
   }
+  // Legacy signup keys were labeled "Default" — rename to the numbered scheme.
+  database.prepare(
+    `UPDATE api_keys SET label = 'OBS Dock Key 1'
+     WHERE lower(trim(label)) = 'default'`
+  ).run();
 }
 
 export function getDb() {
@@ -133,6 +138,39 @@ export function generateApiKeyPlaintext() {
   const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** Next "OBS Dock Key N" for this account (includes revoked keys so numbers stay unique). */
+export function nextObsDockKeyLabel(accountId) {
+  const rows = getDb().prepare(
+    'SELECT label FROM api_keys WHERE account_id = ?'
+  ).all(accountId);
+  let max = 0;
+  for (const row of rows) {
+    const m = String(row.label || '').match(/^OBS Dock Key\s+(\d+)$/i);
+    if (m) {
+      max = Math.max(max, parseInt(m[1], 10) || 0);
+    }
+  }
+  return `OBS Dock Key ${max + 1}`;
+}
+
+function shouldAutoNumberApiKeyLabel(label) {
+  const t = String(label || '').trim().toLowerCase();
+  return !t || t === 'default' || t === 'api key' || t === 'obs dock key';
+}
+
+export function createApiKey(accountId, label) {
+  const database = getDb();
+  const plaintext = generateApiKeyPlaintext();
+  const id = uuidv4();
+  const resolvedLabel = shouldAutoNumberApiKeyLabel(label)
+    ? nextObsDockKeyLabel(accountId)
+    : String(label).trim();
+  database.prepare(
+    `INSERT INTO api_keys (id, account_id, key_hash, key_plaintext, label) VALUES (?, ?, ?, ?, ?)`
+  ).run(id, accountId, hashApiKey(plaintext), plaintext, resolvedLabel);
+  return { id, plaintext, label: resolvedLabel };
 }
 
 export function hashApiKey(key) {
@@ -168,20 +206,62 @@ export function ensureAccountWithRoom(email, authUserId = null) {
   let room = database.prepare('SELECT * FROM rooms WHERE account_id = ? ORDER BY created_at LIMIT 1').get(account.id);
   if (!room) {
     const roomId = uuidv4();
-    database.prepare('INSERT INTO rooms (id, account_id, label) VALUES (?, ?, ?)').run(roomId, account.id, 'Default Room');
+    const label = defaultInstanceLabel('default');
+    database.prepare('INSERT INTO rooms (id, account_id, label) VALUES (?, ?, ?)').run(roomId, account.id, label);
+    // Map as instance_key=default so the first single-instance dock reuses this room
+    // instead of creating a second table and burning quota.
+    database.prepare(
+      `INSERT INTO room_docks (account_id, instance_key, room_id, label, last_seen_at)
+       VALUES (?, 'default', ?, ?, datetime('now'))`
+    ).run(account.id, roomId, label);
     room = database.prepare('SELECT * FROM rooms WHERE id = ?').get(roomId);
+  } else {
+    // Backfill older accounts that got a Default Room with no dock mapping.
+    linkUnmappedRoomToInstance(account.id, room, 'default');
   }
   return { account, room };
 }
 
-export function createApiKey(accountId, label = 'Default') {
+/** Oldest room for this account that is not linked to any OBS instance key. */
+export function findUnmappedRoom(accountId) {
+  return getDb().prepare(`
+    SELECT r.* FROM rooms r
+    WHERE r.account_id = ?
+      AND NOT EXISTS (SELECT 1 FROM room_docks d WHERE d.room_id = r.id)
+    ORDER BY r.created_at ASC
+    LIMIT 1
+  `).get(accountId) || null;
+}
+
+/**
+ * If instanceKey has no dock mapping yet, claim `preferredRoom` (or any orphan) for it.
+ * Returns the linked room, or null if nothing was available to claim.
+ */
+function linkUnmappedRoomToInstance(accountId, preferredRoom, instanceKey, label) {
   const database = getDb();
-  const plaintext = generateApiKeyPlaintext();
-  const id = uuidv4();
+  const key = (instanceKey || 'default').trim() || 'default';
+  const existing = peekRoomDock(accountId, key);
+  if (existing) {
+    return getRoom(existing.room_id);
+  }
+
+  let orphan = null;
+  if (preferredRoom) {
+    const alreadyMapped = database.prepare('SELECT 1 FROM room_docks WHERE room_id = ?').get(preferredRoom.id);
+    if (!alreadyMapped) orphan = preferredRoom;
+  }
+  if (!orphan) orphan = findUnmappedRoom(accountId);
+  if (!orphan) return null;
+
+  const roomLabel = label || defaultInstanceLabel(key);
   database.prepare(
-    `INSERT INTO api_keys (id, account_id, key_hash, key_plaintext, label) VALUES (?, ?, ?, ?, ?)`
-  ).run(id, accountId, hashApiKey(plaintext), plaintext, label);
-  return { id, plaintext };
+    `INSERT INTO room_docks (account_id, instance_key, room_id, label, last_seen_at)
+     VALUES (?, ?, ?, ?, datetime('now'))`
+  ).run(accountId, key, orphan.id, roomLabel);
+  if (orphan.label === 'Default Room') {
+    database.prepare('UPDATE rooms SET label = ? WHERE id = ?').run(roomLabel, orphan.id);
+  }
+  return getRoom(orphan.id);
 }
 
 export function findAccountByApiKey(plaintextKey) {
@@ -495,8 +575,8 @@ function defaultInstanceLabel(instanceKey) {
 
 /** One room per OBS instance key (URL ?instance=) under an account.
  *  Returns { room } for existing mapping, or creates a new room.
+ *  Prefers adopting an unmapped signup room before allocating a new table slot.
  *  Callers must enforce room quotas before create (see room-hub).
- *  Use peekRoomDock / createRoomForInstance when you need a pre-check.
  */
 export function peekRoomDock(accountId, instanceKey) {
   const key = (instanceKey || 'default').trim() || 'default';
@@ -515,6 +595,14 @@ export function ensureRoomForInstance(accountId, instanceKey, label) {
     ).run(label || null, accountId, key);
     return getRoom(row.room_id);
   }
+
+  // Reclaim orphan rooms (e.g. signup Default Room with no room_docks row)
+  // so going single-instance → multi-instance does not burn an extra table slot.
+  const claimed = linkUnmappedRoomToInstance(accountId, null, key, label || null);
+  if (claimed) {
+    return claimed;
+  }
+
   const roomId = uuidv4();
   const roomLabel = label || defaultInstanceLabel(key);
   database.prepare('INSERT INTO rooms (id, account_id, label) VALUES (?, ?, ?)').run(roomId, accountId, roomLabel);

@@ -436,6 +436,15 @@
             foulsP2: typeof window.getRackFouls === 'function'
                 ? window.getRackFouls('2')
                 : Math.max(0, parseInt(dockStorage('snookerFrameFoulsP2', '0') || '0', 10) || 0),
+            snookerCurrentBreak: snooker && typeof window.getSnookerCurrentBreak === 'function'
+                ? window.getSnookerCurrentBreak()
+                : 0,
+            snookerPointsRemaining: snooker && typeof window.getSnookerPointsRemainingOnTable === 'function'
+                ? window.getSnookerPointsRemainingOnTable()
+                : 0,
+            snookerBreakBalls: snooker && typeof window.getSnookerBreakBallsForPublish === 'function'
+                ? window.getSnookerBreakBallsForPublish()
+                : [],
         };
     }
 
@@ -807,8 +816,10 @@
             if (
                 data.code === 'subscription_required' ||
                 data.code === 'invalid_api_key' ||
-                data.code === 'room_limit'
+                data.code === 'room_limit' ||
+                data.code === 'api_key_in_use'
             ) {
+                // api_key_in_use: this key is already connected elsewhere — stop reconnect fighting.
                 isBlockedByServer = true;
                 blockedReason = data.message;
                 setStorageItem('enabled', 'false');
@@ -848,9 +859,19 @@
             clearTimeout(reconnectTimer);
             reconnectTimer = null;
         }
-        if (ws && ws.readyState === WebSocket.OPEN) {
-            try { ws.send(JSON.stringify({ type: 'disconnect' })); } catch (_) { /* ignore */ }
-            ws.close();
+        if (ws) {
+            try {
+                ws.onopen = null;
+                ws.onmessage = null;
+                ws.onerror = null;
+                ws.onclose = null;
+                if (ws.readyState === WebSocket.OPEN) {
+                    try { ws.send(JSON.stringify({ type: 'disconnect' })); } catch (_) { /* ignore */ }
+                }
+                if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+                    ws.close();
+                }
+            } catch (_) { /* ignore */ }
         }
         ws = null;
         isConnected = false;
@@ -859,11 +880,22 @@
         updateCloudUI();
     }
 
+    function clearBlockedState() {
+        isBlockedByServer = false;
+        blockedReason = null;
+    }
+
     function setEnabled(enabled) {
         isEnabled = !!enabled;
         setStorageItem('enabled', isEnabled ? 'true' : 'false');
-        if (isEnabled) connect();
-        else disconnect();
+        if (isEnabled) {
+            // Allow retry after a previous invalid-key block without a full page refresh.
+            clearBlockedState();
+            reconnectAttempts = 0;
+            connect();
+        } else {
+            disconnect();
+        }
         updateCloudUI();
     }
 
@@ -879,11 +911,24 @@
         return lastState;
     }
 
+    /**
+     * Update dock cloud credentials. Clears blocked status and drops any live
+     * socket so the next connect/join cannot reuse a stale key or room.
+     */
     function setCredentials({ serverUrl, roomId, accessToken, apiKey }) {
         if (serverUrl != null) setStorageItem('serverUrl', serverUrl);
         if (roomId != null) setStorageItem('roomId', roomId);
         if (accessToken != null) setStorageItem('accessToken', accessToken);
         if (apiKey != null) setStorageItem('apiKey', apiKey);
+        clearBlockedState();
+        reconnectAttempts = 0;
+        const wasEnabled = isEnabled;
+        disconnect();
+        if (wasEnabled) {
+            connect();
+        } else {
+            updateCloudUI();
+        }
     }
 
     function clearSession() {
@@ -893,6 +938,8 @@
         setStorageItem('signedInEmail', '');
         setStorageItem('enabled', 'false');
         isEnabled = false;
+        clearBlockedState();
+        reconnectAttempts = 0;
         disconnect();
     }
 

@@ -861,9 +861,10 @@ select.dropdown option,
 
 .rack-foul-counter {
 	display: inline-flex;
+	flex-direction: column;
 	align-items: center;
 	justify-content: center;
-	gap: 8px;
+	gap: 4px;
 	flex: 0 0 auto;
 	padding: 4px 0;
 	min-height: 0;
@@ -871,8 +872,63 @@ select.dropdown option,
 	font-size: 12px;
 	line-height: 1.2;
 	/* Inherit theme text color (div white / light-theme black) */
-	white-space: nowrap;
+	white-space: normal;
 	user-select: none;
+}
+
+.rack-stat-row {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-wrap: wrap;
+	gap: 8px;
+	white-space: nowrap;
+}
+
+.rack-stat-row.noShow {
+	display: none;
+}
+
+.rack-break-group,
+.rack-remaining-group {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.rack-break-group.noShow,
+.rack-foul-sep.noShow {
+	display: none;
+}
+
+.rack-stat-value {
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+}
+
+.rack-break-balls {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-wrap: wrap;
+	gap: 4px;
+}
+
+.rack-break-ball {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.45em;
+	height: 1.45em;
+	border-radius: 50%;
+	border: 2px solid var(--break-ball-color, #90a4ae);
+	color: var(--break-ball-color, #90a4ae);
+	background: transparent;
+	font-size: 10px;
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+	line-height: 1;
+	box-sizing: border-box;
 }
 
 .rack-foul-heading {
@@ -2156,6 +2212,12 @@ label.switch.toggle-disabled {
 
 .stats-rack-detail-table td {
 	padding: 3px 8px;
+}
+
+.stats-match-duration-footer {
+	margin: 6px 0 2px;
+	font-size: 0.85em;
+	opacity: 0.85;
 }
 
 .stats-win-streak {

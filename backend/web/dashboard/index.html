@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>CueSport Scoreboard Cloud — Dashboard</title>
-  <link rel="stylesheet" href="/web/shared/styles.css?v=8.0.0.7" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.0.0.14" />
 </head>
 <body>
   <header class="site-header">
@@ -103,7 +103,7 @@
                 <thead>
                   <tr>
                     <th>Date</th>
-                    <th>Info</th>
+                    <th>Event</th>
                     <th>Game</th>
                     <th>Match</th>
                     <th>Score</th>
@@ -146,16 +146,13 @@
           <div class="stats-table-wrap">
             <table class="dash-stats-table">
               <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Info</th>
-                  <th>Game</th>
-                  <th>Opponent</th>
-                  <th>Score</th>
-                  <th>Result</th>
-                  <th>Extras</th>
-                  <th></th>
-                </tr>
+                  <tr>
+                    <th>Date</th>
+                    <th>Opponent</th>
+                    <th>Game</th>
+                    <th>Score</th>
+                    <th></th>
+                  </tr>
               </thead>
               <tbody id="statsPlayerMatchesBody"></tbody>
             </table>
@@ -175,9 +172,9 @@
           </div>
         </div>
         <div class="panel">
-          <h2>API Keys (Self-Host Dock)</h2>
-          <p class="hint">Paste into OBS → Replay/Share → CueSport Cloud self-host settings. Room/table ID is assigned automatically per instance.</p>
-          <button id="createKeyBtn" class="btn">Create API Key</button>
+          <h2>OBS Dock Keys</h2>
+          <p class="hint">One key per dock: create a key for each table, then paste it into that dock’s CueSport Cloud settings. A second dock using the same key is rejected (the first stays connected). Room/table ID is assigned automatically per instance.</p>
+          <button id="createKeyBtn" class="btn">Create Dock Key</button>
           <p id="apiKeyLimitHint" class="hint hidden"></p>
           <pre id="newKeyDisplay" class="key-display hidden" role="button" tabindex="0" title="Click to copy API key" aria-label="API key — click to copy"></pre>
           <p id="keyCopyNotice" class="copy-notice hidden" aria-live="polite"></p>
@@ -212,60 +209,16 @@
           <select id="statsMatchGameType"></select>
         </label>
         <label class="stats-filter">
-          Game / other info
+          Event Info
           <input id="statsMatchGameInfo" type="text" maxlength="60" placeholder="Optional — league, event, notes…" />
         </label>
-        <div class="stats-toolbar">
-          <label class="stats-filter">
-            <span id="statsMatchScoreP1Label">P1 score</span>
-            <input id="statsMatchScoreP1" type="number" min="0" max="999" required />
-          </label>
-          <label class="stats-filter">
-            <span id="statsMatchScoreP2Label">P2 score</span>
-            <input id="statsMatchScoreP2" type="number" min="0" max="999" required />
-          </label>
-        </div>
-        <label class="stats-filter">
-          Date
-          <input id="statsMatchDate" type="date" />
-        </label>
-        <div id="statsMatchExtrasHb" class="stats-toolbar hidden">
-          <label class="stats-filter">
-            <span id="statsMatchHbP1Label">Highest break P1</span>
-            <input id="statsMatchHbP1" type="number" min="0" max="999" />
-          </label>
-          <label class="stats-filter">
-            <span id="statsMatchHbP2Label">Highest break P2</span>
-            <input id="statsMatchHbP2" type="number" min="0" max="999" />
-          </label>
-        </div>
-        <div id="statsMatchExtrasHr" class="stats-toolbar hidden">
-          <label class="stats-filter">
-            <span id="statsMatchHrP1Label">Longest run P1</span>
-            <input id="statsMatchHrP1" type="number" min="0" max="999" />
-          </label>
-          <label class="stats-filter">
-            <span id="statsMatchHrP2Label">Longest run P2</span>
-            <input id="statsMatchHrP2" type="number" min="0" max="999" />
-          </label>
-        </div>
-        <div id="statsMatchExtrasRuns" class="stats-toolbar hidden">
-          <label class="stats-filter">
-            <span id="statsMatchBrP1Label">B&amp;R P1</span>
-            <input id="statsMatchBrP1" type="number" min="0" max="999" />
-          </label>
-          <label class="stats-filter">
-            <span id="statsMatchBrP2Label">B&amp;R P2</span>
-            <input id="statsMatchBrP2" type="number" min="0" max="999" />
-          </label>
-          <label class="stats-filter">
-            <span id="statsMatchTrP1Label">TR P1</span>
-            <input id="statsMatchTrP1" type="number" min="0" max="999" />
-          </label>
-          <label class="stats-filter">
-            <span id="statsMatchTrP2Label">TR P2</span>
-            <input id="statsMatchTrP2" type="number" min="0" max="999" />
-          </label>
+        <div class="stats-match-score-summary" id="statsMatchScoreSummary">Match: 0 – 0</div>
+        <div class="stats-match-racks-editor-wrap">
+          <div class="stats-match-racks-editor-header">
+            <span id="statsMatchRacksEditorLabel">Racks</span>
+            <button type="button" class="btn" id="statsMatchAddRackBtn">Add Rack</button>
+          </div>
+          <div id="statsMatchRacksEditor" class="stats-match-racks-editor"></div>
         </div>
         <div id="statsMatchExtrasBalls" class="stats-toolbar hidden">
           <label class="stats-filter">
@@ -277,16 +230,10 @@
             <input id="statsMatchBallsP2" type="number" min="0" max="999" />
           </label>
         </div>
-        <div id="statsMatchExtrasFouls" class="stats-toolbar hidden">
-          <label class="stats-filter">
-            <span id="statsMatchFoulsP1Label">Fouls P1</span>
-            <input id="statsMatchFoulsP1" type="number" min="0" max="999" />
-          </label>
-          <label class="stats-filter">
-            <span id="statsMatchFoulsP2Label">Fouls P2</span>
-            <input id="statsMatchFoulsP2" type="number" min="0" max="999" />
-          </label>
-        </div>
+        <label class="stats-filter">
+          Date
+          <input id="statsMatchDate" type="date" />
+        </label>
         <p id="statsMatchError" class="error hidden"></p>
         <div class="stats-toolbar">
               <button type="submit" id="statsMatchSaveBtn" class="btn primary" disabled>Save</button>
@@ -296,6 +243,6 @@
       </form>
     </div>
   </div>
-  <script type="module" src="/web/dashboard/app.js?v=8.0.0.9"></script>
+  <script type="module" src="/web/dashboard/app.js?v=8.0.0.17"></script>
 </body>
 </html>

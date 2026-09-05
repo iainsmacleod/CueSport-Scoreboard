@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
   <title>CueSport Scoreboard Cloud Control</title>
-  <link rel="stylesheet" href="/web/shared/styles.css?v=8.0.0.7" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.0.0.11" />
 </head>
 <body class="mobile">
   <header>
@@ -33,6 +33,10 @@
     </div>
   </header>
   <main id="app">
+    <div id="reconnectBanner" class="reconnect-banner hidden" role="status" aria-live="polite">
+      <p id="reconnectBannerText">Connection lost</p>
+      <button type="button" id="reconnectBtn" class="btn primary block">Reconnect</button>
+    </div>
     <section id="connectingSection">
       <p class="hint">Connecting…</p>
     </section>
@@ -60,16 +64,29 @@
             <p id="ballGridHint" class="ball-grid-hint hidden"></p>
             <div id="ballGrid" class="ball-grid ball-grid-live"></div>
             <div id="rackFoulCounter" class="rack-foul-counter hidden" aria-live="polite" title="Fouls this rack or frame">
-              <span class="rack-foul-heading">Fouls</span>
-              <span class="rack-foul-player" id="rackFoulP1Wrap">
-                <span class="rack-foul-name" id="rackFoulP1Name">P1</span>
-                <span class="rack-foul-count" id="rackFoulP1">0</span>
-              </span>
-              <span class="rack-foul-sep" aria-hidden="true">·</span>
-              <span class="rack-foul-player" id="rackFoulP2Wrap">
-                <span class="rack-foul-name" id="rackFoulP2Name">P2</span>
-                <span class="rack-foul-count" id="rackFoulP2">0</span>
-              </span>
+              <div class="rack-stat-row hidden" id="rackSnookerStatsRow">
+                <span class="rack-break-group" id="rackBreakGroup">
+                  <span class="rack-foul-heading" id="rackCurrentBreakLabel">Break 0</span>
+                  <div class="rack-break-balls" id="rackBreakBalls" aria-label="Balls in current break"></div>
+                </span>
+                <span class="rack-foul-sep" id="rackSnookerStatsSep" aria-hidden="true">|</span>
+                <span class="rack-remaining-group">
+                  <span class="rack-foul-heading">Remaining</span>
+                  <span class="rack-stat-value" id="rackPointsRemainingValue">0</span>
+                </span>
+              </div>
+              <div class="rack-stat-row" id="rackFoulRow">
+                <span class="rack-foul-heading">Fouls</span>
+                <span class="rack-foul-player" id="rackFoulP1Wrap">
+                  <span class="rack-foul-name" id="rackFoulP1Name">P1</span>
+                  <span class="rack-foul-count" id="rackFoulP1">0</span>
+                </span>
+                <span class="rack-foul-sep" aria-hidden="true">·</span>
+                <span class="rack-foul-player" id="rackFoulP2Wrap">
+                  <span class="rack-foul-name" id="rackFoulP2Name">P2</span>
+                  <span class="rack-foul-count" id="rackFoulP2">0</span>
+                </span>
+              </div>
             </div>
           </div>
           <div class="live-score-controls">
@@ -141,10 +158,10 @@
         </div>
         <div class="panel" id="setupPanel">
           <h2>Game Setup</h2>
-          <label for="gameInfoInput">Game Information</label>
+          <label for="gameInfoInput">Event Information</label>
           <div class="field-row">
             <input id="gameInfoInput" maxlength="60" />
-            <button type="button" class="icon-btn" id="saveGameInfoBtn" title="Save game info" aria-label="Save game info" disabled>
+            <button type="button" class="icon-btn" id="saveGameInfoBtn" title="Save event info" aria-label="Save event info" disabled>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
             </button>
           </div>
@@ -223,7 +240,7 @@
         <div class="panel share-panel">
           <h2>Public Control Link</h2>
           <p class="hint share-limitations">
-            Guests can score, pot balls, apply fouls, pick the breaker, and edit race / game info.
+            Guests can score, pot balls, apply fouls, pick the breaker, and edit race / event info.
             They cannot change player names, game type, reset or end the match, or use replay.
           </p>
           <div id="shareQrWrap" class="share-qr-wrap">
@@ -304,6 +321,6 @@
       <div id="snookerFoulTargets" class="snooker-foul-targets"></div>
     </div>
   </div>
-  <script type="module" src="/web/mobile/app.js?v=8.0.0.10"></script>
+  <script type="module" src="/web/mobile/app.js?v=8.0.0.16"></script>
 </body>
 </html>

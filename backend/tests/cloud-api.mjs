@@ -53,7 +53,7 @@ function waitForWsErrorThenClose(ws, timeoutMs = 8000) {
   });
 }
 
-function wsJoin({ roomId, client, accessToken, apiKey, guestToken, timeoutMs = 8000 }) {
+function wsJoin({ roomId, client, accessToken, apiKey, guestToken, timeoutMs = 8000, instanceId }) {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(`${WS_BASE}/ws`);
     const timer = setTimeout(() => {
@@ -76,6 +76,7 @@ function wsJoin({ roomId, client, accessToken, apiKey, guestToken, timeoutMs = 8
       }
       if (accessToken) msg.access_token = accessToken;
       if (apiKey) msg.api_key = apiKey;
+      if (instanceId) msg.instance_id = instanceId;
       ws.send(JSON.stringify(msg));
     });
 
@@ -92,7 +93,7 @@ function wsJoin({ roomId, client, accessToken, apiKey, guestToken, timeoutMs = 8
       } else if (data.type === 'error') {
         clearTimeout(timer);
         ws.close();
-        reject(new Error(data.message || data.code || 'join error'));
+        reject(Object.assign(new Error(data.message || data.code || 'join error'), { code: data.code }));
       }
     });
   });
@@ -275,6 +276,30 @@ async function run() {
       tokenFresh = relogin2.body.access_token;
     } catch (e) {
       assert('WS join mobile + disconnect on Sign Out Everywhere', false, e.message);
+    }
+
+    // Option A: one key = one dock seat (reject second dock; keep first)
+    if (apiKey) {
+      let seatA;
+      try {
+        seatA = await wsJoin({ roomId, client: 'dock', apiKey });
+        let rejected = false;
+        try {
+          await wsJoin({ roomId, client: 'dock', apiKey });
+        } catch (e) {
+          rejected = e.code === 'api_key_in_use' || /already in use/i.test(e.message);
+          assert('Same API key rejects second dock', rejected, e.message);
+        }
+        if (!rejected) {
+          assert('Same API key rejects second dock', false, 'second dock was allowed');
+        }
+        assert('First dock kept after conflict', seatA.ws.readyState === 1);
+        seatA.ws.close();
+        await new Promise((r) => setTimeout(r, 100));
+      } catch (e) {
+        assert('Same API key rejects second dock', false, e.message);
+        if (seatA) try { seatA.ws.close(); } catch (_) { /* ignore */ }
+      }
     }
 
     // WebSocket: dock api key

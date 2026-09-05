@@ -997,6 +997,77 @@ function setSnookerCurrentBreak(n) {
     setStorageItem("snookerCurrentBreak", String(Math.max(0, n || 0)));
 }
 
+const SNOOKER_BREAK_BALLS_KEY = "snookerBreakBalls";
+const SNOOKER_BREAK_BALL_ORDER = [
+    "red", "yellow", "green", "brown", "blue", "pink", "black", "gold", "freeball"
+];
+const SNOOKER_BREAK_BALL_COLORS = {
+    red: "#e53935",
+    yellow: "#fdd835",
+    green: "#43a047",
+    brown: "#8d6e63",
+    blue: "#1e88e5",
+    pink: "#ec407a",
+    black: "#f5f5f5",
+    gold: "#ffc107",
+    freeball: "#b0bec5"
+};
+const SNOOKER_NUM_TO_BREAK_KEY = {
+    1: "red",
+    2: "yellow",
+    3: "green",
+    4: "brown",
+    5: "blue",
+    6: "pink",
+    7: "black",
+    8: "gold",
+    10: "freeball"
+};
+
+function getSnookerBreakBallCounts() {
+    try {
+        const parsed = JSON.parse(getStorageItem(SNOOKER_BREAK_BALLS_KEY) || "{}");
+        return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+    } catch (e) {
+        return {};
+    }
+}
+
+function setSnookerBreakBallCounts(counts) {
+    try {
+        setStorageItem(SNOOKER_BREAK_BALLS_KEY, JSON.stringify(counts || {}));
+    } catch (e) {
+        console.error("Failed to persist snooker break balls:", e);
+    }
+}
+
+function clearSnookerBreakBallCounts() {
+    setSnookerBreakBallCounts({});
+}
+
+function recordSnookerBreakBall(ballKey) {
+    if (!ballKey) {
+        return;
+    }
+    const counts = getSnookerBreakBallCounts();
+    counts[ballKey] = (parseInt(counts[ballKey], 10) || 0) + 1;
+    setSnookerBreakBallCounts(counts);
+}
+
+/** Balls used in the active visit break — only colors with count > 0, snooker order. */
+function getSnookerBreakBallsForPublish() {
+    const counts = getSnookerBreakBallCounts();
+    return SNOOKER_BREAK_BALL_ORDER.filter(function (key) {
+        return (parseInt(counts[key], 10) || 0) > 0;
+    }).map(function (key) {
+        return {
+            key: key,
+            count: parseInt(counts[key], 10) || 0,
+            color: SNOOKER_BREAK_BALL_COLORS[key] || "#90a4ae"
+        };
+    });
+}
+
 function getSnookerFrameHighBreak(player) {
     const key = player === "2" ? "snookerFrameHighBreakP2" : "snookerFrameHighBreakP1";
     return parseInt(getStorageItem(key) || "0", 10) || 0;
@@ -1009,6 +1080,7 @@ function setSnookerFrameHighBreak(player, n) {
 
 function resetSnookerBreakTracking(keepFrameHighs) {
     setSnookerCurrentBreak(0);
+    clearSnookerBreakBallCounts();
     if (!keepFrameHighs) {
         setSnookerFrameHighBreak("1", 0);
         setSnookerFrameHighBreak("2", 0);
@@ -1053,6 +1125,29 @@ function shortPlayerLabel(player) {
     return first.length > 10 ? first.slice(0, 9) + "…" : first;
 }
 
+function renderRackBreakBallCircles(container, balls) {
+    if (!container) {
+        return;
+    }
+    container.innerHTML = "";
+    if (!Array.isArray(balls) || !balls.length) {
+        return;
+    }
+    balls.forEach(function (ball) {
+        if (!ball || !(ball.count > 0)) {
+            return;
+        }
+        const el = document.createElement("span");
+        el.className = "rack-break-ball";
+        el.style.setProperty("--break-ball-color", ball.color || "#90a4ae");
+        el.dataset.ball = ball.key || "";
+        el.title = (ball.key || "ball") + " × " + ball.count;
+        el.setAttribute("aria-label", (ball.key || "ball") + " potted " + ball.count + " times");
+        el.textContent = String(ball.count);
+        container.appendChild(el);
+    });
+}
+
 /** Live rack/frame foul totals on the ball-tracker action row. */
 function updateRackFoulDisplay() {
     const counter = document.getElementById("rackFoulCounter");
@@ -1092,6 +1187,33 @@ function updateRackFoulDisplay() {
     if (p2Wrap) {
         p2Wrap.classList.toggle("is-active", active === "2");
     }
+
+    const snookerLive = show && isSnookerBallMode();
+    const statsRow = document.getElementById("rackSnookerStatsRow");
+    const breakGroup = document.getElementById("rackBreakGroup");
+    const statsSep = document.getElementById("rackSnookerStatsSep");
+    const ptsValue = document.getElementById("rackPointsRemainingValue");
+    const breakLabel = document.getElementById("rackCurrentBreakLabel");
+    const breakBallsEl = document.getElementById("rackBreakBalls");
+    const currentBreak = snookerLive ? getSnookerCurrentBreak() : 0;
+    const breakBalls = snookerLive ? getSnookerBreakBallsForPublish() : [];
+    const showBreak = snookerLive && currentBreak > 0;
+    if (statsRow) {
+        statsRow.classList.toggle("noShow", !snookerLive);
+    }
+    if (breakGroup) {
+        breakGroup.classList.toggle("noShow", !showBreak);
+    }
+    if (statsSep) {
+        statsSep.classList.toggle("noShow", !showBreak);
+    }
+    if (ptsValue && snookerLive) {
+        ptsValue.textContent = String(getSnookerPointsRemainingOnTable());
+    }
+    if (breakLabel) {
+        breakLabel.textContent = "Break " + currentBreak;
+    }
+    renderRackBreakBallCircles(breakBallsEl, showBreak ? breakBalls : []);
     syncBallTrackerActionRowVisibility();
 }
 
@@ -1179,12 +1301,15 @@ function applyPoolFoul() {
 window.applyPoolFoul = applyPoolFoul;
 
 /** Add pot points to the active player's continuous break and frame high. */
-function addToSnookerBreak(player, points) {
+function addToSnookerBreak(player, points, ballKey) {
     if (!points || (player !== "1" && player !== "2")) {
         return;
     }
     const nextBreak = getSnookerCurrentBreak() + points;
     setSnookerCurrentBreak(nextBreak);
+    if (ballKey) {
+        recordSnookerBreakBall(ballKey);
+    }
     if (nextBreak > getSnookerFrameHighBreak(player)) {
         setSnookerFrameHighBreak(player, nextBreak);
     }
@@ -1228,6 +1353,7 @@ function captureSnookerUndoSnapshot() {
         clearedColors: getSnookerClearedColors().slice(),
         goldenBallFouled: isSnookerGoldenBallFouled(),
         currentBreak: getSnookerCurrentBreak(),
+        breakBalls: Object.assign({}, getSnookerBreakBallCounts()),
         frameHighP1: getSnookerFrameHighBreak("1"),
         frameHighP2: getSnookerFrameHighBreak("2"),
         foulsP1: getSnookerFrameFouls("1"),
@@ -1634,6 +1760,10 @@ async function undoLastScoringAction() {
     }
     updateScoreControlAvailability();
     updateCallGameButton();
+    updateResetScoreButton();
+    if (window.PlayerStats && typeof window.PlayerStats.maybeDiscardCloudIfFreshStart === "function") {
+        window.PlayerStats.maybeDiscardCloudIfFreshStart();
+    }
     if (window.streamSharing) {
         window.streamSharing.sendUpdate();
     }
@@ -1665,6 +1795,11 @@ async function applyScoringUndoEntry(entry) {
         setSnookerActivePlayerFromUndo(before.activePlayer === "2" ? "2" : "1");
         if (isSnookerBallMode() && before.snookerCurrentBreak != null) {
             setSnookerCurrentBreak(before.snookerCurrentBreak || 0);
+            setSnookerBreakBallCounts(
+                before.snookerBreakBalls && typeof before.snookerBreakBalls === "object"
+                    ? before.snookerBreakBalls
+                    : {}
+            );
             if (before.snookerPhase) {
                 setSnookerPhase(before.snookerPhase);
             }
@@ -1859,6 +1994,9 @@ async function undoLastSnookerAction() {
     setSnookerClearedColors(Array.isArray(snap.clearedColors) ? snap.clearedColors : []);
     setSnookerGoldenBallFouled(!!snap.goldenBallFouled);
     setSnookerCurrentBreak(snap.currentBreak || 0);
+    setSnookerBreakBallCounts(
+        snap.breakBalls && typeof snap.breakBalls === "object" ? snap.breakBalls : {}
+    );
     setSnookerFrameHighBreak("1", snap.frameHighP1 || 0);
     setSnookerFrameHighBreak("2", snap.frameHighP2 || 0);
     setSnookerFrameFouls("1", snap.foulsP1 || 0);
@@ -1882,6 +2020,10 @@ async function undoLastSnookerAction() {
     updateScoreControlAvailability();
     refreshSnookerOverlayStats();
     updateScoringUndoButton();
+    updateResetScoreButton();
+    if (window.PlayerStats && typeof window.PlayerStats.maybeDiscardCloudIfFreshStart === "function") {
+        window.PlayerStats.maybeDiscardCloudIfFreshStart();
+    }
     if (window.streamSharing) {
         window.streamSharing.sendUpdate();
     }
@@ -1891,6 +2033,7 @@ async function undoLastSnookerAction() {
 /** End the current visit without adding foul/award points to the break. */
 function endSnookerBreak() {
     setSnookerCurrentBreak(0);
+    clearSnookerBreakBallCounts();
     if (window.PlayerStats && typeof window.PlayerStats.broadcastOverlayStatsIfEnabled === 'function') {
         window.PlayerStats.broadcastOverlayStatsIfEnabled();
     }
@@ -2100,6 +2243,7 @@ function refreshSnookerOverlayStats() {
     } else if (window.PlayerStats && typeof window.PlayerStats.broadcastOverlayStatsIfEnabled === "function") {
         window.PlayerStats.broadcastOverlayStatsIfEnabled();
     }
+    updateRackFoulDisplay();
 }
 
 /** True once the frame is in colors-only clearance and yellow→black are all off the table. */
@@ -2184,6 +2328,10 @@ function getSnookerPointsRemainingOnTable() {
     }
     return pts;
 }
+
+window.getSnookerBreakBallsForPublish = getSnookerBreakBallsForPublish;
+window.getSnookerCurrentBreak = getSnookerCurrentBreak;
+window.getSnookerPointsRemainingOnTable = getSnookerPointsRemainingOnTable;
 
 /**
  * Remaining points for a player's maximum continuing break:
@@ -2989,7 +3137,7 @@ async function handleSnookerBallClick(element) {
         if (!addSnookerPoints(scorer, meta.points)) {
             return;
         }
-        addToSnookerBreak(scorer, meta.points);
+        addToSnookerBreak(scorer, meta.points, "gold");
         markSnookerColorCleared(8);
         flashSnookerColorFeedback(element, function () {
             updateSnookerBallAvailability();
@@ -3022,7 +3170,7 @@ async function handleSnookerBallClick(element) {
         if (!addSnookerPoints(scorer, meta.points)) {
             return;
         }
-        addToSnookerBreak(scorer, meta.points);
+        addToSnookerBreak(scorer, meta.points, "red");
         setSnookerRedsPotted(reds + 1);
         setSnookerAfterFreeball(false);
         setSnookerFreeBallOffered(false);
@@ -3046,7 +3194,7 @@ async function handleSnookerBallClick(element) {
         if (!addSnookerPoints(scorer, freeBallPoints)) {
             return;
         }
-        addToSnookerBreak(scorer, freeBallPoints);
+        addToSnookerBreak(scorer, freeBallPoints, "freeball");
         setSnookerFreeBallOffered(false);
         setSnookerFoulAwaitingPlayerChange(false);
         if (!redsDone) {
@@ -3078,7 +3226,7 @@ async function handleSnookerBallClick(element) {
         if (!addSnookerPoints(scorer, meta.points)) {
             return;
         }
-        addToSnookerBreak(scorer, meta.points);
+        addToSnookerBreak(scorer, meta.points, SNOOKER_NUM_TO_BREAK_KEY[num] || null);
 
         const afterFreeball = getSnookerAfterFreeball();
         setSnookerAfterFreeball(false);
@@ -4935,7 +5083,7 @@ function resetCurrentGame(options) {
 }
 
 function clearGame() {
-    const confirmed = confirm("Are you sure you wish to clear player, score, and game information?");
+    const confirmed = confirm("Are you sure you wish to clear player, score, and event information?");
     if (!confirmed) {
         return;
     }
@@ -5720,6 +5868,7 @@ function togglePlayer(isChecked, options) {
             };
             if (isSnookerBallMode()) {
                 playerSwitchBefore.snookerCurrentBreak = getSnookerCurrentBreak();
+                playerSwitchBefore.snookerBreakBalls = Object.assign({}, getSnookerBreakBallCounts());
                 playerSwitchBefore.snookerPhase = getSnookerPhase();
                 playerSwitchBefore.snookerAfterFreeball = getSnookerAfterFreeball();
                 playerSwitchBefore.snookerFoulAwaitingPlayerChange = getSnookerFoulAwaitingPlayerChange();

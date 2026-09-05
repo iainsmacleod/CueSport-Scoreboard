@@ -172,7 +172,7 @@ Tabs: **Setup**, **Controls**, **Images**, **Replay/Share**, **Stats**, **Settin
 ### Setup
 
 - **Game Selection** — **Game Variant** (8-Ball through Snooker and Custom) and **Ball Variant** (World / International / Unity / Snooker). Changing variant automatically finalizes the open match under the previous type (**End Match** if the race/Best Of is complete, **Call Match Early** if racks/frames exist mid-race, otherwise **Reset Score**), then applies the new variant with a cleared scoreline and **clears scoring Undo history**. **Golden Ball** (Snooker only), **Win on Break** (8-Ball) / **Early Game Ball/Win on Break** (9-Ball / 10-Ball), and **Point Based** (Custom only) appear on that row when applicable. Snooker game variant forces Snooker balls.
-- **Game Information** — **Race Info** (short numeric race-to; the last number in the field is used as the race target; leave blank for no race lock) or **Best Of** for Snooker, plus **Game/Other Info** free text (max 60 characters). **Update Info** pushes race/game text to the overlay.
+- **Event Information** — **Race Info** (short numeric race-to; the last number in the field is used as the race target; leave blank for no race lock) or **Best Of** for Snooker, plus **Event Info** free text (max 60 characters). **Update Info** pushes race/event text to the overlay.
 - **Player/Team 1 Details** / **Player/Team 2 Details** — each section has **Name** (max 20 characters; autocomplete from your stats roster, or **double-click** to open the full scrollable player list) and **Color** for the scoreboard bar.
 - **Swap Colors** / **Clear Game** — **Clear Game** wipes player names, race/game info, and the on-screen scoreline, abandons any in-progress stats match (undoing recorded racks/frames/balls for that session), and resets the stats session. It does **not** delete players or completed match history from the database.
 
@@ -309,7 +309,7 @@ The OBS **dock remains the scoring authority**. Mobile and guest clients send co
 |---------|-----|---------|
 | **Dashboard** | `/dashboard` | Sign in, see live tables, API keys, open mobile control |
 | **Mobile control** | `/m/{room_id}` | Full remote (admin): score, balls, setup, replay, share |
-| **Guest control** | `/g/{token}` | Limited remote: score, balls, fouls, race/game info — no names, game type, reset/end, or replay |
+| **Guest control** | `/g/{token}` | Limited remote: score, balls, fouls, race/event info — no names, game type, reset/end, or replay |
 | **Stream listing** | `/` or `/streams` | Public page of promoted live streams |
 
 - **Stats-safe relay** — mobile commands invoke the same dock functions as the control panel (`postScore`, `selectRackBreaker`, etc.)
@@ -317,7 +317,7 @@ The OBS **dock remains the scoring authority**. Mobile and guest clients send co
 - **Connection gating** — mobile/guest controls pause when the dock is offline or the cloud socket is down, so the UI does not drift out of sync
 - **Match confirmations** — Restart Match, End Match, and Call Match require confirmation on mobile (danger-styled buttons)
 - **Cloud match stats** — completed dock races sync to the account (`session:start` / `session:end`); the dashboard **Stats** tab shows a leaderboard, recent matches, player detail (rename across history, edit/delete matches), and extras (B&R / TR, highest break, longest run, balls). Local dock stats keep a rolling **30-day** window; cloud history is unbounded. When cloud is connected, dock import/export/clear for stats are disabled — manage history on the dashboard.
-- **Game Info** — optional dock Game Information text is stored on cloud matches and shown in the dashboard Info column (preferred over room/table labels for match context)
+- **Event Info** — optional dock Event Information text is stored on cloud matches and shown in the dashboard Event column (preferred over room/table labels for match context)
 - **Google sign-in** (hosted) or **OBS Dock Key** (self-host) via CueSport Cloud **Connection settings** (⚙) in Replay/Share
 
 ### Quick start (self-host)
@@ -339,7 +339,7 @@ docker compose up -d --build
 ```
 
 1. Open **http://localhost:3000/dashboard** (or **:4003** with Docker) and **dev sign-in** with your `DEV_AUTH_SECRET`.
-2. In OBS **Replay/Share**, open **CueSport Cloud → Connection settings (⚙)** → **Self-hosting** → Server URL and OBS Dock Key.
+2. Create an **OBS Dock Key** per table (basic plan: 2 seats). Paste each key into that dock’s CueSport Cloud **Connection settings (⚙)** → **Self-hosting** (Server URL + key). Each key may only be connected on one dock at a time — a second dock gets an error and should use its own key.
 3. Enable the **CueSport Cloud** toggle on the dock.
 4. On your phone, open **http://localhost:3000/m/{room_id}** — if you already signed in on the dashboard in the same browser, tap **Connect**; on a new device, enter the dev secret once (it is saved for next time).
 5. Optional: from mobile **Share**, create a **guest link** (`/g/{token}`) for helpers who should not change names, game type, or end the match.
@@ -550,7 +550,7 @@ From the project root:
 python -m http.server 8765
 ```
 
-Open `http://localhost:8765/tests/smoke_test.html` and click **Run all tests**. Coverage includes core wiring and version; Setup (**Game Selection** / **Game Information**, player details, game-variant option integrity); dock **zoom** and **tab** persistence; Stats tab restore; **Manual Adjustments** layout (chosen ball placement, player-tracking block visibility); Show Scores / Ball Scoring preference handling; Stats tab (Player Stats, Import / Export / Clear, per-game overlay visibility toggles); **OverlayVisibility** (stats toggles through initial build, broadcast rebuild, and Snooker live publish); overlay mode toggles and payload sync; stats APIs and match history; live H2H / in-progress match editing; **Breaking Player?** / **Active Player** (all game types with Ball Scoring on, section hidden when off, race-complete lock, player switching, International Red/Yellow auto-assign); Snooker (frames/points, Golden Ball, fouls, Free Ball, undo stack, scoring lock, overlay Display Balls rules); Ball Scoring rack wins (8/9/10-ball including **Break & Run** / **Table Run** rack flags and career totals, Straight 14.1 re-rack, Bank/One Pocket); **Call Match Early** modal copy; replay clip delete note; and related UI labels.
+Open `http://localhost:8765/tests/smoke_test.html` and click **Run all tests**. Coverage includes core wiring and version; Setup (**Game Selection** / **Event Information**, player details, game-variant option integrity); dock **zoom** and **tab** persistence; Stats tab restore; **Manual Adjustments** layout (chosen ball placement, player-tracking block visibility); Show Scores / Ball Scoring preference handling; Stats tab (Player Stats, Import / Export / Clear, per-game overlay visibility toggles); **OverlayVisibility** (stats toggles through initial build, broadcast rebuild, and Snooker live publish); overlay mode toggles and payload sync; stats APIs and match history; live H2H / in-progress match editing; **Breaking Player?** / **Active Player** (all game types with Ball Scoring on, section hidden when off, race-complete lock, player switching, International Red/Yellow auto-assign); Snooker (frames/points, Golden Ball, fouls, Free Ball, undo stack, scoring lock, overlay Display Balls rules); Ball Scoring rack wins (8/9/10-ball including **Break & Run** / **Table Run** rack flags and career totals, Straight 14.1 re-rack, Bank/One Pocket); **Call Match Early** modal copy; replay clip delete note; and related UI labels.
 
 **CueSport Cloud** (requires `backend` running on port 3000 or 4003):
 
