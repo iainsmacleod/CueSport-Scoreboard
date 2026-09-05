@@ -19,7 +19,7 @@ Open:
 
 Default database is **SQLite** at `backend/data/cuesport.db` — no external services required for development. Path is controlled by **`SQLITE_PATH`** (`src/config.js` → `src/db/sqlite.js`).
 
-> **Note:** Root-level `server.js` / `db.js` are a leftover legacy stream-promotion stack. They use `DB_PATH` → `streams.db` and are **not** used by `npm start` or Docker (`CMD node src/index.js`).
+> **Note:** Root-level `server.js` / `db.js` are a leftover legacy stream-promotion stack. They use `DB_PATH` → `streams.db` and are **not** used by `npm start` or Docker (`CMD node src/index.js`). Running `node server.js` exits immediately. Old `auth.js` / `logger.js` helpers for that stack were removed.
 
 Set `DEV_AUTH_SECRET` in `.env` (see `.env.example`) before using dev sign-in on the dashboard or mobile.
 
