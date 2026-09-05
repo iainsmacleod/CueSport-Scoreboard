@@ -6,7 +6,7 @@ import {
   revokeGuestLink,
   fetchPlayers,
   GAME_TYPES,
-} from '../shared/cloud-client.js?v=8.0.0';
+} from '../shared/cloud-client.js?v=8.0.0.1';
 
 const TOKEN_KEY = 'cuesport_token';
 let client = null;

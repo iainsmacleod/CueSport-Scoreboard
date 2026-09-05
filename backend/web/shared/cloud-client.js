@@ -166,11 +166,25 @@ export async function fetchPublicConfig(serverUrl) {
 
 export async function devLogin(serverUrl, secret) {
   const base = serverUrl.replace(/\/$/, '');
-  const res = await fetch(`${base}/api/auth/dev-login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ secret }),
-  });
+  let res;
+  try {
+    const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timeoutId = ctrl
+      ? setTimeout(() => ctrl.abort(), 15000)
+      : null;
+    res = await fetch(`${base}/api/auth/dev-login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ secret }),
+      signal: ctrl ? ctrl.signal : undefined,
+    });
+    if (timeoutId != null) clearTimeout(timeoutId);
+  } catch (err) {
+    if (err && err.name === 'AbortError') {
+      throw err;
+    }
+    throw new Error(err && err.message ? err.message : 'Failed to fetch');
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     const msg = err.error || err.message || defaultDevLoginError(res.status);

@@ -14,7 +14,7 @@ import {
   invalidateAllSessions,
   revokeAllGuestLinks,
   GAME_TYPES,
-} from '../shared/cloud-client.js?v=8.0.0';
+} from '../shared/cloud-client.js?v=8.0.0.1';
 
 const TOKEN_KEY = 'cuesport_token';
 const SERVER_KEY = 'cuesport_server';
@@ -119,7 +119,17 @@ async function copyDisplayedApiKey() {
 }
 
 function getServerUrl() {
-  return localStorage.getItem(SERVER_KEY) || window.location.origin;
+  const origin = (window.location.origin || '').replace(/\/$/, '');
+  const saved = (localStorage.getItem(SERVER_KEY) || '').replace(/\/$/, '');
+  // Always use the origin serving this page. A stale cuesport_server (old tunnel,
+  // LAN IP, previous host) makes login hang or fail with no useful feedback on
+  // phones — while a clean/incognito profile works because storage is empty.
+  if (saved && saved !== origin) {
+    try {
+      localStorage.setItem(SERVER_KEY, origin);
+    } catch (_) { /* ignore */ }
+  }
+  return origin || window.location.origin;
 }
 
 function getToken() {
@@ -1300,11 +1310,17 @@ document.getElementById('statsMatchModal')?.addEventListener('click', (event) =>
 
 async function submitDevLogin() {
   setError('');
-  const secret = document.getElementById('devSecret').value;
+  const secretEl = document.getElementById('devSecret');
+  // Read after a tick so iOS password autofill has committed into .value
+  await new Promise((r) => setTimeout(r, 0));
+  const secret = secretEl ? String(secretEl.value || '').trim() : '';
   if (!secret) return setError('Dev auth secret required');
   const btn = document.getElementById('devLoginBtn');
-  btn.disabled = true;
+  if (btn) btn.disabled = true;
   try {
+    // Drop any prior session so a half-broken token cannot fight the new login.
+    localStorage.removeItem(TOKEN_KEY);
+    stopLiveFeed();
     const data = await devLogin(getServerUrl(), secret);
     localStorage.setItem(TOKEN_KEY, data.access_token);
     localStorage.setItem(SERVER_KEY, getServerUrl());
@@ -1315,10 +1331,32 @@ async function submitDevLogin() {
     lastTablesFingerprint = '';
     await renderDashboard();
   } catch (err) {
-    setError(err.message);
+    const msg = err && err.name === 'AbortError'
+      ? 'Login timed out — check your connection and try again.'
+      : (err && err.message) || 'Dev login failed';
+    // fetch() network failures often surface as TypeError: Failed to fetch
+    if (/failed to fetch|networkerror|load failed/i.test(msg)) {
+      setError('Could not reach this server. Clear site data if login keeps failing, then retry.');
+    } else {
+      setError(msg);
+    }
   } finally {
-    btn.disabled = false;
+    if (btn) btn.disabled = false;
   }
+}
+
+function clearSavedDashboardLogin() {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(SERVER_KEY);
+  stopLiveFeed();
+  lastTablesFingerprint = '';
+  statsData = null;
+  statsLoaded = false;
+  setError('');
+  show('loginSection', true);
+  show('dashboardSection', false);
+  const secretEl = document.getElementById('devSecret');
+  if (secretEl) secretEl.value = '';
 }
 
 document.getElementById('devLoginBtn').addEventListener('click', () => {
@@ -1329,6 +1367,10 @@ document.getElementById('devSecret')?.addEventListener('keydown', (event) => {
     event.preventDefault();
     submitDevLogin();
   }
+});
+document.getElementById('clearSavedLoginBtn')?.addEventListener('click', () => {
+  if (!window.confirm('Clear saved dashboard login on this device?')) return;
+  clearSavedDashboardLogin();
 });
 
 document.getElementById('createKeyBtn').addEventListener('click', async () => {
@@ -1355,6 +1397,7 @@ document.getElementById('newKeyDisplay')?.addEventListener('keydown', (event) =>
 document.getElementById('signOutBtn').addEventListener('click', () => {
   if (!window.confirm('Sign out of this dashboard on this device?')) return;
   localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(SERVER_KEY);
   stopLiveFeed();
   goToMainPage();
 });
