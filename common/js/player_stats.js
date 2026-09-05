@@ -1165,6 +1165,8 @@
         if (typed.highestRun == null) typed.highestRun = 0;
         if (typed.highestBreak == null) typed.highestBreak = 0;
         if (typed.fouls == null) typed.fouls = 0;
+        if (typed.breakAndRuns == null) typed.breakAndRuns = 0;
+        if (typed.tableRuns == null) typed.tableRuns = 0;
         return typed;
     }
 
@@ -1903,17 +1905,22 @@
         return { winnerId: activeMatchSession.player2Id, loserId: activeMatchSession.player1Id };
     }
 
+    // Serialize career/match writes so concurrent ball pots and rack wins cannot
+    // overwrite each other (e.g. B&R lost when creditTrackerRackWin fires both).
     let rackRecordQueue = Promise.resolve();
+
+    function enqueueStatsWrite(run) {
+        const queued = rackRecordQueue.then(run, run);
+        rackRecordQueue = queued.catch(function () { /* keep queue alive */ });
+        return queued;
+    }
 
     async function flushRackRecordQueue() {
         await rackRecordQueue;
     }
 
     async function recordRackWin(playerSlot, options) {
-        const run = () => recordRackWinInternal(playerSlot, options);
-        const queued = rackRecordQueue.then(run, run);
-        rackRecordQueue = queued.catch(function () { /* keep queue alive */ });
-        return queued;
+        return enqueueStatsWrite(() => recordRackWinInternal(playerSlot, options));
     }
 
     async function recordRackWinInternal(playerSlot, options) {
@@ -2238,10 +2245,7 @@
     }
 
     async function undoLastRack(playerSlot) {
-        const run = () => undoLastRackInternal(playerSlot);
-        const queued = rackRecordQueue.then(run, run);
-        rackRecordQueue = queued.catch(function () { /* keep queue alive */ });
-        return queued;
+        return enqueueStatsWrite(() => undoLastRackInternal(playerSlot));
     }
 
     async function undoLastRackInternal(playerSlot) {
@@ -2326,6 +2330,10 @@
     }
 
     async function recordBallWin(playerSlot) {
+        return enqueueStatsWrite(() => recordBallWinInternal(playerSlot));
+    }
+
+    async function recordBallWinInternal(playerSlot) {
         const ready = await ensureActiveSession();
         if (!ready || activeMatchSession.duplicateNames) {
             return;
@@ -2388,6 +2396,10 @@
     }
 
     async function undoLastBall(playerSlot) {
+        return enqueueStatsWrite(() => undoLastBallInternal(playerSlot));
+    }
+
+    async function undoLastBallInternal(playerSlot) {
         if (!activeMatchSession.matchId || activeMatchSession.lastBallWinnerSlot !== playerSlot) {
             return;
         }
@@ -4559,6 +4571,28 @@
         }
     }
 
+    /** Match history: date + time (minutes), locale-aware. */
+    function formatDateTime(iso) {
+        if (!iso) {
+            return '\u2014';
+        }
+        try {
+            const d = new Date(iso);
+            if (Number.isNaN(d.getTime())) {
+                return iso;
+            }
+            return d.toLocaleString(undefined, {
+                year: 'numeric',
+                month: 'numeric',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit'
+            });
+        } catch (e) {
+            return iso;
+        }
+    }
+
     function rackFrameWord(gameType, plural) {
         return isSnookerGameType(gameType) ? (plural ? 'Frames' : 'Frame') : (plural ? 'Racks' : 'Rack');
     }
@@ -4691,8 +4725,8 @@
             const inProgress = m.status !== 'completed';
             const score = m.finalScore || { p1: 0, p2: 0 };
             const dateLabel = inProgress
-                ? 'In progress'
-                : formatDate(m.completedAt || m.startedAt);
+                ? ('In progress' + (m.startedAt ? ' \u00b7 ' + formatDateTime(m.startedAt) : ''))
+                : formatDateTime(m.completedAt || m.startedAt);
             let mainRow;
             if (h2h) {
                 const id1 = h2h.id1;
@@ -5830,7 +5864,7 @@
             '<div class="stats-section">' +
             '<h4 class="stats-section-title">Match History</h4>' +
             '<div class="stats-scroll-panel">' +
-            '<table class="stats-table"><thead><tr><th>Date</th><th>Opponent</th><th>Game</th><th>Score</th><th>Actions</th></tr></thead><tbody>' +
+            '<table class="stats-table"><thead><tr><th>Date / time</th><th>Opponent</th><th>Game</th><th>Score</th><th>Actions</th></tr></thead><tbody>' +
             matchRows + '</tbody></table></div></div>';
 
         const opponentSelect = document.getElementById('statsPlayerOpponentSelect');
@@ -5902,7 +5936,7 @@
             '<div class="stats-section">' +
             '<h4 class="stats-section-title">Match History</h4>' +
             '<div class="stats-scroll-panel">' +
-            '<table class="stats-table"><thead><tr><th>Date</th><th>Opponent</th><th>Game</th><th>Score</th><th>Actions</th></tr></thead><tbody>' +
+            '<table class="stats-table"><thead><tr><th>Date / time</th><th>Opponent</th><th>Game</th><th>Score</th><th>Actions</th></tr></thead><tbody>' +
             matchRows + '</tbody></table></div></div>';
 
         const opponentSelect = document.getElementById('statsPlayerOpponentSelect');
@@ -6001,7 +6035,7 @@
             return;
         }
 
-        container.innerHTML = '<table class="stats-table"><thead><tr><th>Date</th><th>Game</th><th>Score</th><th>Actions</th></tr></thead><tbody>' +
+        container.innerHTML = '<table class="stats-table"><thead><tr><th>Date / time</th><th>Game</th><th>Score</th><th>Actions</th></tr></thead><tbody>' +
             renderMatchHistoryRows(h2h.matches, {
                 colspan: 4,
                 h2h: {

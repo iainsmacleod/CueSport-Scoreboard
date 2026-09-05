@@ -1017,6 +1017,32 @@ body.controls-locked #snookerFoulModal {
 .dash-stats-table tbody tr.stats-row-clickable:hover {
   background: #292e42;
 }
+.stats-match-when {
+  white-space: nowrap;
+  line-height: 1.25;
+  vertical-align: top;
+}
+.stats-match-date {
+  display: block;
+}
+.stats-match-time {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.78em;
+  opacity: 0.7;
+}
+.stats-match-in-progress td {
+  background: rgba(122, 162, 247, 0.08);
+}
+.stats-match-live-badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #7aa2f7;
+  opacity: 0.95;
+}
 .dash-modal {
   position: fixed;
   inset: 0;

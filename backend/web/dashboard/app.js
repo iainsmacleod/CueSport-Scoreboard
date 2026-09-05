@@ -309,6 +309,39 @@ function formatStatsDate(value) {
   return d.toLocaleDateString();
 }
 
+function formatStatsTime(value) {
+  if (!value) return '';
+  const iso = String(value).includes('T') ? value : String(value).replace(' ', 'T') + 'Z';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString(undefined, {
+    hour: 'numeric',
+    minute: '2-digit'
+  });
+}
+
+/** Recent matches date cell: date on first line, time below. */
+function matchDateCellHtml(value, options = {}) {
+  const inProgress = !!options.inProgress;
+  if (!value && !inProgress) {
+    return '<span class="stats-match-date">—</span>';
+  }
+  if (inProgress) {
+    const dateStr = value ? formatStatsDate(value) : '';
+    const timeStr = value ? formatStatsTime(value) : '';
+    const started = [dateStr, timeStr].filter(Boolean).join(' · ');
+    return `<span class="stats-match-date">In progress</span>` +
+      (started ? `<span class="stats-match-time">${escapeHtml(started)}</span>` : '');
+  }
+  const dateStr = formatStatsDate(value);
+  const timeStr = formatStatsTime(value);
+  if (!timeStr) {
+    return `<span class="stats-match-date">${escapeHtml(dateStr)}</span>`;
+  }
+  return `<span class="stats-match-date">${escapeHtml(dateStr)}</span>` +
+    `<span class="stats-match-time">${escapeHtml(timeStr)}</span>`;
+}
+
 function winPct(won, lost) {
   const total = (won || 0) + (lost || 0);
   if (!total) return 0;
@@ -316,12 +349,32 @@ function winPct(won, lost) {
 }
 
 function scoreLine(match) {
+  if (isMatchInProgress(match) && !match.scores) return 'In progress';
   if (!match.scores) return '—';
   return `${match.scores.p1 ?? 0}–${match.scores.p2 ?? 0}`;
 }
 
 function completedMatches(data) {
   return (data.matches || []).filter((m) => m.status === 'completed' && m.startEventId);
+}
+
+/** Recent matches list: completed + still-active sessions (same idea as dock match history). */
+function recentMatches(data) {
+  return (data.matches || [])
+    .filter((m) => !!m.startEventId)
+    .slice()
+    .sort((a, b) => {
+      const aLive = isMatchInProgress(a) ? 1 : 0;
+      const bLive = isMatchInProgress(b) ? 1 : 0;
+      if (aLive !== bLive) return bLive - aLive;
+      const da = a.completedAt || a.startedAt || '';
+      const db = b.completedAt || b.startedAt || '';
+      return String(db).localeCompare(String(da));
+    });
+}
+
+function isMatchInProgress(match) {
+  return !!(match && match.status && match.status !== 'completed');
 }
 
 function statsFromMatches(matches) {
@@ -429,6 +482,14 @@ function renderAccountStats() {
   }
 
   const filtered = applyStatsFilters(statsData);
+  const searchQuery = (document.getElementById('statsPlayerSearch')?.value || '').trim().toLowerCase();
+  let matchList = recentMatches(statsData);
+  if (searchQuery) {
+    matchList = matchList.filter((m) =>
+      String(m.player1Name || '').toLowerCase().includes(searchQuery) ||
+      String(m.player2Name || '').toLowerCase().includes(searchQuery)
+    );
+  }
   const racksPlayed = filtered.matches.reduce((sum, m) => {
     if (!m.scores) return sum;
     return sum + (Number(m.scores.p1) || 0) + (Number(m.scores.p2) || 0);
@@ -454,10 +515,10 @@ function renderAccountStats() {
     `).join('');
   }
 
-  if (!filtered.matches.length) {
+  if (!matchList.length) {
     matchBody.innerHTML = '<tr><td colspan="6" class="dash-stats-empty">No match history yet.</td></tr>';
   } else {
-    matchBody.innerHTML = filtered.matches.slice(0, 50).map((m) => matchOverviewRow(m)).join('');
+    matchBody.innerHTML = matchList.slice(0, 50).map((m) => matchOverviewRow(m)).join('');
   }
   if (statusEl) statusEl.textContent = '';
 }
@@ -471,14 +532,18 @@ function matchPairHtml(m) {
 }
 
 function matchOverviewRow(m) {
+  const inProgress = isMatchInProgress(m);
+  const actions = inProgress
+    ? '<span class="stats-match-live-badge">Live</span>'
+    : `<button type="button" class="btn" data-edit-match="${escapeHtml(m.startEventId)}">Edit</button>`;
   return `
-    <tr>
-      <td>${escapeHtml(formatStatsDate(m.completedAt || m.startedAt))}</td>
+    <tr class="${inProgress ? 'stats-match-in-progress' : ''}">
+      <td class="stats-match-when">${matchDateCellHtml(m.startedAt || m.completedAt, { inProgress })}</td>
       <td>${escapeHtml(m.gameInfo || '—')}</td>
       <td>${escapeHtml(gameTypeLabel(m.gameType))}</td>
       <td>${matchPairHtml(m)}</td>
       <td>${escapeHtml(scoreLine(m))}</td>
-      <td><button type="button" class="btn" data-edit-match="${escapeHtml(m.startEventId)}">Edit</button></td>
+      <td>${actions}</td>
     </tr>
   `;
 }
@@ -487,7 +552,7 @@ function playerMatches(playerKey, options = {}) {
   const key = String(playerKey || '').toLowerCase();
   const opponentKey = String(options.opponent || '').toLowerCase();
   const gameType = options.gameType || '';
-  return completedMatches(statsData || {}).filter((m) => {
+  return recentMatches(statsData || {}).filter((m) => {
     const isP1 = String(m.player1Name || '').toLowerCase() === key;
     const isP2 = String(m.player2Name || '').toLowerCase() === key;
     if (!isP1 && !isP2) return false;
@@ -607,21 +672,27 @@ function renderPlayerDetail() {
   body.innerHTML = matches.map((m) => {
     const isP1 = String(m.player1Name || '').toLowerCase() === selectedPlayerKey;
     const opponent = isP1 ? m.player2Name : m.player1Name;
+    const inProgress = isMatchInProgress(m);
     let result = '—';
-    if (m.winnerSlot === '1' || m.winnerSlot === '2') {
+    if (inProgress) {
+      result = 'In progress';
+    } else if (m.winnerSlot === '1' || m.winnerSlot === '2') {
       const won = (m.winnerSlot === '1' && isP1) || (m.winnerSlot === '2' && !isP1);
       result = won ? 'Win' : 'Loss';
     }
+    const actions = inProgress
+      ? '<span class="stats-match-live-badge">Live</span>'
+      : `<button type="button" class="btn" data-edit-match="${escapeHtml(m.startEventId)}">Edit</button>`;
     return `
-      <tr>
-        <td>${escapeHtml(formatStatsDate(m.completedAt || m.startedAt))}</td>
+      <tr class="${inProgress ? 'stats-match-in-progress' : ''}">
+        <td class="stats-match-when">${matchDateCellHtml(m.startedAt || m.completedAt, { inProgress })}</td>
         <td>${escapeHtml(m.gameInfo || '—')}</td>
         <td>${escapeHtml(gameTypeLabel(m.gameType))}</td>
         <td>${escapeHtml(opponent)}</td>
         <td>${escapeHtml(scoreLine(m))}</td>
         <td>${result}</td>
-        <td>${escapeHtml(matchExtrasLabel(m))}</td>
-        <td><button type="button" class="btn" data-edit-match="${escapeHtml(m.startEventId)}">Edit</button></td>
+        <td>${escapeHtml(inProgress ? '—' : matchExtrasLabel(m))}</td>
+        <td>${actions}</td>
       </tr>
     `;
   }).join('');
@@ -800,7 +871,7 @@ function syncMatchModalSaveEnabled() {
 
 function openMatchModal(startEventId) {
   const match = findMatchByStartId(startEventId);
-  if (!match) return;
+  if (!match || isMatchInProgress(match)) return;
   fillMatchGameTypes();
   document.getElementById('statsMatchEventId').value = match.startEventId;
   document.getElementById('statsMatchP1').value = match.player1Name || '';

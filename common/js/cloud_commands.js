@@ -6,7 +6,14 @@
  */
 (function () {
     function isFoulBallId(ballId) {
-        return ballId === 'ball 11' || ballId === 'poolFoulBtn';
+        if (ballId === 'poolFoulBtn') {
+            return true;
+        }
+        // Snooker only: ball 11 is the foul control. In 8/9/10/Straight/etc. it is an object ball.
+        if (ballId === 'ball 11' && typeof isSnookerBallMode === 'function' && isSnookerBallMode()) {
+            return true;
+        }
+        return false;
     }
 
     /** Drop stale in-flight snapshots, then publish authoritative dock state. */

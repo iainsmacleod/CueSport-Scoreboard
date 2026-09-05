@@ -567,6 +567,9 @@
             state.canUndo = snookerMode
                 ? (undoStackLen('snookerUndoStack') > 0 || undoStackLen('scoringUndoStack') > 0)
                 : undoStackLen('scoringUndoStack') > 0;
+            if (state.breakerPromptVisible) {
+                state.canUndo = false;
+            }
             state.ballGrid = collectBallGridSnapshot();
             state.ballGrid.awaitingBreaker = state.awaitingBreaker;
             state.ballGrid.locked = state.gameScoringLocked;

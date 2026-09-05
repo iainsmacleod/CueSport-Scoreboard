@@ -149,12 +149,13 @@ function isDefaultPlayerName(name) {
   );
 }
 
+/** True when either name is still a placeholder — prefer Setup so names get set. */
 function needsMatchSetup(state) {
   if (!state || typeof state !== 'object') return true;
   return isDefaultPlayerName(state.player1Name) || isDefaultPlayerName(state.player2Name);
 }
 
-/** Pick Control vs Setup once when the first usable dock state arrives. */
+/** Default Control; Setup only when names are still placeholders (Player 1 / Player 2). */
 function maybeChooseInitialView(state) {
   if (initialViewChosen) return;
   if (!state || typeof state !== 'object' || !Object.keys(state).length) return;
@@ -929,9 +930,9 @@ function renderBallGrid(state) {
     let hasPoolFoul = false;
     snapshot.balls.forEach((b) => {
       if (b.hidden) return;
-      // Foul is the only local UI exception (dock modal cannot run on the phone).
-      // Free ball, colors, reds, and pool pots all go through dock handlers.
-      const isFoul = b.foul === true || b.id === 'ball 11' || b.id === 'poolFoulBtn';
+      // Trust dock snapshot foul flag (snooker ball 11 / poolFoulBtn). Do not treat
+      // pool object ball 11 as foul — that was a snooker-era mobile shortcut.
+      const isFoul = b.foul === true || b.id === 'poolFoulBtn';
       if (isFoul && !snapshot.snooker) hasPoolFoul = true;
       appendBallButton(grid, {
         src: resolveBallImageSrc(state, b.id, b.file),

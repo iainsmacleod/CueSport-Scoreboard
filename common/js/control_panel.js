@@ -546,12 +546,21 @@ function updateRackBreakerButtonState() {
     syncPlayerSlotPickerUI();
 }
 
+/**
+ * Rack/frame is committed when Breaking Player (or End Match) is shown —
+ * drop in-rack undo history; corrections go through stats / score controls.
+ */
+function commitScoringHistoryForBreakerPrompt() {
+    clearAllScoringUndoHistory();
+}
+
 /** Match is complete — show breaker prompt with buttons disabled until End Match. */
 function showRackBreakerPickerForMatchLocked() {
     if (!isRackBreakerPromptEnabled()) {
         return;
     }
     clearRackBreakerState();
+    commitScoringHistoryForBreakerPrompt();
     updateRackBreakerBallLock();
     syncPlayerSlotPickerUI();
     syncRackBreakerPlayerToggleVisibility();
@@ -568,6 +577,7 @@ function showRackBreakerPicker() {
         return;
     }
     clearRackBreakerState();
+    commitScoringHistoryForBreakerPrompt();
     updateRackBreakerBallLock();
     syncPlayerSlotPickerUI();
     syncRackBreakerPlayerToggleVisibility();
@@ -1521,10 +1531,11 @@ function updateScoringUndoButton() {
         return;
     }
     const show = isBallTrackerControlsVisible();
+    const awaitingBreaker = isPlayerSlotPickerBreakerMode();
     const hasSnookerUndo = isSnookerBallMode() && snookerUndoStack.length > 0;
     const hasPoolUndo = scoringUndoStack.length > 0;
-    // Allow undo even when the race is locked so a match-winning game-ball pot can be reversed.
-    const canUndo = show && (hasSnookerUndo || hasPoolUndo);
+    // Rack/frame is committed once Breaking Player / End Match is shown.
+    const canUndo = show && !awaitingBreaker && (hasSnookerUndo || hasPoolUndo);
     btn.classList.toggle("noShow", !show);
     btn.classList.toggle("snooker-ball-disabled", !canUndo);
     if (canUndo) {
@@ -1534,7 +1545,9 @@ function updateScoringUndoButton() {
             : "Undo last scoring action (pots, fouls, breaker, player change)";
     } else {
         btn.setAttribute("aria-disabled", "true");
-        btn.title = "Undo last scoring action";
+        btn.title = awaitingBreaker
+            ? "Rack/frame committed — choose Breaking Player (edit via stats if needed)"
+            : "Undo last scoring action";
     }
     syncBallTrackerActionRowVisibility();
 }
@@ -1576,6 +1589,9 @@ function setSnookerPointsAbsolute(player, value) {
 }
 
 async function undoLastScoringAction() {
+    if (isPlayerSlotPickerBreakerMode()) {
+        return;
+    }
     const btn = document.getElementById("snookerUndoBtn");
     if (btn && (btn.classList.contains("snooker-ball-disabled") || btn.getAttribute("aria-disabled") === "true")) {
         return;
@@ -2280,10 +2296,12 @@ function updateSnookerBallAvailability() {
     setSnookerBallDisabled(10, !freeBallOk);
 
     if (clearance) {
-        // Must pot yellow→green→brown→blue→pink→black in order
+        // Must pot yellow→green→brown→blue→pink→black in order.
+        // Allow the next clearance color even if it still has the brief post-pot
+        // "clicked" flash (color after 15th red → yellow stays legal).
         for (let i = 2; i <= 7; i++) {
             const el = document.getElementById("ball " + i);
-            if (el && el.classList.contains("snooker-ball-clicked")) {
+            if (el && el.classList.contains("snooker-ball-clicked") && i !== nextClearanceColor) {
                 setSnookerBallDisabled(i, true);
                 continue;
             }
@@ -2333,13 +2351,15 @@ function flashSnookerColorFeedback(ballEl, afterFeedback) {
         updateSnookerBallAvailability();
     }
     if (ballEl) {
-        requestAnimationFrame(function () {
+        // Clear the flash on the next task so the same color can be legal again
+        // (e.g. yellow after the color that follows the 15th red).
+        setTimeout(function () {
+            ballEl.classList.remove("snooker-ball-clicked");
             if (snookerColorFeedbackBall === ballEl) {
-                ballEl.classList.remove("snooker-ball-clicked");
                 snookerColorFeedbackBall = null;
             }
             updateSnookerBallAvailability();
-        });
+        }, 0);
     }
 }
 
@@ -2565,9 +2585,51 @@ function areAllEightBallObjectBallsPotted() {
 }
 
 /**
+ * Ball numbers for one player's 8-Ball group from the P1-centric playerBallSet.
+ * American/Unity: red/smalls = 1–7 (solids), yellow/bigs = 9–15 (stripes).
+ * International: red/smalls = 9–15 (reds), yellow/bigs = 1–7 (yellows).
+ * Returns null while the table is still Open.
+ */
+function getEightBallGroupBallNumbersForSlot(slot) {
+    const set = getStorageItem("playerBallSet") || "p1Open";
+    if (set !== "p1red/smalls" && set !== "p1yellow/bigs") {
+        return null;
+    }
+    const selection = getStorageItem("ballSelection") || "american";
+    const p1HasLowGroup = selection === "international"
+        ? set === "p1yellow/bigs"
+        : set === "p1red/smalls";
+    const lowGroup = [1, 2, 3, 4, 5, 6, 7];
+    const highGroup = [9, 10, 11, 12, 13, 14, 15];
+    const p1Group = p1HasLowGroup ? lowGroup : highGroup;
+    if (slot === "1") {
+        return p1Group;
+    }
+    return p1HasLowGroup ? highGroup : lowGroup;
+}
+
+/** Active Player has cleared their assigned 8-Ball group (opponent balls may remain). */
+function areActivePlayerEightBallGroupPotted() {
+    const group = getEightBallGroupBallNumbersForSlot(getActivePlayerSlot());
+    if (!group) {
+        return false;
+    }
+    for (let i = 0; i < group.length; i++) {
+        const ball = document.getElementById("ball " + group[i]);
+        if (!ball || ball.classList.contains("noShow")) {
+            continue;
+        }
+        if (!ball.classList.contains("faded")) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/**
  * Resolve potting the game ball for 8 / 9 / 10-Ball.
  * 9/10: Early Game Ball/Win on Break on → early win; off → require all lower balls (else reject).
- * 8: Win on Break on + first ball → win; all object balls down → win; otherwise out of sequence → loss.
+ * 8: Win on Break on + first ball → win; own group (or all objects) down → win; otherwise out of sequence → loss.
  * 8 with Win on Break off + first ball → reject (no win on break).
  */
 function resolveTrackerGameBallPot(ballId) {
@@ -2592,11 +2654,12 @@ function resolveTrackerGameBallPot(ballId) {
             }
             return;
         }
-        if (areAllEightBallObjectBallsPotted()) {
+        // Legal win: Active Player cleared their group, or (no groups / both sides) full table clear.
+        if (areActivePlayerEightBallGroupPotted() || areAllEightBallObjectBallsPotted()) {
             creditTrackerRackWin(ballId);
             return;
         }
-        // 8 potted with other object balls still up — loss of rack for Active Player.
+        // 8 potted with own group (or any objects while Open) still up — loss of rack.
         creditTrackerRackLoss(ballId);
         return;
     }
@@ -3901,6 +3964,7 @@ function togglePot(element) {
             });
             debitPocketBallUnpot(element.id);
         }
+        publishCloudStateAfterTrackerChange();
         return;
     }
 
@@ -3944,6 +4008,8 @@ function togglePot(element) {
                 }
             }
         }
+        // Object-ball fades (and rejects) must reach mobile; rack-win paths also publish.
+        publishCloudStateAfterTrackerChange();
         return;
     }
 
@@ -3958,6 +4024,7 @@ function togglePot(element) {
             });
             debitStraightPoolUnpot(element.id);
         }
+        publishCloudStateAfterTrackerChange();
     }
 }
 
@@ -4072,11 +4139,15 @@ function creditPocketBallPot(ballId) {
         (parseInt(getStorageItem("p1ScoreCtrlPanel"), 10) || 0) +
         (parseInt(getStorageItem("p2ScoreCtrlPanel"), 10) || 0);
     const awardedRack = scoreAfter > scoreBefore;
+    if (awardedRack) {
+        // postBalls → maybeAwardPocketRack already prompted Breaking Player and cleared undo.
+        return;
+    }
     pushScoringUndo({
         type: "pocketPot",
         player: player,
         ballId: ballId,
-        awardedRack: awardedRack,
+        awardedRack: false,
         before: before
     });
 }
@@ -4099,7 +4170,6 @@ function debitPocketBallUnpot(ballId) {
  * so a double-click cannot award/undo immediately, then clears so the next rack can be won.
  */
 function creditTrackerRackWin(ballId) {
-    const before = captureScoringUndoSnapshot({ unfadeBallId: ballId });
     const player = getActivePlayerSlot();
     // Capture B&R / TR before clearing breaker state for the next-rack prompt.
     const rackRunClass = isRackBreakerPromptEnabled()
@@ -4118,14 +4188,8 @@ function creditTrackerRackWin(ballId) {
     setStorageItem("trackerRackWinBall", ballId);
     startTrackerRackWinCooldown(ballId);
     recordTrackerBallPot(player);
-    pushScoringUndo({
-        type: "rackWin",
-        player: player,
-        ballId: ballId,
-        before: before,
-        recordedBall: true,
-        recordedBallPlayer: player
-    });
+    // Commit in-rack undo history; Breaking Player prompt also clears (idempotent).
+    commitScoringHistoryForBreakerPrompt();
     maybeShowRackBreakerPickerAfterRackChange();
     publishCloudStateAfterTrackerChange();
 }
@@ -4134,7 +4198,6 @@ function creditTrackerRackWin(ballId) {
  * 8-Ball: game ball potted out of sequence — Active Player loses the rack (opponent scores).
  */
 function creditTrackerRackLoss(ballId) {
-    const before = captureScoringUndoSnapshot({ unfadeBallId: ballId });
     const active = getActivePlayerSlot();
     const opponent = active === "1" ? "2" : "1";
     // Classification is for the player who receives the rack (opponent).
@@ -4154,14 +4217,8 @@ function creditTrackerRackLoss(ballId) {
     startTrackerRackWinCooldown(ballId);
     // Still counts as a pot for the shooter who sank the 8.
     recordTrackerBallPot(active);
-    pushScoringUndo({
-        type: "rackLoss",
-        player: opponent,
-        ballId: ballId,
-        before: before,
-        recordedBall: true,
-        recordedBallPlayer: active
-    });
+    // Commit in-rack undo history; Breaking Player prompt also clears (idempotent).
+    commitScoringHistoryForBreakerPrompt();
     maybeShowRackBreakerPickerAfterRackChange();
     publishCloudStateAfterTrackerChange();
 }
@@ -4408,7 +4465,10 @@ function maybeStraightPoolRerack() {
     if (!isStraightPool()) {
         return;
     }
-    const balls = Array.from(document.querySelectorAll(".ballTracker .ball")).filter(function (ball) {
+    const balls = Array.from(document.querySelectorAll("#ballTrackerDiv .ball")).filter(function (ball) {
+        if (ball.id === "snookerUndoBtn" || ball.id === "poolFoulBtn") {
+            return false;
+        }
         return !ball.classList.contains("noShow");
     });
     if (balls.length < 2) {
@@ -5386,11 +5446,15 @@ function postScore(opt1, player, options) {
         // Frame awarded — start a fresh points/sequence state for the next frame
         resetSnookerSequenceState();
         cancelSnookerFoul();
+        commitScoringHistoryForBreakerPrompt();
         maybeShowRackBreakerPickerAfterRackChange();
     } else if (!isSnooker() && !skipTrackerReset) {
         // Straight Pool and tracker rack-win keep/partially keep tracker state.
         resetBallTracker();
         resetBallSet();
+        if (opt1 === "add" && scoreChanged) {
+            commitScoringHistoryForBreakerPrompt();
+        }
     }
     updateScoreControlAvailability();
 
@@ -5409,7 +5473,7 @@ function postScore(opt1, player, options) {
                     updateCallGameButton();
                     updateScoreControlAvailability();
                     // Tracker rack win/loss already prompted for the next breaker; skipping
-                    // avoids clobbering Active Player after a quick Undo of that rack.
+                    // avoids re-prompting after a rack that was already committed.
                     if (!skipTrackerReset) {
                         maybeShowRackBreakerPickerAfterRackChange();
                     }
