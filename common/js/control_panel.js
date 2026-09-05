@@ -651,6 +651,10 @@ function selectRackBreaker(slot) {
     syncRackBreakerPlayerToggleVisibility();
     updatePlayerBallControlVisibility();
     updateResetScoreButton();
+    // Breaker pick is real match activity — start cloud session (not mere name entry).
+    if (window.PlayerStats && typeof window.PlayerStats.onBreakerSelected === "function") {
+        window.PlayerStats.onBreakerSelected();
+    }
     if (window.streamSharing && typeof window.streamSharing.sendUpdate === 'function') {
         window.streamSharing.sendUpdate();
     }

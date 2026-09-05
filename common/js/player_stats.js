@@ -1107,6 +1107,8 @@
         gameInfo: '',
         status: 'active',
         matchCompletedRecorded: false,
+        /** True after cloud session:start — not set merely because both names are filled. */
+        cloudSessionStarted: false,
         lastRackWinnerSlot: null,
         lastBallWinnerSlot: null,
         duplicateNames: false,
@@ -1127,8 +1129,8 @@
         if ((match.racks && match.racks.length > 0) || (match.balls && match.balls.length > 0)) {
             await undoAllRacksInMatch(match);
         }
-        // Drop the open cloud session (Clear Game, name/type change, discard pending).
-        if (!(options && options.skipCloudDiscard) && matchId) {
+        // Drop the open cloud session only if we actually published session:start.
+        if (!(options && options.skipCloudDiscard) && matchId && activeMatchSession.cloudSessionStarted) {
             emitCloudSessionDiscard(
                 matchId,
                 (options && options.cloudReason) || 'abandon'
@@ -1445,6 +1447,7 @@
             gameInfo: activeMatchSession.gameInfo,
             status: activeMatchSession.status,
             matchCompletedRecorded: !!activeMatchSession.matchCompletedRecorded,
+            cloudSessionStarted: !!activeMatchSession.cloudSessionStarted,
             lastRackWinnerSlot: activeMatchSession.lastRackWinnerSlot,
             lastBallWinnerSlot: activeMatchSession.lastBallWinnerSlot,
             duplicateNames: !!activeMatchSession.duplicateNames,
@@ -1514,6 +1517,14 @@
         activeMatchSession.duplicateNames = !!snap.duplicateNames;
         activeMatchSession.straightPoolRunSlot = snap.straightPoolRunSlot || null;
         activeMatchSession.straightPoolRunLength = snap.straightPoolRunLength || 0;
+        // Already under way locally → treat cloud as started (do not re-emit session:start).
+        const match = snap.pendingMatch || {};
+        const racks = match.racks || [];
+        const balls = match.balls || [];
+        const score = match.finalScore || {};
+        const hasActivity = racks.length > 0 || balls.length > 0 ||
+            (Number(score.p1) || 0) > 0 || (Number(score.p2) || 0) > 0;
+        activeMatchSession.cloudSessionStarted = !!(snap.cloudSessionStarted || hasActivity);
 
         if (activeMatchSession.player1Id) {
             setPlayerIdOnInput('1', activeMatchSession.player1Id);
@@ -1767,20 +1778,59 @@
         activeMatchSession.gameInfo = context.gameInfo || '';
         activeMatchSession.status = 'active';
         activeMatchSession.matchCompletedRecorded = false;
+        activeMatchSession.cloudSessionStarted = false;
         activeMatchSession.lastRackWinnerSlot = null;
         activeMatchSession.lastBallWinnerSlot = null;
         activeMatchSession.duplicateNames = duplicateNames;
         activeMatchSession.straightPoolRunSlot = null;
         activeMatchSession.straightPoolRunLength = 0;
         await persistPendingSession();
+        // Do not emit cloud session:start yet — wait for breaker pick or first score/pot.
+        return true;
+    }
+
+    /**
+     * Publish session:start once the match has real activity (breaker or scoring).
+     * Naming both players alone must not create an idle "In progress" cloud match.
+     */
+    function ensureCloudMatchStarted(reason) {
+        if (activeMatchSession.cloudSessionStarted || activeMatchSession.matchCompletedRecorded) {
+            return false;
+        }
+        const match = getActivePendingMatch();
+        if (!match || !match.id) {
+            return false;
+        }
+        if (activeMatchSession.duplicateNames) {
+            return false;
+        }
+        activeMatchSession.cloudSessionStarted = true;
         emitCloudSession('start', {
             sessionId: match.id,
-            gameType: context.gameType,
-            gameInfo: context.gameInfo || '',
+            gameType: match.gameType || activeMatchSession.gameType,
+            gameInfo: match.gameInfo || activeMatchSession.gameInfo || '',
             player1: match.player1Name,
             player2: match.player2Name,
+            reason: reason || 'activity'
         });
+        queuePersistPendingSession();
         return true;
+    }
+
+    /** Breaking Player chosen — match is no longer idle setup. */
+    function onBreakerSelected() {
+        if (!activeMatchSession.matchId) {
+            // Names may not have created a session yet; ensure then mark started.
+            ensureActiveSession().then(function (ready) {
+                if (ready) {
+                    ensureCloudMatchStarted('breaker');
+                }
+            }).catch(function (err) {
+                console.error('PlayerStats onBreakerSelected error:', err);
+            });
+            return;
+        }
+        ensureCloudMatchStarted('breaker');
     }
 
     async function ensureActiveSession() {
@@ -1970,6 +2020,7 @@
         if (!ready || activeMatchSession.duplicateNames) {
             return;
         }
+        ensureCloudMatchStarted('rack');
 
         const ids = getSlotPlayerIds(playerSlot);
         const context = getCurrentContext();
@@ -2220,6 +2271,7 @@
         if (!ready || activeMatchSession.duplicateNames) {
             return;
         }
+        ensureCloudMatchStarted('snooker_frame');
 
         const match = getActivePendingMatch();
         if (!match) {
@@ -2385,6 +2437,7 @@
         if (!showsBallStats(context.gameType)) {
             return;
         }
+        ensureCloudMatchStarted('ball');
 
         const ids = getSlotPlayerIds(playerSlot);
         const match = getActivePendingMatch();
@@ -2595,15 +2648,18 @@
         await putMatch(match);
 
         await applyGameDelta(ids.winnerId, ids.loserId, activeMatchSession.gameType, 1);
+        ensureCloudMatchStarted('race_complete');
         activeMatchSession.status = 'completed';
         activeMatchSession.matchCompletedRecorded = true;
         await persistPendingSession();
-        emitCloudSession('end', buildCloudMatchEndPayload(match, {
-            matchId: match.id,
-            winnerSlot: winnerSlot,
-            scores: scores,
-            reason: 'race_complete',
-        }));
+        if (activeMatchSession.cloudSessionStarted) {
+            emitCloudSession('end', buildCloudMatchEndPayload(match, {
+                matchId: match.id,
+                winnerSlot: winnerSlot,
+                scores: scores,
+                reason: 'race_complete',
+            }));
+        }
         broadcastOverlayStatsIfEnabled();
     }
 
@@ -2659,14 +2715,17 @@
             match.winnerId = null;
             captureActiveMatchGameInfo();
             await putMatch(match);
+            ensureCloudMatchStarted('call_early');
             activeMatchSession.status = 'completed';
             activeMatchSession.matchCompletedRecorded = true;
             await persistPendingSession();
-            emitCloudSession('end', buildCloudMatchEndPayload(match, {
-                reason: 'call_early',
-                scores: scores,
-                winnerSlot: 'draw',
-            }));
+            if (activeMatchSession.cloudSessionStarted) {
+                emitCloudSession('end', buildCloudMatchEndPayload(match, {
+                    reason: 'call_early',
+                    scores: scores,
+                    winnerSlot: 'draw',
+                }));
+            }
             broadcastOverlayStatsIfEnabled();
         }
         return true;
@@ -2781,7 +2840,9 @@
             // End Match: rack/frame stats are already stored on the match row. The scoreboard
             // is cleared before this runs, so do not persist finalScore from live storage.
             const match = getActivePendingMatch();
-            emitCloudSession('end', buildCloudMatchEndPayload(match, { reason: 'end_match' }));
+            if (activeMatchSession.cloudSessionStarted) {
+                emitCloudSession('end', buildCloudMatchEndPayload(match, { reason: 'end_match' }));
+            }
             await resetSessionState();
             await ensureActiveSession();
             broadcastOverlayStatsIfEnabled();
@@ -2905,6 +2966,7 @@
         activeMatchSession.gameInfo = '';
         activeMatchSession.status = 'active';
         activeMatchSession.matchCompletedRecorded = false;
+        activeMatchSession.cloudSessionStarted = false;
         activeMatchSession.lastRackWinnerSlot = null;
         activeMatchSession.lastBallWinnerSlot = null;
         activeMatchSession.duplicateNames = false;
@@ -6201,6 +6263,7 @@
         callGame: callGame,
         flushRackRecordQueue: flushRackRecordQueue,
         onNamesUpdated: onNamesUpdated,
+        onBreakerSelected: onBreakerSelected,
         onClearGame: onClearGame,
         onResetScores: onResetScores,
         getHeadToHead: getHeadToHead,
