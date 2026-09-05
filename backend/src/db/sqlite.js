@@ -376,6 +376,71 @@ export function deleteMatchEvents(ids) {
   return tx(list);
 }
 
+/**
+ * Delete session:start / session:end rows for a room that belong to one match/session key.
+ * Used when Clear Game discards an in-progress cloud match (do not leave "active" history).
+ */
+export function discardRoomSessionEvents(roomId, matchKey) {
+  if (!roomId) return 0;
+  const key = matchKey ? String(matchKey) : '';
+  const rows = getDb().prepare(
+    `SELECT id, session_id, event_type, payload
+     FROM match_events
+     WHERE room_id = ?
+       AND event_type IN ('session:start', 'session:end')
+     ORDER BY created_at DESC
+     LIMIT 200`
+  ).all(roomId);
+
+  const ids = [];
+  for (const row of rows) {
+    let payload = {};
+    try {
+      payload = JSON.parse(row.payload || '{}') || {};
+    } catch (_) {
+      payload = {};
+    }
+    const candidates = [
+      row.session_id,
+      payload.sessionId,
+      payload.matchId,
+    ].filter(Boolean).map(String);
+
+    if (key) {
+      if (candidates.includes(key)) ids.push(row.id);
+      continue;
+    }
+  }
+
+  // No key (or no payload match): drop the newest unpaired session:start for this room.
+  if (!ids.length) {
+    const starts = [];
+    const ended = new Set();
+    for (const row of rows) {
+      let payload = {};
+      try {
+        payload = JSON.parse(row.payload || '{}') || {};
+      } catch (_) {
+        payload = {};
+      }
+      if (row.event_type === 'session:end') {
+        const endKey = String(payload.matchId || payload.sessionId || row.session_id || '');
+        if (endKey) ended.add(endKey);
+        continue;
+      }
+      starts.push({ row, payload });
+    }
+    for (const { row, payload } of starts) {
+      const startKey = String(payload.sessionId || payload.matchId || row.session_id || '');
+      if (startKey && ended.has(startKey)) continue;
+      ids.push(row.id);
+      break;
+    }
+  }
+
+  return deleteMatchEvents(ids);
+}
+
 export function upsertLiveStream(roomId, streamUrl, state) {
   getDb().prepare(
     `INSERT INTO live_streams (room_id, stream_url, state, updated_at) VALUES (?, ?, ?, datetime('now'))

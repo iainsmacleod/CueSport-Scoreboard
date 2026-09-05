@@ -285,6 +285,7 @@
                     id: key,
                     name: (name || '').trim(),
                     gamesWon: 0,
+                    gamesDrawn: 0,
                     gamesLost: 0,
                     racksWon: 0,
                     racksLost: 0,
@@ -328,17 +329,39 @@
                 scores: ep.scores || null
             };
 
-            if (endEv && ep.winnerSlot) {
-                match.winnerSlot = String(ep.winnerSlot);
-                var winner = match.winnerSlot === '1' ? p1 : p2;
-                var loser = match.winnerSlot === '1' ? p2 : p1;
-                winner.gamesWon++;
-                loser.gamesLost++;
+            if (endEv) {
+                var rawSlot = ep.winnerSlot != null ? String(ep.winnerSlot) : '';
+                var slot = null;
+                var isDraw = false;
+                if (rawSlot === '1' || rawSlot === '2') {
+                    slot = rawSlot;
+                } else if (rawSlot === 'draw' || rawSlot === 'tie' || rawSlot === '0') {
+                    isDraw = true;
+                } else if (ep.scores) {
+                    var s1 = Number(ep.scores.p1) || 0;
+                    var s2 = Number(ep.scores.p2) || 0;
+                    if (s1 > s2) slot = '1';
+                    else if (s2 > s1) slot = '2';
+                    else isDraw = true;
+                }
+                match.winnerSlot = isDraw ? 'draw' : slot;
+
                 if (ep.scores) {
-                    winner.racksWon += Number(ep.scores.p1 && match.winnerSlot === '1' ? ep.scores.p1 : ep.scores.p2) || 0;
-                    winner.racksLost += Number(match.winnerSlot === '1' ? ep.scores.p2 : ep.scores.p1) || 0;
-                    loser.racksWon += Number(match.winnerSlot === '1' ? ep.scores.p2 : ep.scores.p1) || 0;
-                    loser.racksLost += Number(match.winnerSlot === '1' ? ep.scores.p1 : ep.scores.p2) || 0;
+                    var r1 = Number(ep.scores.p1) || 0;
+                    var r2 = Number(ep.scores.p2) || 0;
+                    p1.racksWon += r1;
+                    p1.racksLost += r2;
+                    p2.racksWon += r2;
+                    p2.racksLost += r1;
+                }
+                if (slot === '1' || slot === '2') {
+                    var winner = slot === '1' ? p1 : p2;
+                    var loser = slot === '1' ? p2 : p1;
+                    winner.gamesWon++;
+                    loser.gamesLost++;
+                } else if (isDraw) {
+                    p1.gamesDrawn++;
+                    p2.gamesDrawn++;
                 }
             }
 
@@ -1095,14 +1118,33 @@
         return activeMatchSession.pendingMatch || null;
     }
 
-    async function abandonActivePendingMatch() {
+    async function abandonActivePendingMatch(options) {
         const match = getActivePendingMatch();
         if (!match || activeMatchSession.matchCompletedRecorded) {
             return;
         }
+        const matchId = match.id || activeMatchSession.matchId || null;
         if ((match.racks && match.racks.length > 0) || (match.balls && match.balls.length > 0)) {
             await undoAllRacksInMatch(match);
         }
+        // Drop the open cloud session (Clear Game, name/type change, discard pending).
+        if (!(options && options.skipCloudDiscard) && matchId) {
+            emitCloudSessionDiscard(
+                matchId,
+                (options && options.cloudReason) || 'abandon'
+            );
+        }
+    }
+
+    function emitCloudSessionDiscard(matchId, reason) {
+        if (!matchId) {
+            return;
+        }
+        emitCloudSession('discard', {
+            matchId: matchId,
+            sessionId: matchId,
+            reason: reason || 'abandon'
+        });
     }
 
     function generateId() {
@@ -2623,6 +2665,7 @@
             emitCloudSession('end', buildCloudMatchEndPayload(match, {
                 reason: 'call_early',
                 scores: scores,
+                winnerSlot: 'draw',
             }));
             broadcastOverlayStatsIfEnabled();
         }
@@ -2727,7 +2770,7 @@
     }
 
     async function onClearGame() {
-        await abandonActivePendingMatch();
+        await abandonActivePendingMatch({ cloudReason: 'clear_game' });
         await resetSessionState();
     }
 
@@ -3657,7 +3700,7 @@
 
         // Reverse live rack/ball deltas, then rebuild career stats from completed matches only
         // so highest breaks and any residual frame counts from this match are fully cleared.
-        await abandonActivePendingMatch();
+        await abandonActivePendingMatch({ cloudReason: 'discard_pending' });
         await resetSessionState();
         clearLiveMatchScoreboardState();
 

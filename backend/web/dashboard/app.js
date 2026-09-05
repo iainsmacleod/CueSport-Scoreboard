@@ -352,8 +352,8 @@ function matchDateCellHtml(value, options = {}) {
     `<span class="stats-match-time">${escapeHtml(timeStr)}</span>`;
 }
 
-function winPct(won, lost) {
-  const total = (won || 0) + (lost || 0);
+function winPct(won, lost, drawn = 0) {
+  const total = (won || 0) + (lost || 0) + (drawn || 0);
   if (!total) return 0;
   return Math.round(((won || 0) / total) * 100);
 }
@@ -362,6 +362,30 @@ function scoreLine(match) {
   if (isMatchInProgress(match) && !match.scores) return 'In progress';
   if (!match.scores) return '—';
   return `${match.scores.p1 ?? 0}–${match.scores.p2 ?? 0}`;
+}
+
+/** Normalize stored winner / scores into a decisive result or draw. */
+function resolveMatchResult(match) {
+  const raw = match && match.winnerSlot != null ? String(match.winnerSlot) : '';
+  if (raw === '1' || raw === '2') {
+    return { winnerSlot: raw, isDraw: false };
+  }
+  if (raw === 'draw' || raw === 'tie' || raw === '0') {
+    return { winnerSlot: null, isDraw: true };
+  }
+  const scores = match && match.scores;
+  if (!scores || typeof scores !== 'object') {
+    return { winnerSlot: null, isDraw: false };
+  }
+  const p1 = Number(scores.p1) || 0;
+  const p2 = Number(scores.p2) || 0;
+  if (p1 > p2) return { winnerSlot: '1', isDraw: false };
+  if (p2 > p1) return { winnerSlot: '2', isDraw: false };
+  return { winnerSlot: null, isDraw: true };
+}
+
+function formatMatchRecord(won, drawn, lost) {
+  return `${won || 0}/${drawn || 0}/${lost || 0}`;
 }
 
 function completedMatches(data) {
@@ -398,6 +422,7 @@ function statsFromMatches(matches) {
         id: key,
         name: display,
         gamesWon: 0,
+        gamesDrawn: 0,
         gamesLost: 0,
         racksWon: 0,
         racksLost: 0,
@@ -416,20 +441,27 @@ function statsFromMatches(matches) {
     const p1 = touch(match.player1Name);
     const p2 = touch(match.player2Name);
     if (!p1 || !p2) continue;
-    if (match.winnerSlot === '1' || match.winnerSlot === '2') {
-      const winner = match.winnerSlot === '1' ? p1 : p2;
-      const loser = match.winnerSlot === '1' ? p2 : p1;
+
+    if (match.scores) {
+      const s1 = Number(match.scores.p1) || 0;
+      const s2 = Number(match.scores.p2) || 0;
+      p1.racksWon += s1;
+      p1.racksLost += s2;
+      p2.racksWon += s2;
+      p2.racksLost += s1;
+    }
+
+    const result = resolveMatchResult(match);
+    if (result.winnerSlot === '1' || result.winnerSlot === '2') {
+      const winner = result.winnerSlot === '1' ? p1 : p2;
+      const loser = result.winnerSlot === '1' ? p2 : p1;
       winner.gamesWon += 1;
       loser.gamesLost += 1;
-      if (match.scores) {
-        const wRacks = Number(match.winnerSlot === '1' ? match.scores.p1 : match.scores.p2) || 0;
-        const lRacks = Number(match.winnerSlot === '1' ? match.scores.p2 : match.scores.p1) || 0;
-        winner.racksWon += wRacks;
-        winner.racksLost += lRacks;
-        loser.racksWon += lRacks;
-        loser.racksLost += wRacks;
-      }
+    } else if (result.isDraw) {
+      p1.gamesDrawn += 1;
+      p2.gamesDrawn += 1;
     }
+
     p1.highestBreak = Math.max(p1.highestBreak, Number(match.highestBreakP1) || 0);
     p2.highestBreak = Math.max(p2.highestBreak, Number(match.highestBreakP2) || 0);
     p1.highestRun = Math.max(p1.highestRun, Number(match.highestRunP1) || 0);
@@ -449,7 +481,10 @@ function statsFromMatches(matches) {
     }
   }
   const players = Array.from(playerMap.values()).sort((a, b) =>
-    b.gamesWon - a.gamesWon || b.racksWon - a.racksWon || a.name.localeCompare(b.name)
+    b.gamesWon - a.gamesWon ||
+    (b.gamesDrawn || 0) - (a.gamesDrawn || 0) ||
+    b.racksWon - a.racksWon ||
+    a.name.localeCompare(b.name)
   );
   return { matches, players };
 }
@@ -517,8 +552,8 @@ function renderAccountStats() {
       <tr class="stats-row-clickable" data-player-id="${escapeHtml(p.id)}">
         <td class="stats-pos">${index + 1}</td>
         <td>${escapeHtml(p.name)}</td>
-        <td>${p.gamesWon}/${p.gamesLost}</td>
-        <td>${winPct(p.gamesWon, p.gamesLost)}%</td>
+        <td>${formatMatchRecord(p.gamesWon, p.gamesDrawn, p.gamesLost)}</td>
+        <td>${winPct(p.gamesWon, p.gamesLost, p.gamesDrawn)}%</td>
         <td>${p.racksWon}/${p.racksLost}</td>
         <td>${escapeHtml(formatStatsDate(p.lastPlayedAt))}</td>
       </tr>
@@ -536,8 +571,10 @@ function renderAccountStats() {
 function matchPairHtml(m) {
   const p1 = escapeHtml(m.player1Name);
   const p2 = escapeHtml(m.player2Name);
-  if (m.winnerSlot === '1') return `<span class="stats-winner">${p1}</span> vs ${p2}`;
-  if (m.winnerSlot === '2') return `${p1} vs <span class="stats-winner">${p2}</span>`;
+  const result = resolveMatchResult(m);
+  if (result.winnerSlot === '1') return `<span class="stats-winner">${p1}</span> vs ${p2}`;
+  if (result.winnerSlot === '2') return `${p1} vs <span class="stats-winner">${p2}</span>`;
+  if (result.isDraw) return `${p1} vs ${p2} <span class="stats-draw">(Draw)</span>`;
   return `${p1} vs ${p2}`;
 }
 
@@ -641,6 +678,7 @@ function renderPlayerDetail() {
   if (summary) {
     const cards = [];
     const gamesWon = player ? (player.gamesWon || 0) : 0;
+    const gamesDrawn = player ? (player.gamesDrawn || 0) : 0;
     const gamesLost = player ? (player.gamesLost || 0) : 0;
     const racksWon = player ? (player.racksWon || 0) : 0;
     const racksLost = player ? (player.racksLost || 0) : 0;
@@ -648,9 +686,9 @@ function renderPlayerDetail() {
     const highestRun = player ? (player.highestRun || 0) : 0;
     const breakAndRuns = player ? (player.breakAndRuns || 0) : 0;
     const tableRuns = player ? (player.tableRuns || 0) : 0;
-    if (gamesWon + gamesLost > 0) {
-      cards.push(`<div class="stats-summary-card"><strong>${gamesWon}/${gamesLost}</strong><span>Matches W/L</span></div>`);
-      cards.push(`<div class="stats-summary-card"><strong>${winPct(gamesWon, gamesLost)}%</strong><span>Win %</span></div>`);
+    if (gamesWon + gamesDrawn + gamesLost > 0) {
+      cards.push(`<div class="stats-summary-card"><strong>${formatMatchRecord(gamesWon, gamesDrawn, gamesLost)}</strong><span>Matches W/D/L</span></div>`);
+      cards.push(`<div class="stats-summary-card"><strong>${winPct(gamesWon, gamesLost, gamesDrawn)}%</strong><span>Win %</span></div>`);
     }
     if (racksWon + racksLost > 0) {
       cards.push(`<div class="stats-summary-card"><strong>${racksWon}/${racksLost}</strong><span>Racks W/L</span></div>`);
@@ -686,9 +724,14 @@ function renderPlayerDetail() {
     let result = '—';
     if (inProgress) {
       result = 'In progress';
-    } else if (m.winnerSlot === '1' || m.winnerSlot === '2') {
-      const won = (m.winnerSlot === '1' && isP1) || (m.winnerSlot === '2' && !isP1);
-      result = won ? 'Win' : 'Loss';
+    } else {
+      const outcome = resolveMatchResult(m);
+      if (outcome.winnerSlot === '1' || outcome.winnerSlot === '2') {
+        const won = (outcome.winnerSlot === '1' && isP1) || (outcome.winnerSlot === '2' && !isP1);
+        result = won ? 'Win' : 'Loss';
+      } else if (outcome.isDraw) {
+        result = 'Draw';
+      }
     }
     const actions = inProgress
       ? '<span class="stats-match-live-badge">Live</span>'

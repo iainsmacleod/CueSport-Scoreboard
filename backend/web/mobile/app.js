@@ -819,11 +819,9 @@ function appendUndoButton(grid, { canUndo, title }) {
   grid.appendChild(btn);
 }
 
-function shortMobilePlayerLabel(name, fallback) {
-  const raw = String(name || '').trim();
-  if (!raw) return fallback;
-  const first = raw.split(/\s+/)[0];
-  return first.length > 10 ? `${first.slice(0, 9)}…` : first;
+function foulCounterPlayerLabel(name, fallback) {
+  const raw = truncatePlayerName(name);
+  return raw || fallback;
 }
 
 function updateMobileRackFoulDisplay(state) {
@@ -845,12 +843,12 @@ function updateMobileRackFoulDisplay(state) {
   const p2Count = document.getElementById('rackFoulP2');
   const p1Wrap = document.getElementById('rackFoulP1Wrap');
   const p2Wrap = document.getElementById('rackFoulP2Wrap');
-  // Same fields as score rows / player-slot buttons (not p1Name/p2Name).
+  // Same 20-char limit as Setup name fields (not a shorter first-name clip).
   if (p1NameEl) {
-    p1NameEl.textContent = shortMobilePlayerLabel(state.player1Name, 'P1');
+    p1NameEl.textContent = foulCounterPlayerLabel(state.player1Name, 'P1');
   }
   if (p2NameEl) {
-    p2NameEl.textContent = shortMobilePlayerLabel(state.player2Name, 'P2');
+    p2NameEl.textContent = foulCounterPlayerLabel(state.player2Name, 'P2');
   }
   if (p1Count) p1Count.textContent = String(foulsP1);
   if (p2Count) p2Count.textContent = String(foulsP2);

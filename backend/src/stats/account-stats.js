@@ -64,6 +64,7 @@ export function summarizeAccountStats(events) {
         id: key,
         name: display,
         gamesWon: 0,
+        gamesDrawn: 0,
         gamesLost: 0,
         racksWon: 0,
         racksLost: 0,
@@ -77,6 +78,35 @@ export function summarizeAccountStats(events) {
       });
     }
     return playerMap.get(key);
+  }
+
+  /** Resolve decisive winner, draw, or unknown from stored end payload / scores. */
+  function resolveMatchResult(winnerSlotRaw, scores) {
+    const raw = winnerSlotRaw != null ? String(winnerSlotRaw) : '';
+    if (raw === '1' || raw === '2') {
+      return { winnerSlot: raw, isDraw: false };
+    }
+    if (raw === 'draw' || raw === 'tie' || raw === '0') {
+      return { winnerSlot: null, isDraw: true };
+    }
+    if (!scores || typeof scores !== 'object') {
+      return { winnerSlot: null, isDraw: false };
+    }
+    const p1 = Number(scores.p1) || 0;
+    const p2 = Number(scores.p2) || 0;
+    if (p1 > p2) return { winnerSlot: '1', isDraw: false };
+    if (p2 > p1) return { winnerSlot: '2', isDraw: false };
+    return { winnerSlot: null, isDraw: true };
+  }
+
+  function applyMatchScoresToPlayers(p1, p2, scores) {
+    if (!scores || typeof scores !== 'object') return;
+    const s1 = Number(scores.p1) || 0;
+    const s2 = Number(scores.p2) || 0;
+    p1.racksWon += s1;
+    p1.racksLost += s2;
+    p2.racksWon += s2;
+    p2.racksLost += s1;
   }
 
   const matches = [];
@@ -117,6 +147,7 @@ export function summarizeAccountStats(events) {
       extras.highestBreakP2 = 0;
     }
 
+    const result = resolveMatchResult(ep.winnerSlot, ep.scores);
     const match = {
       id: start.payload?.sessionId || start.session_id || start.id,
       startEventId: start.id,
@@ -130,7 +161,7 @@ export function summarizeAccountStats(events) {
       startedAt: start.created_at,
       completedAt: end ? end.created_at : null,
       status: end ? 'completed' : 'active',
-      winnerSlot: ep.winnerSlot != null ? String(ep.winnerSlot) : null,
+      winnerSlot: result.isDraw ? 'draw' : result.winnerSlot,
       scores: ep.scores || null,
       reason: ep.reason || null,
       ...extras,
@@ -142,19 +173,17 @@ export function summarizeAccountStats(events) {
     const p2 = getPlayer(p2Name);
     if (!p1 || !p2) continue;
 
-    if (match.winnerSlot === '1' || match.winnerSlot === '2') {
-      const winner = match.winnerSlot === '1' ? p1 : p2;
-      const loser = match.winnerSlot === '1' ? p2 : p1;
+    // Racks/frames always come from the final scoreline (including draws).
+    applyMatchScoresToPlayers(p1, p2, ep.scores);
+
+    if (result.winnerSlot === '1' || result.winnerSlot === '2') {
+      const winner = result.winnerSlot === '1' ? p1 : p2;
+      const loser = result.winnerSlot === '1' ? p2 : p1;
       winner.gamesWon += 1;
       loser.gamesLost += 1;
-      if (ep.scores) {
-        const wRacks = Number(match.winnerSlot === '1' ? ep.scores.p1 : ep.scores.p2) || 0;
-        const lRacks = Number(match.winnerSlot === '1' ? ep.scores.p2 : ep.scores.p1) || 0;
-        winner.racksWon += wRacks;
-        winner.racksLost += lRacks;
-        loser.racksWon += lRacks;
-        loser.racksLost += wRacks;
-      }
+    } else if (result.isDraw) {
+      p1.gamesDrawn += 1;
+      p2.gamesDrawn += 1;
     }
 
     p1.highestBreak = Math.max(p1.highestBreak, extras.highestBreakP1);

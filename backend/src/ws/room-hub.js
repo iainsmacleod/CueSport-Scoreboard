@@ -484,25 +484,49 @@ function handleSession(ws, meta, msg) {
   if (!requireJoined(ws, meta)) return;
   const action = msg.action;
   let sessionId = sqlite.getRoomSessionState(meta.roomId).sessionId;
+  const payload = msg.payload || {};
 
   if (action === 'start') {
     sessionId = uuidv4();
     sqlite.setRoomSessionId(meta.roomId, sessionId);
   } else if (action === 'end') {
     sqlite.setRoomSessionId(meta.roomId, null);
+  } else if (action === 'discard') {
+    // Clear Game / abandon: remove the open cloud match from history (not a completed end).
+    const matchKey = payload.matchId || payload.sessionId || sessionId || null;
+    const deleted = sqlite.discardRoomSessionEvents(meta.roomId, matchKey);
+    sqlite.setRoomSessionId(meta.roomId, null);
+    sessionId = null;
+    broadcast(meta.roomId, {
+      type: 'session',
+      room_id: meta.roomId,
+      action: 'discard',
+      session_id: null,
+      payload: Object.assign({}, payload, { deleted }),
+      source: meta.client,
+      ts: new Date().toISOString(),
+    }, ws);
+    if (meta.accountId) {
+      notifyAccountTables(meta.accountId, { immediate: true });
+    }
+    return;
   }
 
-  persistEvent(meta, `session:${action}`, msg.payload || {}, meta.client);
+  persistEvent(meta, `session:${action}`, payload, meta.client);
 
   broadcast(meta.roomId, {
     type: 'session',
     room_id: meta.roomId,
     action,
     session_id: sessionId,
-    payload: msg.payload || {},
+    payload,
     source: meta.client,
     ts: new Date().toISOString(),
   }, ws);
+
+  if (meta.accountId && (action === 'start' || action === 'end')) {
+    notifyAccountTables(meta.accountId, { immediate: true });
+  }
 }
 
 async function handleLegacyAuth(ws, meta, msg, authenticateJoin) {
