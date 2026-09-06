@@ -2681,7 +2681,7 @@
     }
 
     async function undoLastBallInternal(playerSlot) {
-        if (!activeMatchSession.matchId || activeMatchSession.lastBallWinnerSlot !== playerSlot) {
+        if (!activeMatchSession.matchId || (playerSlot !== '1' && playerSlot !== '2')) {
             return;
         }
         const match = getActivePendingMatch();
@@ -2689,19 +2689,47 @@
             return;
         }
 
-        const lastBall = match.balls[match.balls.length - 1];
+        const playerId = playerSlot === '1'
+            ? activeMatchSession.player1Id
+            : activeMatchSession.player2Id;
+        if (!playerId) {
+            return;
+        }
+
+        // Remove this player's most recent pot — not only when they were last overall.
+        // Re-enabling a faded ball (Bank / One Pocket) can debit an earlier pot after
+        // the opponent (or the same player) has potted again.
+        let idx = -1;
+        for (let i = match.balls.length - 1; i >= 0; i--) {
+            if (match.balls[i] && match.balls[i].winnerId === playerId) {
+                idx = i;
+                break;
+            }
+        }
+        if (idx < 0) {
+            return;
+        }
+
+        const removed = match.balls.splice(idx, 1)[0];
         const context = getCurrentContext();
-        const winnerId = lastBall.winnerId;
+        const winnerId = removed.winnerId;
         const loserId = winnerId === activeMatchSession.player1Id
             ? activeMatchSession.player2Id
             : activeMatchSession.player1Id;
 
-        match.balls.pop();
         await applyBallDelta(winnerId, loserId, context.gameType, -1);
-        activeMatchSession.lastBallWinnerSlot = match.balls.length > 0
-            ? (match.balls[match.balls.length - 1].winnerId === activeMatchSession.player1Id ? '1' : '2')
-            : null;
+        if (match.balls.length > 0) {
+            const last = match.balls[match.balls.length - 1];
+            activeMatchSession.lastBallWinnerSlot = last.winnerId === activeMatchSession.player1Id
+                ? '1'
+                : (last.winnerId === activeMatchSession.player2Id ? '2' : null);
+        } else {
+            activeMatchSession.lastBallWinnerSlot = null;
+        }
         await persistPendingSession();
+        if (context.gameType !== 'game8') {
+            broadcastOverlayStatsIfEnabled();
+        }
     }
 
     function getCurrentScores() {

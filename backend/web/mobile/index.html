@@ -321,6 +321,18 @@
       <div id="snookerFoulTargets" class="snooker-foul-targets"></div>
     </div>
   </div>
-  <script type="module" src="/web/mobile/app.js?v=8.0.0.16"></script>
+
+  <div id="poolRespotModal" class="mobile-modal hidden" role="dialog" aria-modal="true" aria-labelledby="poolRespotTitle">
+    <div class="mobile-modal-backdrop" id="poolRespotBackdrop"></div>
+    <div class="mobile-modal-sheet snooker-foul-sheet">
+      <div class="mobile-modal-head">
+        <h2 id="poolRespotTitle">Select Ball to Respot</h2>
+        <button type="button" class="icon-btn mobile-modal-close" id="poolRespotCancel" aria-label="Cancel">×</button>
+      </div>
+      <p id="poolRespotHint" class="snooker-foul-hint" aria-live="polite"></p>
+      <div id="poolRespotTargets" class="snooker-foul-targets"></div>
+    </div>
+  </div>
+  <script type="module" src="/web/mobile/app.js?v=8.0.0.17"></script>
 </body>
 </html>

@@ -21,7 +21,7 @@ for more information about Salotto please visit https://salotto.app
     <link rel="stylesheet" href="./common/css/control_panel/grey.css?v=8.0.0" />
     <link rel="stylesheet" href="./common/css/control_panel/light.css?v=8.0.0" />
     <link rel="stylesheet" href="./common/css/control_panel/rachni.css?v=8.0.0" />
-    <link rel="stylesheet" href="./common/css/control_panel/required.css?v=8.0.0.10" />
+    <link rel="stylesheet" href="./common/css/control_panel/required.css?v=8.0.0.11" />
     <script>
         //---------------------------------------------------------------------------------------------
         var versionNum = "8.0.0";
@@ -29,11 +29,11 @@ for more information about Salotto please visit https://salotto.app
     </script>
     <script src="./common/js/obs-websocket-js.js?v=8.0.0"></script>
     <script src="./common/js/jquery.js?v=8.0.0"></script>
-    <script src="./common/js/cloud_relay.js?v=8.0.0.10"></script>
+    <script src="./common/js/cloud_relay.js?v=8.0.0.11"></script>
     <script src="./common/js/stream_sharing.js?v=8.0.0"></script>
-    <script src="./common/js/player_stats.js?v=8.0.0.15"></script>
-    <script src="./common/js/control_panel.js?v=8.0.0.23"></script>
-    <script src="./common/js/cloud_commands.js?v=8.0.0.3"></script>
+    <script src="./common/js/player_stats.js?v=8.0.0.16"></script>
+    <script src="./common/js/control_panel.js?v=8.0.0.24"></script>
+    <script src="./common/js/cloud_commands.js?v=8.0.0.4"></script>
     <script src="./common/js/cloud_auth.js?v=8.0.0.1"></script>
     <script src="hotkeys.js?v=8.0.0"></script>
 
@@ -256,6 +256,10 @@ for more information about Salotto please visit https://salotto.app
                 <div class="ball-tracker-row ball-tracker-action-row" id="ballTrackerActionRow">
                 <div class="ball noShow" id="poolFoulBtn" onclick="applyPoolFoul()" title="Foul">
                     <img src="./common/images/foul-small.png" alt="Foul">
+                </div>
+                <div class="ball noShow" id="poolRespotBtn" onclick="openPoolRespotPicker()" title="Respot"
+                    aria-disabled="true">
+                    <img src="./common/images/respot-small.png" alt="Respot">
                 </div>
                 <div class="ball snooker-undo-ball noShow" id="snookerUndoBtn" onclick="undoLastScoringAction()"
                     title="Undo last scoring action" aria-disabled="true">
@@ -1195,6 +1199,25 @@ for more information about Salotto please visit https://salotto.app
             <div class="modal-footer">
                 <div class="modal-footer-buttons">
                     <button type="button" class="modal-cancel-btn hover obs28 button" onclick="cancelSnookerFoul()">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bank / One Pocket: respot a faded object ball without changing scores -->
+    <div id="poolRespotModal" class="modal" onclick="poolRespotModalBackdrop(event)">
+        <div class="modal-content snooker-foul-modal-content">
+            <div class="modal-header">
+                <h2>Select Ball to Respot</h2>
+                <span class="modal-close" onclick="cancelPoolRespot()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="snooker-foul-targets" id="poolRespotTargets"></div>
+                <div id="poolRespotHoverLabel" class="snooker-foul-hover-label" aria-live="polite"></div>
+            </div>
+            <div class="modal-footer">
+                <div class="modal-footer-buttons">
+                    <button type="button" class="modal-cancel-btn hover obs28 button" onclick="cancelPoolRespot()">Cancel</button>
                 </div>
             </div>
         </div>

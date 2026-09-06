@@ -363,8 +363,8 @@
         const balls = [];
         if (tracker) {
             tracker.querySelectorAll('.ball').forEach(function (el) {
-                if (el.id === 'snookerUndoBtn' || el.id === 'poolFoulBtn') {
-                    // Always include the pool foul control for mobile (not an object ball).
+                if (el.id === 'snookerUndoBtn' || el.id === 'poolFoulBtn' || el.id === 'poolRespotBtn') {
+                    // Always include pool foul / respot controls for mobile (not object balls).
                     if (el.id === 'poolFoulBtn') {
                         balls.push({
                             id: el.id,
@@ -375,6 +375,20 @@
                             disabled: el.classList.contains('snooker-ball-disabled') ||
                                 el.getAttribute('aria-disabled') === 'true',
                             foul: true,
+                            respot: false,
+                            freeball: false,
+                        });
+                    } else if (el.id === 'poolRespotBtn') {
+                        balls.push({
+                            id: el.id,
+                            file: imageFileName(el.querySelector('img')) || 'respot-small.png',
+                            title: 'Respot',
+                            hidden: el.classList.contains('noShow'),
+                            faded: false,
+                            disabled: el.classList.contains('snooker-ball-disabled') ||
+                                el.getAttribute('aria-disabled') === 'true',
+                            foul: false,
+                            respot: true,
                             freeball: false,
                         });
                     }
@@ -397,6 +411,7 @@
                     clicked: el.classList.contains('snooker-ball-clicked'),
                     // Roles match control_panel SNOOKER_BALL_META — do not infer from title text.
                     foul: snooker && el.id === 'ball 11',
+                    respot: false,
                     freeball: snooker && el.id === 'ball 10',
                 });
             });

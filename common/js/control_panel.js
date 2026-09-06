@@ -1300,6 +1300,180 @@ function applyPoolFoul() {
 
 window.applyPoolFoul = applyPoolFoul;
 
+/** Ball-tracker action controls (not object balls). */
+function isTrackerActionBallId(ballId) {
+    return ballId === "snookerUndoBtn" ||
+        ballId === "poolFoulBtn" ||
+        ballId === "poolRespotBtn";
+}
+
+/** Bank / One Pocket — respot returns a faded ball to the table with no score change. */
+function isPoolRespotGame() {
+    return isPocketScoreGame();
+}
+
+function getFadedObjectBallElements() {
+    return Array.prototype.filter.call(
+        document.querySelectorAll("#ballTrackerDiv .ball"),
+        function (ball) {
+            if (!ball || isTrackerActionBallId(ball.id)) {
+                return false;
+            }
+            if (ball.classList.contains("noShow") || ball.classList.contains("snooker-spacer")) {
+                return false;
+            }
+            return ball.classList.contains("faded");
+        }
+    );
+}
+
+function canApplyPoolRespot() {
+    if (!isPoolRespotGame() || isSnookerBallMode() || isGameScoringLocked()) {
+        return false;
+    }
+    if (isRackBreakerBallGridLockEnabled() && !getRackBreakerSlot()) {
+        return false;
+    }
+    return getFadedObjectBallElements().length > 0;
+}
+
+/**
+ * Unfade a potted object ball without changing scores or pot/career stats.
+ * Used when a scored ball must return to the table (Bank / One Pocket).
+ */
+function applyRespotBall(ballId) {
+    if (!canApplyPoolRespot() || !ballId || isTrackerActionBallId(ballId)) {
+        return false;
+    }
+    const ball = document.getElementById(ballId);
+    if (!ball || !ball.classList.contains("faded")) {
+        return false;
+    }
+    if (window.streamSharing && typeof window.streamSharing.invalidatePendingPublishes === "function") {
+        window.streamSharing.invalidatePendingPublishes();
+    }
+
+    const owners = getPocketBallOwners();
+    const previousOwner = owners[ballId] || null;
+    pushScoringUndo({
+        type: "respot",
+        ballId: ballId,
+        previousOwner: previousOwner
+    });
+
+    ball.classList.remove("faded");
+    const ballState = JSON.parse(getStorageItem("ballState") || "{}");
+    ballState[ballId] = false;
+    setStorageItem("ballState", JSON.stringify(ballState));
+    if (previousOwner) {
+        delete owners[ballId];
+        setPocketBallOwners(owners);
+    }
+    if (typeof bc !== "undefined") {
+        bc.postMessage({ resetBall: ballId });
+    }
+
+    updatePoolRespotButton();
+    updateScoringUndoButton();
+    publishCloudStateAfterTrackerChange();
+    console.log("Respot (no score change):", ballId);
+    return true;
+}
+
+function clearPoolRespotHoverLabel() {
+    const label = document.getElementById("poolRespotHoverLabel");
+    if (label) {
+        label.textContent = "";
+    }
+}
+
+function updatePoolRespotHoverLabel(element) {
+    const label = document.getElementById("poolRespotHoverLabel");
+    if (!label || !element) {
+        return;
+    }
+    label.textContent = element.getAttribute("title") || element.getAttribute("data-ball-id") || "Respot";
+}
+
+function populatePoolRespotTargets() {
+    const container = document.getElementById("poolRespotTargets");
+    if (!container) {
+        return 0;
+    }
+    container.innerHTML = "";
+    const faded = getFadedObjectBallElements();
+    faded.forEach(function (srcBall) {
+        const img = srcBall.querySelector("img");
+        const target = document.createElement("div");
+        target.className = "ball snooker-foul-target";
+        target.setAttribute("data-ball-id", srcBall.id);
+        target.setAttribute("title", srcBall.getAttribute("title") || srcBall.id);
+        target.setAttribute("onclick", "selectPoolRespot(this)");
+        target.setAttribute("onmouseenter", "updatePoolRespotHoverLabel(this)");
+        target.setAttribute("onmouseleave", "clearPoolRespotHoverLabel()");
+        if (img) {
+            const clone = img.cloneNode(true);
+            target.appendChild(clone);
+        }
+        container.appendChild(target);
+    });
+    return faded.length;
+}
+
+function openPoolRespotPicker() {
+    const btn = document.getElementById("poolRespotBtn");
+    if (btn && (btn.classList.contains("snooker-ball-disabled") ||
+        btn.getAttribute("aria-disabled") === "true" ||
+        btn.classList.contains("noShow"))) {
+        return;
+    }
+    if (!canApplyPoolRespot()) {
+        updatePoolRespotButton();
+        return;
+    }
+    const modal = document.getElementById("poolRespotModal");
+    if (!modal) {
+        return;
+    }
+    const count = populatePoolRespotTargets();
+    if (!count) {
+        updatePoolRespotButton();
+        return;
+    }
+    clearPoolRespotHoverLabel();
+    modal.style.display = "block";
+}
+
+function cancelPoolRespot() {
+    const modal = document.getElementById("poolRespotModal");
+    if (modal) {
+        modal.style.display = "none";
+    }
+    clearPoolRespotHoverLabel();
+}
+
+function poolRespotModalBackdrop(event) {
+    if (event && event.target && event.target.id === "poolRespotModal") {
+        cancelPoolRespot();
+    }
+}
+
+function selectPoolRespot(element) {
+    const ballId = element && element.getAttribute("data-ball-id");
+    cancelPoolRespot();
+    if (ballId) {
+        applyRespotBall(ballId);
+    }
+}
+
+window.applyRespotBall = applyRespotBall;
+window.openPoolRespotPicker = openPoolRespotPicker;
+window.cancelPoolRespot = cancelPoolRespot;
+window.selectPoolRespot = selectPoolRespot;
+window.poolRespotModalBackdrop = poolRespotModalBackdrop;
+window.updatePoolRespotHoverLabel = updatePoolRespotHoverLabel;
+window.clearPoolRespotHoverLabel = clearPoolRespotHoverLabel;
+
 /** Add pot points to the active player's continuous break and frame high. */
 function addToSnookerBreak(player, points, ballKey) {
     if (!points || (player !== "1" && player !== "2")) {
@@ -1525,7 +1699,7 @@ function restoreTrackerFromScoringSnapshot(before) {
     const ballState = before.ballState && typeof before.ballState === "object" ? before.ballState : {};
     setStorageItem("ballState", JSON.stringify(ballState));
     document.querySelectorAll("#ballTrackerDiv .ball").forEach(function (ball) {
-        if (ball.id === "snookerUndoBtn" || ball.id === "poolFoulBtn") {
+        if (isTrackerActionBallId(ball.id)) {
             return;
         }
         const faded = !!ballState[ball.id];
@@ -1577,6 +1751,7 @@ function syncBallTrackerRows() {
     const b10 = document.getElementById("ball 10");
     const b11 = document.getElementById("ball 11");
     const poolFoul = document.getElementById("poolFoulBtn");
+    const poolRespot = document.getElementById("poolRespotBtn");
     const undo = document.getElementById("snookerUndoBtn");
 
     if (isSnookerBallMode()) {
@@ -1601,11 +1776,14 @@ function syncBallTrackerRows() {
         if (poolFoul) {
             actionRow.appendChild(poolFoul);
         }
+        if (poolRespot) {
+            actionRow.appendChild(poolRespot);
+        }
         if (undo) {
             actionRow.appendChild(undo);
         }
     } else {
-        // Pool: numbered object balls in order; Foul / Undo on the second row.
+        // Pool: numbered object balls in order; Foul / Respot / Undo on the second row.
         for (let i = 1; i <= 15; i++) {
             const el = document.getElementById("ball " + i);
             if (el) {
@@ -1614,6 +1792,9 @@ function syncBallTrackerRows() {
         }
         if (poolFoul) {
             actionRow.appendChild(poolFoul);
+        }
+        if (poolRespot) {
+            actionRow.appendChild(poolRespot);
         }
         if (undo) {
             actionRow.appendChild(undo);
@@ -1653,9 +1834,43 @@ function syncPoolFoulButtonVisibility() {
     syncBallTrackerActionRowVisibility();
 }
 
+function syncPoolRespotButtonVisibility() {
+    const btn = document.getElementById("poolRespotBtn");
+    if (!btn) {
+        return;
+    }
+    const show = isPoolRespotGame() && !isSnookerBallMode() && isBallTrackerControlsVisible();
+    btn.classList.toggle("noShow", !show);
+    syncBallTrackerActionRowVisibility();
+}
+
+/** Enable Respot only when at least one object ball is faded (Bank / One Pocket). */
+function updatePoolRespotButton() {
+    syncPoolRespotButtonVisibility();
+    const btn = document.getElementById("poolRespotBtn");
+    if (!btn) {
+        return;
+    }
+    if (btn.classList.contains("noShow")) {
+        btn.classList.add("snooker-ball-disabled");
+        btn.setAttribute("aria-disabled", "true");
+        return;
+    }
+    const canRespot = canApplyPoolRespot();
+    btn.classList.toggle("snooker-ball-disabled", !canRespot);
+    if (canRespot) {
+        btn.removeAttribute("aria-disabled");
+        btn.title = "Respot a potted ball (no score change)";
+    } else {
+        btn.setAttribute("aria-disabled", "true");
+        btn.title = "No potted balls to respot";
+    }
+}
+
 function updateScoringUndoButton() {
     const btn = document.getElementById("snookerUndoBtn");
     syncPoolFoulButtonVisibility();
+    updatePoolRespotButton();
     updateRackFoulDisplay();
     if (!btn) {
         return;
@@ -1672,7 +1887,7 @@ function updateScoringUndoButton() {
         btn.removeAttribute("aria-disabled");
         btn.title = isSnookerBallMode() && hasSnookerUndo
             ? "Undo last pot, foul, or player change"
-            : "Undo last scoring action (pots, fouls, breaker, player change)";
+            : "Undo last scoring action (pots, fouls, respot, breaker, player change)";
     } else {
         btn.setAttribute("aria-disabled", "true");
         btn.title = awaitingBreaker
@@ -1839,6 +2054,29 @@ async function applyScoringUndoEntry(entry) {
         if (window.PlayerStats && typeof window.PlayerStats.broadcastOverlayStatsIfEnabled === "function") {
             window.PlayerStats.broadcastOverlayStatsIfEnabled();
         }
+        return;
+    }
+    if (entry.type === "respot") {
+        const ballId = entry.ballId;
+        const ball = ballId ? document.getElementById(ballId) : null;
+        if (ball && !ball.classList.contains("faded")) {
+            ball.classList.add("faded");
+            const ballState = JSON.parse(getStorageItem("ballState") || "{}");
+            ballState[ballId] = true;
+            setStorageItem("ballState", JSON.stringify(ballState));
+            if (typeof bc !== "undefined") {
+                bc.postMessage({ toggle: ballId });
+            }
+        }
+        if (entry.previousOwner === "1" || entry.previousOwner === "2") {
+            const owners = getPocketBallOwners();
+            owners[ballId] = entry.previousOwner;
+            setPocketBallOwners(owners);
+        }
+        updatePoolRespotButton();
+        updateScoringUndoButton();
+        updateScoreControlAvailability();
+        publishCloudStateAfterTrackerChange();
         return;
     }
     if (entry.type === "fade") {
@@ -3472,6 +3710,7 @@ function applyGameTypeChange(value, options) {
 
     const gameType = resolved;
     cancelSnookerFoul();
+    cancelPoolRespot();
 
     // 9-Ball or 10-Ball -> hide both
     if (["game2", "game3"].includes(gameType)) {
@@ -4116,6 +4355,7 @@ function togglePot(element) {
             });
             debitPocketBallUnpot(element.id);
         }
+        updatePoolRespotButton();
         publishCloudStateAfterTrackerChange();
         return;
     }
@@ -4528,7 +4768,7 @@ function resetBallTrackerKeepingBall(keepBallId, ownerPlayer) {
     const ballElements = document.querySelectorAll("#ballTrackerDiv .ball");
 
     ballElements.forEach(function (ball) {
-        if (ball.id === "snookerUndoBtn") {
+        if (isTrackerActionBallId(ball.id)) {
             return;
         }
         if (ball.id === keepBallId) {
@@ -4618,7 +4858,7 @@ function maybeStraightPoolRerack() {
         return;
     }
     const balls = Array.from(document.querySelectorAll("#ballTrackerDiv .ball")).filter(function (ball) {
-        if (ball.id === "snookerUndoBtn" || ball.id === "poolFoulBtn") {
+        if (isTrackerActionBallId(ball.id)) {
             return false;
         }
         return !ball.classList.contains("noShow");
@@ -6285,7 +6525,7 @@ function resetBallTracker() {
     const ballElements = document.querySelectorAll("#ballTrackerDiv .ball");
 
     ballElements.forEach(function (ball) {
-        if (ball.id === "snookerUndoBtn" || ball.id === "poolFoulBtn") {
+        if (isTrackerActionBallId(ball.id)) {
             return;
         }
         // Remove the 'faded' class to reset the ball
@@ -6305,6 +6545,7 @@ function resetBallTracker() {
 
     console.log("All balls have been reset in ball tracker.");
     restoreRackBreakerPromptAfterScoreReset();
+    updatePoolRespotButton();
 }
 
 function clearLogo(xL) {

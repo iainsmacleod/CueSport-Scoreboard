@@ -16,6 +16,13 @@
         return false;
     }
 
+    function isActionBallId(ballId) {
+        return ballId === 'poolFoulBtn' ||
+            ballId === 'poolRespotBtn' ||
+            ballId === 'snookerUndoBtn' ||
+            isFoulBallId(ballId);
+    }
+
     /** Drop stale in-flight snapshots, then publish authoritative dock state. */
     function publishAfterScoring() {
         if (window.streamSharing && typeof window.streamSharing.invalidatePendingPublishes === 'function') {
@@ -206,7 +213,7 @@
             case 'toggle_pot':
             case 'snooker_ball': {
                 const ballId = payload && payload.ballId;
-                if (isFoulBallId(ballId)) {
+                if (isActionBallId(ballId)) {
                     return Promise.resolve();
                 }
                 const el = ballId ? document.getElementById(ballId) : null;
@@ -234,6 +241,15 @@
                     applyPoolFoul();
                 } else if (typeof window.applyPoolFoul === 'function') {
                     window.applyPoolFoul();
+                }
+                return Promise.resolve();
+            }
+            case 'respot_ball': {
+                const ballId = payload && payload.ballId ? String(payload.ballId) : '';
+                if (ballId && typeof applyRespotBall === 'function') {
+                    applyRespotBall(ballId);
+                } else if (ballId && typeof window.applyRespotBall === 'function') {
+                    window.applyRespotBall(ballId);
                 }
                 return Promise.resolve();
             }

@@ -920,6 +920,10 @@ function appendBallButton(grid, { src, title, faded, disabled, awaiting, action,
         openSnookerFoulPicker();
         return;
       }
+      if (action === 'open_respot_picker') {
+        openPoolRespotPicker();
+        return;
+      }
       // Dock owns scoring rules (snooker free ball, rack wins, pocket pots, etc.).
       sendCmd(action, payload);
     };
@@ -1100,7 +1104,14 @@ function renderBallGrid(state) {
       // Trust dock snapshot foul flag (snooker ball 11 / poolFoulBtn). Do not treat
       // pool object ball 11 as foul — that was a snooker-era mobile shortcut.
       const isFoul = b.foul === true || b.id === 'poolFoulBtn';
+      const isRespot = b.respot === true || b.id === 'poolRespotBtn';
       if (isFoul && !snapshot.snooker) hasPoolFoul = true;
+      let action = snapshot.snooker ? 'snooker_ball' : 'toggle_pot';
+      if (isFoul) {
+        action = snapshot.snooker ? 'open_foul_picker' : 'pool_foul';
+      } else if (isRespot) {
+        action = 'open_respot_picker';
+      }
       appendBallButton(grid, {
         src: resolveBallImageSrc(state, b.id, b.file),
         title: b.title,
@@ -1111,9 +1122,7 @@ function renderBallGrid(state) {
         cooldown: !!b.cooldown,
         clicked: !!b.clicked,
         extraClass: b.freeball ? 'freeball-btn' : '',
-        action: isFoul
-          ? (snapshot.snooker ? 'open_foul_picker' : 'pool_foul')
-          : (snapshot.snooker ? 'snooker_ball' : 'toggle_pot'),
+        action,
         payload: { ballId: b.id },
       });
     });
@@ -1239,6 +1248,62 @@ function selectSnookerFoul(foulKey) {
 function wireSnookerFoulModal() {
   document.getElementById('snookerFoulCancel')?.addEventListener('click', closeSnookerFoulPicker);
   document.getElementById('snookerFoulBackdrop')?.addEventListener('click', closeSnookerFoulPicker);
+}
+
+function openPoolRespotPicker() {
+  const modal = document.getElementById('poolRespotModal');
+  const container = document.getElementById('poolRespotTargets');
+  const hint = document.getElementById('poolRespotHint');
+  if (!modal || !container) return;
+
+  const snapshot = lastState && lastState.ballGrid;
+  const faded = (snapshot && Array.isArray(snapshot.balls) ? snapshot.balls : [])
+    .filter((b) => b && !b.hidden && b.faded && !b.foul && !b.respot &&
+      b.id !== 'poolFoulBtn' && b.id !== 'poolRespotBtn' && b.id !== 'snookerUndoBtn');
+  container.innerHTML = '';
+  if (hint) {
+    hint.textContent = faded.length
+      ? 'Choose a ball to return to the table (no score change)'
+      : 'No potted balls to respot';
+    hint.classList.toggle('hidden', !faded.length);
+  }
+  faded.forEach((b) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'foul-target-btn';
+    btn.title = b.title || b.id;
+    const img = document.createElement('img');
+    img.src = resolveBallImageSrc(lastState || {}, b.id, b.file);
+    img.alt = b.title || b.id;
+    btn.appendChild(img);
+    btn.addEventListener('pointerdown', (e) => {
+      if (e.pointerType !== 'mouse' || e.button === 0) {
+        e.preventDefault();
+      }
+    });
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      selectPoolRespot(b.id);
+    });
+    container.appendChild(btn);
+  });
+  modal.classList.remove('hidden');
+}
+
+function closePoolRespotPicker() {
+  const modal = document.getElementById('poolRespotModal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function selectPoolRespot(ballId) {
+  closePoolRespotPicker();
+  if (ballId) sendCmd('respot_ball', { ballId });
+}
+
+function wirePoolRespotModal() {
+  document.getElementById('poolRespotCancel')?.addEventListener('click', closePoolRespotPicker);
+  document.getElementById('poolRespotBackdrop')?.addEventListener('click', closePoolRespotPicker);
 }
 
 function getResetActionLabel(state = lastState) {
@@ -2117,6 +2182,7 @@ wireSetupPanel();
 wirePlayerAutocomplete();
 wireMatchConfirmModal();
 wireSnookerFoulModal();
+wirePoolRespotModal();
 wireMobileNav();
 
 function startBootConnect(message) {
