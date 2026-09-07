@@ -55,10 +55,27 @@
           } else if (data.type === 'error') {
             clearTimeout(t);
             ws.close();
-            reject(new Error(data.message || data.code));
+            const err = new Error(data.message || data.code);
+            err.code = data.code;
+            reject(err);
           }
         };
         ws.onerror = () => { clearTimeout(t); reject(new Error('ws error')); };
+      });
+    }
+
+    function waitForWsMessage(ws, predicate, timeoutMs = 5000) {
+      return new Promise((resolve, reject) => {
+        const t = setTimeout(() => reject(new Error('message timeout')), timeoutMs);
+        const onMessage = (ev) => {
+          let data;
+          try { data = JSON.parse(ev.data); } catch { return; }
+          if (!predicate(data)) return;
+          clearTimeout(t);
+          ws.removeEventListener('message', onMessage);
+          resolve(data);
+        };
+        ws.addEventListener('message', onMessage);
       });
     }
 
@@ -88,6 +105,7 @@
 
       assert('Dashboard CSS', (await fetch(SERVER + '/web/shared/styles.css')).ok);
       assert('Dashboard app.js', (await fetch(SERVER + '/web/dashboard/app.js')).ok);
+      assert('Mobile guest page', (await fetch(SERVER + '/web/mobile/index.html')).ok);
 
       const secret = new URLSearchParams(location.search).get('dev_secret')
         || window.prompt('Dev auth secret (DEV_AUTH_SECRET from server .env):', '');
@@ -138,16 +156,10 @@
         assert('WS join mobile (dev token)', false, 'no room from dock join');
       }
 
-      if (dockJoin) {
+      if (dockJoin && roomId) {
         try {
           const mobile2 = await wsJoin({ room_id: roomId, client: 'mobile', access_token: token });
-          const cmdPromise = new Promise((resolve, reject) => {
-            const t = setTimeout(() => reject(new Error('no command')), 5000);
-            mobile2.ws.onmessage = (ev) => {
-              const d = JSON.parse(ev.data);
-              if (d.type === 'command') { clearTimeout(t); resolve(d); }
-            };
-          });
+          const cmdPromise = waitForWsMessage(mobile2.ws, (d) => d.type === 'command');
           dockJoin.ws.send(JSON.stringify({
             type: 'command', room_id: roomId, action: 'score_add',
             payload: { player: '1' }, source: 'dock',
@@ -155,11 +167,86 @@
           const cmd = await cmdPromise;
           assert('Command relay', cmd.action === 'score_add');
           mobile2.ws.close();
-          dockJoin.ws.close();
         } catch (e) {
           assert('Command relay', false, e.message);
-          dockJoin.ws.close();
         }
+
+        // Guest links: setup allowlist + single active session
+        const guestLink = await fetchJson('/api/rooms/' + encodeURIComponent(roomId) + '/guest-link', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ label: 'browser-guest' }),
+        });
+        assert('Create guest link', guestLink.ok && !!guestLink.body.token);
+        const guestToken = guestLink.body.token;
+
+        let guestWs;
+        if (guestToken) {
+          try {
+            guestWs = await wsJoin({ guest_token: guestToken, client: 'mobile_guest' });
+            assert('WS join guest', guestWs.data.client === 'mobile_guest');
+          } catch (e) {
+            assert('WS join guest', false, e.message);
+          }
+
+          if (guestWs) {
+            let secondBlocked = false;
+            try {
+              await wsJoin({ guest_token: guestToken, client: 'mobile_guest' });
+            } catch (e) {
+              secondBlocked = e.code === 'guest_link_in_use';
+              assert('Guest second join rejected', secondBlocked, e.message);
+            }
+            if (!secondBlocked) {
+              assert('Guest second join rejected', false, 'expected guest_link_in_use');
+            }
+
+            try {
+              const setupCmdP = waitForWsMessage(dockJoin.ws, (d) => d.type === 'command' && d.action === 'set_game_type');
+              guestWs.ws.send(JSON.stringify({
+                type: 'command', action: 'set_game_type', payload: { gameType: 'game8' },
+              }));
+              const setupCmd = await setupCmdP;
+              assert('Guest set_game_type allowed', setupCmd.action === 'set_game_type');
+            } catch (e) {
+              assert('Guest set_game_type allowed', false, e.message);
+            }
+
+            try {
+              const goldCmdP = waitForWsMessage(dockJoin.ws, (d) => d.type === 'command' && d.action === 'set_snooker_gold');
+              guestWs.ws.send(JSON.stringify({
+                type: 'command', action: 'set_snooker_gold', payload: { enabled: true },
+              }));
+              const goldCmd = await goldCmdP;
+              assert('Guest set_snooker_gold allowed', goldCmd.action === 'set_snooker_gold');
+            } catch (e) {
+              assert('Guest set_snooker_gold allowed', false, e.message);
+            }
+
+            try {
+              const forbidP = waitForWsMessage(guestWs.ws, (d) => d.type === 'error' && d.code === 'guest_forbidden');
+              guestWs.ws.send(JSON.stringify({
+                type: 'command', action: 'set_player_name', payload: { slot: '1', name: 'Nope' },
+              }));
+              const forbid = await forbidP;
+              assert('Guest set_player_name forbidden', forbid.code === 'guest_forbidden');
+            } catch (e) {
+              assert('Guest set_player_name forbidden', false, e.message);
+            }
+
+            guestWs.ws.close();
+            await new Promise((r) => setTimeout(r, 150));
+            try {
+              const guest2 = await wsJoin({ guest_token: guestToken, client: 'mobile_guest' });
+              assert('Guest reconnect after close', guest2.data.client === 'mobile_guest');
+              guest2.ws.close();
+            } catch (e) {
+              assert('Guest reconnect after close', false, e.message);
+            }
+          }
+        }
+
+        try { dockJoin.ws.close(); } catch (_) { /* ignore */ }
       }
 
       assert('cloudRelay global', typeof window.cloudRelay === 'object');

@@ -626,7 +626,24 @@ async function run() {
       try {
         const guestWs = await wsJoin({ guestToken: guestLink.body.token });
         assert('WS join guest token', guestWs.data.client === 'mobile_guest');
-        const guestKickedP = waitForWsErrorThenClose(guestWs.ws);
+
+        let secondRejected = false;
+        try {
+          await wsJoin({ guestToken: guestLink.body.token });
+        } catch (e) {
+          secondRejected = e.code === 'guest_link_in_use';
+          assert('Second guest join rejected while first active', secondRejected, e.message);
+        }
+        if (!secondRejected) {
+          assert('Second guest join rejected while first active', false, 'expected guest_link_in_use');
+        }
+
+        guestWs.ws.close();
+        await new Promise((r) => setTimeout(r, 150));
+        const guestWs2 = await wsJoin({ guestToken: guestLink.body.token });
+        assert('Guest can reconnect after prior session closes', guestWs2.data.client === 'mobile_guest');
+
+        const guestKickedP = waitForWsErrorThenClose(guestWs2.ws);
         const revAll = await fetchJson('/api/guest-links/revoke-all', {
           method: 'POST',
           headers: { Authorization: `Bearer ${tokenFresh}` },

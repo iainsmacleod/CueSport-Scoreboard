@@ -105,7 +105,7 @@ You do not need a public server for the scoreboard itself. Local files or a tiny
 
 ![CueSport Cloud dashboard — Tables tab](docs/readme/images/04-cloud-dashboard.png)
 
-**Mobile control** — phone/tablet remote at `/m/{room_id}`; guests use `/g/{token}` with limited permissions.
+**Mobile control** — phone/tablet remote at `/m/{room_id}`; guests use `/g/{token}` (score + game setup; one device per link; no names / reset / replay).
 
 ![CueSport Cloud mobile control](docs/readme/images/05-cloud-mobile-control.png)
 
@@ -309,7 +309,7 @@ The OBS **dock remains the scoring authority**. Mobile and guest clients send co
 |---------|-----|---------|
 | **Dashboard** | `/dashboard` | Sign in, see live tables, API keys, open mobile control |
 | **Mobile control** | `/m/{room_id}` | Full remote (admin): score, balls, setup, replay, share |
-| **Guest control** | `/g/{token}` | Limited remote: score, balls, fouls, race/event info — no names, game type, reset/end, or replay |
+| **Guest control** | `/g/{token}` | Limited remote: score, balls, fouls, breaker, game type and its options (ball variant, win on break / early game, golden ball, point based), race, and event info — no names, reset/end match, or replay. **One active device per guest link** at a time (link stays valid until revoked). |
 | **Stream listing** | `/` or `/streams` | Public page of promoted live streams |
 
 - **Stats-safe relay** — mobile commands invoke the same dock functions as the control panel (`postScore`, `selectRackBreaker`, etc.)
@@ -343,7 +343,7 @@ docker compose up -d --build
 2. Create an **OBS Dock Key** per dock (starter plan: 2 seats). Paste each key into that dock’s CueSport Cloud **Connection settings** (⚙) — managed or Self-hosting. Each key may only be connected on one dock at a time. Rooms are created automatically when the dock connects.
 3. Enable the **CueSport Cloud** toggle on the dock.
 4. On your phone, open **http://localhost:3000/m/{room_id}** — if you already signed in on the dashboard in the same browser, tap **Connect**; on a new device, enter the dev secret once (it is saved for next time).
-5. Optional: from mobile **Share**, create a **guest link** (`/g/{token}`) for helpers who should not change names, game type, or end the match.
+5. Optional: from mobile **Share**, create a **guest link** (`/g/{token}`) for helpers. Guests can score and change game setup (type + options, race, event info) but cannot edit names, reset/end the match, or use replay. Only one device may use a given guest link at once; revoke the link when you want it invalidated.
 
 See [`backend/README.md`](backend/README.md) for Supabase/Google OAuth production setup.
 
@@ -551,13 +551,13 @@ From the project root:
 python -m http.server 8765
 ```
 
-Open `http://localhost:8765/tests/smoke_test.html` and click **Run all tests**. Coverage includes core wiring and version; Setup (**Game Selection** / **Event Information**, player details, game-variant option integrity); dock **zoom** and **tab** persistence; Stats tab restore; **Manual Adjustments** layout (chosen ball placement, player-tracking block visibility); Show Scores / Ball Scoring preference handling; Stats tab (Player Stats, Import / Export / Clear, per-game overlay visibility toggles); **OverlayVisibility** (stats toggles through initial build, broadcast rebuild, and Snooker live publish); overlay mode toggles and payload sync; stats APIs and match history; live H2H / in-progress match editing; **Breaking Player?** / **Active Player** (all game types with Ball Scoring on, section hidden when off, race-complete lock, player switching, International Red/Yellow auto-assign); Snooker (frames/points, Golden Ball, fouls, Free Ball, undo stack, scoring lock, overlay Display Balls rules); Ball Scoring rack wins (8/9/10-ball including **Break & Run** / **Table Run** rack flags and career totals, Straight 14.1 re-rack, Bank/One Pocket); **Call Match Early** modal copy; replay clip delete note; and related UI labels.
+Open `http://localhost:8765/tests/smoke_test.html` and click **Run all tests**. Coverage includes core wiring and version; Setup (**Game Selection** / **Event Information**, player details, game-variant option integrity); dock **zoom** and **tab** persistence; Stats tab restore; **Manual Adjustments** layout (chosen ball placement, player-tracking block visibility); Show Scores / Ball Scoring preference handling; Stats tab (Player Stats, Import / Export / Clear, per-game overlay visibility toggles); **OverlayVisibility** (stats toggles through initial build, broadcast rebuild, and Snooker live publish); overlay mode toggles and payload sync; stats APIs and match history; live H2H / in-progress match editing; **Breaking Player?** / **Active Player** (all game types with Ball Scoring on, section hidden when off, race-complete lock, player switching, International Red/Yellow auto-assign); Snooker (frames/points, Golden Ball, fouls, Free Ball, undo stack, scoring lock, overlay Display Balls rules); Ball Scoring rack wins (8/9/10-ball including **Break & Run** / **Table Run** rack flags and career totals, Straight 14.1 re-rack, Bank/One Pocket); **Call Match Early** modal copy; replay clip delete note; **CueSport Cloud** dock modules (credentials, mobile scoring prerequisites, guest setup command handlers on the dock); and related UI labels.
 
 **CueSport Cloud** (requires `backend` running on port 3000 or 4003):
 
-- API/WebSocket (headless): `cd backend && npm test` (or `npm test -- http://localhost:4003`)
-- Browser relay tests: `http://localhost:8765/tests/cloud_relay_test.html` (`?server=http://localhost:4003` for Docker)
-- Control panel **Cloud** suite in smoke tests above; optional backend checks via `?cloud=http://localhost:4003` on smoke_test URL
+- API/WebSocket (headless): `cd backend && npm test` (or `npm test -- http://localhost:4003`) — includes guest link create/join, **single-session** rejection, reconnect after close, and revoke-all kick
+- Browser relay tests: `http://localhost:8765/tests/cloud_relay_test.html` (`?server=…&dev_secret=…`) — dock/mobile join, command relay, guest allowlist + single-session
+- Control panel **Cloud** suite in smoke tests above (includes guest setup command coverage on the dock); optional live backend checks via `?cloud=http://localhost:4003&dev_secret=…` on the smoke_test URL
 
 ---
 

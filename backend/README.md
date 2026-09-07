@@ -111,6 +111,8 @@ On first Google sign-in, the server links `auth.users.id` to an `accounts` row. 
 
 Clients send `join` then `event`, `command`, `state`, or `session` messages. See the [CueSport Cloud plan](../docs/) or root README for full schema.
 
+**Guest links** (`join` with `guest_token`): reusable until revoked, but only **one live WebSocket per token**. A second concurrent join receives `guest_link_in_use`. Guests may score and change game setup (`set_game_type`, ball variant / early-game / golden ball / point-based, race, event info); names, match end/reset, and replay stay forbidden.
+
 Legacy stream promotion clients (`auth` + `update`) are supported for backward compatibility.
 
 ## GPL + hosted service
@@ -128,7 +130,9 @@ This backend is GPL-licensed alongside the scoreboard. You may run your own inst
 | GET | `/api/api-keys/:keyId` | View API key plaintext (account owner) |
 | DELETE | `/api/api-keys/:keyId` | Revoke API key (kicks connected dock) |
 | DELETE | `/api/rooms/:roomId` | Delete room/table mapping (keeps match history) |
-| GET | `/api/guest-links` | List guest scorer links |
+| POST | `/api/rooms/:roomId/guest-link` | Create guest scorer link (token for `/g/{token}`) |
+| GET | `/api/rooms/:roomId/guest-links` | List guest links for a room |
+| GET | `/api/guest-links` | List guest scorer links for the account |
 | DELETE | `/api/guest-links/:token` | Revoke guest link |
 | POST | `/api/guest-links/revoke-all` | Revoke all guest links and disconnect guests |
 | POST | `/api/sessions/invalidate-all` | Sign out everywhere (invalidate + disconnect admin dashboard and mobile) |

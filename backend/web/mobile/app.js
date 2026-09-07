@@ -55,7 +55,7 @@ function syncLoginPanel() {
   const secretRow = document.getElementById('devSecretRow');
   if (saved) {
     if (hint) {
-      hint.innerHTML = 'Using saved login from this browser. Tap <strong>Connect</strong> to open this table. Use <strong>Clear saved login</strong> to sign in with a different secret.';
+      hint.innerHTML = 'Using saved login from this browser. Tap <strong>Connect</strong> to open this table. Use <strong>Clear Saved Login</strong> to sign in with a different secret.';
     }
     secretRow?.classList.add('hidden');
   } else {
@@ -2003,6 +2003,15 @@ async function connect(options = {}) {
         setError('This guest link has been revoked.');
         return;
       }
+      if (e.code === 'guest_link_in_use') {
+        wantConnection = false;
+        clearReconnectTimer();
+        setReconnectBanner(false);
+        show('connectingSection', false);
+        setConnectionStatus('disconnected');
+        setError(e.message || 'This guest link is already in use on another device.');
+        return;
+      }
       setError(e.message || e.code || 'Connection failed');
     });
     try {
@@ -2029,6 +2038,13 @@ async function connect(options = {}) {
         clearReconnectTimer();
         setReconnectBanner(false);
         setError('This guest link has been revoked.');
+        return;
+      }
+      if (err?.code === 'guest_link_in_use') {
+        wantConnection = false;
+        clearReconnectTimer();
+        setReconnectBanner(false);
+        setError(err.message || 'This guest link is already in use on another device.');
         return;
       }
       if (quiet) {
@@ -2177,9 +2193,13 @@ document.getElementById('devSecret')?.addEventListener('keydown', (event) => {
   }
 });
 document.getElementById('clearTokenBtn')?.addEventListener('click', () => {
-  if (!window.confirm('Clear saved login on this device? You will need to sign in again to connect.')) return;
-  forceRelogin('', { clearToken: true });
-  setActiveView('control');
+  if (!window.confirm('Clear Saved Login on this device? You will return to the main page to sign in again.')) return;
+  wantConnection = false;
+  clearReconnectTimer();
+  localStorage.removeItem(TOKEN_KEY);
+  try { client?.disconnect(); } catch (_) { /* ignore */ }
+  client = null;
+  window.location.href = '/';
 });
 document.getElementById('reconnectBtn')?.addEventListener('click', () => {
   ensureConnection({ force: true });

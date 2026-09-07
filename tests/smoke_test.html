@@ -488,6 +488,21 @@
             assert('Cloud', 'cloudCommands.runCommand fn', typeof cp.cloudCommands.runCommand === 'function');
             assert('Cloud', 'undoLastScoringAction on dock', typeof cp.undoLastScoringAction === 'function');
             assert('Cloud', 'isDualScoreMode on dock', typeof cp.isDualScoreMode === 'function');
+            (function () {
+                const src = String(cp.cloudCommands.runCommand);
+                const guestSetupActions = [
+                    'set_game_type',
+                    'set_ball_selection',
+                    'set_early_game_ball',
+                    'set_snooker_gold',
+                    'set_point_based',
+                    'set_race',
+                    'set_game_info',
+                ];
+                const missing = guestSetupActions.filter((a) => src.indexOf("'" + a + "'") === -1 && src.indexOf('"' + a + '"') === -1);
+                assert('Cloud', 'Dock runCommand supports guest setup actions',
+                    missing.length === 0, missing.length ? missing.join(', ') : '');
+            })();
             assert('Cloud', 'Snooker dual-score helper treats game8 as frames+points',
                 (function () {
                     const orig = cp.getStoredGameType ? cp.getStoredGameType() : cp.getStorageItem('gameType');

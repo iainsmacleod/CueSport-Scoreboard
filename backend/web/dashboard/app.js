@@ -2025,7 +2025,7 @@ document.getElementById('devSecret')?.addEventListener('keydown', (event) => {
   }
 });
 document.getElementById('clearSavedLoginBtn')?.addEventListener('click', () => {
-  if (!window.confirm('Clear saved dashboard login on this device?')) return;
+  if (!window.confirm('Clear Saved Login on this device? You will need to sign in again.')) return;
   clearSavedDashboardLogin();
 });
 

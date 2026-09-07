@@ -46,7 +46,7 @@
         <input type="password" id="devSecret" placeholder="Dev auth secret (only if needed)" autocomplete="current-password" />
       </div>
       <button id="connectBtn" class="btn primary block">Connect</button>
-      <button type="button" id="clearTokenBtn" class="btn block secondary">Clear saved login</button>
+      <button type="button" id="clearTokenBtn" class="btn block secondary">Clear Saved Login</button>
       <p id="loginError" class="error hidden" role="alert"></p>
     </section>
     <section id="controlSection" class="hidden">
@@ -169,8 +169,8 @@
           <div class="field-row">
             <select id="gameTypeSelect"></select>
           </div>
-          <label id="setupBallVariantLabel" class="admin-only hidden" for="ballSelectionSelect">Ball Variant</label>
-          <div id="setupBallVariantRow" class="field-row admin-only hidden">
+          <label id="setupBallVariantLabel" class="hidden" for="ballSelectionSelect">Ball Variant</label>
+          <div id="setupBallVariantRow" class="field-row hidden">
             <select id="ballSelectionSelect">
               <option value="american">World Balls</option>
               <option value="international">International Balls</option>
@@ -179,7 +179,7 @@
               <option value="snooker">Snooker</option>
             </select>
           </div>
-          <div id="setupVariantOptions" class="setup-variant-options admin-only">
+          <div id="setupVariantOptions" class="setup-variant-options">
             <label id="setupEarlyGameRow" class="setup-option-row hidden" for="earlyGameBallCheckbox">
               <span id="earlyGameBallLabel">Win on Break</span>
               <input type="checkbox" id="earlyGameBallCheckbox" class="setup-option-check" />
@@ -240,8 +240,10 @@
         <div class="panel share-panel">
           <h2>Public Control Link</h2>
           <p class="hint share-limitations">
-            Guests can score, pot balls, apply fouls, pick the breaker, and edit game type, race, and event info.
-            They cannot change player names, ball variants, reset or end the match, or use replay.
+            Guests can score, pot balls, apply fouls, pick the breaker, and edit game type plus its options
+            (ball variant, win on break, golden ball, point based), race, and event info.
+            They cannot change player names, reset or end the match, or use replay.
+            Each guest link allows only one active device at a time.
           </p>
           <div id="shareQrWrap" class="share-qr-wrap">
             <img id="shareQrImg" class="share-qr hidden" alt="QR code for public control link" />
@@ -253,7 +255,7 @@
             <button type="button" id="shareNativeBtn" class="btn primary block hidden" disabled>Share link</button>
           </div>
           <h3 class="share-links-heading">Guest links</h3>
-          <p class="hint">Each link can be revoked on its own. Live guests still count toward this table’s connection limit, even if they all use the same URL.</p>
+          <p class="hint">Each link stays reusable after disconnect, but only one device can be connected with it at once. Revoke a link to invalidate it.</p>
           <button type="button" id="shareNewLinkBtn" class="btn block">Create new link</button>
           <ul id="guestLinkList" class="guest-link-list"></ul>
         </div>
@@ -333,6 +335,6 @@
       <div id="poolRespotTargets" class="snooker-foul-targets"></div>
     </div>
   </div>
-  <script type="module" src="/web/mobile/app.js?v=8.0.0.18"></script>
+  <script type="module" src="/web/mobile/app.js?v=8.0.0.21"></script>
 </body>
 </html>

@@ -307,8 +307,30 @@ function handleStats(ws, meta, msg) {
 const GUEST_ALLOWED_COMMANDS = new Set([
   'score_add', 'score_sub', 'balls_add', 'balls_sub',
   'player_slot', 'select_breaker', 'toggle_pot', 'snooker_ball', 'snooker_foul', 'undo',
+  'pool_foul', 'respot_ball',
   'set_race', 'set_game_info', 'set_game_type',
+  'set_ball_selection', 'set_early_game_ball', 'set_snooker_gold', 'set_point_based',
 ]);
+
+function findLiveGuestToken(token, excludeWs = null) {
+  if (!token) return null;
+  for (const [ws, meta] of connections) {
+    if (excludeWs && ws === excludeWs) continue;
+    if (meta.client !== 'mobile_guest' || meta.guestToken !== token) continue;
+    if (ws.readyState === 1) return { ws, meta };
+  }
+  return null;
+}
+
+const GUEST_LINK_IN_USE_MESSAGE =
+  'This guest link is already in use on another device. Wait for that session to disconnect, or create a new guest link.';
+
+/** One live socket per guest token; reject additional joins without kicking the first. */
+function guestTokenSessionConflict(token, incomingWs) {
+  if (!token) return null;
+  if (!findLiveGuestToken(token, incomingWs)) return null;
+  return { error: 'guest_link_in_use', message: GUEST_LINK_IN_USE_MESSAGE };
+}
 
 function countControlConnections(roomId, excludeWs = null) {
   let n = 0;
@@ -397,6 +419,11 @@ async function handleJoin(ws, meta, msg, authenticateJoin) {
     const guest = sqlite.findGuestToken(msg.guest_token);
     if (!guest) {
       send(ws, { type: 'error', code: 'invalid_guest_token', message: 'Invalid or expired guest link' });
+      return;
+    }
+    const conflict = guestTokenSessionConflict(msg.guest_token, ws);
+    if (conflict) {
+      send(ws, { type: 'error', code: conflict.error, message: conflict.message });
       return;
     }
     roomId = guest.room_id;
