@@ -1,0 +1,14 @@
+{
+  "name": "cuesport-tests",
+  "private": true,
+  "description": "Run smoke + cloud API + cloud relay suites",
+  "type": "module",
+  "scripts": {
+    "test": "node run-all.mjs",
+    "test:all": "node run-all.mjs",
+    "postinstall": "npx playwright install chromium"
+  },
+  "devDependencies": {
+    "playwright": "^1.62.0"
+  }
+}

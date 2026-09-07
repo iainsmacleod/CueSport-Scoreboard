@@ -197,9 +197,17 @@
 
         const passed = rows.filter(function (r) { return r.pass; }).length;
         const total = rows.length;
+        const failed = total - passed;
         summaryEl.className = passed === total ? 'pass' : 'fail';
         summaryEl.textContent = passed + ' / ' + total + ' passed' +
             (passed === total ? ' — all good.' : ' — see failures below.');
+        window.__CUESPORT_TEST_RESULT__ = {
+            suite: 'smoke',
+            passed: passed,
+            failed: failed,
+            total: total,
+            ok: failed === 0,
+        };
     }
 
     function escapeHtml(s) {
@@ -3738,6 +3746,14 @@
         runAllTests().catch(function (err) {
             summaryEl.className = 'fail';
             summaryEl.textContent = 'Runner error: ' + err.message;
+            window.__CUESPORT_TEST_RESULT__ = {
+                suite: 'smoke',
+                passed: 0,
+                failed: 1,
+                total: 1,
+                ok: false,
+                error: err.message,
+            };
             runBtn.disabled = false;
             reloadBtn.disabled = false;
         });
@@ -3751,8 +3767,32 @@
 
     reloadFrames().then(function () {
         statusEl.textContent = 'Frames ready — click Run all tests.';
+        if (new URLSearchParams(window.location.search).get('autorun') === '1') {
+            runAllTests().catch(function (err) {
+                summaryEl.className = 'fail';
+                summaryEl.textContent = 'Runner error: ' + err.message;
+                window.__CUESPORT_TEST_RESULT__ = {
+                    suite: 'smoke',
+                    passed: 0,
+                    failed: 1,
+                    total: 1,
+                    ok: false,
+                    error: err.message,
+                };
+                runBtn.disabled = false;
+                reloadBtn.disabled = false;
+            });
+        }
     }).catch(function (err) {
         statusEl.textContent = 'Frame load failed: ' + err.message;
+        window.__CUESPORT_TEST_RESULT__ = {
+            suite: 'smoke',
+            passed: 0,
+            failed: 1,
+            total: 1,
+            ok: false,
+            error: err.message,
+        };
     });
     </script>
 </body>

@@ -98,6 +98,14 @@
         skip('Backend tests', 'Start backend: cd backend && npm start');
         assert('cloudRelay global exists', typeof window.cloudRelay === 'object');
         document.getElementById('summary').textContent = `${passed} passed, ${failed} failed, ${skipped} skipped (backend offline)`;
+        window.__CUESPORT_TEST_RESULT__ = {
+          suite: 'cloud_relay',
+          passed,
+          failed,
+          skipped,
+          total: passed + failed + skipped,
+          ok: failed === 0,
+        };
         return;
       }
 
@@ -323,9 +331,43 @@
       document.getElementById('summary').textContent =
         passed + ' / ' + (passed + failed) + ' passed' + (skipped ? ', ' + skipped + ' skipped' : '');
       document.getElementById('summary').className = failed ? 'fail' : 'pass';
+      window.__CUESPORT_TEST_RESULT__ = {
+        suite: 'cloud_relay',
+        passed,
+        failed,
+        skipped,
+        total: passed + failed + skipped,
+        ok: failed === 0,
+      };
     }
 
-    document.getElementById('runBtn').onclick = () => runTests().catch(e => log(e.message, 'fail'));
+    document.getElementById('runBtn').onclick = () => runTests().catch((e) => {
+      log(e.message, 'fail');
+      window.__CUESPORT_TEST_RESULT__ = {
+        suite: 'cloud_relay',
+        passed: 0,
+        failed: 1,
+        skipped: 0,
+        total: 1,
+        ok: false,
+        error: e.message,
+      };
+    });
+
+    if (new URLSearchParams(location.search).get('autorun') === '1') {
+      runTests().catch((e) => {
+        log(e.message, 'fail');
+        window.__CUESPORT_TEST_RESULT__ = {
+          suite: 'cloud_relay',
+          passed: 0,
+          failed: 1,
+          skipped: 0,
+          total: 1,
+          ok: false,
+          error: e.message,
+        };
+      });
+    }
   </script>
 </body>
 </html>

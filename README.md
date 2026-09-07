@@ -556,11 +556,23 @@ python -m http.server 8765
 
 Open `http://localhost:8765/tests/smoke_test.html` and click **Run all tests**. Coverage includes core wiring and version; Setup (**Game Selection** / **Event Information**, player details, game-variant option integrity); dock **zoom** and **tab** persistence; Stats tab restore; **Manual Adjustments** layout (chosen ball placement, player-tracking block visibility); Show Scores / Ball Scoring preference handling; Stats tab (Player Stats, Import / Export / Clear, per-game overlay visibility toggles); **OverlayVisibility** (stats toggles through initial build, broadcast rebuild, and Snooker live publish); overlay mode toggles and payload sync; stats APIs and match history; live H2H / in-progress match editing; **Breaking Player?** / **Active Player** (all game types with Ball Scoring on, section hidden when off, race-complete lock, player switching, International Red/Yellow auto-assign); Snooker (frames/points, Golden Ball, fouls, Free Ball, undo stack, scoring lock, overlay Display Balls rules); Ball Scoring rack wins (8/9/10-ball including **Break & Run** / **Table Run** rack flags and career totals, Straight 14.1 re-rack, Bank/One Pocket); **Call Match Early** modal copy; replay clip delete note; **CueSport Cloud** dock modules (credentials, mobile scoring prerequisites, guest setup command handlers on the dock); and related UI labels.
 
+**Run everything** (API + smoke + cloud relay) with Cloud already up:
+
+```bash
+cd tests
+npm install          # once — installs Playwright Chromium
+node run-all.mjs     # or: .\run-all.ps1
+# Docker backend: node run-all.mjs --cloud http://localhost:4003
+```
+
+Reads `DEV_AUTH_SECRET` from `backend/.env`. Options: `--skip-api`, `--skip-smoke`, `--skip-relay`, `--headed`, `--dev-secret=…`.
+
 **CueSport Cloud** (requires `backend` running on port 3000 or 4003):
 
 - API/WebSocket (headless): `cd backend && npm test` (or `npm test -- http://localhost:4003`) — includes guest link create/join, **single-session** rejection, reconnect after close, and revoke-all kick
 - Browser relay tests: `http://localhost:8765/tests/cloud_relay_test.html` (`?server=…&dev_secret=…`) — dock/mobile join, command relay, guest allowlist + single-session
 - Control panel **Cloud** suite in smoke tests above (includes guest setup command coverage on the dock); optional live backend checks via `?cloud=http://localhost:4003&dev_secret=…` on the smoke_test URL
+- Unattended browser suites also accept `?autorun=1` (used by `tests/run-all.mjs`)
 
 ---
 
