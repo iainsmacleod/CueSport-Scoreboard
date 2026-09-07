@@ -1,11 +1,15 @@
 import * as sqlite from '../db/sqlite.js';
 import { resolveAccountFromRequest } from './accounts.js';
 import { getAccountStats, pairSessionEvents } from '../stats/account-stats.js';
+import {
+  clampScore,
+  normalizePlayerDisplayName,
+} from '../lib/scoreboard-helpers.js';
 
 const GAME_TYPE_IDS = new Set(['game1', 'game2', 'game3', 'game4', 'game5', 'game6', 'game7', 'game8']);
 
 function normalizePlayerName(name) {
-  return String(name || '').trim().slice(0, 20);
+  return normalizePlayerDisplayName(name);
 }
 
 function namesEqual(a, b) {
@@ -17,12 +21,6 @@ function toSqliteDateTime(value) {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return null;
   return d.toISOString().slice(0, 19).replace('T', ' ');
-}
-
-function clampScore(value) {
-  const n = parseInt(value, 10);
-  if (!Number.isFinite(n) || n < 0) return 0;
-  return Math.min(n, 999);
 }
 
 function deriveWinnerSlot(p1, p2) {

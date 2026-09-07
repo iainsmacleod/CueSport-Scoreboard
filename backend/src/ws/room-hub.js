@@ -268,11 +268,6 @@ async function handleMessage(ws, meta, msg) {
       return handleStats(ws, meta, msg);
     case 'disconnect':
       return ws.close();
-    // Legacy compat shim for old stream_sharing clients
-    case 'auth':
-      return handleLegacyAuth(ws, meta, msg, authenticateJoin);
-    case 'update':
-      return handleLegacyUpdate(ws, meta, msg);
     default:
       send(ws, { type: 'error', code: 'unknown_type', message: `Unknown message type: ${msg.type}` });
   }
@@ -303,13 +298,15 @@ function handleStats(ws, meta, msg) {
   }
 }
 
-/** Commands allowed for guest scorer links (no names, match end/reset, or replay). */
+/** Commands allowed for guest scorer links (no names or replay). */
 const GUEST_ALLOWED_COMMANDS = new Set([
   'score_add', 'score_sub', 'balls_add', 'balls_sub',
   'player_slot', 'select_breaker', 'toggle_pot', 'snooker_ball', 'snooker_foul', 'undo',
   'pool_foul', 'respot_ball',
   'set_race', 'set_game_info', 'set_game_type',
   'set_ball_selection', 'set_early_game_ball', 'set_snooker_gold', 'set_point_based',
+  // Restart / End / Call Match Early (same match controls as admin remote).
+  'reset_scores', 'end_match', 'call_match_early',
 ]);
 
 function findLiveGuestToken(token, excludeWs = null) {
@@ -377,43 +374,53 @@ function resolveRoomIdForJoin(msg, auth, client) {
 }
 
 async function handleJoin(ws, meta, msg, authenticateJoin) {
+  const client = msg.client || 'dock';
+
+  if (client === 'dashboard') {
+    return handleDashboardJoin(ws, meta, msg, authenticateJoin);
+  }
+
+  return handleRoomClientJoin(ws, meta, msg, authenticateJoin);
+}
+
+/** Account-scoped dashboard feed: no room join; push tables on dock/state changes. */
+async function handleDashboardJoin(ws, meta, msg, authenticateJoin) {
+  const auth = await authenticateJoin({
+    apiKey: msg.api_key,
+    accessToken: msg.access_token,
+    client: 'dashboard',
+  });
+  if (auth.error) {
+    send(ws, { type: 'error', code: auth.error, message: auth.message });
+    return;
+  }
+  if (meta.client === 'dashboard' && meta.accountId) {
+    removeAccountDashboard(meta.accountId, ws);
+  }
+  if (meta.roomId) {
+    const old = getRoomClients(meta.roomId);
+    for (const c of old) {
+      if (c.ws === ws) old.delete(c);
+    }
+  }
+  const accountId = auth.account.id;
+  meta.accountId = accountId;
+  meta.client = 'dashboard';
+  meta.roomId = null;
+  addAccountDashboard(accountId, ws);
+  send(ws, {
+    type: 'joined',
+    client: 'dashboard',
+    account_id: accountId,
+    rooms: buildDashboardRooms(accountId),
+  });
+}
+
+/** Dock, mobile, or guest join into a room. */
+async function handleRoomClientJoin(ws, meta, msg, authenticateJoin) {
   let client = msg.client || 'dock';
   let roomId = msg.room_id || msg.room;
   let accountId = null;
-
-  // Account-scoped dashboard feed: no room join; push tables on dock/state changes.
-  if (client === 'dashboard') {
-    const auth = await authenticateJoin({
-      apiKey: msg.api_key,
-      accessToken: msg.access_token,
-      client: 'dashboard',
-    });
-    if (auth.error) {
-      send(ws, { type: 'error', code: auth.error, message: auth.message });
-      return;
-    }
-    if (meta.client === 'dashboard' && meta.accountId) {
-      removeAccountDashboard(meta.accountId, ws);
-    }
-    if (meta.roomId) {
-      const old = getRoomClients(meta.roomId);
-      for (const c of old) {
-        if (c.ws === ws) old.delete(c);
-      }
-    }
-    accountId = auth.account.id;
-    meta.accountId = accountId;
-    meta.client = 'dashboard';
-    meta.roomId = null;
-    addAccountDashboard(accountId, ws);
-    send(ws, {
-      type: 'joined',
-      client: 'dashboard',
-      account_id: accountId,
-      rooms: buildDashboardRooms(accountId),
-    });
-    return;
-  }
 
   if (msg.guest_token) {
     const guest = sqlite.findGuestToken(msg.guest_token);
@@ -701,59 +708,6 @@ function handleSession(ws, meta, msg) {
   if (meta.accountId && (action === 'start' || action === 'end')) {
     notifyAccountTables(meta.accountId, { immediate: true });
   }
-}
-
-async function handleLegacyAuth(ws, meta, msg, authenticateJoin) {
-  if (!msg.api_key) {
-    send(ws, { type: 'auth', status: 'error', message: 'api_key required' });
-    return;
-  }
-  const auth = await authenticateJoin({ apiKey: msg.api_key, client: 'dock' });
-  if (auth.error) {
-    send(ws, { type: 'auth', status: auth.error === 'invalid_api_key' ? 'blocked' : 'error', message: auth.message });
-    return;
-  }
-  if (auth.authMethod === 'api_key' && auth.keyId) {
-    const conflict = apiKeyDockSeatConflict(auth.keyId, ws);
-    if (conflict) {
-      send(ws, { type: 'auth', status: 'blocked', message: conflict.message });
-      return;
-    }
-    meta.apiKeyId = auth.keyId;
-    meta.client = 'dock';
-    trackDockApiKey(ws, auth.keyId);
-  }
-  if (accountRooms.length === 0) {
-    send(ws, { type: 'auth', status: 'error', message: 'No room configured' });
-    return;
-  }
-  meta.legacyRoomId = accountRooms[0].id;
-  meta.accountId = auth.account.id;
-  meta.client = 'dock';
-  meta.roomId = meta.legacyRoomId;
-  getRoomClients(meta.legacyRoomId).add({
-    ws,
-    client: 'dock',
-    accountId: auth.account.id,
-    sourceId: meta.sourceId,
-    apiKeyId: meta.apiKeyId || null,
-  });
-  send(ws, { type: 'auth', status: 'success' });
-  notifyAccountTables(auth.account.id, { immediate: true });
-}
-
-function handleLegacyUpdate(ws, meta, msg) {
-  if (!msg.api_key || !meta.legacyRoomId) {
-    send(ws, { type: 'ack', status: 'error', message: 'Not authenticated' });
-    return;
-  }
-  const state = msg.state || {};
-  sqlite.setRoomSessionState(meta.legacyRoomId, sqlite.getRoomSessionState(meta.legacyRoomId).sessionId, state);
-  if (state.streamUrl) {
-    sqlite.upsertLiveStream(meta.legacyRoomId, state.streamUrl, state);
-  }
-  send(ws, { type: 'ack', status: 'ok' });
-  if (meta.accountId) notifyAccountTables(meta.accountId);
 }
 
 export function getConnectionCount() {

@@ -105,7 +105,7 @@ You do not need a public server for the scoreboard itself. Local files or a tiny
 
 ![CueSport Cloud dashboard — Tables tab](docs/readme/images/04-cloud-dashboard.png)
 
-**Mobile control** — phone/tablet remote at `/m/{room_id}`; guests use `/g/{token}` (score + game setup; one device per link; no names / reset / replay).
+**Mobile control** — phone/tablet remote at `/m/{room_id}`; guests use `/g/{token}` (score + game setup + Restart/End/Call Match; one device per link; no names / replay).
 
 ![CueSport Cloud mobile control](docs/readme/images/05-cloud-mobile-control.png)
 
@@ -150,14 +150,15 @@ Same as Windows with a `file:///` URI, or use `python3 -m http.server 8000` like
 
 ### Multiple instances
 
-If you run more than one scoreboard (e.g. two tables), append the same query string to **both** the dock and the overlay:
+If you run more than one scoreboard (e.g. two tables), append the same query string to the dock, overlay, and optional shot-clock page:
 
 ```text
 control_panel.html?instance=table2
 browser_source.html?instance=table2
+shot_clock_display.html?instance=table2
 ```
 
-Both pages must share the same `instance` value so they share the correct BroadcastChannel and localStorage prefix.
+All pages must share the same `instance` value so they share the correct BroadcastChannel and localStorage prefix.
 
 Per `instance`: live scores, settings, overlay stats mode/payload, stats visibility toggles, and in-progress match sessions. **Shared across all instances:** the player roster and match history in IndexedDB (`cuesport_stats`), and OBS replay clip history (one stream buffer).
 
@@ -222,7 +223,7 @@ Details: [OBS WebSocket Setup](#obs-websocket-setup), [Instant Replay](#instant-
 
 ## OBS WebSocket Setup
 
-WebSocket is required for **instant replay** and for **stream promotion** (so the dock can tell whether OBS is streaming).
+WebSocket is required for **instant replay** and for **stream promotion** (so the dock can tell whether OBS is streaming). **Promote Live Stream** also requires **CueSport Cloud** connected with an OBS Dock Key — listing flags are published via Cloud `state` (no separate stream WebSocket).
 
 ### Enable the server in OBS
 
@@ -309,8 +310,8 @@ The OBS **dock remains the scoring authority**. Mobile and guest clients send co
 |---------|-----|---------|
 | **Dashboard** | `/dashboard` | Sign in, see live tables, API keys, open mobile control |
 | **Mobile control** | `/m/{room_id}` | Full remote (admin): score, balls, setup, replay, share |
-| **Guest control** | `/g/{token}` | Limited remote: score, balls, fouls, breaker, game type and its options (ball variant, win on break / early game, golden ball, point based), race, and event info — no names, reset/end match, or replay. **One active device per guest link** at a time (link stays valid until revoked). |
-| **Stream listing** | `/` or `/streams` | Public page of promoted live streams |
+| **Guest control** | `/g/{token}` | Limited remote: score, balls, fouls, breaker, game type and its options (ball variant, win on break / early game, golden ball, point based), race, event info, and **Restart/End/Call Match** — no names or replay. **One active device per guest link** at a time (link stays valid until revoked). |
+| **Stream listing** | `/` or `/streams` | Public page of promoted live streams (requires Cloud + Promote toggle + OBS live + stream URL) |
 
 - **Stats-safe relay** — mobile commands invoke the same dock functions as the control panel (`postScore`, `selectRackBreaker`, etc.)
 - **Live dashboard** — account WebSocket pushes table list updates when docks connect, disconnect, or publish state (no polling)
@@ -343,7 +344,7 @@ docker compose up -d --build
 2. Create an **OBS Dock Key** per dock (starter plan: 2 seats). Paste each key into that dock’s CueSport Cloud **Connection settings** (⚙) — managed or Self-hosting. Each key may only be connected on one dock at a time. Rooms are created automatically when the dock connects.
 3. Enable the **CueSport Cloud** toggle on the dock.
 4. On your phone, open **http://localhost:3000/m/{room_id}** — if you already signed in on the dashboard in the same browser, tap **Connect**; on a new device, enter the dev secret once (it is saved for next time).
-5. Optional: from mobile **Share**, create a **guest link** (`/g/{token}`) for helpers. Guests can score and change game setup (type + options, race, event info) but cannot edit names, reset/end the match, or use replay. Only one device may use a given guest link at once; revoke the link when you want it invalidated.
+5. Optional: from mobile **Share**, create a **guest link** (`/g/{token}`) for helpers. Guests can score, change game setup (type + options, race, event info), and Restart/End/Call Match, but cannot edit names or use replay. Only one device may use a given guest link at once; revoke the link when you want it invalidated.
 
 See [`backend/README.md`](backend/README.md) for Supabase/Google OAuth production setup.
 
@@ -491,6 +492,8 @@ Ball Scoring is the control-panel scoring grid. **Display Balls** is a separate 
 ## Shot Clock
 
 Enable **Shot Clock** under General, then use Controls:
+
+Optional **2nd-monitor display:** open `shot_clock_display.html` in a browser (or OBS browser source) with the **same** `?instance=` value as the control panel and overlay, e.g. `shot_clock_display.html?instance=table2`. It listens on the same BroadcastChannels (`main_${instance}` / `recv_${instance}`) for countdown ticks and stop.
 
 - **30s** / **60s** — start countdown on the overlay (and a local countdown in the dock).
 - **Stop Clock** — stop after the stroke (typical use: stop when the tip hits the cue ball).

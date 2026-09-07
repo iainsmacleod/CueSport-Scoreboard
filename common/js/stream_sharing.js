@@ -1,136 +1,94 @@
 'use strict';
 
-// Stream Sharing Module for CueSport Scoreboard
-// Handles WebSocket connection and game state updates to external server
-
+/**
+ * Stream promotion for CueSport Scoreboard.
+ * Listing flags ride on CueSport Cloud join/state — no separate WebSocket.
+ * Requires Cloud connected + OBS live + a valid manual stream URL.
+ */
 (function() {
-    // Storage key prefix for this instance
     const STORAGE_PREFIX = 'streamSharing_';
-    
-    // Connection state
-    let ws = null;
-    let reconnectTimer = null;
-    let reconnectAttempts = 0;
-    const MAX_RECONNECT_ATTEMPTS = 10;
-    const INITIAL_RECONNECT_DELAY = 1000; // 1 second
-    const MAX_RECONNECT_DELAY = 60000; // 1 minute
-    
+
     let isEnabled = false;
-    let isConnected = false;
-    let isAuthenticated = false;
     let isObsStreaming = false;
     let streamingCheckInterval = null;
-    let isBlockedByServer = false;
-    let blockedReason = null;
-    
-    // Helper function to get storage item (compatible with existing codebase pattern)
+    let publishGeneration = 0;
+
     function getStorageItem(key) {
         const prefixedKey = STORAGE_PREFIX + key;
         const instanceId = new URLSearchParams(window.location.search).get('instance') || '';
         const fullKey = instanceId ? `${instanceId}_${prefixedKey}` : prefixedKey;
         return localStorage.getItem(fullKey);
     }
-    
-    // Helper function to set storage item
+
     function setStorageItem(key, value) {
         const prefixedKey = STORAGE_PREFIX + key;
         const instanceId = new URLSearchParams(window.location.search).get('instance') || '';
         const fullKey = instanceId ? `${instanceId}_${prefixedKey}` : prefixedKey;
         localStorage.setItem(fullKey, value);
     }
-    
-    // Generate unique API key (32 character hex string)
-    function generateApiKey() {
-        const array = new Uint8Array(16);
-        crypto.getRandomValues(array);
-        return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+
+    function isCloudReady() {
+        return !!(
+            window.cloudRelay &&
+            typeof window.cloudRelay.isEnabled === 'function' &&
+            window.cloudRelay.isEnabled() &&
+            typeof window.cloudRelay.isConnected === 'function' &&
+            window.cloudRelay.isConnected()
+        );
     }
-    
-    // Get or create API key
-    function getApiKey() {
-        let apiKey = getStorageItem('apiKey');
-        if (!apiKey) {
-            apiKey = generateApiKey();
-            setStorageItem('apiKey', apiKey);
-            updateApiKeyDisplay();
-        }
-        return apiKey;
+
+    function isCloudEnabled() {
+        return !!(
+            window.cloudRelay &&
+            typeof window.cloudRelay.isEnabled === 'function' &&
+            window.cloudRelay.isEnabled()
+        );
     }
-    
-    // Update API key display in UI
-    function updateApiKeyDisplay() {
-        const apiKeyField = document.getElementById('streamApiKey');
-        if (apiKeyField) {
-            apiKeyField.value = getApiKey();
-        }
-    }
-    
-    // Get server URL - hardcoded to hosted server
-    function getServerUrl() {
-        return 'https://cuesports.macleod.systems';
-    }
-    
-    
-    // Validate stream URL format
+
     function isValidStreamUrl(urlString) {
         if (!urlString || typeof urlString !== 'string') {
             return false;
         }
-        
+
         const trimmed = urlString.trim();
-        if (!trimmed || trimmed.length === 0) {
+        if (!trimmed || trimmed.length < 10) {
             return false;
         }
-        
-        // Must have a minimum length
-        if (trimmed.length < 10) {
-            return false;
-        }
-        
-        // Must start with http:// or https://
+
         if (!trimmed.match(/^https?:\/\//i)) {
             return false;
         }
-        
+
         try {
             const url = new URL(trimmed);
-            
-            // Must be http or https protocol
+
             if (url.protocol !== 'http:' && url.protocol !== 'https:') {
                 return false;
             }
-            
-            // Must have a valid hostname (not empty)
+
             if (!url.hostname || url.hostname.length === 0) {
                 return false;
             }
-            
-            // Hostname should contain at least one dot (for domain) or be localhost
-            if (!url.hostname.match(/^localhost(:\d+)?$|^\[?[\da-fA-F:]+\)?$/) && !url.hostname.includes('.')) {
+
+            if (!url.hostname.match(/^localhost(:\d+)?$|^\[?[\da-fA-F:]+\]?$/) && !url.hostname.includes('.')) {
                 return false;
             }
-            
-            // Hostname should not contain spaces or invalid characters
+
             if (url.hostname.match(/[\s<>"{}|\\^`\[\]]/)) {
                 return false;
             }
-            
-            // Basic validation: should have a reasonable structure
-            // Check that it's not just "http://" or "https://"
+
             if (url.href === url.protocol + '//' || url.href === url.protocol + '///') {
                 return false;
             }
-            
+
             return true;
         } catch (e) {
-            // URL constructor throws error for invalid URLs
             return false;
         }
     }
-    
-    // Get manual stream URL synchronously (for button state checks)
+
     function getManualStreamUrl() {
-        // Try modal input first, then fallback to localStorage
         const modalInput = document.getElementById('manualStreamUrlModal');
         if (modalInput && modalInput.value) {
             const manualUrl = String(modalInput.value).trim();
@@ -144,87 +102,53 @@
         }
         return '';
     }
-    
-    // Get stream URL from OBS or manual input
+
     async function getStreamUrl() {
-        // First check for manual input
         const manualUrl = getManualStreamUrl();
         if (manualUrl) {
-            console.log('Using manual stream URL:', manualUrl);
             return manualUrl;
         }
-        
-        // Try to auto-detect from OBS
+
         try {
-            // Check if OBS is ready
             if (typeof obs === 'undefined' || !obs || typeof isObsReady === 'undefined' || !isObsReady) {
                 return '';
             }
-            
+
             try {
-                // Get stream service settings
                 const serviceSettings = await obs.call('GetStreamServiceSettings');
-                console.log('Stream service settings:', serviceSettings);
-                
                 const serviceType = serviceSettings.streamServiceType || '';
                 const settings = serviceSettings.streamServiceSettings || {};
-                
-                // Build stream URL based on service type
                 let streamUrl = '';
-                
-                // For Twitch
+
                 if (serviceType.toLowerCase().includes('twitch')) {
-                    // Twitch settings can have 'channel' field or 'server' + 'key'
                     const channel = settings.channel || settings.key || '';
-                    // Remove leading @ if present
                     const cleanChannel = channel.replace(/^@/, '');
                     if (cleanChannel) {
                         streamUrl = `https://www.twitch.tv/${cleanChannel}`;
-                        console.log('Detected Twitch channel:', cleanChannel);
                     }
-                } 
-                // For YouTube
-                else if (serviceType.toLowerCase().includes('youtube')) {
-                    // YouTube uses stream keys in format, but we can't always construct watch URL
-                    // Try to get channel from settings if available
+                } else if (serviceType.toLowerCase().includes('youtube')) {
                     const streamKey = settings.key || settings.stream_key || '';
-                    // YouTube Live streams use different URLs, but we can try
                     if (streamKey) {
-                        // For now, just provide a generic YouTube Live link
                         streamUrl = 'https://www.youtube.com/live';
-                        console.log('Detected YouTube streaming');
                     }
-                } 
-                // For Facebook
-                else if (serviceType.toLowerCase().includes('facebook')) {
+                } else if (serviceType.toLowerCase().includes('facebook')) {
                     streamUrl = 'https://www.facebook.com/live';
-                    console.log('Detected Facebook Live');
-                }
-                // For RTMP (custom or common)
-                else if (serviceType.includes('rtmp')) {
-                    // For RTMP services, try to extract readable info
-                    // Check if server contains twitch/youtube domain
+                } else if (serviceType.includes('rtmp')) {
                     const server = settings.server || '';
                     if (server.includes('twitch.tv')) {
                         const channel = settings.key || '';
                         if (channel) {
                             const cleanChannel = channel.replace(/^@/, '');
                             streamUrl = `https://www.twitch.tv/${cleanChannel}`;
-                            console.log('Detected Twitch via RTMP:', cleanChannel);
                         }
                     } else if (server.includes('youtube.com') || server.includes('googlevideo.com')) {
                         streamUrl = 'https://www.youtube.com/live';
-                        console.log('Detected YouTube via RTMP');
                     }
                 }
-                
+
                 if (streamUrl && isValidStreamUrl(streamUrl)) {
-                    console.log('Auto-detected stream URL:', streamUrl);
                     return streamUrl;
-                } else if (streamUrl) {
-                    console.warn('Auto-detected stream URL failed validation:', streamUrl);
                 }
-                
                 return '';
             } catch (error) {
                 console.warn('Could not get stream service settings:', error);
@@ -235,9 +159,6 @@
             return '';
         }
     }
-    
-    // Collect current game state
-    let publishGeneration = 0;
 
     function invalidatePendingPublishes() {
         publishGeneration += 1;
@@ -257,13 +178,11 @@
     }
 
     async function collectGameState() {
-        // Helper to safely get value
         const getValue = (id, defaultValue = '') => {
             const el = document.getElementById(id);
             return el ? (el.value || defaultValue) : defaultValue;
         };
-        
-        // Helper to safely get storage item
+
         const getStorage = (key, defaultValue = '') => {
             try {
                 const val = localStorage.getItem(key);
@@ -272,11 +191,10 @@
                 return defaultValue;
             }
         };
-        
+
         const instanceId = new URLSearchParams(window.location.search).get('instance') || '';
         const storagePrefix = instanceId ? `${instanceId}_` : '';
 
-        // Snapshot scoreline BEFORE any await so in-flight OBS calls cannot interleave with scoring.
         const scoreSnapshot = {
             player1Name: getValue('p1Name', '') || getStorage(`${storagePrefix}p1NameCtrlPanel`, ''),
             player2Name: getValue('p2Name', '') || getStorage(`${storagePrefix}p2NameCtrlPanel`, ''),
@@ -289,11 +207,10 @@
             raceInfo: getValue('raceInfoTxt', '') || getStorage(`${storagePrefix}raceInfo`, ''),
             gameInfo: getValue('gameInfoTxt', '') || getStorage(`${storagePrefix}gameInfo`, ''),
         };
-        
-        // Get stream URL from OBS (validate it) — may await; score snapshot already frozen above.
+
         const streamUrl = await getStreamUrl();
         const validatedUrl = isValidStreamUrl(streamUrl) ? streamUrl : '';
-        
+
         const player1Setting = String(getStorage(`${storagePrefix}usePlayer1`, getStorage('usePlayer1', 'yes')) || 'yes').toLowerCase();
         const player2Setting = String(getStorage(`${storagePrefix}usePlayer2`, getStorage('usePlayer2', 'yes')) || 'yes').toLowerCase();
         const player1Enabled = !(player1Setting === 'no' || player1Setting === 'false' || player1Setting === '0');
@@ -311,7 +228,7 @@
 
         const breakingPlayerSetting = String(getStorage(`${storagePrefix}usePlayerToggle`, getStorage('usePlayerToggle', 'no')) || 'no').toLowerCase();
         const breakingPlayerEnabled = breakingPlayerSetting === 'yes' || breakingPlayerSetting === 'true' || breakingPlayerSetting === '1';
-        
+
         const ballSelection = String(getStorage(`${storagePrefix}ballSelection`, getStorage('ballSelection', 'american')) || 'american').toLowerCase();
         let ballType = 'World';
         if (ballSelection === 'international') {
@@ -323,7 +240,7 @@
         } else if (ballSelection === 'snooker') {
             ballType = 'Snooker';
         }
-        
+
         return {
             ...scoreSnapshot,
             streamUrl: validatedUrl,
@@ -338,242 +255,51 @@
             timestamp: new Date().toISOString()
         };
     }
-    
-    // Send game state update to server
+
     async function sendGameState() {
         const gen = publishGeneration;
         try {
+            if (!isCloudEnabled()) {
+                return false;
+            }
             const state = await collectGameState();
             if (gen !== publishGeneration) {
-                // A newer scoring change invalidated this in-flight publish.
                 return false;
             }
-
-            // CueSport Cloud relay (primary path when cloud is enabled)
-            if (window.cloudRelay && typeof window.cloudRelay.isEnabled === 'function' && window.cloudRelay.isEnabled()) {
-                return window.cloudRelay.sendState(state);
-            }
-
-            if (!ws || ws.readyState !== WebSocket.OPEN || !isAuthenticated) {
-                return false;
-            }
-            if (gen !== publishGeneration) {
-                return false;
-            }
-
-            const message = {
-                type: 'update',
-                api_key: getApiKey(),
-                state: state
-            };
-
-            ws.send(JSON.stringify(message));
-            return true;
+            return window.cloudRelay.sendState(state);
         } catch (error) {
             console.error('Error sending game state:', error);
             return false;
         }
     }
-    
-    // Connect to WebSocket server
-    function connect() {
-        if (window.cloudRelay && typeof window.cloudRelay.isEnabled === 'function' && window.cloudRelay.isEnabled()) {
-            window.cloudRelay.connect();
+
+    /** Push listing state through Cloud; never opens a separate socket. */
+    function publishPromotionState() {
+        if (!isCloudEnabled()) {
             return;
         }
-
-        if (ws && (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN)) {
-            return; // Already connecting or connected
-        }
-
-        if (isBlockedByServer) {
-            const reason = blockedReason || 'API key is blocked by administrator';
-            alert(`Stream sharing is blocked:\n${reason}`);
+        if (typeof window.cloudRelay.pushDockStateSoon === 'function') {
+            window.cloudRelay.pushDockStateSoon();
             return;
         }
-        
-        const serverUrl = getServerUrl();
-        if (!serverUrl) {
-            console.error('No server URL');
-            return;
-        }
-        
-        // Convert HTTP URL to WebSocket URL if needed
-        let wsUrl = serverUrl;
-        if (wsUrl.startsWith('http://')) {
-            wsUrl = wsUrl.replace('http://', 'ws://');
-        } else if (wsUrl.startsWith('https://')) {
-            wsUrl = wsUrl.replace('https://', 'wss://');
-        }
-        if (!wsUrl.startsWith('ws://') && !wsUrl.startsWith('wss://')) {
-            wsUrl = 'ws://' + wsUrl;
-        }
-        
-        // Add /ws path if not present
-        if (!wsUrl.endsWith('/ws')) {
-            wsUrl = wsUrl.replace(/\/$/, '') + '/ws';
-        }
-        
-        console.log('Connecting to stream sharing server...');
-        console.log('Connecting to:', wsUrl);
-        
-        try {
-            ws = new WebSocket(wsUrl);
-            
-            ws.onopen = function() {
-                console.log('WebSocket connected');
-                reconnectAttempts = 0;
-                isConnected = true;
-                            console.log('Authenticating...');
-                
-                // Send authentication
-                const authMessage = {
-                    type: 'auth',
-                    api_key: getApiKey()
-                };
-                ws.send(JSON.stringify(authMessage));
-            };
-            
-            ws.onmessage = function(event) {
-                try {
-                    const data = JSON.parse(event.data);
-                    
-                    if (data.type === 'auth') {
-                        if (data.status === 'success') {
-                            isAuthenticated = true;
-                            console.log('Stream sharing connected');
-                            updateConnectButton();
-                            console.log('Authenticated successfully');
-                            // Send initial state
-                            sendGameState();
-                        } else if (data.status === 'pending') {
-                            // Server is waiting for authentication - ignore, we already sent it
-                            // Do nothing, wait for success response
-                        } else if (data.status === 'blocked') {
-                            blockedReason = typeof data.message === 'string' && data.message.trim() ? data.message.trim() : 'API key is blocked by administrator';
-                            isBlockedByServer = true;
-                            isAuthenticated = false;
-                            isEnabled = false;
-                            setStorageItem('enabled', 'false');
-                            setStorageItem('streamPromotionEnabled', 'false');
-                            updateStreamPromotionToggle();
-                            updateStreamSharingVisibility();
-                            alert(`Stream sharing blocked:\n${blockedReason}`);
-                            ws.close(4003, 'API key blocked');
-                        } else {
-                            isAuthenticated = false;
-                            console.error('Auth failed: ' + (data.message || 'Unknown error'));
-                            updateConnectButton();
-                            console.error('Authentication failed:', data.message);
-                            ws.close();
-                        }
-                    } else if (data.type === 'ack') {
-                        if (data.status === 'error') {
-                            console.warn('Server error:', data.message);
-                        }
-                    } else if (data.type === 'pong') {
-                        // Heartbeat response
-                    }
-                } catch (error) {
-                    console.error('Error parsing message:', error);
-                }
-            };
-            
-            ws.onerror = function(error) {
-                console.error('WebSocket error:', error);
-                console.error('Connection error');
-                isConnected = false;
-                isAuthenticated = false;
-            };
-            
-            ws.onclose = function(event) {
-                console.log('WebSocket closed:', event.code, event.reason);
-                isConnected = false;
-                isAuthenticated = false;
-                
-                if (isBlockedByServer) {
-                    reconnectTimer = null;
-                    reconnectAttempts = 0;
-                    updateConnectButton();
-                    updateStreamSharingVisibility();
-                    return;
-                }
+        sendGameState();
+    }
 
-                // Don't reconnect if streaming has stopped - only reconnect if streaming is active
-                if (isEnabled && isObsStreaming && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-                    // Exponential backoff reconnection
-                    const delay = Math.min(
-                        INITIAL_RECONNECT_DELAY * Math.pow(2, reconnectAttempts),
-                        MAX_RECONNECT_DELAY
-                    );
-                    reconnectAttempts++;
-                    console.log(`Reconnecting... (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
-                    
-                    reconnectTimer = setTimeout(() => {
-                        connect();
-                    }, delay);
-                } else {
-                    console.log('Disconnected');
-                    if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-                        console.error('Max reconnection attempts reached');
-                        console.error('Connection failed');
-                    }
-                }
-            };
-            
-        } catch (error) {
-            console.error('Error creating WebSocket:', error);
-            console.error('Connection error');
-            isConnected = false;
-        }
-    }
-    
-    // Disconnect from server
-    function disconnect() {
-        if (window.cloudRelay && typeof window.cloudRelay.isEnabled === 'function' && window.cloudRelay.isEnabled()) {
-            window.cloudRelay.disconnect();
-        }
-
-        if (reconnectTimer) {
-            clearTimeout(reconnectTimer);
-            reconnectTimer = null;
-        }
-        
-        if (ws && ws.readyState === WebSocket.OPEN) {
-            // Send disconnect message to server for immediate deactivation
-            try {
-                ws.send(JSON.stringify({
-                    type: 'disconnect'
-                }));
-            } catch (e) {
-                console.warn('Failed to send disconnect message:', e);
-            }
-            // Small delay to ensure message is sent before closing
-            setTimeout(() => {
-                if (ws) {
-                    ws.close();
-                    ws = null;
-                }
-            }, 100);
-        } else if (ws) {
-            ws.close();
-            ws = null;
-        }
-        
-        isConnected = false;
-        isAuthenticated = false;
-        reconnectAttempts = 0;
-        console.log('Disconnected');
-    }
-    
-    // Update connect/disconnect button text and visibility (legacy - now updates toggle)
-    function updateConnectButton() {
-        updateStreamPromotionToggle();
-    }
-    
-    // Update stream promotion toggle state
     function canUseStreamPromotion() {
-        return !isBlockedByServer && !!isObsStreaming;
+        return isCloudEnabled() && !!isObsStreaming;
+    }
+
+    function promotionUnavailableReason() {
+        if (!isCloudEnabled()) {
+            return 'Enable CueSport Cloud (with an OBS Dock Key) to promote your stream';
+        }
+        if (!isCloudReady()) {
+            return 'CueSport Cloud must be connected before promoting';
+        }
+        if (!isObsStreaming) {
+            return 'OBS must be live streaming to promote your stream';
+        }
+        return '';
     }
 
     function updateStreamPromotionToggle() {
@@ -582,16 +308,14 @@
 
         const usable = canUseStreamPromotion();
         toggle.disabled = !usable;
-        // Update toggle state based on connection status
-        toggle.checked = isEnabled && (isConnected || isAuthenticated);
+        toggle.checked = !!isEnabled;
 
         const switchLabel = toggle.closest('label.switch, label.toggle');
         if (switchLabel) {
             switchLabel.classList.toggle('toggle-disabled', !usable);
-            if (isBlockedByServer) {
-                switchLabel.title = blockedReason || 'Stream promotion is blocked';
-            } else if (!isObsStreaming) {
-                switchLabel.title = 'OBS must be live streaming to promote your stream';
+            const reason = promotionUnavailableReason();
+            if (reason) {
+                switchLabel.title = reason;
             } else {
                 switchLabel.removeAttribute('title');
             }
@@ -603,119 +327,79 @@
             header.classList.toggle('stream-promotion-unavailable', !usable);
         }
     }
-    
-    // Update stream sharing UI visibility based on streaming state
+
     function updateStreamSharingVisibility() {
         updateStreamPromotionToggle();
         const section = document.getElementById('streamSharingLabel');
         if (!section) return;
-        
-        const parent = section.parentElement;
-        if (!parent) return;
-        
-        // Find the stream sharing section and related elements
-        let currentElement = section.nextElementSibling;
-        const streamSection = section.closest('.tabcontent') || parent;
-        
-        // Walk through siblings to find stream sharing controls
-        const streamElements = [];
-        streamElements.push(section);
+
         const switchLabel = document.querySelector('#streamPromotionToggle')?.closest('label.switch, label.toggle');
+        const streamElements = [section];
         if (switchLabel) streamElements.push(switchLabel);
-        
-        // Find elements by their IDs (legacy elements that may not exist anymore)
-        const apiKeyField = document.getElementById('streamApiKey');
-        const connectBtn = document.getElementById('streamConnectBtn');
-        const statusEl = document.getElementById('streamConnectionStatus');
-        const manualUrlField = document.getElementById('manualStreamUrl');
-        
-        if (apiKeyField) streamElements.push(apiKeyField.parentElement);
-        if (connectBtn) streamElements.push(connectBtn.parentElement);
-        if (statusEl) streamElements.push(statusEl.parentElement);
-        if (manualUrlField) streamElements.push(manualUrlField.parentElement);
-        
-        // Apply styling based on streaming state
+
         streamElements.forEach(el => {
-            if (el) {
-                if (isBlockedByServer) {
-                    el.style.opacity = '0.4';
-                } else if (!isObsStreaming) {
-                    el.style.opacity = '0.6';
-                } else {
-                    el.style.opacity = '1';
-                }
+            if (!el) return;
+            if (!isCloudEnabled() || !isObsStreaming) {
+                el.style.opacity = '0.6';
+            } else {
+                el.style.opacity = '1';
             }
         });
     }
 
-    function handleStreamingStopped() {
-        if (isConnected || isAuthenticated) {
-            console.log('OBS stopped streaming, disconnecting stream sharing');
-            disconnect();
-        }
+    function clearPromotionEnabled() {
+        isEnabled = false;
+        setStorageItem('enabled', 'false');
+        setStorageItem('streamPromotionEnabled', 'false');
+    }
 
+    function handleStreamingStopped() {
+        if (isEnabled) {
+            clearPromotionEnabled();
+        }
         updateStreamPromotionToggle();
         updateStreamSharingVisibility();
-        if (window.cloudRelay && typeof window.cloudRelay.isEnabled === 'function' && window.cloudRelay.isEnabled()) {
-            if (window.streamSharing && typeof window.streamSharing.sendUpdate === 'function') {
-                window.streamSharing.sendUpdate();
-            }
-        }
+        publishPromotionState();
     }
-    
-    // Check OBS streaming status
+
     async function checkObsStreamingStatus() {
         try {
-            // Access the global obs object
-            if (typeof obs === 'undefined' || !obs) {
+            if (typeof obs === 'undefined' || !obs || typeof isObsReady === 'undefined' || !isObsReady) {
+                const wasStreaming = isObsStreaming;
                 isObsStreaming = false;
-                updateConnectButton();
-                updateStreamSharingVisibility();
+                if (wasStreaming) {
+                    handleStreamingStopped();
+                } else {
+                    updateStreamPromotionToggle();
+                    updateStreamSharingVisibility();
+                }
                 return;
             }
-            
-            // Check if OBS is ready
-            if (typeof isObsReady === 'undefined' || !isObsReady) {
-                isObsStreaming = false;
-                updateConnectButton();
-                updateStreamSharingVisibility();
-                return;
-            }
-            
+
             try {
                 const status = await obs.call('GetStreamStatus');
                 const wasStreaming = isObsStreaming;
-                // GetStreamStatus returns { outputActive: boolean, outputTimecode: string, outputDuration: number, etc. }
                 isObsStreaming = status.outputActive === true;
-                
-                // If streaming stopped and we were connected, disconnect
+
                 if (wasStreaming && !isObsStreaming) {
                     handleStreamingStopped();
                 }
 
-                // If streaming has started and sharing is enabled, ensure connection
                 if (!wasStreaming && isObsStreaming) {
-                    if (!isBlockedByServer && isEnabled && (!isConnected || !isAuthenticated)) {
-                        console.log('OBS streaming detected, reconnecting stream sharing');
-                        connect();
-                    }
-                    if (window.cloudRelay && typeof window.cloudRelay.isEnabled === 'function' && window.cloudRelay.isEnabled()) {
-                        if (window.streamSharing && typeof window.streamSharing.sendUpdate === 'function') {
-                            window.streamSharing.sendUpdate();
-                        }
+                    if (isEnabled) {
+                        publishPromotionState();
                     }
                 }
-                
-                updateConnectButton();
+
+                updateStreamPromotionToggle();
                 updateStreamSharingVisibility();
             } catch (error) {
-                // If we can't check status, assume not streaming
                 console.warn('Could not check OBS streaming status:', error);
                 if (isObsStreaming) {
                     handleStreamingStopped();
                 }
                 isObsStreaming = false;
-                updateConnectButton();
+                updateStreamPromotionToggle();
                 updateStreamSharingVisibility();
             }
         } catch (error) {
@@ -724,154 +408,75 @@
                 handleStreamingStopped();
             }
             isObsStreaming = false;
-            updateConnectButton();
+            updateStreamPromotionToggle();
             updateStreamSharingVisibility();
         }
     }
-    
-    // Toggle stream sharing on/off (new toggle-based version)
+
     function toggleStreamPromotion() {
         const toggle = document.getElementById('streamPromotionToggle');
         if (!toggle) return;
 
         if (toggle.disabled || !canUseStreamPromotion()) {
-            toggle.checked = isEnabled && (isConnected || isAuthenticated);
+            toggle.checked = !!isEnabled;
             updateStreamPromotionToggle();
-            if (isBlockedByServer) {
-                alert(`Stream sharing is blocked:\n${blockedReason || 'API key is blocked by administrator'}`);
-            } else if (!isObsStreaming) {
-                alert('OBS must be streaming to share your game data.');
+            const reason = promotionUnavailableReason();
+            if (reason) {
+                alert(reason);
             }
             return;
         }
-        
-        if (isBlockedByServer) {
-            toggle.checked = false;
-            const reason = blockedReason || 'API key is blocked by administrator';
-            alert(`Stream sharing is blocked:\n${reason}`);
-            return;
-        }
 
-        // If trying to enable but not configured, show modal
         if (toggle.checked) {
+            if (!isCloudReady()) {
+                toggle.checked = false;
+                alert('CueSport Cloud must be connected before promoting. Enable CueSport Cloud and wait until it is joined.');
+                updateStreamPromotionToggle();
+                return;
+            }
+
             const streamUrl = getManualStreamUrl();
-            if (!streamUrl || streamUrl === '') {
+            if (!streamUrl) {
                 toggle.checked = false;
                 openStreamPromotionSettingsModal();
                 return;
             }
-            
-            // Don't allow connection if not streaming
+
             if (!isObsStreaming) {
                 toggle.checked = false;
                 alert('OBS must be streaming to share your game data.');
                 return;
             }
-            
-            // Connect
+
             isEnabled = true;
             setStorageItem('enabled', 'true');
-            setStorageItem('streamPromotionEnabled', 'true'); // Persistent enabled state
+            setStorageItem('streamPromotionEnabled', 'true');
             updateStreamPromotionToggle();
             updateStreamSharingVisibility();
-            connect();
+            publishPromotionState();
         } else {
-            // Disconnect
-            isEnabled = false;
-            setStorageItem('enabled', 'false');
-            setStorageItem('streamPromotionEnabled', 'false'); // Persistent enabled state
-            disconnect();
+            clearPromotionEnabled();
             updateStreamPromotionToggle();
             updateStreamSharingVisibility();
+            publishPromotionState();
         }
     }
-    
-    // Legacy function for backwards compatibility
-    function toggleShareStream() {
-        const toggle = document.getElementById('streamPromotionToggle');
-        if (toggle) {
-            toggle.checked = !toggle.checked;
-            toggleStreamPromotion();
-        }
-    }
-    
-    // Generate new API key (UI function)
-    function generateApiKeyUI() {
-        if (confirm('Generate a new API key? Your current key will be replaced and you will need to reconnect.')) {
-            const newKey = generateApiKey();
-            setStorageItem('apiKey', newKey);
-            updateApiKeyDisplay();
-            isBlockedByServer = false;
-            blockedReason = null;
-            
-            if (isConnected) {
-                disconnect();
-            }
-            
-            if (isEnabled) {
-                setTimeout(() => connect(), 1000);
-            }
-        }
-    }
-    
-    // Copy API key to clipboard
-    function copyApiKey() {
-        const apiKey = getApiKey();
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(apiKey).then(() => {
-                alert('API key copied to clipboard');
-            }).catch(err => {
-                console.error('Failed to copy:', err);
-                fallbackCopy(apiKey);
-            });
-        } else {
-            fallbackCopy(apiKey);
-        }
-    }
-    
-    // Fallback copy method
-    function fallbackCopy(text) {
-        const textArea = document.createElement('textarea');
-        textArea.value = text;
-        textArea.style.position = 'fixed';
-        textArea.style.opacity = '0';
-        document.body.appendChild(textArea);
-        textArea.select();
-        try {
-            document.execCommand('copy');
-            alert('API key copied to clipboard');
-        } catch (err) {
-            console.error('Fallback copy failed:', err);
-            alert('Failed to copy. Please copy manually: ' + text);
-        }
-        document.body.removeChild(textArea);
-    }
-    
-    // Initialize on page load
+
     function init() {
-        // Load saved settings - check for persistent enabled state
         const savedEnabled = getStorageItem('streamPromotionEnabled') === 'true' || getStorageItem('enabled') === 'true';
         isEnabled = savedEnabled;
-        
-        // Update toggle state
+
         updateStreamPromotionToggle();
         updateStreamSharingVisibility();
-        
-        // Update API key display
-        updateApiKeyDisplay();
-        
-        // Start checking OBS streaming status
+
         checkObsStreamingStatus();
-        
-        // Check streaming status every 2 seconds
+
         if (streamingCheckInterval) {
             clearInterval(streamingCheckInterval);
         }
         streamingCheckInterval = setInterval(checkObsStreamingStatus, 2000);
-        
-        // Also check when OBS becomes ready
+
         if (typeof window !== 'undefined') {
-            // Listen for OBS ready state changes
             let lastObsReady = false;
             const obsReadyCheck = setInterval(() => {
                 if (typeof isObsReady !== 'undefined' && isObsReady !== lastObsReady) {
@@ -881,130 +486,97 @@
                     }
                 }
             }, 500);
-            
-            // Clean up on page unload
+
             window.addEventListener('beforeunload', () => {
                 if (streamingCheckInterval) clearInterval(streamingCheckInterval);
                 clearInterval(obsReadyCheck);
             });
         }
-        
-        // Auto-connect if previously enabled and configured
+
         if (isEnabled) {
             const streamUrl = getManualStreamUrl();
-            if (!streamUrl || streamUrl === '') {
-                // Was enabled but URL is missing - disable and show modal if toggle is on
-                isEnabled = false;
-                setStorageItem('enabled', 'false');
-                setStorageItem('streamPromotionEnabled', 'false');
+            if (!streamUrl) {
+                clearPromotionEnabled();
                 const toggle = document.getElementById('streamPromotionToggle');
                 if (toggle && toggle.checked) {
                     toggle.checked = false;
                     openStreamPromotionSettingsModal();
                 }
             } else {
-                // Was enabled and configured - auto-connect when OBS starts streaming
-                // Connection will happen automatically when OBS streaming is detected
-                // Delay slightly to ensure DOM is ready
                 setTimeout(() => {
-                    if (isEnabled && isObsStreaming) {
-                        connect();
+                    if (isEnabled && isObsStreaming && isCloudReady()) {
+                        publishPromotionState();
                     }
                 }, 500);
             }
         }
     }
-    
-    // Stream Promotion Settings Modal Functions
+
     function openStreamPromotionSettingsModal() {
         const modal = document.getElementById('streamPromotionSettingsModal');
         if (!modal) return;
-        
-        // Load current values into modal
+
         const urlInput = document.getElementById('manualStreamUrlModal');
         if (urlInput) {
             const saved = getStorageItem('manualStreamUrl');
             urlInput.value = saved || '';
         }
-        
+
         modal.style.display = 'block';
     }
-    
+
     function closeStreamPromotionSettingsModal() {
         const modal = document.getElementById('streamPromotionSettingsModal');
         if (modal) {
             modal.style.display = 'none';
         }
     }
-    
+
     function saveStreamPromotionSettings() {
         const urlInput = document.getElementById('manualStreamUrlModal');
         if (!urlInput) return;
-        
+
         const url = urlInput.value.trim();
-        
-        // Validate URL if provided
+
         if (url && !isValidStreamUrl(url)) {
             alert('Please enter a valid URL starting with http:// or https://');
             urlInput.focus();
             return;
         }
-        
-        // Save to localStorage
-        if (url) {
-            setStorageItem('manualStreamUrl', url);
-        } else {
-            setStorageItem('manualStreamUrl', '');
-        }
-        
+
+        setStorageItem('manualStreamUrl', url || '');
         closeStreamPromotionSettingsModal();
-        
-        // If toggle is on, attempt to connect (if OBS is streaming)
-        const toggle = document.getElementById('streamPromotionToggle');
-        if (toggle && toggle.checked && isObsStreaming) {
-            if (!isConnected && !isAuthenticated) {
-                connect();
-            }
+
+        if (isEnabled && isObsStreaming && isCloudReady()) {
+            publishPromotionState();
         }
-        
+
         updateStreamPromotionToggle();
         updateStreamSharingVisibility();
     }
-    
-    // Expose modal functions globally
+
     window.openStreamPromotionSettingsModal = openStreamPromotionSettingsModal;
     window.closeStreamPromotionSettingsModal = closeStreamPromotionSettingsModal;
     window.saveStreamPromotionSettings = saveStreamPromotionSettings;
     window.toggleStreamPromotion = toggleStreamPromotion;
-    
-    // Export public API
+
     window.streamSharing = {
-        // Send current game state (called from update functions)
         sendUpdate: function() {
-            // CueSport Cloud: push whenever cloud relay is enabled (independent of legacy stream toggle)
-            if (window.cloudRelay && typeof window.cloudRelay.isEnabled === 'function' && window.cloudRelay.isEnabled()) {
-                sendGameState();
-                return;
-            }
-            if (isEnabled && isConnected && isAuthenticated) {
+            if (isCloudEnabled()) {
                 sendGameState();
             }
         },
 
-        /** Drop in-flight state publishes so a newer score change cannot be overwritten by an older snapshot. */
         invalidatePendingPublishes: invalidatePendingPublishes,
-        
-        // Check if sharing is enabled
+
         isEnabled: function() {
             return isEnabled;
         },
-        
-        // Check if connected
+
         isConnected: function() {
-            return isConnected && isAuthenticated;
+            return isEnabled && isCloudReady();
         },
 
-        /** For CueSport Cloud state — public listing only when promotion on + OBS streaming. */
         getPromotionListingState: function() {
             const promotionOn = getStorageItem('streamPromotionEnabled') === 'true';
             const manualUrl = getManualStreamUrl();
@@ -1015,40 +587,29 @@
                 streamUrl: streamUrl,
             };
         },
-        
-        // Disconnect stream sharing (called when WebSocket disconnects)
+
+        /** Called when OBS WebSocket disconnects — clear promotion listing. */
         disconnect: function() {
-            if (isConnected || isAuthenticated) {
-                isEnabled = false;
-                setStorageItem('enabled', 'false');
-                setStorageItem('streamPromotionEnabled', 'false');
-                disconnect();
+            if (isEnabled) {
+                clearPromotionEnabled();
                 updateStreamPromotionToggle();
                 updateStreamSharingVisibility();
+                publishPromotionState();
             }
         },
-        
-        // Toggle function (called from HTML)
-        toggle: toggleShareStream,
-        
-        // Generate API key function (called from HTML)
-        generateApiKey: generateApiKeyUI,
-        
-        // Copy API key function (called from HTML)
-        copyApiKey: copyApiKey
+
+        /** Refresh toggle when Cloud connect/disconnect changes availability. */
+        refreshUi: function() {
+            updateStreamPromotionToggle();
+            updateStreamSharingVisibility();
+        },
+
+        toggle: toggleStreamPromotion,
     };
-    
-    // Expose functions for HTML onclick handlers
-    window.toggleShareStream = toggleShareStream;
-    window.generateApiKey = generateApiKeyUI;
-    window.copyApiKey = copyApiKey;
-    
-    // Initialize when DOM is ready
+
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {
         init();
     }
-    
 })();
-

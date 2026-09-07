@@ -1550,7 +1550,7 @@ function commitSnookerUndoSnapshot(snapshot, recordedBallPlayer) {
         snookerUndoStack.shift();
     }
     persistSnookerUndoStack();
-    updateSnookerUndoButton();
+    updateScoringUndoButton();
 }
 
 function clearSnookerUndoStack() {
@@ -1895,11 +1895,6 @@ function updateScoringUndoButton() {
             : "Undo last scoring action";
     }
     syncBallTrackerActionRowVisibility();
-}
-
-/** @deprecated Use updateScoringUndoButton */
-function updateSnookerUndoButton() {
-    updateScoringUndoButton();
 }
 
 function setSnookerActivePlayerFromUndo(player) {
@@ -2335,7 +2330,44 @@ function isRaceComplete() {
     return isGameScoringLocked();
 }
 
-/** Primary rack/frame scores meet the race / Best Of target — match is over until End Match. */
+function getRaceTarget() {
+    const raceInput = document.getElementById("raceInfoTxt");
+    let raceString = '';
+
+    if (raceInput && raceInput.value && raceInput.value.trim().length > 0) {
+        raceString = raceInput.value.trim();
+    } else {
+        raceString = (getStorageItem("raceInfo") || '').toString().trim();
+    }
+
+    const gameType = typeof isSnooker === 'function' && isSnooker()
+        ? 'game8'
+        : (getStorageItem('gameType') || 'game1');
+    if (window.ScoreboardHelpers && typeof window.ScoreboardHelpers.parseRaceTarget === 'function') {
+        return window.ScoreboardHelpers.parseRaceTarget(raceString, gameType);
+    }
+
+    if (!raceString) {
+        return null;
+    }
+
+    const matches = raceString.match(/\d+/g);
+    if (!matches || matches.length === 0) {
+        return null;
+    }
+
+    const target = parseInt(matches[matches.length - 1], 10);
+    if (!Number.isFinite(target) || target <= 0) {
+        return null;
+    }
+
+    if (gameType === 'game8') {
+        return Math.floor(target / 2) + 1;
+    }
+
+    return target;
+}
+
 function isGameScoringLocked() {
     const raceTarget = getRaceTarget();
     if (raceTarget === null) {
@@ -2349,6 +2381,9 @@ function isGameScoringLocked() {
     const p2Value = p2Input
         ? (parseInt(p2Input.value, 10) || 0)
         : (parseInt(getStorageItem("p2ScoreCtrlPanel"), 10) || 0);
+    if (window.ScoreboardHelpers && typeof window.ScoreboardHelpers.isRaceLocked === 'function') {
+        return window.ScoreboardHelpers.isRaceLocked(p1Value, p2Value, raceTarget);
+    }
     return p1Value >= raceTarget || p2Value >= raceTarget;
 }
 
@@ -2667,7 +2702,7 @@ function updateSnookerBallAvailability() {
             setSnookerBallDisabled(i, true);
         }
         updateSnookerGoldVisibility();
-        updateSnookerUndoButton();
+        updateScoringUndoButton();
         return;
     }
 
@@ -2725,7 +2760,7 @@ function updateSnookerBallAvailability() {
     setSnookerBallDisabled(11, allColorsCleared);
     refreshSnookerFreeBallLabel();
     updateSnookerGoldVisibility();
-    updateSnookerUndoButton();
+    updateScoringUndoButton();
 }
 
 function flashSnookerColorFeedback(ballEl, afterFeedback) {
@@ -2793,11 +2828,6 @@ function enableBallTrackerScoringAids() {
     enableActivePlayerTrackerAids();
 }
 
-/** @deprecated Use enableBallTrackerScoringAids */
-function enablePocketScoringAids() {
-    enableBallTrackerScoringAids();
-}
-
 function syncSetupVariantOptionSlot() {
     const slot = document.getElementById("setupVariantOptionSlot");
     const goldDiv = document.getElementById("snookerGoldDiv");
@@ -2849,7 +2879,7 @@ function updateSnookerUiVisibility() {
     } else {
         clearSnookerUndoStack();
     }
-    updateSnookerUndoButton();
+    updateScoringUndoButton();
     if (typeof syncBallDisplayControls === "function") {
         syncBallDisplayControls();
     }
@@ -5354,38 +5384,6 @@ function postNames() {
     }
 }
 
-function getRaceTarget() {
-    const raceInput = document.getElementById("raceInfoTxt");
-    let raceString = '';
-
-    if (raceInput && raceInput.value && raceInput.value.trim().length > 0) {
-        raceString = raceInput.value.trim();
-    } else {
-        raceString = (getStorageItem("raceInfo") || '').toString().trim();
-    }
-
-    if (!raceString) {
-        return null;
-    }
-
-    const matches = raceString.match(/\d+/g);
-    if (!matches || matches.length === 0) {
-        return null;
-    }
-
-    const target = parseInt(matches[matches.length - 1], 10);
-    if (!Number.isFinite(target) || target <= 0) {
-        return null;
-    }
-
-    // Snooker "Best Of N" → first to floor(N/2)+1 frames (e.g. best of 35 → first to 18)
-    if (isSnooker()) {
-        return Math.floor(target / 2) + 1;
-    }
-
-    return target;
-}
-
 function getRaceOverlayText(raceValue) {
     // Show the stored race / Best Of value as entered — do not rewrite as "Best of N" on overlay.
     return (raceValue == null ? "" : String(raceValue)).trim();
@@ -5740,10 +5738,17 @@ function postScore(opt1, player, options) {
     let p1ScoreValue = parseInt(getStorageItem("p1ScoreCtrlPanel")) || 0;
     let p2ScoreValue = parseInt(getStorageItem("p2ScoreCtrlPanel")) || 0;
     const raceTarget = getRaceTarget();
-    const raceLocked = raceTarget !== null && (p1ScoreValue >= raceTarget || p2ScoreValue >= raceTarget);
-    const winnerIsP1 = raceLocked && raceTarget !== null && p1ScoreValue >= raceTarget && p1ScoreValue >= p2ScoreValue;
-    const winnerIsP2 = raceLocked && raceTarget !== null && p2ScoreValue >= raceTarget && p2ScoreValue >= p1ScoreValue;
-    const isWinner = player === '1' ? winnerIsP1 : player === '2' ? winnerIsP2 : false;
+    const raceLocked = window.ScoreboardHelpers && typeof window.ScoreboardHelpers.isRaceLocked === 'function'
+        ? window.ScoreboardHelpers.isRaceLocked(p1ScoreValue, p2ScoreValue, raceTarget)
+        : (raceTarget !== null && (p1ScoreValue >= raceTarget || p2ScoreValue >= raceTarget));
+    const winnerSlot = window.ScoreboardHelpers && typeof window.ScoreboardHelpers.winnerSlotFromScores === 'function'
+        ? window.ScoreboardHelpers.winnerSlotFromScores({ p1: p1ScoreValue, p2: p2ScoreValue }, raceTarget)
+        : (raceLocked
+            ? (p1ScoreValue >= raceTarget && p1ScoreValue >= p2ScoreValue
+                ? '1'
+                : (p2ScoreValue >= raceTarget && p2ScoreValue >= p1ScoreValue ? '2' : null))
+            : null);
+    const isWinner = (player === '1' || player === '2') && winnerSlot === player;
     let scoreChanged = false;
     let snookerFrameSnapshot = null;
     const skipTrackerReset = !!(options && options.skipTrackerReset) || isStraightPool();
@@ -5764,69 +5769,38 @@ function postScore(opt1, player, options) {
         snookerFrameSnapshot.winnerSlot = player;
     }
 
-    if (player == "1") {
-        if (opt1 == "add") {
-            if (raceTarget !== null && p1ScoreValue + 1 > raceTarget) {
-                p1ScoreValue = raceTarget;
-                document.getElementById("p" + player + "Score").value = p1ScoreValue;
-                updateScoreControlAvailability();
-                return;
-            }
-
-            if (p1ScoreValue < 999) {
-                p1ScoreValue = p1ScoreValue + 1;
-                msg = { player: player, score: p1ScoreValue };
-                bc.postMessage(msg);
-                setStorageItem("p" + player + "ScoreCtrlPanel", p1ScoreValue);
-                setStorageItem("p" + player + "Score", p1ScoreValue);
-                stopClock();
-                document.getElementById("p" + player + "Score").value = p1ScoreValue;
-                resetExt('p1', 'noflash');
-                resetExt('p2', 'noflash');
-                resetBothPlayersBalls();
-                scoreChanged = true;
-            }
-        } else if (p1ScoreValue > 0) {
-            p1ScoreValue = p1ScoreValue - 1;
-            msg = { player: player, score: p1ScoreValue };
-            bc.postMessage(msg);
-            setStorageItem("p" + player + "ScoreCtrlPanel", p1ScoreValue);
-            setStorageItem("p" + player + "Score", p1ScoreValue);
-            document.getElementById("p" + player + "Score").value = p1ScoreValue;
-            scoreChanged = true;
-        }
+    if (player !== "1" && player !== "2") {
+        return;
     }
-    if (player == "2") {
-        if (opt1 == "add") {
-            if (raceTarget !== null && p2ScoreValue + 1 > raceTarget) {
-                p2ScoreValue = raceTarget;
-                document.getElementById("p" + player + "Score").value = p2ScoreValue;
-                updateScoreControlAvailability();
-                return;
-            }
 
-            if (p2ScoreValue < 999) {
-                p2ScoreValue = p2ScoreValue + 1;
-                msg2 = { player: player, score: p2ScoreValue };
-                bc.postMessage(msg2);
-                setStorageItem("p" + player + "ScoreCtrlPanel", p2ScoreValue);
-                setStorageItem("p" + player + "Score", p2ScoreValue);
-                stopClock();
-                document.getElementById("p" + player + "Score").value = p2ScoreValue;
-                resetExt('p1', 'noflash');
-                resetExt('p2', 'noflash');
-                resetBothPlayersBalls();
-                scoreChanged = true;
-            }
-        } else if (p2ScoreValue > 0) {
-            p2ScoreValue = p2ScoreValue - 1;
-            msg2 = { player: player, score: p2ScoreValue };
-            bc.postMessage(msg2);
-            setStorageItem("p" + player + "ScoreCtrlPanel", p2ScoreValue);
-            setStorageItem("p" + player + "Score", p2ScoreValue);
-            document.getElementById("p" + player + "Score").value = p2ScoreValue;
+    let scoreValue = player === "1" ? p1ScoreValue : p2ScoreValue;
+    if (opt1 === "add") {
+        if (raceTarget !== null && scoreValue + 1 > raceTarget) {
+            scoreValue = raceTarget;
+            document.getElementById("p" + player + "Score").value = scoreValue;
+            updateScoreControlAvailability();
+            return;
+        }
+
+        if (scoreValue < 999) {
+            scoreValue = scoreValue + 1;
+            bc.postMessage({ player: player, score: scoreValue });
+            setStorageItem("p" + player + "ScoreCtrlPanel", scoreValue);
+            setStorageItem("p" + player + "Score", scoreValue);
+            stopClock();
+            document.getElementById("p" + player + "Score").value = scoreValue;
+            resetExt('p1', 'noflash');
+            resetExt('p2', 'noflash');
+            resetBothPlayersBalls();
             scoreChanged = true;
         }
+    } else if (scoreValue > 0) {
+        scoreValue = scoreValue - 1;
+        bc.postMessage({ player: player, score: scoreValue });
+        setStorageItem("p" + player + "ScoreCtrlPanel", scoreValue);
+        setStorageItem("p" + player + "Score", scoreValue);
+        document.getElementById("p" + player + "Score").value = scoreValue;
+        scoreChanged = true;
     }
 
     // Send update to stream sharing if enabled
@@ -6144,7 +6118,7 @@ function togglePlayer(isChecked, options) {
             setSnookerFreeBallOffered(true);
             updateSnookerBallAvailability();
         }
-        updateSnookerUndoButton();
+        updateScoringUndoButton();
     }
     // Manual Active Player change is undoable without reversing pots/points.
     // Fouls already commit their own snapshot and call togglePlayer with skipUndo.
@@ -6948,15 +6922,6 @@ async function disconnectWebSocket() {
     } catch (err) {
         console.error('Failed to disconnect:', err);
         alert('Failed to disconnect: ' + (err.message || err.toString()));
-    }
-}
-
-// Legacy function for backwards compatibility
-async function connectToObsWebSocket() {
-    const toggle = document.getElementById('websocketToggle');
-    if (toggle) {
-        toggle.checked = !toggle.checked;
-        await toggleWebSocketConnection();
     }
 }
 

@@ -3029,7 +3029,7 @@
             if (typeof cp.loadScoringUndoStackFromStorage === 'function') {
                 cp.loadScoringUndoStackFromStorage();
             }
-            cp.updateSnookerUndoButton();
+            cp.updateScoringUndoButton();
             assert('Snooker', 'Undo stack reloads from storage',
                 undoBtn && !undoBtn.classList.contains('snooker-ball-disabled'));
 

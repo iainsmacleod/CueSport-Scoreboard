@@ -81,18 +81,14 @@
                 extras.highestBreakP2 = Math.max(extras.highestBreakP2, clampScore(r.highestBreakP2));
             }
             if (r.breakAndRun) {
-                if (r.winnerId === p1Id || r.winnerId === '1' || r.winnerId === 1) {
-                    extras.breakAndRunsP1 += 1;
-                } else if (r.winnerId === p2Id || r.winnerId === '2' || r.winnerId === 2) {
-                    extras.breakAndRunsP2 += 1;
-                }
+                const slot = resolveWinnerSlot(r.winnerId, p1Id, p2Id);
+                if (slot === '1') extras.breakAndRunsP1 += 1;
+                else if (slot === '2') extras.breakAndRunsP2 += 1;
             }
             if (r.tableRun) {
-                if (r.winnerId === p1Id || r.winnerId === '1' || r.winnerId === 1) {
-                    extras.tableRunsP1 += 1;
-                } else if (r.winnerId === p2Id || r.winnerId === '2' || r.winnerId === 2) {
-                    extras.tableRunsP2 += 1;
-                }
+                const slot = resolveWinnerSlot(r.winnerId, p1Id, p2Id);
+                if (slot === '1') extras.tableRunsP1 += 1;
+                else if (slot === '2') extras.tableRunsP2 += 1;
             }
             extras.foulsP1 += clampScore(r.foulsP1);
             extras.foulsP2 += clampScore(r.foulsP2);
@@ -756,9 +752,7 @@
     /** Map editor racks (winnerId 1/2) to cloud session:end rack shape. */
     function serializeEditorRacksForCloud(editorRacks) {
         return (editorRacks || []).map(function (r, index) {
-            const slot = r.winnerId === '1' || r.winnerId === 1
-                ? '1'
-                : (r.winnerId === '2' || r.winnerId === 2 ? '2' : null);
+            const slot = resolveWinnerSlot(r.winnerId, null, null);
             if (!slot) {
                 return null;
             }
@@ -2058,6 +2052,71 @@
         return { breakAndRun: false, tableRun: false, breakerSlot: breaker };
     }
 
+    function mutateFoulDelta(player, gameType, delta, now) {
+        if (!player || !delta) return;
+        player.stats.fouls = Math.max(0, (player.stats.fouls || 0) + delta);
+        const typeStats = ensureTypeStats(player.stats, gameType);
+        typeStats.fouls = Math.max(0, (typeStats.fouls || 0) + delta);
+        if (delta > 0) player.lastPlayedAt = now;
+        player.updatedAt = now;
+    }
+
+    function mutateRunOutDelta(winner, gameType, delta, kind, now) {
+        if (!winner || !delta) return;
+        const field = kind === 'tableRun' ? 'tableRuns' : 'breakAndRuns';
+        winner.stats[field] = (winner.stats[field] || 0) + delta;
+        const typeStats = ensureTypeStats(winner.stats, gameType);
+        typeStats[field] = (typeStats[field] || 0) + delta;
+        if (delta > 0) winner.lastPlayedAt = now;
+        winner.updatedAt = now;
+    }
+
+    function mutateRackDelta(winner, loser, gameType, delta, now) {
+        if (!winner || !loser || !delta) return;
+        winner.stats.racksWon += delta;
+        loser.stats.racksLost += delta;
+        const wType = ensureTypeStats(winner.stats, gameType);
+        const lType = ensureTypeStats(loser.stats, gameType);
+        wType.racksWon += delta;
+        lType.racksLost += delta;
+        if (delta > 0) {
+            winner.lastPlayedAt = now;
+            loser.lastPlayedAt = now;
+        }
+        winner.updatedAt = now;
+        loser.updatedAt = now;
+    }
+
+    function mutateBallDelta(winner, loser, gameType, delta, now) {
+        if (!winner || !loser || !delta) return;
+        winner.stats.ballsWon += delta;
+        loser.stats.ballsLost += delta;
+        const wType = ensureTypeStats(winner.stats, gameType);
+        const lType = ensureTypeStats(loser.stats, gameType);
+        wType.ballsWon += delta;
+        lType.ballsLost += delta;
+        if (delta > 0) {
+            winner.lastPlayedAt = now;
+            loser.lastPlayedAt = now;
+        }
+        winner.updatedAt = now;
+        loser.updatedAt = now;
+    }
+
+    function mutateGameDelta(winner, loser, gameType, delta, now) {
+        if (!winner || !loser || !delta) return;
+        winner.stats.gamesWon += delta;
+        loser.stats.gamesLost += delta;
+        const wType = ensureTypeStats(winner.stats, gameType);
+        const lType = ensureTypeStats(loser.stats, gameType);
+        wType.gamesWon += delta;
+        lType.gamesLost += delta;
+        winner.lastPlayedAt = now;
+        loser.lastPlayedAt = now;
+        winner.updatedAt = now;
+        loser.updatedAt = now;
+    }
+
     async function applyFoulDelta(playerId, gameType, delta) {
         if (!playerId || !delta) {
             return;
@@ -2066,31 +2125,16 @@
         if (!player) {
             return;
         }
-        const now = new Date().toISOString();
-        player.stats.fouls = Math.max(0, (player.stats.fouls || 0) + delta);
-        const typeStats = ensureTypeStats(player.stats, gameType);
-        typeStats.fouls = Math.max(0, (typeStats.fouls || 0) + delta);
-        if (delta > 0) {
-            player.lastPlayedAt = now;
-        }
-        player.updatedAt = now;
+        mutateFoulDelta(player, gameType, delta, new Date().toISOString());
         await putPlayer(player);
     }
 
     async function applyRunOutDelta(winnerId, gameType, delta, kind) {
-        const field = kind === 'tableRun' ? 'tableRuns' : 'breakAndRuns';
         const winner = await getPlayer(winnerId);
         if (!winner) {
             return;
         }
-        const now = new Date().toISOString();
-        winner.stats[field] = (winner.stats[field] || 0) + delta;
-        const typeStats = ensureTypeStats(winner.stats, gameType);
-        typeStats[field] = (typeStats[field] || 0) + delta;
-        if (delta > 0) {
-            winner.lastPlayedAt = now;
-        }
-        winner.updatedAt = now;
+        mutateRunOutDelta(winner, gameType, delta, kind, new Date().toISOString());
         await putPlayer(winner);
     }
 
@@ -2101,22 +2145,8 @@
         if (!winner || !loser) {
             return;
         }
-
-        winner.stats.racksWon += delta;
-        loser.stats.racksLost += delta;
-        const wType = ensureTypeStats(winner.stats, gameType);
-        const lType = ensureTypeStats(loser.stats, gameType);
-        wType.racksWon += delta;
-        lType.racksLost += delta;
-
-        if (delta > 0) {
-            winner.lastPlayedAt = now;
-            loser.lastPlayedAt = now;
-        }
-        winner.updatedAt = now;
-        loser.updatedAt = now;
-        await putPlayer(winner);
-        await putPlayer(loser);
+        mutateRackDelta(winner, loser, gameType, delta, now);
+        await Promise.all([putPlayer(winner), putPlayer(loser)]);
     }
 
     async function applyBallDelta(winnerId, loserId, gameType, delta) {
@@ -2126,22 +2156,8 @@
         if (!winner || !loser) {
             return;
         }
-
-        winner.stats.ballsWon += delta;
-        loser.stats.ballsLost += delta;
-        const wType = ensureTypeStats(winner.stats, gameType);
-        const lType = ensureTypeStats(loser.stats, gameType);
-        wType.ballsWon += delta;
-        lType.ballsLost += delta;
-
-        if (delta > 0) {
-            winner.lastPlayedAt = now;
-            loser.lastPlayedAt = now;
-        }
-        winner.updatedAt = now;
-        loser.updatedAt = now;
-        await putPlayer(winner);
-        await putPlayer(loser);
+        mutateBallDelta(winner, loser, gameType, delta, now);
+        await Promise.all([putPlayer(winner), putPlayer(loser)]);
     }
 
     async function applyGameDelta(winnerId, loserId, gameType, delta) {
@@ -2154,20 +2170,8 @@
         if (!winner || !loser) {
             return;
         }
-
-        winner.stats.gamesWon += delta;
-        loser.stats.gamesLost += delta;
-        const wType = ensureTypeStats(winner.stats, gameType);
-        const lType = ensureTypeStats(loser.stats, gameType);
-        wType.gamesWon += delta;
-        lType.gamesLost += delta;
-
-        winner.lastPlayedAt = now;
-        loser.lastPlayedAt = now;
-        winner.updatedAt = now;
-        loser.updatedAt = now;
-        await putPlayer(winner);
-        await putPlayer(loser);
+        mutateGameDelta(winner, loser, gameType, delta, now);
+        await Promise.all([putPlayer(winner), putPlayer(loser)]);
     }
 
     function getSlotPlayerIds(slot) {
@@ -2240,11 +2244,6 @@
             }
             rackEntry.breakAndRun = !!runClass.breakAndRun;
             rackEntry.tableRun = !!runClass.tableRun;
-            if (runClass.breakAndRun) {
-                await applyRunOutDelta(ids.winnerId, context.gameType, 1, 'breakAndRun');
-            } else if (runClass.tableRun) {
-                await applyRunOutDelta(ids.winnerId, context.gameType, 1, 'tableRun');
-            }
         }
         const foulsP1 = Math.max(0, parseInt(getStorageItem('snookerFrameFoulsP1') || '0', 10) || 0);
         const foulsP2 = Math.max(0, parseInt(getStorageItem('snookerFrameFoulsP2') || '0', 10) || 0);
@@ -2256,13 +2255,31 @@
         const p2Score = parseInt(getStorageItem('p2ScoreCtrlPanel'), 10) || 0;
         match.finalScore = { p1: p1Score, p2: p2Score };
 
-        await applyRackDelta(ids.winnerId, ids.loserId, context.gameType, 1);
-        if (foulsP1 > 0) {
-            await applyFoulDelta(activeMatchSession.player1Id, context.gameType, foulsP1);
+        // One read-modify-write per player for rack + optional run-out + foul deltas.
+        const now = new Date().toISOString();
+        const [winner, loser, foulP1Player, foulP2Player] = await Promise.all([
+            getPlayer(ids.winnerId),
+            getPlayer(ids.loserId),
+            foulsP1 > 0 ? getPlayer(activeMatchSession.player1Id) : Promise.resolve(null),
+            foulsP2 > 0 ? getPlayer(activeMatchSession.player2Id) : Promise.resolve(null),
+        ]);
+        if (winner && loser) {
+            if (rackEntry.breakAndRun) {
+                mutateRunOutDelta(winner, context.gameType, 1, 'breakAndRun', now);
+            } else if (rackEntry.tableRun) {
+                mutateRunOutDelta(winner, context.gameType, 1, 'tableRun', now);
+            }
+            mutateRackDelta(winner, loser, context.gameType, 1, now);
         }
-        if (foulsP2 > 0) {
-            await applyFoulDelta(activeMatchSession.player2Id, context.gameType, foulsP2);
-        }
+        if (foulP1Player) mutateFoulDelta(foulP1Player, context.gameType, foulsP1, now);
+        if (foulP2Player) mutateFoulDelta(foulP2Player, context.gameType, foulsP2, now);
+
+        const toSave = new Map();
+        [winner, loser, foulP1Player, foulP2Player].forEach(function (p) {
+            if (p && p.id) toSave.set(p.id, p);
+        });
+        await Promise.all(Array.from(toSave.values()).map(putPlayer));
+
         if (typeof setStorageItem === 'function') {
             setStorageItem('snookerFrameFoulsP1', '0');
             setStorageItem('snookerFrameFoulsP2', '0');
@@ -2744,7 +2761,33 @@
         return { p1: p1, p2: p2 };
     }
 
+    function clampScore(value) {
+        if (window.ScoreboardHelpers && typeof window.ScoreboardHelpers.clampScore === 'function') {
+            return window.ScoreboardHelpers.clampScore(value);
+        }
+        const n = parseInt(value, 10);
+        if (!Number.isFinite(n)) {
+            return 0;
+        }
+        return Math.min(Math.max(n, 0), 999);
+    }
+
+    function resolveWinnerSlot(winnerId, p1Id, p2Id) {
+        if (window.ScoreboardHelpers && typeof window.ScoreboardHelpers.resolveWinnerSlot === 'function') {
+            return window.ScoreboardHelpers.resolveWinnerSlot(winnerId, p1Id, p2Id);
+        }
+        if (winnerId == null || winnerId === '') return null;
+        if (winnerId === '1' || winnerId === 1) return '1';
+        if (winnerId === '2' || winnerId === 2) return '2';
+        if (p1Id != null && winnerId === p1Id) return '1';
+        if (p2Id != null && winnerId === p2Id) return '2';
+        return null;
+    }
+
     function getWinnerSlotFromScores(scores, raceTo) {
+        if (window.ScoreboardHelpers && typeof window.ScoreboardHelpers.winnerSlotFromScores === 'function') {
+            return window.ScoreboardHelpers.winnerSlotFromScores(scores, raceTo);
+        }
         if (raceTo === null) {
             return null;
         }
@@ -2789,7 +2832,14 @@
         let p2Have = match.racks.filter(function (r) { return r.winnerId === p2Id; }).length;
         const gameType = match.gameType || activeMatchSession.gameType || 'game1';
         const now = new Date().toISOString();
+        const missingP1 = wantP1 - p1Have;
+        const missingP2 = wantP2 - p2Have;
+        if (missingP1 <= 0 && missingP2 <= 0) {
+            match.finalScore = { p1: wantP1, p2: wantP2 };
+            return;
+        }
 
+        const [p1Player, p2Player] = await Promise.all([getPlayer(p1Id), getPlayer(p2Id)]);
         while (p1Have < wantP1) {
             const entry = {
                 rackNumber: match.racks.length + 1,
@@ -2801,7 +2851,9 @@
                 entry.highestRunP2 = 0;
             }
             match.racks.push(entry);
-            await applyRackDelta(p1Id, p2Id, gameType, 1);
+            if (p1Player && p2Player) {
+                mutateRackDelta(p1Player, p2Player, gameType, 1, now);
+            }
             p1Have += 1;
         }
         while (p2Have < wantP2) {
@@ -2815,16 +2867,20 @@
                 entry.highestRunP2 = 0;
             }
             match.racks.push(entry);
-            await applyRackDelta(p2Id, p1Id, gameType, 1);
+            if (p1Player && p2Player) {
+                mutateRackDelta(p2Player, p1Player, gameType, 1, now);
+            }
             p2Have += 1;
+        }
+        if (p1Player && p2Player) {
+            await Promise.all([putPlayer(p1Player), putPlayer(p2Player)]);
         }
 
         match.finalScore = { p1: wantP1, p2: wantP2 };
         if (match.racks.length > 0) {
             const last = match.racks[match.racks.length - 1];
-            activeMatchSession.lastRackWinnerSlot = last.winnerId === p1Id
-                ? '1'
-                : (last.winnerId === p2Id ? '2' : activeMatchSession.lastRackWinnerSlot);
+            activeMatchSession.lastRackWinnerSlot = resolveWinnerSlot(last.winnerId, p1Id, p2Id)
+                || activeMatchSession.lastRackWinnerSlot;
         }
     }
 
@@ -3520,14 +3576,6 @@
         await openDatabase();
         const store = tx(['players'], 'readwrite').objectStore('players');
         return promisifyRequest(store.delete(playerId));
-    }
-
-    function clampScore(value) {
-        const n = parseInt(value, 10);
-        if (!Number.isFinite(n)) {
-            return 0;
-        }
-        return Math.min(Math.max(n, 0), 999);
     }
 
     function synthesizeRacksFromScores(match) {
@@ -4920,6 +4968,9 @@
     }
 
     function parseIsoMs(iso) {
+        if (window.MatchRacksHelpers && typeof window.MatchRacksHelpers.parseIsoMs === 'function') {
+            return window.MatchRacksHelpers.parseIsoMs(iso);
+        }
         if (!iso) {
             return NaN;
         }
@@ -4928,6 +4979,9 @@
     }
 
     function computeDurationSeconds(startedAt, endedAt) {
+        if (window.MatchRacksHelpers && typeof window.MatchRacksHelpers.computeDurationSeconds === 'function') {
+            return window.MatchRacksHelpers.computeDurationSeconds(startedAt, endedAt);
+        }
         const startMs = parseIsoMs(startedAt);
         const endMs = parseIsoMs(endedAt);
         if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < startMs) {
@@ -4964,6 +5018,9 @@
 
     /** Fill missing rack durations from consecutive timestamps (legacy matches). */
     function enrichRacksWithDuration(match) {
+        if (window.MatchRacksHelpers && typeof window.MatchRacksHelpers.enrichRacksWithDuration === 'function') {
+            return window.MatchRacksHelpers.enrichRacksWithDuration(match);
+        }
         const racks = Array.isArray(match && match.racks) ? match.racks : [];
         let prevEnd = match && match.startedAt;
         return racks.map(function (r) {
@@ -4986,6 +5043,9 @@
     }
 
     function sumRackDurationSeconds(match) {
+        if (window.MatchRacksHelpers && typeof window.MatchRacksHelpers.sumRackDurationSeconds === 'function') {
+            return window.MatchRacksHelpers.sumRackDurationSeconds(match);
+        }
         let sum = 0;
         let any = false;
         enrichRacksWithDuration(match).forEach(function (r) {
@@ -5014,6 +5074,9 @@
     }
 
     function formatDurationSeconds(durationSeconds) {
+        if (window.MatchRacksHelpers && typeof window.MatchRacksHelpers.formatDurationSeconds === 'function') {
+            return window.MatchRacksHelpers.formatDurationSeconds(durationSeconds);
+        }
         let secs = Number(durationSeconds);
         if (!Number.isFinite(secs) || secs < 0) {
             return '';

@@ -121,26 +121,48 @@
 
       const token = login.body.access_token;
 
+      let apiKey = null;
       const keyRes = await fetchJson('/api/api-keys', {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
         body: JSON.stringify({ label: 'browser-test' }),
       });
-      assert('Create API key', keyRes.ok && keyRes.body.key?.length === 32);
-      const apiKey = keyRes.body.key;
+      if (keyRes.ok && keyRes.body.key?.length === 32) {
+        apiKey = keyRes.body.key;
+        assert('Create API key', true);
+      } else if (keyRes.body?.code === 'api_key_limit') {
+        // Reuse an existing dock key when the starter seat quota is full.
+        const me = await fetchJson('/api/me', {
+          headers: { Authorization: 'Bearer ' + token },
+        });
+        const existingId = me.body?.api_keys?.[0]?.id;
+        const viewed = existingId
+          ? await fetchJson('/api/api-keys/' + existingId, {
+              headers: { Authorization: 'Bearer ' + token },
+            })
+          : { ok: false, body: {} };
+        apiKey = viewed.body?.key || null;
+        assert('Create API key', !!apiKey && apiKey.length === 32, keyRes.body?.message || 'reuse existing key');
+      } else {
+        assert('Create API key', false, keyRes.body?.message || keyRes.body?.error || 'create failed');
+      }
 
       let dockJoin;
       let roomId = null;
-      try {
-        dockJoin = await wsJoin({
-          client: 'dock',
-          api_key: apiKey,
-          instance_id: 'browser-relay-' + Date.now(),
-        });
-        roomId = dockJoin.data.room_id;
-        assert('WS join dock creates room', !!roomId);
-      } catch (e) {
-        assert('WS join dock creates room', false, e.message);
+      if (!apiKey) {
+        assert('WS join dock creates room', false, 'no API key available');
+      } else {
+        try {
+          dockJoin = await wsJoin({
+            client: 'dock',
+            api_key: apiKey,
+            instance_id: 'browser-relay-' + Date.now(),
+          });
+          roomId = dockJoin.data.room_id;
+          assert('WS join dock creates room', !!roomId);
+        } catch (e) {
+          assert('WS join dock creates room', false, e.message);
+        }
       }
 
       let mobileJoin;
@@ -221,6 +243,28 @@
               assert('Guest set_snooker_gold allowed', goldCmd.action === 'set_snooker_gold');
             } catch (e) {
               assert('Guest set_snooker_gold allowed', false, e.message);
+            }
+
+            try {
+              const resetCmdP = waitForWsMessage(dockJoin.ws, (d) => d.type === 'command' && d.action === 'reset_scores');
+              guestWs.ws.send(JSON.stringify({
+                type: 'command', action: 'reset_scores', payload: {},
+              }));
+              const resetCmd = await resetCmdP;
+              assert('Guest reset_scores allowed', resetCmd.action === 'reset_scores');
+            } catch (e) {
+              assert('Guest reset_scores allowed', false, e.message);
+            }
+
+            try {
+              const callCmdP = waitForWsMessage(dockJoin.ws, (d) => d.type === 'command' && d.action === 'call_match_early');
+              guestWs.ws.send(JSON.stringify({
+                type: 'command', action: 'call_match_early', payload: {},
+              }));
+              const callCmd = await callCmdP;
+              assert('Guest call_match_early allowed', callCmd.action === 'call_match_early');
+            } catch (e) {
+              assert('Guest call_match_early allowed', false, e.message);
             }
 
             try {

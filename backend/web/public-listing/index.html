@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>CueSport Scoreboard Cloud</title>
   <link rel="stylesheet" href="/web/shared/styles.css" />
 </head>
@@ -20,7 +20,14 @@
     </div>
   </header>
   <main class="landing-main">
-    <section class="hero panel">
+    <section id="liveNow" class="panel live-now-panel">
+      <h2>Live Now</h2>
+      <p class="hint">Only streams with Stream Promotion enabled and OBS actively streaming appear here.</p>
+      <ul id="streamList" class="stream-list"></ul>
+      <p id="empty" class="hidden">No one is streaming with promotion enabled right now.</p>
+    </section>
+
+    <section class="hero panel landing-marketing">
       <h2>Score From Anywhere</h2>
       <p>
         Connect your OBS scoreboard dock to CueSport Cloud, then control matches from your phone —
@@ -32,10 +39,10 @@
       </div>
     </section>
 
-    <section class="feature-grid">
+    <section class="feature-grid landing-marketing">
       <article class="panel">
         <h3>CueSport Cloud</h3>
-        <p>Remote mobile control, match event logging, and synced stats (coming soon). Separate from public stream listing.</p>
+        <p>Remote mobile control, match event logging, and synced account stats. Separate from public stream listing.</p>
       </article>
       <article class="panel">
         <h3>Stream Promotion</h3>
@@ -46,20 +53,27 @@
         <p>Run multiple OBS docks with different <code>instance</code> IDs — each registers as its own table in your account.</p>
       </article>
     </section>
-
-    <section class="panel">
-      <h2>Live Now</h2>
-      <p class="hint">Only streams with Stream Promotion enabled and OBS actively streaming appear here.</p>
-      <ul id="streamList" class="stream-list"></ul>
-      <p id="empty" class="hidden">No one is streaming with promotion enabled right now.</p>
-    </section>
   </main>
   <script type="module">
+    // /streams prioritizes the live list; home keeps marketing below Live Now.
+    if (/\/streams\/?$/.test(location.pathname)) {
+      document.body.classList.add('streams-page');
+      document.title = 'Live Streams — CueSport Scoreboard Cloud';
+    }
+
     function syncAuthNav() {
       const btn = document.getElementById('authNavBtn');
       if (!btn) return;
       const signedIn = !!localStorage.getItem('cuesport_token');
       btn.textContent = signedIn ? 'Dashboard' : 'Sign In';
+    }
+
+    function escapeHtml(text) {
+      return String(text || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
     }
 
     async function loadStreams() {
@@ -77,16 +91,18 @@
         const st = s.state || {};
         const li = document.createElement('li');
         li.className = 'stream-card';
-        const p1 = st.player1Name || 'Player 1';
-        const p2 = st.player2Name || 'Player 2';
+        const p1 = escapeHtml(st.player1Name || 'Player 1');
+        const p2 = escapeHtml(st.player2Name || 'Player 2');
         const score = st.dualScoreMode
           ? `${st.p1Balls ?? 0} — ${st.p2Balls ?? 0} <span class="stream-subscore">(${st.p1Score ?? 0}–${st.p2Score ?? 0} frames)</span>`
           : `${st.p1Score ?? 0} — ${st.p2Score ?? 0}`;
+        const meta = escapeHtml(`${st.gameInfo || st.gameType || ''}${st.raceInfo ? ' · ' + st.raceInfo : ''}`.trim());
+        const url = typeof s.stream_url === 'string' && /^https?:\/\//i.test(s.stream_url) ? s.stream_url : '';
         li.innerHTML = `
           <h3>${p1} vs ${p2}</h3>
           <p class="score">${score}</p>
-          <p class="stream-meta">${st.gameInfo || st.gameType || ''} ${st.raceInfo ? '· ' + st.raceInfo : ''}</p>
-          ${s.stream_url ? `<a href="${s.stream_url}" target="_blank" rel="noopener">Watch Stream</a>` : ''}
+          ${meta ? `<p class="stream-meta">${meta}</p>` : ''}
+          ${url ? `<a class="stream-watch" href="${escapeHtml(url)}" target="_blank" rel="noopener">Watch Stream</a>` : ''}
         `;
         list.appendChild(li);
       });

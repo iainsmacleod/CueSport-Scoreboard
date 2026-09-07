@@ -19,8 +19,6 @@ Open:
 
 Default database is **SQLite** at `backend/data/cuesport.db` — no external services required for development. Path is controlled by **`SQLITE_PATH`** (`src/config.js` → `src/db/sqlite.js`). On startup, a legacy `match_events` table without `account_id` is dropped and recreated (match history cleared; accounts/rooms kept). To fully reset local data, delete `cuesport.db` (and `-wal` / `-shm`) and restart.
 
-> **Note:** Root-level `server.js` / `db.js` are a leftover legacy stream-promotion stack. They use `DB_PATH` → `streams.db` and are **not** used by `npm start` or Docker (`CMD node src/index.js`). Running `node server.js` exits immediately. Old `auth.js` / `logger.js` helpers for that stack were removed.
-
 Set `DEV_AUTH_SECRET` and `DEV_AUTH_ACCOUNT_EMAIL` in `.env` (see `.env.example`) before using dev sign-in on the dashboard or mobile.
 
 ### Docker (self-host)
@@ -111,9 +109,9 @@ On first Google sign-in, the server links `auth.users.id` to an `accounts` row. 
 
 Clients send `join` then `event`, `command`, `state`, or `session` messages. See the [CueSport Cloud plan](../docs/) or root README for full schema.
 
-**Guest links** (`join` with `guest_token`): reusable until revoked, but only **one live WebSocket per token**. A second concurrent join receives `guest_link_in_use`. Guests may score and change game setup (`set_game_type`, ball variant / early-game / golden ball / point-based, race, event info); names, match end/reset, and replay stay forbidden.
+**Guest links** (`join` with `guest_token`): reusable until revoked, but only **one live WebSocket per token**. A second concurrent join receives `guest_link_in_use`. Guests may score, change game setup (`set_game_type`, ball variant / early-game / golden ball / point-based, race, event info), and match controls (`reset_scores` / `end_match` / `call_match_early`); names and replay stay forbidden.
 
-Legacy stream promotion clients (`auth` + `update`) are supported for backward compatibility.
+**Promote Live Stream** uses Cloud `state` only (`streamPromotionListed` + OBS live + stream URL). Legacy WebSocket `auth` / `update` messages are no longer accepted.
 
 ## GPL + hosted service
 

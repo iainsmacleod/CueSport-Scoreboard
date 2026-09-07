@@ -4,6 +4,14 @@ import Database from 'better-sqlite3';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { config } from '../config.js';
+import {
+  normalizePlayerNameKey,
+  truncatePlayerName,
+} from '../lib/scoreboard-helpers.js';
+
+function normalizePlayerName(name) {
+  return normalizePlayerNameKey(name);
+}
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS accounts (
@@ -284,11 +292,6 @@ export function ensureAccount(email, authUserId = null) {
   return { account, room: null };
 }
 
-/** @deprecated Use ensureAccount — kept as alias for older imports. */
-export function ensureAccountWithRoom(email, authUserId = null) {
-  return ensureAccount(email, authUserId);
-}
-
 /** Rooms with no room_docks mapping (junk from legacy signup / disabled POST). */
 export function listUnmappedRooms() {
   return getDb().prepare(`
@@ -328,16 +331,6 @@ export function countActiveGuestTokensForRoom(roomId) {
   return getDb().prepare(
     `SELECT COUNT(*) AS n FROM room_guest_tokens WHERE room_id = ? AND revoked_at IS NULL`
   ).get(roomId)?.n || 0;
-}
-
-export function findUnmappedRoom(accountId) {
-  return getDb().prepare(`
-    SELECT r.* FROM rooms r
-    WHERE r.account_id = ?
-      AND NOT EXISTS (SELECT 1 FROM room_docks d WHERE d.room_id = r.id)
-    ORDER BY r.created_at ASC
-    LIMIT 1
-  `).get(accountId) || null;
 }
 
 export function findAccountByApiKey(plaintextKey) {
@@ -784,14 +777,6 @@ export function revokeAllGuestTokens(accountId) {
      WHERE account_id = ? AND revoked_at IS NULL`
   ).run(accountId);
   return result.changes;
-}
-
-function normalizePlayerName(name) {
-  return String(name || '').trim().toLowerCase();
-}
-
-function truncatePlayerName(name) {
-  return String(name || '').trim().slice(0, 20);
 }
 
 /** Remember a player name for account roster / mobile autocomplete. */

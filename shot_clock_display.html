@@ -1,60 +1,74 @@
-<!-- 
+<!--
 	shot_clock_display.html
-	local display for players on 2nd monitor.  
-	
+	Local large shot-clock display for a 2nd monitor / player view.
+
+	Must use the same ?instance= query value as control_panel.html and
+	browser_source.html so BroadcastChannels match (main_${instance} / recv_${instance}).
+
 	G4ScoreBoard addon for OBS version 1.6.0 Copyright 2022-2023 Norman Gholson IV
 	https://g4billiards.com http://www.g4creations.com
 
 	this is a purely javascript/html/css driven scoreboard system for OBS Studio
 
-	free to use and modify and use as long as this copyright statment remains intact. 
+	free to use and modify and use as long as this copyright statement remains intact.
 -->
-
-	<html>
-		<head>
-
+<html>
+	<head>
 		<style>
 			body {
-			background: rgba(0,0,0,0);
-			font-size:600pt;
-			font-family:tahoma;
-			font-weight:bolder;
-			text-align:center;
-			vertical-align: middle;
+				background: rgba(0,0,0,0);
+				font-size: 600pt;
+				font-family: tahoma;
+				font-weight: bolder;
+				text-align: center;
+				vertical-align: middle;
 			}
 		</style>
-		</head>
-		<script>
-			const bcr = new BroadcastChannel('g4-recv'); // messages from browser_source 
-			const bc = new BroadcastChannel('g4-main');
-			
-			bc.onmessage = (event) => {
-				if(event.data.clockDisplay == "stopClock") {
-					setTimeout(function() {
-						document.getElementsByTagName("body")[0].style.background = "rgba(0,0,0,0)";
-						document.getElementsByTagName("body")[0].innerHTML = "&nbsp;";
-						//setTimeout( function() {document.getElementTagName("body")[0].innerHTML = "&nbsp;";},1000);
-					},2000);
-				}
-			}
+	</head>
+	<script>
+		const INSTANCE_ID = new URLSearchParams(window.location.search).get('instance') || '';
+		// Same channels as control_panel / browser_source:
+		// main_* = dock → overlay commands; recv_* = overlay → dock (and clock ticks).
+		const bc = new BroadcastChannel(`main_${INSTANCE_ID}`);
+		const bcr = new BroadcastChannel(`recv_${INSTANCE_ID}`);
 
-			bcr.onmessage = (event) => {
-				document.getElementsByTagName("body")[0].style.background = "darkgreen";
-				document.getElementsByTagName("body")[0].innerHTML = event.data;
-				if (event.data > 5) { document.getElementsByTagName("body")[0].style.color = "black"; } ;
-				if (event.data < 21) { document.getElementsByTagName("body")[0].style.background = "orange"; } ;
-				if (event.data < 16) { document.getElementsByTagName("body")[0].style.background = "yellow"; } ;
-				if (event.data < 11) { document.getElementsByTagName("body")[0].style.background = "tomato"; } ;
-				if (event.data < 6) { document.getElementsByTagName("body")[0].style.background = "red"; document.getElementsByTagName("body")[0].style.color = "white"; } ;
-				if (event.data = 0) { document.getElementsByTagName("body")[0].style.background = "red"; setTimeout("resetClock()",2000);};
+		function resetClock() {
+			document.getElementsByTagName('body')[0].style.background = 'darkgreen';
+			document.getElementsByTagName('body')[0].innerHTML = '&nbsp;';
+		}
+
+		bc.onmessage = (event) => {
+			const data = event.data;
+			if (data && data.clockDisplay === 'stopClock') {
+				setTimeout(function () {
+					document.getElementsByTagName('body')[0].style.background = 'rgba(0,0,0,0)';
+					document.getElementsByTagName('body')[0].innerHTML = '&nbsp;';
+				}, 2000);
 			}
-		
-			function resetClock() {
-				document.getElementsByTagName("body")[0].style.background = "darkgreen";
-				document.getElementsByTagName("body")[0].innerHTML = "&nbsp;";
+		};
+
+		bcr.onmessage = (event) => {
+			const seconds = Number(event.data);
+			if (!Number.isFinite(seconds)) {
+				return;
 			}
-		</script>
-		<body>
-		</body>
-	
-	</html>
+			const body = document.getElementsByTagName('body')[0];
+			body.style.background = 'darkgreen';
+			body.innerHTML = String(seconds);
+			if (seconds > 5) { body.style.color = 'black'; }
+			if (seconds < 21) { body.style.background = 'orange'; }
+			if (seconds < 16) { body.style.background = 'yellow'; }
+			if (seconds < 11) { body.style.background = 'tomato'; }
+			if (seconds < 6) {
+				body.style.background = 'red';
+				body.style.color = 'white';
+			}
+			if (seconds === 0) {
+				body.style.background = 'red';
+				setTimeout(resetClock, 2000);
+			}
+		};
+	</script>
+	<body>
+	</body>
+</html>

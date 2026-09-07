@@ -27,6 +27,8 @@ function sendWebHtml(reply, relativePath) {
     });
   }
   const html = fs.readFileSync(filePath, 'utf8');
+  // Always revalidate shell HTML so ?v= cache-busters on scripts/CSS take effect.
+  reply.header('Cache-Control', 'no-store');
   reply.type('text/html').send(html);
 }
 
@@ -68,6 +70,14 @@ await app.register(fastifyStatic, {
   root: webRoot,
   prefix: '/web/',
   decorateReply: false,
+  setHeaders(res, filePath) {
+    // Versioned JS/CSS URLs are safe to cache; HTML under /web should not stick.
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-store');
+    } else if (/\.(js|css)$/i.test(filePath)) {
+      res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
+    }
+  },
 });
 
 function resolveBallImageRoot() {

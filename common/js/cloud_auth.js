@@ -188,17 +188,6 @@
         if (modal) modal.style.display = 'none';
     }
 
-    /** @deprecated Use openCloudConnectionModal */
-    function openCloudSelfHostModal() {
-        openCloudConnectionModal();
-        showCloudSelfHostPane();
-    }
-
-    /** @deprecated Use closeCloudConnectionModal */
-    function closeCloudSelfHostModal() {
-        closeCloudConnectionModal();
-    }
-
     function saveCloudConnectionSettings(options) {
         if (!window.cloudRelay) return false;
         const connect = !!(options && options.connect);
@@ -249,11 +238,6 @@
         saveCloudConnectionSettings({ connect: true });
     }
 
-    /** @deprecated Use saveCloudConnectionSettings */
-    function saveCloudSelfHostSettings() {
-        saveCloudConnectionSettings();
-    }
-
     function toggleCloudRelay() {
         const toggle = document.getElementById('cloudRelayToggle');
         if (!toggle || !window.cloudRelay) return;
@@ -278,11 +262,8 @@
     window.signOutCloud = signOutCloud;
     window.openCloudConnectionModal = openCloudConnectionModal;
     window.closeCloudConnectionModal = closeCloudConnectionModal;
-    window.openCloudSelfHostModal = openCloudSelfHostModal;
-    window.closeCloudSelfHostModal = closeCloudSelfHostModal;
     window.showCloudManagedPane = showCloudManagedPane;
     window.showCloudSelfHostPane = showCloudSelfHostPane;
-    window.saveCloudSelfHostSettings = saveCloudSelfHostSettings;
     window.saveCloudConnectionSettings = saveCloudConnectionSettings;
     window.saveCloudConnectionSettingsAndConnect = saveCloudConnectionSettingsAndConnect;
     window.toggleCloudRelay = toggleCloudRelay;

@@ -876,10 +876,6 @@
             handlePresenceForControlClients(clients);
             return;
         }
-        // Legacy auth
-        if (data.type === 'auth' && data.status === 'success') {
-            isJoined = true;
-        }
     }
 
     function disconnect() {
@@ -1013,6 +1009,9 @@
         if (toggle) toggle.checked = isEnabled;
         // Notify listeners (e.g. stats) of cloud connection state change
         try { window.dispatchEvent(new CustomEvent('cloudRelayStateChange', { detail: { connected: isCloudConnected(), enabled: isEnabled } })); } catch (_) {}
+        if (window.streamSharing && typeof window.streamSharing.refreshUi === 'function') {
+            window.streamSharing.refreshUi();
+        }
         const emailEl = document.getElementById('cloudSignedInEmail');
         const statusSep = document.getElementById('cloudStatusSep');
         if (emailEl) {

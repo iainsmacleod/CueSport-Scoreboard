@@ -7,6 +7,12 @@ import {
   fetchPlayers,
   GAME_TYPES,
 } from '../shared/cloud-client.js?v=8.0.0.3';
+import {
+  parseRaceTarget,
+  isRaceLocked,
+  normalizePlayerName,
+  truncatePlayerName,
+} from '../shared/scoreboard-helpers.js?v=8.0.0';
 
 const TOKEN_KEY = 'cuesport_token';
 let client = null;
@@ -69,7 +75,8 @@ function syncLoginPanel() {
 function applyGuestUI() {
   const title = document.getElementById('pageTitle');
   if (title) title.textContent = 'CueSport Scoreboard Guest Control';
-  ['adminPlayersPanel', 'matchPanel', 'viewReplay', 'viewShare'].forEach((id) => show(id, false));
+  // Guests get full match controls (Restart/End/Call); replay and share stay admin-only.
+  ['adminPlayersPanel', 'viewReplay', 'viewShare'].forEach((id) => show(id, false));
   document.querySelectorAll('.admin-only').forEach((el) => el.classList.add('hidden'));
   const replayBtn = document.getElementById('navReplayBtn');
   if (replayBtn) replayBtn.classList.add('hidden');
@@ -342,9 +349,9 @@ function wireMobileNav() {
     nativeShareBtn.addEventListener('click', async () => {
       if (!cachedGuestShareUrl || !canNativeShare()) return;
       try {
+        // URL only — share-sheet "Copy" concatenates `text` with the link on many phones.
         await navigator.share({
           title: 'CueSport public control link',
-          text: 'Join as guest scorer',
           url: cachedGuestShareUrl,
         });
       } catch (err) {
@@ -625,6 +632,7 @@ function applyState(state) {
     lastBallGridKey = '';
   }
   maybeChooseInitialView(state);
+  resolvePendingBreakerFromState(state);
 
   const p1Name = state.player1Name != null && state.player1Name !== '' ? state.player1Name : 'P1';
   const p2Name = state.player2Name != null && state.player2Name !== '' ? state.player2Name : 'P2';
@@ -686,10 +694,16 @@ function applyState(state) {
     slotP2.classList.remove('selected', 'rack-breaker-match-locked', 'rack-breaker-inactive', 'rack-breaker-current');
     slotP1.disabled = false;
     slotP2.disabled = false;
+    const breakerPending = isCommandPending('select_breaker');
     if (slotMode === 'breaker' || slotMode === 'match_locked') {
       slotP1.classList.toggle('rack-breaker-match-locked', slotMode === 'match_locked');
       slotP2.classList.toggle('rack-breaker-match-locked', slotMode === 'match_locked');
       // Keep clickable when match-locked so tap can open End Match (same as dock).
+      // While select_breaker is in flight, disable both to prevent double-send.
+      if (breakerPending && slotMode === 'breaker') {
+        slotP1.disabled = true;
+        slotP2.disabled = true;
+      }
     } else {
       // Active (or off): highlight current player — names live here now.
       // Current active player cannot be re-selected (avoids false switch events).
@@ -735,25 +749,67 @@ const BALL_IMG = '/web/images/balls';
 let lastBallGridKey = '';
 let lastStateSeq = 0;
 
-/** Hold local setup edits until dock state confirms (avoids select/checkbox snap-back). */
+/**
+ * Hold local setup edits until dock state echoes the same value (no wall-clock TTL).
+ * Cleared on echo match, command send failure, or explicit clearPendingSetup.
+ */
 const pendingSetupSync = {};
 
+/** In-flight remote commands waiting for dock-authoritative state (no optimistic UI). */
+const pendingCommands = {};
+
 function markSetupPending(key, value) {
-  pendingSetupSync[key] = { value: String(value), until: Date.now() + 5000 };
+  pendingSetupSync[key] = { value: String(value) };
+}
+
+function clearPendingSetup(key) {
+  if (key) delete pendingSetupSync[key];
+  else Object.keys(pendingSetupSync).forEach((k) => delete pendingSetupSync[k]);
 }
 
 function shouldSyncSetupFromState(key, stateValue) {
   const pending = pendingSetupSync[key];
   if (!pending) return true;
-  if (Date.now() > pending.until) {
-    delete pendingSetupSync[key];
-    return true;
-  }
   if (String(stateValue) === pending.value) {
     delete pendingSetupSync[key];
     return true;
   }
   return false;
+}
+
+function markCommandPending(action, meta) {
+  pendingCommands[action] = { ...(meta || {}), since: Date.now() };
+}
+
+function clearCommandPending(action) {
+  if (action) delete pendingCommands[action];
+  else Object.keys(pendingCommands).forEach((k) => delete pendingCommands[k]);
+}
+
+function isCommandPending(action) {
+  return !!pendingCommands[action];
+}
+
+/** Clear pending select_breaker once dock state confirms or rejects the choice. */
+function resolvePendingBreakerFromState(state) {
+  const pending = pendingCommands.select_breaker;
+  if (!pending) return;
+  const slot = String(pending.slot || '');
+  const dockSlot = String(state.rackBreakerSlot || '');
+  if ((slot === '1' || slot === '2') && dockSlot === slot) {
+    clearCommandPending('select_breaker');
+    return;
+  }
+  const seq = typeof state.stateSeq === 'number' ? state.stateSeq : null;
+  // Newer dock publish after our command that still awaits breaker → command did not apply.
+  if (
+    seq != null &&
+    pending.expectAfterSeq != null &&
+    seq > pending.expectAfterSeq &&
+    (state.awaitingBreaker === true || state.playerSlotMode === 'breaker')
+  ) {
+    clearCommandPending('select_breaker');
+  }
 }
 
 function syncSelectFromState(selectId, key, stateValue) {
@@ -809,17 +865,22 @@ function isBreakerPromptGame(state) {
   return true;
 }
 
-/** Match control_panel: lock balls until rackBreakerSlot is set for this frame. */
+/**
+ * Dock publishes awaitingBreaker / playerSlotMode / rackBreakerSlot.
+ * Trust those fields; only fall back when older docks omit them.
+ */
 function inferAwaitingBreaker(state) {
   if (!state || state.gameScoringLocked) return false;
-  if (state.awaitingBreaker === true) return true;
-  if (state.ballGrid && state.ballGrid.awaitingBreaker === true) return true;
-  const slot = String(state.rackBreakerSlot || '');
-  if (slot === '1' || slot === '2') return false;
+  if (typeof state.awaitingBreaker === 'boolean') return state.awaitingBreaker;
+  if (state.ballGrid && typeof state.ballGrid.awaitingBreaker === 'boolean') {
+    return state.ballGrid.awaitingBreaker;
+  }
   if (state.playerSlotMode === 'breaker') return true;
   if (state.playerSlotMode === 'active' || state.playerSlotMode === 'off' || state.playerSlotMode === 'match_locked') {
     return false;
   }
+  const slot = String(state.rackBreakerSlot || '');
+  if (slot === '1' || slot === '2') return false;
   return isBreakerPromptGame(state);
 }
 
@@ -829,29 +890,14 @@ function inferPlayerSlotMode(state) {
   if (dockMode === 'breaker' || dockMode === 'match_locked' || dockMode === 'active' || dockMode === 'off') {
     return dockMode;
   }
-  if (state.breakerPromptVisible === true) return state.gameScoringLocked ? 'match_locked' : 'breaker';
+  if (typeof state.awaitingBreaker === 'boolean') {
+    if (state.gameScoringLocked) return 'match_locked';
+    return state.awaitingBreaker ? 'breaker' : 'active';
+  }
   const slot = String(state.rackBreakerSlot || '');
   if (slot === '1' || slot === '2') return 'active';
   if (state.gameScoringLocked) return 'match_locked';
   return 'breaker';
-}
-
-function optimisticSelectBreaker(slot) {
-  const s = String(slot);
-  if (s !== '1' && s !== '2') return;
-  lastState = {
-    ...lastState,
-    rackBreakerSlot: s,
-    activePlayer: s,
-    awaitingBreaker: false,
-    breakerPromptVisible: false,
-    playerSlotMode: 'active',
-    ballGrid: lastState.ballGrid
-      ? { ...lastState.ballGrid, awaitingBreaker: false }
-      : lastState.ballGrid,
-  };
-  lastBallGridKey = '';
-  applyState(lastState);
 }
 
 function ballImageFile(n, selection) {
@@ -1312,24 +1358,12 @@ function getResetActionLabel(state = lastState) {
 
 /** Same rule as control_panel getRaceTarget / isGameScoringLocked. */
 function getRaceTargetFromState(state) {
-  const raceString = String(state?.raceInfo || '').trim();
-  if (!raceString) return null;
-  const matches = raceString.match(/\d+/g);
-  if (!matches || matches.length === 0) return null;
-  const target = parseInt(matches[matches.length - 1], 10);
-  if (!Number.isFinite(target) || target <= 0) return null;
-  // Snooker Best Of N → first to floor(N/2)+1
-  if (state?.gameType === 'game8') return Math.floor(target / 2) + 1;
-  return target;
+  return parseRaceTarget(state?.raceInfo, state?.gameType);
 }
 
 function isRaceCompleteFromState(state) {
   if (!state) return false;
-  const raceTarget = getRaceTargetFromState(state);
-  if (raceTarget === null) return false;
-  const p1 = Number(state.p1Score) || 0;
-  const p2 = Number(state.p2Score) || 0;
-  return p1 >= raceTarget || p2 >= raceTarget;
+  return isRaceLocked(state.p1Score, state.p2Score, getRaceTargetFromState(state));
 }
 
 /**
@@ -1527,20 +1561,20 @@ function controlLockMessage() {
 function sendCmd(action, payload) {
   if (!controlsEnabled()) {
     setError(controlLockMessage());
-    return;
+    return false;
   }
   const sent = client.sendCommand(action, payload);
   if (!sent) {
     setError('Failed to send command — check connection');
+    if (action === 'select_breaker') clearCommandPending('select_breaker');
+    if (action === 'set_game_type') clearPendingSetup('gameType');
+    if (action === 'set_early_game_ball') clearPendingSetup('earlyGameBall');
+    if (action === 'set_snooker_gold') clearPendingSetup('snookerGold');
+    if (action === 'set_point_based') clearPendingSetup('pointBased');
+    if (action === 'set_ball_selection') clearPendingSetup('ballSelection');
+    return false;
   }
-}
-
-function normalizePlayerName(name) {
-  return String(name || '').trim().toLowerCase();
-}
-
-function truncatePlayerName(name) {
-  return String(name || '').trim().slice(0, 20);
+  return true;
 }
 
 function escapeHtml(text) {
@@ -1926,8 +1960,17 @@ function wireCommands() {
         payload.name = document.getElementById(payload.slot === '1' ? 'p1Name' : 'p2Name').value;
       }
       if (cmd === 'player_slot' && payload.slot && inferPlayerSlotMode(lastState) === 'breaker') {
-        optimisticSelectBreaker(payload.slot);
-        sendCmd('select_breaker', { slot: payload.slot });
+        if (isCommandPending('select_breaker')) return;
+        markCommandPending('select_breaker', { slot: payload.slot, expectAfterSeq: lastStateSeq });
+        // Disable buttons until dock state confirms — no optimistic local mutation.
+        const slotP1 = document.getElementById('playerSlotP1Btn');
+        const slotP2 = document.getElementById('playerSlotP2Btn');
+        if (slotP1) slotP1.disabled = true;
+        if (slotP2) slotP2.disabled = true;
+        if (!sendCmd('select_breaker', { slot: payload.slot })) {
+          if (slotP1) slotP1.disabled = false;
+          if (slotP2) slotP2.disabled = false;
+        }
         return;
       }
       if (MATCH_CONFIRM_CMDS.has(cmd)) {
@@ -1960,102 +2003,84 @@ function wireReplayClearButtons() {
   });
 }
 
-async function connect(options = {}) {
-  const quiet = !!(options && options.quiet);
-  const epoch = ++connectEpoch;
-  setError('');
-  const ctx = pathContext();
-  guestToken = ctx.guestToken || '';
-  isGuestMode = !!guestToken;
-  roomId = ctx.roomId || '';
-  wantConnection = true;
-  if (quiet) {
-    setReconnectBanner(true, 'Reconnecting…');
-  } else {
-    showConnecting();
-    setReconnectBanner(false);
+async function connectGuestSession({ quiet, isCurrent }) {
+  applyGuestUI();
+  if (client) {
+    try { client.disconnect(); } catch (_) { /* ignore */ }
   }
-
-  const isCurrent = () => epoch === connectEpoch;
-
-  if (isGuestMode) {
-    applyGuestUI();
-    if (client) {
-      try { client.disconnect(); } catch (_) { /* ignore */ }
-    }
-    client = new CloudClient({
-      serverUrl: window.location.origin,
-      guestToken,
-      client: 'mobile_guest',
-    });
-    client.on('state', applyState);
-    wireClientLifecycle(client);
-    client.on('error', (e) => {
-      if (!isCurrent()) return;
-      if (e.code === 'guest_revoked' || e.code === 'invalid_guest_token') {
-        wantConnection = false;
-        clearReconnectTimer();
-        setReconnectBanner(false);
-        show('controlSection', false);
-        showMobileNav(false);
-        show('connectingSection', false);
-        setConnectionStatus('disconnected');
-        setError('This guest link has been revoked.');
-        return;
-      }
-      if (e.code === 'guest_link_in_use') {
-        wantConnection = false;
-        clearReconnectTimer();
-        setReconnectBanner(false);
-        show('connectingSection', false);
-        setConnectionStatus('disconnected');
-        setError(e.message || 'This guest link is already in use on another device.');
-        return;
-      }
-      setError(e.message || e.code || 'Connection failed');
-    });
-    try {
-      const joined = await client.connect();
-      if (!isCurrent()) return;
-      showControl();
-      dockPresent = (joined.clients || []).includes('dock');
-      if (joined.state && Object.keys(joined.state).length) {
-        applyState(joined.state);
-      } else {
-        setActiveView('setup');
-        initialViewChosen = false;
-      }
-      setConnectionStatus(dockPresent ? 'connected' : 'waiting');
-      reconnectAttempt = 0;
-      if (connectionIsOpen()) setReconnectBanner(false);
-      else setReconnectBanner(true, 'Connection lost — tap Reconnect');
-    } catch (err) {
-      if (!isCurrent()) throw err;
+  client = new CloudClient({
+    serverUrl: window.location.origin,
+    guestToken,
+    client: 'mobile_guest',
+  });
+  client.on('state', applyState);
+  wireClientLifecycle(client);
+  client.on('error', (e) => {
+    if (!isCurrent()) return;
+    if (e.code === 'guest_revoked' || e.code === 'invalid_guest_token') {
+      wantConnection = false;
+      clearReconnectTimer();
+      setReconnectBanner(false);
+      show('controlSection', false);
+      showMobileNav(false);
       show('connectingSection', false);
       setConnectionStatus('disconnected');
-      if (err?.code === 'guest_revoked' || err?.code === 'invalid_guest_token') {
-        wantConnection = false;
-        clearReconnectTimer();
-        setReconnectBanner(false);
-        setError('This guest link has been revoked.');
-        return;
-      }
-      if (err?.code === 'guest_link_in_use') {
-        wantConnection = false;
-        clearReconnectTimer();
-        setReconnectBanner(false);
-        setError(err.message || 'This guest link is already in use on another device.');
-        return;
-      }
-      if (quiet) {
-        setReconnectBanner(true, 'Connection lost — tap Reconnect');
-        throw err;
-      }
-      setError(err.message || 'Connection failed');
+      setError('This guest link has been revoked.');
+      return;
     }
-    return;
+    if (e.code === 'guest_link_in_use') {
+      wantConnection = false;
+      clearReconnectTimer();
+      setReconnectBanner(false);
+      show('connectingSection', false);
+      setConnectionStatus('disconnected');
+      setError(e.message || 'This guest link is already in use on another device.');
+      return;
+    }
+    setError(e.message || e.code || 'Connection failed');
+  });
+  try {
+    const joined = await client.connect();
+    if (!isCurrent()) return;
+    showControl();
+    dockPresent = (joined.clients || []).includes('dock');
+    if (joined.state && Object.keys(joined.state).length) {
+      applyState(joined.state);
+    } else {
+      setActiveView('setup');
+      initialViewChosen = false;
+    }
+    setConnectionStatus(dockPresent ? 'connected' : 'waiting');
+    reconnectAttempt = 0;
+    if (connectionIsOpen()) setReconnectBanner(false);
+    else setReconnectBanner(true, 'Connection lost — tap Reconnect');
+  } catch (err) {
+    if (!isCurrent()) throw err;
+    show('connectingSection', false);
+    setConnectionStatus('disconnected');
+    if (err?.code === 'guest_revoked' || err?.code === 'invalid_guest_token') {
+      wantConnection = false;
+      clearReconnectTimer();
+      setReconnectBanner(false);
+      setError('This guest link has been revoked.');
+      return;
+    }
+    if (err?.code === 'guest_link_in_use') {
+      wantConnection = false;
+      clearReconnectTimer();
+      setReconnectBanner(false);
+      setError(err.message || 'This guest link is already in use on another device.');
+      return;
+    }
+    if (quiet) {
+      setReconnectBanner(true, 'Connection lost — tap Reconnect');
+      throw err;
+    }
+    setError(err.message || 'Connection failed');
   }
+}
 
+async function connectAuthenticatedSession({ quiet, isCurrent }) {
   if (!roomId) {
     wantConnection = false;
     showLogin();
@@ -2175,6 +2200,30 @@ async function connect(options = {}) {
     }
     forceRelogin(reloginMessage(err), { clearToken: shouldClearSavedLogin(err) });
   }
+}
+
+async function connect(options = {}) {
+  const quiet = !!(options && options.quiet);
+  const epoch = ++connectEpoch;
+  setError('');
+  const ctx = pathContext();
+  guestToken = ctx.guestToken || '';
+  isGuestMode = !!guestToken;
+  roomId = ctx.roomId || '';
+  wantConnection = true;
+  if (quiet) {
+    setReconnectBanner(true, 'Reconnecting…');
+  } else {
+    showConnecting();
+    setReconnectBanner(false);
+  }
+
+  const isCurrent = () => epoch === connectEpoch;
+
+  if (isGuestMode) {
+    return connectGuestSession({ quiet, isCurrent });
+  }
+  return connectAuthenticatedSession({ quiet, isCurrent });
 }
 
 const select = document.getElementById('gameTypeSelect');
