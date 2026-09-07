@@ -23,6 +23,29 @@
             isFoulBallId(ballId);
     }
 
+    /** Route tracker action controls (foul / undo / respot) — never silent-drop guest/admin remotes. */
+    function runActionBallRemote(ballId) {
+        if (ballId === 'snookerUndoBtn') {
+            if (typeof undoLastScoringAction === 'function') {
+                return Promise.resolve(undoLastScoringAction()).then(publishAfterScoring);
+            }
+            return Promise.resolve();
+        }
+        if (ballId === 'poolFoulBtn') {
+            if (typeof applyPoolFoul === 'function') {
+                applyPoolFoul();
+            } else if (typeof window.applyPoolFoul === 'function') {
+                window.applyPoolFoul();
+            }
+            return Promise.resolve().then(publishAfterScoring);
+        }
+        // Snooker foul needs foulKey (snooker_foul). Respot needs a target ball (respot_ball).
+        if (ballId === 'poolRespotBtn' || isFoulBallId(ballId)) {
+            return Promise.resolve();
+        }
+        return null;
+    }
+
     /** Drop stale in-flight snapshots, then publish authoritative dock state. */
     function publishAfterScoring() {
         if (window.streamSharing && typeof window.streamSharing.invalidatePendingPublishes === 'function') {
@@ -213,8 +236,10 @@
             case 'toggle_pot':
             case 'snooker_ball': {
                 const ballId = payload && payload.ballId;
+                // Free Ball is ball 10 — not an action-control id; must reach handleSnookerBallClick.
                 if (isActionBallId(ballId)) {
-                    return Promise.resolve();
+                    const handled = runActionBallRemote(ballId);
+                    return handled || Promise.resolve();
                 }
                 const el = ballId ? document.getElementById(ballId) : null;
                 if (!el) return Promise.resolve();
@@ -234,7 +259,7 @@
                     ? applySnookerFoulByKey
                     : (typeof window.applySnookerFoulByKey === 'function' ? window.applySnookerFoulByKey : null);
                 if (apply) apply(String(payload.foulKey));
-                return Promise.resolve();
+                return Promise.resolve().then(publishAfterScoring);
             }
             case 'pool_foul': {
                 if (typeof applyPoolFoul === 'function') {
@@ -242,7 +267,7 @@
                 } else if (typeof window.applyPoolFoul === 'function') {
                     window.applyPoolFoul();
                 }
-                return Promise.resolve();
+                return Promise.resolve().then(publishAfterScoring);
             }
             case 'respot_ball': {
                 const ballId = payload && payload.ballId ? String(payload.ballId) : '';
@@ -251,7 +276,7 @@
                 } else if (ballId && typeof window.applyRespotBall === 'function') {
                     window.applyRespotBall(ballId);
                 }
-                return Promise.resolve();
+                return Promise.resolve().then(publishAfterScoring);
             }
             case 'reset_scores':
                 if (typeof window.canResetOrEndMatch === 'function' && !window.canResetOrEndMatch()) {

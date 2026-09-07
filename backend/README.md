@@ -109,7 +109,7 @@ On first Google sign-in, the server links `auth.users.id` to an `accounts` row. 
 
 Clients send `join` then `event`, `command`, `state`, or `session` messages. See the [CueSport Cloud plan](../docs/) or root README for full schema.
 
-**Guest links** (`join` with `guest_token`): reusable until revoked, but only **one live WebSocket per token**. A second concurrent join receives `guest_link_in_use`. Guests may score, change game setup (`set_game_type`, ball variant / early-game / golden ball / point-based, race, event info), and match controls (`reset_scores` / `end_match` / `call_match_early`); names and replay stay forbidden.
+**Guest links** (`join` with `guest_token`): reusable until revoked, but only **one live WebSocket per token**. A second concurrent join receives `guest_link_in_use`. Guests may score with the same action balls as the dock for that game (`pool_foul` / `snooker_foul` / `undo`; free ball via `snooker_ball` on Snooker; `respot_ball` on Bank / One Pocket), change game setup (`set_game_type`, ball variant / early-game / golden ball / point-based, race, event info), and match controls (`reset_scores` / `end_match` / `call_match_early`); names and replay stay forbidden.
 
 **Promote Live Stream** uses Cloud `state` only (`streamPromotionListed` + OBS live + stream URL). Legacy WebSocket `auth` / `update` messages are no longer accepted.
 

@@ -267,6 +267,26 @@
               assert('Guest call_match_early allowed', false, e.message);
             }
 
+            const actionCmds = [
+              { action: 'undo', payload: {} },
+              { action: 'pool_foul', payload: {} },
+              { action: 'respot_ball', payload: { ballId: 'ball 1' } },
+              { action: 'snooker_ball', payload: { ballId: 'ball 10' } },
+              { action: 'snooker_foul', payload: { foulKey: 'black' } },
+            ];
+            for (const cmd of actionCmds) {
+              try {
+                const p = waitForWsMessage(dockJoin.ws, (d) => d.type === 'command' && d.action === cmd.action);
+                guestWs.ws.send(JSON.stringify({
+                  type: 'command', action: cmd.action, payload: cmd.payload,
+                }));
+                const got = await p;
+                assert('Guest ' + cmd.action + ' allowed', got.action === cmd.action);
+              } catch (e) {
+                assert('Guest ' + cmd.action + ' allowed', false, e.message);
+              }
+            }
+
             try {
               const forbidP = waitForWsMessage(guestWs.ws, (d) => d.type === 'error' && d.code === 'guest_forbidden');
               guestWs.ws.send(JSON.stringify({

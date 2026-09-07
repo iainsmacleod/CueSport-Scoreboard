@@ -1078,6 +1078,87 @@ function updateMobileRackFoulDisplay(state) {
   }
 }
 
+function isSnookerGameState(state, snapshot) {
+  return !!(snapshot && snapshot.snooker) ||
+    state.gameType === 'game8' ||
+    state.ballSelection === 'snooker';
+}
+
+/** Bank / One Pocket — same rule as dock isPoolRespotGame(). */
+function isPoolRespotGameType(state) {
+  return state.gameType === 'game5' || state.gameType === 'game6';
+}
+
+function isTrackerActionControlId(id) {
+  return id === 'poolFoulBtn' || id === 'poolRespotBtn' || id === 'snookerUndoBtn';
+}
+
+function findSnapshotBall(snapshot, id) {
+  if (!snapshot || !Array.isArray(snapshot.balls)) return null;
+  return snapshot.balls.find((b) => b && b.id === id) || null;
+}
+
+/**
+ * Action-row controls mirror the dock per game type:
+ * - Snooker: Free Ball, Foul (picker), Undo
+ * - Bank / One Pocket: Foul, Respot, Undo
+ * - Other pool: Foul, Undo
+ */
+function appendActionBallsForGame(grid, state, snapshot, { locked, awaiting, canUndo, undoTitle }) {
+  const snooker = isSnookerGameState(state, snapshot);
+  if (snooker) {
+    const b10 = findSnapshotBall(snapshot, 'ball 10');
+    const freeOffered = state.snookerFreeBallOffered === true;
+    // When offered, keep tappable even if dock disable flag raced the publish.
+    const freeDisabled = locked || (!freeOffered && (b10 ? !!b10.disabled : true));
+    appendBallButton(grid, {
+      src: resolveBallImageSrc(state, 'ball 10', (b10 && b10.file) || 'snooker-freeball-small.png'),
+      title: (b10 && b10.title) || 'Free Ball',
+      faded: false,
+      disabled: freeOffered && !locked ? false : freeDisabled,
+      awaiting,
+      clicked: !!(b10 && b10.clicked),
+      extraClass: 'freeball-btn',
+      action: 'snooker_ball',
+      payload: { ballId: 'ball 10' },
+    });
+    const b11 = findSnapshotBall(snapshot, 'ball 11');
+    appendBallButton(grid, {
+      src: resolveBallImageSrc(state, 'ball 11', (b11 && b11.file) || 'foul-small.png'),
+      title: 'Foul',
+      faded: false,
+      disabled: locked || !!(b11 && b11.disabled),
+      awaiting,
+      action: 'open_foul_picker',
+      payload: { ballId: 'ball 11' },
+    });
+  } else {
+    const foul = findSnapshotBall(snapshot, 'poolFoulBtn');
+    appendBallButton(grid, {
+      src: `${BALL_IMG}/${ballImageBasename(foul && foul.file) || 'foul-small.png'}`,
+      title: 'Foul',
+      faded: false,
+      disabled: locked || !!(foul && foul.disabled),
+      awaiting,
+      action: 'pool_foul',
+      payload: { ballId: 'poolFoulBtn' },
+    });
+    if (isPoolRespotGameType(state)) {
+      const respot = findSnapshotBall(snapshot, 'poolRespotBtn');
+      appendBallButton(grid, {
+        src: `${BALL_IMG}/${ballImageBasename(respot && respot.file) || 'respot-small.png'}`,
+        title: 'Respot',
+        faded: false,
+        disabled: locked || (respot ? !!respot.disabled : true),
+        awaiting,
+        action: 'open_respot_picker',
+        payload: { ballId: 'poolRespotBtn' },
+      });
+    }
+  }
+  appendUndoButton(grid, { canUndo, title: undoTitle });
+}
+
 function renderBallGrid(state) {
   const panel = document.getElementById('ballGridPanel');
   const grid = document.getElementById('ballGrid');
@@ -1086,8 +1167,9 @@ function renderBallGrid(state) {
   updateMobileRackFoulDisplay(state);
   const awaiting = inferAwaitingBreaker(state);
   const locked = !!(state.gameScoringLocked || (snapshot && snapshot.locked));
+  const snooker = isSnookerGameState(state, snapshot);
   const canUndo = state.canUndo === true || (snapshot && snapshot.canUndo === true);
-  const undoTitle = snapshot && snapshot.snooker
+  const undoTitle = snooker
     ? 'Undo last pot, foul, or player change'
     : 'Undo last scoring action (pots, fouls, breaker, player change)';
   const useSnapshot = !!(snapshot && Array.isArray(snapshot.balls) && snapshot.balls.length);
@@ -1097,7 +1179,7 @@ function renderBallGrid(state) {
   const key = JSON.stringify({
     ballSig,
     ballSelection: state.ballSelection || 'american',
-    snooker: snapshot && snapshot.snooker,
+    snooker,
     awaiting,
     locked,
     canUndo,
@@ -1131,10 +1213,10 @@ function renderBallGrid(state) {
     } else if (locked) {
       hint.textContent = 'Scoring locked';
       hint.classList.remove('hidden');
-    } else if (state.snookerFreeBallOffered && snapshot && snapshot.snooker) {
+    } else if (state.snookerFreeBallOffered && snooker) {
       hint.textContent = 'Free ball available';
       hint.classList.remove('hidden');
-    } else if (!useSnapshot && (state.gameType === 'game8' || state.ballSelection === 'snooker')) {
+    } else if (!useSnapshot && snooker) {
       hint.textContent = 'Waiting for ball state from dock…';
       hint.classList.remove('hidden');
     } else {
@@ -1143,55 +1225,46 @@ function renderBallGrid(state) {
     }
   }
 
+  const actionOpts = { locked, awaiting, canUndo, undoTitle };
+
   if (useSnapshot) {
-    let hasPoolFoul = false;
     snapshot.balls.forEach((b) => {
-      if (b.hidden) return;
-      // Trust dock snapshot foul flag (snooker ball 11 / poolFoulBtn). Do not treat
-      // pool object ball 11 as foul — that was a snooker-era mobile shortcut.
-      const isFoul = b.foul === true || b.id === 'poolFoulBtn';
-      const isRespot = b.respot === true || b.id === 'poolRespotBtn';
-      if (isFoul && !snapshot.snooker) hasPoolFoul = true;
-      let action = snapshot.snooker ? 'snooker_ball' : 'toggle_pot';
-      if (isFoul) {
-        action = snapshot.snooker ? 'open_foul_picker' : 'pool_foul';
-      } else if (isRespot) {
-        action = 'open_respot_picker';
-      }
+      if (!b || b.hidden || isTrackerActionControlId(b.id)) return;
+      // Snooker Free Ball / Foul live on the action row — not as object pots.
+      if (snooker && (b.id === 'ball 10' || b.id === 'ball 11')) return;
       appendBallButton(grid, {
         src: resolveBallImageSrc(state, b.id, b.file),
         title: b.title,
-        // Prefer dock DOM snapshot — ballState can lag a rack-win reset over the wire.
         faded: !!b.faded,
         disabled: !!b.disabled || locked,
         awaiting,
         cooldown: !!b.cooldown,
         clicked: !!b.clicked,
-        extraClass: b.freeball ? 'freeball-btn' : '',
-        action,
+        action: snooker ? 'snooker_ball' : 'toggle_pot',
         payload: { ballId: b.id },
       });
     });
-    // Older docks / hidden poolFoulBtn: still expose Foul on mobile for pool games.
-    if (!snapshot.snooker && !hasPoolFoul) {
-      appendBallButton(grid, {
-        src: `${BALL_IMG}/foul-small.png`,
-        title: 'Foul',
-        faded: false,
-        disabled: locked,
-        awaiting,
-        action: 'pool_foul',
-        payload: { ballId: 'poolFoulBtn' },
-      });
-    }
-    appendUndoButton(grid, { canUndo, title: undoTitle });
+    appendActionBallsForGame(grid, state, snapshot, actionOpts);
     return;
   }
 
   const gt = state.gameType;
   const selection = state.ballSelection || 'american';
-  if (gt === 'game8' || selection === 'snooker') {
-    appendUndoButton(grid, { canUndo, title: undoTitle });
+  if (snooker) {
+    // Object colors until dock snapshot arrives; action row still usable.
+    for (let i = 1; i <= 8; i++) {
+      if (i === 8 && state.snookerGoldEnabled !== true) continue;
+      appendBallButton(grid, {
+        src: `${BALL_IMG}/${ballImageFile(i, 'snooker')}`,
+        title: `Ball ${i}`,
+        faded: false,
+        disabled: locked,
+        awaiting,
+        action: 'snooker_ball',
+        payload: { ballId: `ball ${i}` },
+      });
+    }
+    appendActionBallsForGame(grid, state, snapshot, actionOpts);
     return;
   }
 
@@ -1209,16 +1282,7 @@ function renderBallGrid(state) {
       payload: { ballId: id },
     });
   }
-  appendBallButton(grid, {
-    src: `${BALL_IMG}/foul-small.png`,
-    title: 'Foul',
-    faded: false,
-    disabled: locked,
-    awaiting,
-    action: 'pool_foul',
-    payload: { ballId: 'poolFoulBtn' },
-  });
-  appendUndoButton(grid, { canUndo, title: undoTitle });
+  appendActionBallsForGame(grid, state, snapshot, actionOpts);
 }
 
 function defaultSnookerFoulTargets() {

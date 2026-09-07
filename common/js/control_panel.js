@@ -3377,14 +3377,22 @@ async function handleSnookerBallClick(element) {
     if (!element || !element.id || isGameScoringLocked()) {
         return;
     }
-    if (element.classList.contains("snooker-ball-disabled") || element.getAttribute("aria-disabled") === "true") {
+    const matchEarly = element.id.match(/^ball\s+(\d+)$/);
+    const numEarly = matchEarly ? parseInt(matchEarly[1], 10) : NaN;
+    // Remote Free Ball: dock disable flag can lag the offered publish — honor offered state.
+    const freeballRemoteOk = numEarly === 10 &&
+        isCloudRemoteCommand() &&
+        typeof isSnookerFreeBallOffered === "function" &&
+        isSnookerFreeBallOffered();
+    if (!freeballRemoteOk &&
+        (element.classList.contains("snooker-ball-disabled") || element.getAttribute("aria-disabled") === "true")) {
         return;
     }
-    const match = element.id.match(/^ball\s+(\d+)$/);
+    const match = matchEarly;
     if (!match) {
         return;
     }
-    const num = parseInt(match[1], 10);
+    const num = numEarly;
     const meta = SNOOKER_BALL_META[num];
     if (!meta || meta.spacer) {
         return;

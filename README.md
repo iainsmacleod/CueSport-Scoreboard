@@ -105,7 +105,7 @@ You do not need a public server for the scoreboard itself. Local files or a tiny
 
 ![CueSport Cloud dashboard — Tables tab](docs/readme/images/04-cloud-dashboard.png)
 
-**Mobile control** — phone/tablet remote at `/m/{room_id}`; guests use `/g/{token}` (score + game setup + Restart/End/Call Match; one device per link; no names / replay).
+**Mobile control** — phone/tablet remote at `/m/{room_id}`; guests use `/g/{token}` (score with game-type action balls + game setup + Restart/End/Call Match; one device per link; no names / replay).
 
 ![CueSport Cloud mobile control](docs/readme/images/05-cloud-mobile-control.png)
 
@@ -310,7 +310,7 @@ The OBS **dock remains the scoring authority**. Mobile and guest clients send co
 |---------|-----|---------|
 | **Dashboard** | `/dashboard` | Sign in, see live tables, API keys, open mobile control |
 | **Mobile control** | `/m/{room_id}` | Full remote (admin): score, balls, setup, replay, share |
-| **Guest control** | `/g/{token}` | Limited remote: score, balls, fouls, breaker, game type and its options (ball variant, win on break / early game, golden ball, point based), race, event info, and **Restart/End/Call Match** — no names or replay. **One active device per guest link** at a time (link stays valid until revoked). |
+| **Guest control** | `/g/{token}` | Limited remote: score with the same action balls as the dock for that game (foul / undo; free ball on Snooker; respot on Bank / One Pocket), breaker, game type and its options (ball variant, win on break / early game, golden ball, point based), race, event info, and **Restart/End/Call Match** — no names or replay. **One active device per guest link** at a time (link stays valid until revoked). |
 | **Stream listing** | `/` or `/streams` | Public page of promoted live streams (requires Cloud + Promote toggle + OBS live + stream URL) |
 
 - **Stats-safe relay** — mobile commands invoke the same dock functions as the control panel (`postScore`, `selectRackBreaker`, etc.)
@@ -344,7 +344,7 @@ docker compose up -d --build
 2. Create an **OBS Dock Key** per dock (starter plan: 2 seats). Paste each key into that dock’s CueSport Cloud **Connection settings** (⚙) — managed or Self-hosting. Each key may only be connected on one dock at a time. Rooms are created automatically when the dock connects.
 3. Enable the **CueSport Cloud** toggle on the dock.
 4. On your phone, open **http://localhost:3000/m/{room_id}** — if you already signed in on the dashboard in the same browser, tap **Connect**; on a new device, enter the dev secret once (it is saved for next time).
-5. Optional: from mobile **Share**, create a **guest link** (`/g/{token}`) for helpers. Guests can score, change game setup (type + options, race, event info), and Restart/End/Call Match, but cannot edit names or use replay. Only one device may use a given guest link at once; revoke the link when you want it invalidated.
+5. Optional: from mobile **Share**, create a **guest link** (`/g/{token}`) for helpers. Guests can score with the same action balls as the dock for that game (foul, undo, free ball on Snooker, respot on Bank/One Pocket), change game setup (type + options, race, event info), and Restart/End/Call Match, but cannot edit names or use replay. Only one device may use a given guest link at once; revoke the link when you want it invalidated.
 
 See [`backend/README.md`](backend/README.md) for Supabase/Google OAuth production setup.
 
