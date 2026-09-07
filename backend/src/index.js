@@ -5,7 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { config } from './config.js';
-import { handleConnection, getConnectionCount } from './ws/room-hub.js';
+import { handleConnection, getConnectionCount, startRoomCleanupSweeper } from './ws/room-hub.js';
 import { registerAccountRoutes } from './api/accounts.js';
 import { registerEventRoutes } from './api/events.js';
 import { registerQrRoutes } from './api/qr.js';
@@ -136,6 +136,7 @@ await registerEventRoutes(app);
 registerQrRoutes(app);
 
 sqlite.getDb();
+startRoomCleanupSweeper();
 
 if (!fs.existsSync(path.join(webRoot, 'mobile', 'index.html'))) {
   app.log.error(

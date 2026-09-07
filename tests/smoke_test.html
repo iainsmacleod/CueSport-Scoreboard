@@ -476,6 +476,7 @@
             assert('Cloud', 'cloudManagedPane in DOM', !!cp.document.getElementById('cloudManagedPane'));
             assert('Cloud', 'cloudSelfHostPane in DOM', !!cp.document.getElementById('cloudSelfHostPane'));
             assert('Cloud', 'openCloudConnectionModal exposed', typeof cp.openCloudConnectionModal === 'function');
+            assert('Cloud', 'cloudManagedApiKeyModal in DOM', !!cp.document.getElementById('cloudManagedApiKeyModal'));
             assert('Cloud', 'OBS Dock Key label present',
                 (cp.document.querySelector('label[for="cloudApiKeyModal"]')?.textContent || '').indexOf('OBS Dock Key') !== -1);
             assert('Cloud', 'cloudRelayStatus in DOM', !!cp.document.getElementById('cloudRelayStatus'));
@@ -588,7 +589,8 @@
                         });
                         const loginBody = await loginRes.json();
                         assert('Cloud', 'Backend dev-login', loginRes.ok && loginBody.access_token?.startsWith('dev:'));
-                        assert('Cloud', 'Backend dev-login room', !!loginBody.room?.id);
+                        // Rooms are created on first dock join (seat model), not at login.
+                        assert('Cloud', 'Backend dev-login room optional', loginBody.room == null || !!loginBody.room?.id);
                     }
                 }
             } catch (cloudErr) {

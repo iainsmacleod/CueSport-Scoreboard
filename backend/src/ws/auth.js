@@ -104,7 +104,7 @@ export async function authenticateJoin({ apiKey, accessToken, roomId, client }) 
 
     let account = sqlite.getAccountByAuthUserId(sub);
     if (!account) {
-      const ensured = sqlite.ensureAccountWithRoom(email, sub);
+      const ensured = sqlite.ensureAccount(email, sub);
       account = ensured.account;
     }
 
@@ -127,7 +127,7 @@ export async function authenticateJoin({ apiKey, accessToken, roomId, client }) 
 }
 
 export async function ensureAccountFromOAuth(email, authUserId) {
-  return sqlite.ensureAccountWithRoom(email, authUserId);
+  return sqlite.ensureAccount(email, authUserId);
 }
 
 export { getSupabase };

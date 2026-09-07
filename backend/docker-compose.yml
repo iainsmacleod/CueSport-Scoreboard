@@ -3,6 +3,7 @@
 # Copy .env.example → .env and set at least:
 #   PUBLIC_URL=http://localhost:4003
 #   DEV_AUTH_SECRET=...
+#   DEV_AUTH_ACCOUNT_EMAIL=you@example.com
 #
 # Tier quotas (optional — defaults apply when unset):
 #   TIER_DEFAULT=selfhost          # with ALLOW_DEV_AUTH; else starter

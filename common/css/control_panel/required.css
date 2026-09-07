@@ -1026,6 +1026,18 @@ select.dropdown option,
 	min-width: 0;
 }
 
+/* Text links in the dock (readable on dark + light themes; matches Support Developer). */
+.cp-text-link,
+a.cp-text-link {
+	color: red;
+	text-decoration: underline;
+	cursor: pointer;
+}
+.cp-text-link:hover,
+a.cp-text-link:hover {
+	color: #ed4e54;
+}
+
 .cloud-meta-row .cloud-status {
 	justify-content: flex-end;
 	margin-left: auto;

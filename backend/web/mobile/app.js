@@ -230,7 +230,7 @@ function renderGuestLinks(links) {
     const status = n > 0
       ? `${n} connected`
       : 'Offline';
-    label.textContent = `${g.label || 'Guest'} · ${g.created_at} · ${status}`;
+    label.textContent = `${g.label || 'Guest'} · ${formatLocalDateTime(g.created_at) || g.created_at} · ${status}`;
     if (g.token === cachedGuestShareToken) li.classList.add('is-current');
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -1551,11 +1551,42 @@ function escapeHtml(text) {
     .replace(/"/g, '&quot;');
 }
 
+function parseUtcDate(value) {
+  if (!value) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  let iso = raw;
+  if (!/(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw)) {
+    iso = raw.includes('T') ? raw : raw.replace(' ', 'T');
+    if (!/[zZ]$/.test(iso)) iso += 'Z';
+  }
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function formatLocalDate(value) {
+  const d = parseUtcDate(value);
+  if (!d) return value ? String(value) : '—';
+  return d.toLocaleDateString();
+}
+
+function formatLocalDateTime(value) {
+  const d = parseUtcDate(value);
+  if (!d) return value ? String(value) : '';
+  return d.toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
 function formatPlayerPreview(lastSeenAt) {
   if (!lastSeenAt) return 'Saved player';
-  const d = new Date(lastSeenAt);
-  if (Number.isNaN(d.getTime())) return 'Saved player';
-  return `Last seen ${d.toLocaleDateString()}`;
+  const local = formatLocalDate(lastSeenAt);
+  if (!local || local === '—') return 'Saved player';
+  return `Last seen ${local}`;
 }
 
 const playerAutocompleteState = {};

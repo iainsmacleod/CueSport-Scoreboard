@@ -21,7 +21,7 @@ for more information about Salotto please visit https://salotto.app
     <link rel="stylesheet" href="./common/css/control_panel/grey.css?v=8.0.0" />
     <link rel="stylesheet" href="./common/css/control_panel/light.css?v=8.0.0" />
     <link rel="stylesheet" href="./common/css/control_panel/rachni.css?v=8.0.0" />
-    <link rel="stylesheet" href="./common/css/control_panel/required.css?v=8.0.0.11" />
+    <link rel="stylesheet" href="./common/css/control_panel/required.css?v=8.0.0.12" />
     <script>
         //---------------------------------------------------------------------------------------------
         var versionNum = "8.0.0";
@@ -29,7 +29,7 @@ for more information about Salotto please visit https://salotto.app
     </script>
     <script src="./common/js/obs-websocket-js.js?v=8.0.0"></script>
     <script src="./common/js/jquery.js?v=8.0.0"></script>
-    <script src="./common/js/cloud_relay.js?v=8.0.0.11"></script>
+    <script src="./common/js/cloud_relay.js?v=8.0.0.12"></script>
     <script src="./common/js/stream_sharing.js?v=8.0.0"></script>
     <script src="./common/js/player_stats.js?v=8.0.0.16"></script>
     <script src="./common/js/control_panel.js?v=8.0.0.24"></script>
@@ -582,7 +582,7 @@ for more information about Salotto please visit https://salotto.app
                 <div class="form-row cloud-meta-row" id="cloudMetaRow">
                     <div class="field cloud-stats-cta" id="cloudStatsCtaRow" style="display: none;">
                         <span>Cloud Statistics Enabled &mdash;</span>
-                        <a href="#" onclick="document.getElementById('statsTab').click(); return false;">View in Stats tab</a>
+                        <a class="cp-text-link" href="#" onclick="document.getElementById('statsTab').click(); return false;">View in Stats tab</a>
                     </div>
                     <div class="field cloud-status" id="cloudStatusRow">
                         <span id="cloudSignedInEmail" class="noShow"></span><span id="cloudStatusSep" class="noShow">&nbsp;|&nbsp;</span><span>Status: <span id="cloudRelayStatus">Off</span></span>
@@ -724,16 +724,22 @@ for more information about Salotto please visit https://salotto.app
                     <div class="modal-body">
                         <div id="cloudManagedPane">
                             <p style="font-size: 0.9em; opacity: 0.9; margin-bottom: 0.75rem;">
-                                Sign in to the managed CueSport Cloud service, then enable the CueSport Cloud toggle to connect this dock.
+                                Sign in to manage your account, then paste an <strong>OBS Dock Key</strong> from the dashboard (Account → OBS Dock Keys). Every dock needs its own key — same seat model as self-host.
                             </p>
                             <div class="form-row">
                                 <div class="field">
                                     <div class="hover obs28 button" onclick="signInWithGoogle()">Sign in with Google</div>
                                 </div>
                             </div>
+                            <div class="form-row">
+                                <div class="field">
+                                    <label for="cloudManagedApiKeyModal">OBS Dock Key:</label>
+                                    <input type="text" id="cloudManagedApiKeyModal" placeholder="32-char hex key from dashboard" style="width: 100%;" />
+                                </div>
+                            </div>
                             <div class="form-row" style="margin-top: 0.75rem;">
                                 <div class="field">
-                                    <a href="#" id="cloudShowSelfHostLink" onclick="showCloudSelfHostPane(); return false;" style="font-size: 0.85em;">Self-hosting</a>
+                                    <a href="#" id="cloudShowSelfHostLink" class="cp-text-link" onclick="showCloudSelfHostPane(); return false;" style="font-size: 0.85em;">Self-hosting</a>
                                 </div>
                             </div>
                         </div>
@@ -755,14 +761,16 @@ for more information about Salotto please visit https://salotto.app
                             </div>
                             <div class="form-row" style="margin-top: 0.75rem;">
                                 <div class="field">
-                                    <a href="#" id="cloudShowManagedLink" onclick="showCloudManagedPane(); return false;" style="font-size: 0.85em;">Managed service subscription?</a>
+                                    <a href="#" id="cloudShowManagedLink" class="cp-text-link" onclick="showCloudManagedPane(); return false;" style="font-size: 0.85em;">Managed service subscription?</a>
                                 </div>
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer">
                         <div class="modal-footer-buttons">
-                            <button id="cloudConnectionSaveBtn" class="modal-save-btn hover obs28 button noShow" onclick="saveCloudSelfHostSettings()">Save</button>
+                            <button id="cloudConnectionSaveConnectBtn" class="modal-save-btn hover obs28 button" onclick="saveCloudConnectionSettingsAndConnect()" title="Save settings and enable CueSport Cloud">Save &amp; Connect</button>
+                            <button id="cloudConnectionSaveBtn" class="modal-save-btn hover obs28 button" onclick="saveCloudConnectionSettings()">Save</button>
+                            <button type="button" class="modal-cancel-btn hover obs28 button" onclick="signOutCloud()" title="Remove key and sign out on this dock">Clear key</button>
                             <button class="modal-cancel-btn hover obs28 button" onclick="closeCloudConnectionModal()">Close</button>
                         </div>
                     </div>

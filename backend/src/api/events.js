@@ -131,7 +131,7 @@ function findPairByStartId(accountId, startEventId) {
 }
 
 function assertEventAccount(event, accountId) {
-  return event && sqlite.roomBelongsToAccount(event.room_id, accountId);
+  return !!(event && event.account_id === accountId);
 }
 
 export async function registerEventRoutes(app) {
@@ -267,8 +267,9 @@ export async function registerEventRoutes(app) {
     if (!pair?.start || !assertEventAccount(pair.start, account.id)) {
       return reply.code(404).send({ error: 'Match not found' });
     }
+    const abandoned = !pair.end;
     const deleted = sqlite.deleteMatchEvents([pair.start.id, pair.end?.id]);
-    return { ok: true, deleted };
+    return { ok: true, deleted, abandoned };
   });
 
   app.patch('/api/stats/players', async (request, reply) => {
@@ -286,7 +287,7 @@ export async function registerEventRoutes(app) {
     let updated = 0;
     for (const ev of events) {
       if (ev.event_type !== 'session:start') continue;
-      if (!sqlite.roomBelongsToAccount(ev.room_id, account.id)) continue;
+      if (ev.account_id !== account.id) continue;
       const payload = { ...(ev.payload || {}) };
       let changed = false;
       if (namesEqual(payload.player1, fromName)) {

@@ -4,16 +4,20 @@
  * Usage: node tests/cloud-api.mjs [baseUrl]
  * Default baseUrl: http://localhost:3000
  */
+import crypto from 'crypto';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import WebSocket from 'ws';
+import Database from 'better-sqlite3';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 const BASE = (process.argv[2] || process.env.CLOUD_TEST_URL || 'http://localhost:3000').replace(/\/$/, '');
 const WS_BASE = BASE.replace(/^http/, 'ws');
+const SQLITE_PATH = process.env.SQLITE_PATH
+  || path.join(__dirname, '..', 'data', 'cuesport.db');
 
 let passed = 0;
 let failed = 0;
@@ -146,8 +150,9 @@ async function run() {
 
   // Dev auth
   const devSecret = process.env.DEV_AUTH_SECRET || '';
-  if (!devSecret) {
-    console.warn('  SKIP  dev auth tests — set DEV_AUTH_SECRET in backend/.env');
+  const devAccountEmail = (process.env.DEV_AUTH_ACCOUNT_EMAIL || '').trim();
+  if (!devSecret || !devAccountEmail) {
+    console.warn('  SKIP  dev auth tests — set DEV_AUTH_SECRET and DEV_AUTH_ACCOUNT_EMAIL in backend/.env');
   } else {
     const login = await fetchJson('/api/auth/dev-login', {
       method: 'POST',
@@ -156,7 +161,8 @@ async function run() {
     });
     assert('POST /api/auth/dev-login', login.ok);
     assert('Dev token prefix dev:', login.body.access_token?.startsWith('dev:'));
-    assert('Dev login returns room', !!login.body.room?.id);
+    // Rooms are created on dock connect — login may return null room.
+    assert('Dev login room optional', login.body.room == null || !!login.body.room?.id);
 
     const badLogin = await fetchJson('/api/auth/dev-login', {
       method: 'POST',
@@ -166,18 +172,45 @@ async function run() {
     assert('Invalid dev secret returns 401', badLogin.status === 401);
     assert('Invalid dev secret error message', badLogin.body.error === 'Invalid dev auth secret');
 
-    const token = login.body.access_token;
-    const roomId = login.body.room.id;
-    const devAccountEmail = process.env.DEV_AUTH_ACCOUNT_EMAIL || 'dev@local';
+    let token = login.body.access_token;
+    let roomId = login.body.room?.id || null;
 
     const me = await fetchJson('/api/me', {
       headers: { Authorization: `Bearer ${token}` },
     });
     assert('GET /api/me with dev token', me.ok && me.body.account?.email === devAccountEmail);
     assert('GET /api/me includes quota', !!me.body.quota?.limits?.maxApiKeys);
+    assert('GET /api/me includes room_cleanup config', !!me.body.room_cleanup?.grace_ms);
+    const accountId = me.body.account?.id;
+
+    // Free seats/rooms from prior smoke runs so this account is under tier caps.
+    for (const room of me.body.rooms || []) {
+      await fetchJson(`/api/rooms/${room.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    }
+    for (const k of me.body.api_keys || []) {
+      await fetchJson(`/api/api-keys/${k.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    }
+    roomId = null;
+
+    const postRoomsGone = await fetchJson('/api/rooms', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ label: 'should-fail' }),
+    });
+    assert('POST /api/rooms disabled (410)', postRoomsGone.status === 410);
 
     // Create API key (or use existing from prior runs / auto-created on first login)
     let apiKey = null;
+    let apiKeyId = null;
     const keyRes = await fetchJson('/api/api-keys', {
       method: 'POST',
       headers: {
@@ -189,6 +222,7 @@ async function run() {
     if (keyRes.ok) {
       assert('POST /api/api-keys', keyRes.body.key?.length === 32);
       apiKey = keyRes.body.key;
+      apiKeyId = keyRes.body.id;
       const viewRes = await fetchJson(`/api/api-keys/${keyRes.body.id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -212,30 +246,77 @@ async function run() {
         });
         assert('POST /api/api-keys after revoke', retry.ok && retry.body.key?.length === 32);
         apiKey = retry.body.key;
+        apiKeyId = retry.body.id;
       } else {
         assert('Have API key for dock tests', false, 'no keys and create failed');
       }
     }
 
-    // Revoke + recreate cycle
-    const me2 = await fetchJson('/api/me', { headers: { Authorization: `Bearer ${token}` } });
-    const smokeKey = (me2.body.api_keys || []).find((k) => k.label === 'smoke-test' || k.label === 'smoke-test-retry');
-    if (smokeKey) {
-      const revoked = await fetchJson(`/api/api-keys/${smokeKey.id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      assert('DELETE /api/api-keys', revoked.ok);
-      const recreate = await fetchJson('/api/api-keys', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ label: 'smoke-test-2' }),
-      });
-      assert('Recreate API key after revoke', recreate.ok && recreate.body.key?.length === 32);
-      apiKey = recreate.body.key;
+    // Dock without key rejected; dock with key creates room
+    const smokeInstance = `smoke-${Date.now()}`;
+    try {
+      await wsJoin({ client: 'dock', accessToken: token, instanceId: 'smoke-no-key' });
+      assert('Dock join without api_key rejected', false, 'should have failed');
+    } catch (e) {
+      assert(
+        'Dock join without api_key rejected',
+        e.code === 'dock_key_required' || /dock key/i.test(e.message),
+        e.message
+      );
+    }
+    if (apiKey) {
+      try {
+        const boot = await wsJoin({ client: 'dock', apiKey, instanceId: smokeInstance });
+        roomId = boot.data.room_id;
+        assert('Dock join creates room', !!roomId);
+        boot.ws.close();
+        await sleep(150);
+      } catch (e) {
+        assert('Dock join creates room', false, e.message);
+      }
+    }
+
+    // Regenerate the key currently in use (kick live dock), keep seat label
+    if (apiKeyId && apiKey && roomId) {
+      let dockToKick = null;
+      let labelBefore = null;
+      try {
+        const meKeys = await fetchJson('/api/me', { headers: { Authorization: `Bearer ${token}` } });
+        labelBefore = (meKeys.body.api_keys || []).find((k) => k.id === apiKeyId)?.label || null;
+        dockToKick = await wsJoin({ client: 'dock', apiKey, instanceId: smokeInstance });
+        const dockKeyId = dockToKick.data.api_key_id || apiKeyId;
+        assert('Dock join reports api_key_id', !!dockToKick.data.api_key_id, JSON.stringify(dockToKick.data));
+        const kickedP = waitForWsErrorThenClose(dockToKick.ws);
+        const regenerated = await fetchJson(`/api/api-keys/${dockKeyId}/regenerate`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        assert('POST /api/api-keys/:id/regenerate', regenerated.ok && regenerated.body.key?.length === 32);
+        assert('Regenerate keeps seat label', !labelBefore || regenerated.body.label === labelBefore, regenerated.body.label);
+        assert('Regenerate reports kicked', (regenerated.body.kicked || 0) >= 1, `kicked=${regenerated.body.kicked}`);
+        const kicked = await kickedP;
+        assert('Regenerate kicks dock with api_key_revoked', kicked.code === 'api_key_revoked');
+        apiKey = regenerated.body.key;
+        apiKeyId = regenerated.body.id;
+      } catch (e) {
+        assert('Regenerate kicks dock with api_key_revoked', false, e.message);
+        if (dockToKick) try { dockToKick.ws.close(); } catch (_) { /* ignore */ }
+      }
+    }
+
+    if (apiKey && smokeInstance && roomId) {
+      try {
+        const dockReuse = await wsJoin({ client: 'dock', apiKey, instanceId: smokeInstance });
+        assert('Dock reconnect same instance reuses room', dockReuse.data.room_id === roomId);
+        dockReuse.ws.close();
+        await sleep(100);
+      } catch (e) {
+        assert('Dock reconnect same instance reuses room', false, e.message);
+      }
+    }
+
+    if (!roomId) {
+      assert('Have roomId for remaining tests', false, 'dock did not create a room');
     }
 
     // Invalidate sessions — old token dies, fresh token works
@@ -282,10 +363,10 @@ async function run() {
     if (apiKey) {
       let seatA;
       try {
-        seatA = await wsJoin({ roomId, client: 'dock', apiKey });
+        seatA = await wsJoin({ client: 'dock', apiKey, instanceId: smokeInstance });
         let rejected = false;
         try {
-          await wsJoin({ roomId, client: 'dock', apiKey });
+          await wsJoin({ client: 'dock', apiKey, instanceId: `${smokeInstance}-b` });
         } catch (e) {
           rejected = e.code === 'api_key_in_use' || /already in use/i.test(e.message);
           assert('Same API key rejects second dock', rejected, e.message);
@@ -305,8 +386,9 @@ async function run() {
     // WebSocket: dock api key
     let dockJoin;
     try {
-      dockJoin = await wsJoin({ roomId, client: 'dock', apiKey });
+      dockJoin = await wsJoin({ client: 'dock', apiKey, instanceId: smokeInstance });
       assert('WS join dock + api_key', dockJoin.data.room_id === roomId);
+      roomId = dockJoin.data.room_id;
     } catch (e) {
       assert('WS join dock + api_key', false, e.message);
     }
@@ -354,13 +436,13 @@ async function run() {
     }
 
     // Session + state persistence
-    const dock2 = await wsJoin({ roomId, client: 'dock', apiKey }).catch(() => null);
+    const dock2 = await wsJoin({ client: 'dock', apiKey, instanceId: smokeInstance }).catch(() => null);
     if (dock2) {
       dock2.ws.send(JSON.stringify({
         type: 'session',
         room_id: roomId,
         action: 'start',
-        payload: { gameType: 'game1', player1: 'A', player2: 'B' },
+        payload: { gameType: 'game1', player1: 'A', player2: 'B', sessionId: 'smoke-match' },
       }));
       dock2.ws.send(JSON.stringify({
         type: 'state',
@@ -372,7 +454,7 @@ async function run() {
         type: 'session',
         room_id: roomId,
         action: 'end',
-        payload: { matchId: 'smoke-match', winnerSlot: '1', scores: { p1: 5, p2: 2 }, reason: 'race_complete' },
+        payload: { matchId: 'smoke-match', sessionId: 'smoke-match', winnerSlot: '1', scores: { p1: 5, p2: 2 }, reason: 'race_complete' },
       }));
       await sleep(200);
       const events = await fetchJson(`/api/rooms/${roomId}/events?limit=5`, {
@@ -493,6 +575,39 @@ async function run() {
       } else {
         assert('PATCH /api/stats/matches/:id', false, 'no completed match to edit');
       }
+
+      // Abandon an in-progress (unended) match — stats-only discard of session:start
+      const abandonStartId = crypto.randomUUID();
+      const abandonSession = `abandon-${abandonStartId.slice(0, 8)}`;
+      const abandonDb = new Database(SQLITE_PATH);
+      abandonDb.pragma('foreign_keys = ON');
+      abandonDb.prepare(
+        `INSERT INTO match_events (id, account_id, room_id, session_id, event_type, payload, source_client)
+         VALUES (?, ?, ?, ?, 'session:start', ?, 'dock')`
+      ).run(
+        abandonStartId,
+        accountId,
+        roomId,
+        abandonSession,
+        JSON.stringify({ sessionId: abandonSession, gameType: 'game1', player1: 'LiveP1', player2: 'LiveP2' })
+      );
+      abandonDb.close();
+      const beforeAbandon = await fetchJson('/api/stats', {
+        headers: { Authorization: `Bearer ${tokenFresh}` },
+      });
+      const liveBefore = (beforeAbandon.body.matches || []).find((m) => m.startEventId === abandonStartId);
+      assert('Active match appears in stats', !!liveBefore && liveBefore.status === 'active');
+      const abandoned = await fetchJson(`/api/stats/matches/${abandonStartId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${tokenFresh}` },
+      });
+      assert('Abandon in-progress match', abandoned.ok && abandoned.body.ok === true && abandoned.body.abandoned === true);
+      const afterAbandon = await fetchJson('/api/stats', {
+        headers: { Authorization: `Bearer ${tokenFresh}` },
+      });
+      const liveAfter = (afterAbandon.body.matches || []).find((m) => m.startEventId === abandonStartId);
+      assert('Abandoned match removed from stats', !liveAfter);
+
       dock2.ws.close();
     } else {
       assert('Events persisted', false, 'dock join failed');
@@ -521,6 +636,100 @@ async function run() {
         assert('Revoke All Guest Sessions disconnects guests', guestKicked.code === 'guest_revoked');
       } catch (e) {
         assert('Guest WS disconnect on revoke-all', false, e.message);
+      }
+    }
+
+    // DELETE /api/rooms — disconnects clients; match history kept (tested below via FK)
+    if (roomId) {
+      const delRoom = await fetchJson(`/api/rooms/${roomId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${tokenFresh}` },
+      });
+      assert('DELETE /api/rooms/:roomId', delRoom.ok && delRoom.body.ok === true);
+      const meAfterDel = await fetchJson('/api/me', {
+        headers: { Authorization: `Bearer ${tokenFresh}` },
+      });
+      const stillThere = (meAfterDel.body.rooms || []).some((r) => r.id === roomId);
+      assert('Deleted room removed from /api/me', !stillThere);
+    }
+
+    // Match history is account-scoped: deleting a room must not wipe events (ON DELETE SET NULL).
+    if (accountId) {
+      try {
+        const ephemeralRoomId = crypto.randomUUID();
+        const startId = crypto.randomUUID();
+        const endId = crypto.randomUUID();
+        const sessionKey = `survive-${startId.slice(0, 8)}`;
+        const localDb = new Database(SQLITE_PATH);
+        localDb.pragma('foreign_keys = ON');
+        localDb.prepare(
+          'INSERT INTO rooms (id, account_id, label) VALUES (?, ?, ?)'
+        ).run(ephemeralRoomId, accountId, 'ephemeral-stats-room');
+        localDb.prepare(
+          `INSERT INTO match_events (id, account_id, room_id, session_id, event_type, payload, source_client, created_at)
+           VALUES (?, ?, ?, ?, 'session:start', ?, 'dock', ?)`
+        ).run(
+          startId,
+          accountId,
+          ephemeralRoomId,
+          sessionKey,
+          JSON.stringify({ sessionId: sessionKey, gameType: 'game1', player1: 'SurvP1', player2: 'SurvP2' }),
+          '2026-01-01 12:00:00'
+        );
+        localDb.prepare(
+          `INSERT INTO match_events (id, account_id, room_id, session_id, event_type, payload, source_client, created_at)
+           VALUES (?, ?, ?, ?, 'session:end', ?, 'dock', ?)`
+        ).run(
+          endId,
+          accountId,
+          ephemeralRoomId,
+          sessionKey,
+          JSON.stringify({
+            matchId: sessionKey,
+            sessionId: sessionKey,
+            winnerSlot: '1',
+            scores: { p1: 5, p2: 1 },
+            reason: 'race_complete',
+          }),
+          '2026-01-01 12:00:01'
+        );
+        localDb.prepare('DELETE FROM rooms WHERE id = ?').run(ephemeralRoomId);
+        const nulled = localDb.prepare(
+          'SELECT account_id, room_id FROM match_events WHERE id = ?'
+        ).get(startId);
+        localDb.close();
+        assert(
+          'Room delete nulls match_events.room_id',
+          !!nulled && nulled.account_id === accountId && nulled.room_id == null
+        );
+        const statsSurvive = await fetchJson('/api/stats', {
+          headers: { Authorization: `Bearer ${tokenFresh}` },
+        });
+        const survived = (statsSurvive.body.matches || []).find((m) => m.startEventId === startId);
+        assert('GET /api/stats keeps match after room delete', !!survived && survived.player1Name === 'SurvP1');
+        assert('Stats players array after room delete', statsSurvive.ok && Array.isArray(statsSurvive.body.players));
+
+        // Cross-check: PATCH still finds match by account_id even with null room_id.
+        const patchOrphan = await fetchJson(`/api/stats/matches/${startId}`, {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${tokenFresh}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            player1Name: 'SurvP1',
+            player2Name: 'SurvP2',
+            gameType: 'game1',
+            scores: { p1: 6, p2: 2 },
+          }),
+        });
+        assert(
+          'PATCH match with null room_id',
+          patchOrphan.ok && patchOrphan.body.ok === true,
+          `${patchOrphan.status} ${JSON.stringify(patchOrphan.body)}`
+        );
+      } catch (e) {
+        assert('Stats survive room delete', false, e.message);
       }
     }
   }

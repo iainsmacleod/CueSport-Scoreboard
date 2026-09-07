@@ -165,8 +165,8 @@
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
             </button>
           </div>
-          <label class="admin-only" for="gameTypeSelect">Game Type</label>
-          <div class="field-row admin-only">
+          <label for="gameTypeSelect">Game Type</label>
+          <div class="field-row">
             <select id="gameTypeSelect"></select>
           </div>
           <label id="setupBallVariantLabel" class="admin-only hidden" for="ballSelectionSelect">Ball Variant</label>
@@ -240,8 +240,8 @@
         <div class="panel share-panel">
           <h2>Public Control Link</h2>
           <p class="hint share-limitations">
-            Guests can score, pot balls, apply fouls, pick the breaker, and edit race / event info.
-            They cannot change player names, game type, reset or end the match, or use replay.
+            Guests can score, pot balls, apply fouls, pick the breaker, and edit game type, race, and event info.
+            They cannot change player names, ball variants, reset or end the match, or use replay.
           </p>
           <div id="shareQrWrap" class="share-qr-wrap">
             <img id="shareQrImg" class="share-qr hidden" alt="QR code for public control link" />
@@ -333,6 +333,6 @@
       <div id="poolRespotTargets" class="snooker-foul-targets"></div>
     </div>
   </div>
-  <script type="module" src="/web/mobile/app.js?v=8.0.0.17"></script>
+  <script type="module" src="/web/mobile/app.js?v=8.0.0.18"></script>
 </body>
 </html>

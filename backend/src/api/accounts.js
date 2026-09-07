@@ -6,14 +6,40 @@ import {
   resolveDevAccountFromToken,
   validateDevSecret,
 } from '../dev-auth.js';
-import { ensureAccountFromOAuth } from '../ws/auth.js';
-import { roomHasConnectedDock, guestConnectionCounts, kickGuestToken, kickAccountAdminClients, kickAccountGuestClients } from '../ws/room-hub.js';
+import {
+  roomHasConnectedDock,
+  guestConnectionCounts,
+  kickGuestToken,
+  kickAccountAdminClients,
+  kickAccountGuestClients,
+  kickApiKeyDocks,
+  performDeleteRoom,
+  getRoomCleanupAfter,
+  resolveRoomApiKeyId,
+} from '../ws/room-hub.js';
 import { config } from '../config.js';
 import {
   assertCanCreateApiKey,
-  assertCanCreateRoom,
   getAccountQuota,
 } from '../quotas.js';
+
+function enrichRoom(room) {
+  const cleanupMs = getRoomCleanupAfter(room.id);
+  const apiKeyId = resolveRoomApiKeyId(room.id, room.api_key_id);
+  const apiKey = apiKeyId ? sqlite.getApiKeyById(apiKeyId) : null;
+  const apiKeyLabel = apiKey?.label || room.api_key_label || null;
+  return {
+    ...room,
+    api_key_id: apiKeyId || null,
+    api_key_label: apiKeyLabel,
+    // Title is the seat name (OBS Dock Key N), never instance nicknames like "Main table".
+    dock_label: apiKeyLabel || (room.dock_label !== 'Main table' && room.dock_label !== 'Default Room'
+      ? room.dock_label
+      : null) || apiKeyLabel || 'Connection',
+    dock_connected: roomHasConnectedDock(room.id),
+    cleanup_after: cleanupMs ? new Date(cleanupMs).toISOString() : null,
+  };
+}
 
 export async function registerAccountRoutes(app) {
   /** Dev login — returns signed token when DEV_AUTH_SECRET is configured */
@@ -22,7 +48,9 @@ export async function registerAccountRoutes(app) {
       return reply.code(403).send({ error: 'Dev auth disabled' });
     }
     if (!isDevAuthConfigured()) {
-      return reply.code(503).send({ error: 'Dev auth not configured (set DEV_AUTH_SECRET)' });
+      return reply.code(503).send({
+        error: 'Dev auth not configured (set DEV_AUTH_SECRET and DEV_AUTH_ACCOUNT_EMAIL)',
+      });
     }
     const { secret } = request.body || {};
     if (!secret || typeof secret !== 'string') {
@@ -31,7 +59,7 @@ export async function registerAccountRoutes(app) {
     if (!validateDevSecret(secret)) {
       return reply.code(401).send({ error: 'Invalid dev auth secret', message: 'Invalid dev auth secret' });
     }
-    const { account, room } = ensureDevAccount();
+    const { account } = ensureDevAccount();
     let apiKey = sqlite.getApiKeysForAccount(account.id)[0];
     let apiKeyPlain = null;
     if (!apiKey) {
@@ -46,6 +74,7 @@ export async function registerAccountRoutes(app) {
       const created = sqlite.createApiKey(account.id);
       apiKeyPlain = created.plaintext;
     }
+    const firstRoom = sqlite.getRoomsForAccount(account.id)[0] || null;
     return {
       access_token: issueDevToken(account),
       account: {
@@ -54,7 +83,7 @@ export async function registerAccountRoutes(app) {
         subscription_status: account.subscription_status,
         subscription_tier: account.subscription_tier,
       },
-      room: { id: room.id, label: room.label },
+      room: firstRoom ? { id: firstRoom.id, label: firstRoom.label } : null,
       api_key: apiKeyPlain,
       quota: getAccountQuota(account),
     };
@@ -67,10 +96,7 @@ export async function registerAccountRoutes(app) {
   app.get('/api/me', async (request, reply) => {
     const account = await resolveAccountFromRequest(request);
     if (!account) return reply.code(401).send({ error: 'Unauthorized' });
-    const rooms = sqlite.getRoomsWithLiveState(account.id).map((room) => ({
-      ...room,
-      dock_connected: roomHasConnectedDock(room.id),
-    }));
+    const rooms = sqlite.getRoomsWithLiveState(account.id).map(enrichRoom);
     const keys = sqlite.getApiKeysForAccount(account.id);
     return {
       account: {
@@ -82,6 +108,11 @@ export async function registerAccountRoutes(app) {
       rooms,
       api_keys: keys,
       quota: getAccountQuota(account),
+      room_cleanup: {
+        grace_ms: config.roomCleanupGraceMs,
+        idle_ttl_ms: config.roomIdleTtlMs,
+        sweeper_ms: config.roomCleanupSweeperMs,
+      },
     };
   });
 
@@ -141,6 +172,24 @@ export async function registerAccountRoutes(app) {
     return { guest_links };
   });
 
+  app.delete('/api/rooms/:roomId', async (request, reply) => {
+    const account = await resolveAccountFromRequest(request);
+    if (!account) return reply.code(401).send({ error: 'Unauthorized' });
+    const { roomId } = request.params;
+    if (!sqlite.roomBelongsToAccount(roomId, account.id)) {
+      return reply.code(403).send({ error: 'Forbidden' });
+    }
+    const result = performDeleteRoom(roomId);
+    if (!result.ok) {
+      return reply.code(404).send({ error: 'Room not found' });
+    }
+    return {
+      ok: true,
+      quota: getAccountQuota(account),
+      rooms: sqlite.getRoomsWithLiveState(account.id).map(enrichRoom),
+    };
+  });
+
   app.delete('/api/guest-links/:token', async (request, reply) => {
     const account = await resolveAccountFromRequest(request);
     if (!account) return reply.code(401).send({ error: 'Unauthorized' });
@@ -162,24 +211,13 @@ export async function registerAccountRoutes(app) {
     return { ok: true, revoked };
   });
 
-  app.post('/api/rooms', async (request, reply) => {
-    const account = await resolveAccountFromRequest(request);
-    if (!account) return reply.code(401).send({ error: 'Unauthorized' });
-    const check = assertCanCreateRoom(account);
-    if (!check.ok) {
-      return reply.code(403).send({
-        error: check.message,
-        code: check.code,
-        quota: check.quota,
-      });
-    }
-    const { label } = request.body || {};
-    const { v4: uuidv4 } = await import('uuid');
-    const id = uuidv4();
-    sqlite.getDb().prepare('INSERT INTO rooms (id, account_id, label) VALUES (?, ?, ?)').run(
-      id, account.id, label || 'Room'
-    );
-    return sqlite.getRoom(id);
+  // Manual room create disabled — rooms are created when an OBS dock connects.
+  app.post('/api/rooms', async (_request, reply) => {
+    return reply.code(410).send({
+      error: 'Room creation via API is disabled',
+      code: 'rooms_created_on_dock_join',
+      message: 'Tables are created automatically when an OBS dock connects with an OBS Dock Key.',
+    });
   });
 
   app.post('/api/api-keys', async (request, reply) => {
@@ -217,13 +255,34 @@ export async function registerAccountRoutes(app) {
     return { id: keyId, key };
   });
 
+  /** Rotate secret; keep seat label. Kicks docks still using the old secret. */
+  app.post('/api/api-keys/:keyId/regenerate', async (request, reply) => {
+    const account = await resolveAccountFromRequest(request);
+    if (!account) return reply.code(401).send({ error: 'Unauthorized' });
+    const { keyId } = request.params;
+    const created = sqlite.regenerateApiKey(keyId, account.id);
+    if (!created) return reply.code(404).send({ error: 'API key not found' });
+    const kicked = kickApiKeyDocks(keyId);
+    return {
+      id: created.id,
+      key: created.plaintext,
+      label: created.label,
+      previous_id: created.previous_id,
+      kicked,
+      quota: getAccountQuota(account),
+      api_keys: sqlite.getApiKeysForAccount(account.id),
+    };
+  });
+
+  /** Remove seat (frees quota). Prefer regenerate when rotating a compromised key. */
   app.delete('/api/api-keys/:keyId', async (request, reply) => {
     const account = await resolveAccountFromRequest(request);
     if (!account) return reply.code(401).send({ error: 'Unauthorized' });
     const { keyId } = request.params;
     const ok = sqlite.revokeApiKey(keyId, account.id);
     if (!ok) return reply.code(404).send({ error: 'API key not found' });
-    return { ok: true, quota: getAccountQuota(account) };
+    const kicked = kickApiKeyDocks(keyId);
+    return { ok: true, kicked, quota: getAccountQuota(account) };
   });
 
   app.post('/api/sessions/invalidate-all', async (request, reply) => {

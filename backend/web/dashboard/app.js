@@ -11,10 +11,12 @@ import {
   createApiKey,
   fetchApiKey,
   revokeApiKey,
+  regenerateApiKey,
+  deleteRoom,
   invalidateAllSessions,
   revokeAllGuestLinks,
   GAME_TYPES,
-} from '../shared/cloud-client.js?v=8.0.0.2';
+} from '../shared/cloud-client.js?v=8.0.0.4';
 
 const TOKEN_KEY = 'cuesport_token';
 const SERVER_KEY = 'cuesport_server';
@@ -34,6 +36,9 @@ let playerDetailGameFilter = '';
 
 function show(id, visible) {
   document.getElementById(id).classList.toggle('hidden', !visible);
+  if (id === 'dashboardSection') {
+    document.body.classList.toggle('has-dash-nav', !!visible);
+  }
 }
 
 function setError(msg) {
@@ -220,19 +225,170 @@ function renderQuota(quota) {
   if (el) {
     el.textContent =
       `Plan: ${tier} · Dock seats (keys) ${usage.apiKeys}/${limits.maxApiKeys} · ` +
-      `Tables ${usage.rooms}/${limits.maxRooms} · ` +
       `Mobile/guest up to ${limits.maxControlConnectionsPerRoom} per table`;
   }
   const atKeyLimit = usage.apiKeys >= limits.maxApiKeys;
   if (createBtn) createBtn.disabled = atKeyLimit;
   if (hint) {
     if (atKeyLimit) {
-      hint.textContent = `Dock key limit reached (${limits.maxApiKeys} on ${tier}). Each key connects one dock — revoke an unused key to create another.`;
+      hint.textContent = `Dock key limit reached (${limits.maxApiKeys} on ${tier}). Each key connects one dock — remove an unused key to create another.`;
       hint.classList.remove('hidden');
     } else {
       hint.classList.add('hidden');
     }
   }
+}
+
+function roomCleanupStatus(room) {
+  if (room.dock_connected) return 'active';
+  if (room.cleanup_after) return 'grace';
+  if (!room.instance_key) return 'unmapped';
+  return 'idle';
+}
+
+/** Title is the seat currently mapped to this room (OBS Dock Key N). */
+function connectionDisplayTitle(room) {
+  const candidates = [
+    room.api_key_label,
+    room.dock_label,
+    room.label,
+  ].filter(Boolean);
+  for (const name of candidates) {
+    if (/^OBS Dock Key\s+\d+/i.test(String(name))) return String(name);
+  }
+  for (const name of candidates) {
+    const n = String(name);
+    if (n && n !== 'Main table' && n !== 'Default Room' && n !== 'Table' && n !== 'Connection' && n !== 'Unassigned connection') {
+      return n;
+    }
+  }
+  return 'Unassigned connection';
+}
+
+function renderDebugRooms(rooms) {
+  const list = document.getElementById('debugRoomList');
+  const empty = document.getElementById('debugRoomsEmpty');
+  if (!list) return;
+  list.innerHTML = '';
+  const rows = rooms || [];
+  if (empty) empty.classList.toggle('hidden', rows.length > 0);
+  rows.forEach((room) => {
+    const li = document.createElement('li');
+    li.className = 'token-list-item debug-room-item';
+    const status = roomCleanupStatus(room);
+    const title = connectionDisplayTitle(room);
+    const st = room.live_state || {};
+    const gameInfo = String(st.gameInfo || '').trim();
+    const meta = document.createElement('div');
+    meta.className = 'debug-room-meta';
+    meta.innerHTML =
+      `<strong>${escapeHtml(title)}</strong>` +
+      `<span class="hint">OBS Dock UUID: ${escapeHtml(room.id)}</span>` +
+      (gameInfo ? `<span>event: ${escapeHtml(gameInfo)}</span>` : '') +
+      `<span>instance: ${escapeHtml(room.instance_key || '—')}</span>` +
+      `<span>dock: ${room.dock_connected ? 'online' : 'offline'}</span>` +
+      `<span>status: ${escapeHtml(status)}</span>` +
+      `<span>last seen: ${escapeHtml(formatLocalDateTime(room.last_seen_at) || '—')}</span>` +
+      (room.cleanup_after ? `<span>cleanup after: ${escapeHtml(formatLocalDateTime(room.cleanup_after))}</span>` : '') +
+      `<span>guest links: ${Number(room.guest_link_count) || 0}</span>`;
+    const actions = document.createElement('div');
+    actions.className = 'token-list-actions';
+    const kickBtn = document.createElement('button');
+    kickBtn.type = 'button';
+    kickBtn.className = 'btn danger';
+    kickBtn.textContent = 'Kick';
+    kickBtn.title = 'Disconnect clients and remove this connection mapping';
+    kickBtn.addEventListener('click', async () => {
+      if (!window.confirm(
+        `Kick “${title}”? Clients disconnect and this connection mapping is removed. Match history is kept.`
+      )) return;
+      try {
+        setError('');
+        const result = await deleteRoom(getServerUrl(), getToken(), room.id);
+        if (result.quota) renderQuota(result.quota);
+        renderDebugRooms(result.rooms || []);
+        renderTableCards(result.rooms || []);
+        const notice = document.getElementById('debugRoomsNotice');
+        if (notice) {
+          notice.textContent = 'Connection kicked. Match history was kept.';
+          notice.classList.remove('hidden');
+        }
+      } catch (err) {
+        setError(err.message);
+      }
+    });
+    actions.appendChild(kickBtn);
+    li.appendChild(meta);
+    li.appendChild(actions);
+    list.appendChild(li);
+  });
+}
+
+function apiKeySummaryText(k) {
+  const when = formatLocalDateTime(k.created_at);
+  return when ? `${k.label} — created ${when}` : String(k.label || 'OBS Dock Key');
+}
+
+const API_KEY_COPY_ICON_SVG =
+  '<svg class="api-key-copy-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+  '<path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>' +
+  '</svg>';
+
+function findApiKeyViewBtn(labelEl) {
+  return labelEl?.closest('.token-list-item')?.querySelector('.api-key-view-btn') || null;
+}
+
+function setApiKeyViewButtonState(viewBtn, revealed) {
+  if (!viewBtn || viewBtn.disabled) return;
+  viewBtn.textContent = revealed ? 'Hide' : 'View';
+  viewBtn.title = revealed ? 'Hide API key' : 'Show API key inline';
+}
+
+function revealApiKeyInSummary(labelEl, key) {
+  if (!labelEl || !key) return;
+  labelEl.dataset.revealedKey = key;
+  labelEl.classList.add('is-revealed');
+  labelEl.classList.remove('is-copied');
+  labelEl.title = 'Click to copy';
+  labelEl.setAttribute('role', 'button');
+  labelEl.tabIndex = 0;
+  labelEl.innerHTML =
+    `<span class="api-key-value">OBS Dock Key: ${escapeHtml(key)}</span>${API_KEY_COPY_ICON_SVG}`;
+  setApiKeyViewButtonState(findApiKeyViewBtn(labelEl), true);
+}
+
+function restoreApiKeySummary(labelEl, summaryText) {
+  if (!labelEl) return;
+  labelEl.textContent = summaryText || labelEl.dataset.summary || '';
+  delete labelEl.dataset.revealedKey;
+  labelEl.classList.remove('is-revealed', 'is-copied');
+  labelEl.removeAttribute('title');
+  labelEl.removeAttribute('role');
+  labelEl.removeAttribute('tabindex');
+  setApiKeyViewButtonState(findApiKeyViewBtn(labelEl), false);
+}
+
+async function copyRevealedApiKey(labelEl) {
+  const key = labelEl?.dataset?.revealedKey;
+  if (!key) return;
+  const summary = labelEl.dataset.summary || labelEl.textContent;
+  const ok = await copyTextToClipboard(key);
+  if (!ok) {
+    setError('Unable to copy automatically — select and copy the key manually.');
+    return;
+  }
+  setError('');
+  labelEl.classList.remove('is-revealed');
+  labelEl.classList.add('is-copied');
+  labelEl.removeAttribute('title');
+  labelEl.removeAttribute('role');
+  labelEl.removeAttribute('tabindex');
+  delete labelEl.dataset.revealedKey;
+  labelEl.textContent = 'Copied to clipboard';
+  setApiKeyViewButtonState(findApiKeyViewBtn(labelEl), false);
+  setTimeout(() => {
+    restoreApiKeySummary(labelEl, summary);
+  }, 1200);
 }
 
 function renderApiKeys(keys) {
@@ -242,40 +398,105 @@ function renderApiKeys(keys) {
     const li = document.createElement('li');
     li.className = 'token-list-item';
     const label = document.createElement('span');
-    label.textContent = `${k.label} — created ${k.created_at}`;
+    const summary = apiKeySummaryText(k);
+    label.className = 'api-key-summary';
+    label.textContent = summary;
+    label.dataset.summary = summary;
     const actions = document.createElement('div');
     actions.className = 'token-list-actions';
 
+    label.addEventListener('click', () => {
+      copyRevealedApiKey(label);
+    });
+    label.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        copyRevealedApiKey(label);
+      }
+    });
+
     const viewBtn = document.createElement('button');
     viewBtn.type = 'button';
-    viewBtn.className = 'btn secondary';
+    viewBtn.className = 'btn secondary api-key-view-btn';
     viewBtn.textContent = 'View';
     viewBtn.disabled = k.viewable === false;
     viewBtn.title = k.viewable === false
       ? 'This key was created before viewable storage. Create a new key to view it later.'
-      : 'Show API key';
+      : 'Show API key inline';
     viewBtn.addEventListener('click', async () => {
+      if (label.dataset.revealedKey) {
+        restoreApiKeySummary(label, label.dataset.summary);
+        showApiKeyDisplay('');
+        return;
+      }
       try {
         setError('');
         const data = await fetchApiKey(getServerUrl(), getToken(), k.id);
-        showApiKeyDisplay(data.key);
-        setActiveDashTab('account');
-        const display = document.getElementById('newKeyDisplay');
-        if (display) display.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        const key = String(data.key || '').trim();
+        if (!key) throw new Error('Key not available');
+        revealApiKeyInSummary(label, key);
+        showApiKeyDisplay('');
       } catch (err) {
         setError(err.message);
       }
     });
 
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'btn danger';
-    btn.textContent = 'Revoke';
-    btn.addEventListener('click', async () => {
-      if (!window.confirm(`Revoke API key “${k.label}”? Docks using it will disconnect.`)) return;
+    const regenBtn = document.createElement('button');
+    regenBtn.type = 'button';
+    regenBtn.className = 'btn secondary';
+    regenBtn.textContent = 'Regenerate';
+    regenBtn.title = 'Issue a new secret with the same seat name; disconnects docks using the old key';
+    regenBtn.addEventListener('click', async () => {
+      if (!window.confirm(
+        `Regenerate “${k.label}”? The old secret stops working immediately. Paste the new key into the dock.`
+      )) return;
       try {
+        setError('');
+        const result = await regenerateApiKey(getServerUrl(), getToken(), k.id);
+        if (result.quota) renderQuota(result.quota);
+        const kicked = Number(result.kicked) || 0;
+        const notice = document.getElementById('keyRevokeNotice');
+        if (notice) {
+          notice.textContent = kicked > 0
+            ? `Key regenerated — disconnected ${kicked} dock connection(s). Paste the new key into the dock.`
+            : 'Key regenerated. Paste the new key into the dock when you reconnect.';
+          notice.classList.remove('hidden');
+        }
+        await renderDashboard();
+        if (result.key && result.label) {
+          const row = [...document.querySelectorAll('#keyList .token-list-item')].find((el) => {
+            const span = el.querySelector('.api-key-summary');
+            return span && (span.dataset.summary || '').startsWith(`${result.label} —`);
+          });
+          const span = row?.querySelector('.api-key-summary');
+          if (span) revealApiKeyInSummary(span, result.key);
+        }
+      } catch (err) {
+        setError(err.message);
+      }
+    });
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'btn danger';
+    removeBtn.textContent = 'Remove';
+    removeBtn.title = 'Free this dock seat';
+    removeBtn.addEventListener('click', async () => {
+      if (!window.confirm(
+        `Remove “${k.label}”? This frees the seat. Any dock using it will be disconnected.`
+      )) return;
+      try {
+        setError('');
         const result = await revokeApiKey(getServerUrl(), getToken(), k.id);
         if (result.quota) renderQuota(result.quota);
+        const kicked = Number(result.kicked) || 0;
+        const notice = document.getElementById('keyRevokeNotice');
+        if (notice) {
+          notice.textContent = kicked > 0
+            ? `Key removed — disconnected ${kicked} dock connection(s).`
+            : 'Key removed.';
+          notice.classList.remove('hidden');
+        }
         await renderDashboard();
       } catch (err) {
         setError(err.message);
@@ -283,7 +504,8 @@ function renderApiKeys(keys) {
     });
 
     actions.appendChild(viewBtn);
-    actions.appendChild(btn);
+    actions.appendChild(regenBtn);
+    actions.appendChild(removeBtn);
     li.appendChild(label);
     li.appendChild(actions);
     keyList.appendChild(li);
@@ -311,23 +533,55 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+function parseUtcDate(value) {
+  if (!value) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  let iso = raw;
+  // SQLite datetime('now') has no zone — treat as UTC.
+  if (!/(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw)) {
+    iso = raw.includes('T') ? raw : raw.replace(' ', 'T');
+    if (!/[zZ]$/.test(iso)) iso += 'Z';
+  }
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function formatLocalDate(value) {
+  const d = parseUtcDate(value);
+  if (!d) return value ? String(value) : '—';
+  return d.toLocaleDateString();
+}
+
+function formatLocalTime(value) {
+  const d = parseUtcDate(value);
+  if (!d) return '';
+  return d.toLocaleTimeString(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+function formatLocalDateTime(value) {
+  const d = parseUtcDate(value);
+  if (!d) return value ? String(value) : '';
+  return d.toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
 function formatStatsDate(value) {
   if (!value) return '—';
-  const iso = String(value).includes('T') ? value : String(value).replace(' ', 'T') + 'Z';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return String(value);
-  return d.toLocaleDateString();
+  return formatLocalDate(value);
 }
 
 function formatStatsTime(value) {
   if (!value) return '';
-  const iso = String(value).includes('T') ? value : String(value).replace(' ', 'T') + 'Z';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleTimeString(undefined, {
-    hour: 'numeric',
-    minute: '2-digit'
-  });
+  return formatLocalTime(value);
 }
 
 function formatMatchDuration(startedAt, completedAt, durationSeconds) {
@@ -783,7 +1037,8 @@ function matchDateOptions(m, inProgress) {
 function matchOverviewRow(m) {
   const inProgress = isMatchInProgress(m);
   const actions = inProgress
-    ? '<span class="stats-match-live-badge">Live</span>'
+    ? `<span class="stats-match-live-badge">Live</span>` +
+      `<button type="button" class="btn danger" data-abandon-match="${escapeHtml(m.startEventId)}" title="Remove this unfinished match from cloud stats">Abandon</button>`
     : `<button type="button" class="btn" data-edit-match="${escapeHtml(m.startEventId)}">Edit</button>`;
   const main = `
     <tr class="${inProgress ? 'stats-match-in-progress' : ''}">
@@ -792,7 +1047,7 @@ function matchOverviewRow(m) {
       <td>${escapeHtml(gameTypeLabel(m.gameType))}</td>
       <td>${matchPairHtml(m)}</td>
       <td>${escapeHtml(scoreLine(m))}</td>
-      <td>${actions}</td>
+      <td class="stats-match-actions">${actions}</td>
     </tr>
   `;
   const breakdown = renderMatchRackBreakdown(m);
@@ -932,7 +1187,8 @@ function renderPlayerDetail() {
     const opp = isP1 ? (m.scores?.p2 ?? 0) : (m.scores?.p1 ?? 0);
     const scoreText = inProgress && !m.scores ? 'In progress' : `${own} - ${opp}`;
     const actions = inProgress
-      ? '<span class="stats-match-live-badge">Live</span>'
+      ? `<span class="stats-match-live-badge">Live</span>` +
+        `<button type="button" class="btn danger" data-abandon-match="${escapeHtml(m.startEventId)}" title="Remove this unfinished match from cloud stats">Abandon</button>`
       : `<button type="button" class="btn" data-edit-match="${escapeHtml(m.startEventId)}">Edit</button>`;
     const main = `
       <tr class="${inProgress ? 'stats-match-in-progress' : ''}">
@@ -940,7 +1196,7 @@ function renderPlayerDetail() {
         <td>${escapeHtml(opponent)}</td>
         <td>${formatMatchGameCellHtml(m)}</td>
         <td>${escapeHtml(scoreText)}</td>
-        <td>${actions}</td>
+        <td class="stats-match-actions">${actions}</td>
       </tr>
     `;
     const breakdown = renderMatchRackBreakdown(m, { viewerPlayerKey: selectedPlayerKey });
@@ -964,9 +1220,8 @@ function findMatchByStartId(startEventId) {
 
 function dateInputValue(value) {
   if (!value) return '';
-  const iso = String(value).includes('T') ? value : String(value).replace(' ', 'T') + 'Z';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return String(value).slice(0, 10);
+  const d = parseUtcDate(value);
+  if (!d) return String(value).slice(0, 10);
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
@@ -1303,6 +1558,21 @@ async function saveMatchModal(event) {
   }
 }
 
+async function abandonInProgressMatch(startEventId) {
+  const id = String(startEventId || '').trim();
+  if (!id) return;
+  if (!window.confirm(
+    'Abandon this unfinished match? It will be removed from cloud stats (no winner recorded). The OBS dock is not notified.'
+  )) return;
+  try {
+    setError('');
+    await deleteAccountMatch(getServerUrl(), getToken(), id);
+    await loadAccountStats(true);
+  } catch (err) {
+    setError(err.message);
+  }
+}
+
 async function deleteMatchFromModal() {
   const startEventId = document.getElementById('statsMatchEventId')?.value;
   if (!startEventId) return;
@@ -1400,6 +1670,7 @@ async function connectLiveFeed() {
 
   client.on('tables', (rooms) => {
     renderTableCards(rooms);
+    renderDebugRooms(rooms);
   });
   client.on('error', (e) => {
     if (e.code === 'invalid_token' || e.code === 'room_forbidden' || e.code === 'session_revoked') {
@@ -1439,6 +1710,7 @@ async function renderDashboard() {
     renderQuota(me.quota);
     renderApiKeys(me.api_keys);
     renderTableCards(me.rooms);
+    renderDebugRooms(me.rooms);
     wantLiveFeed = true;
     clearReconnect();
     connectLiveFeed().catch(() => {});
@@ -1455,9 +1727,9 @@ async function renderDashboard() {
 
 function formatPlayerPreview(lastSeenAt) {
   if (!lastSeenAt) return 'Saved player';
-  const d = new Date(lastSeenAt);
-  if (Number.isNaN(d.getTime())) return 'Saved player';
-  return `Last seen ${d.toLocaleDateString()}`;
+  const local = formatLocalDate(lastSeenAt);
+  if (!local || local === '—') return 'Saved player';
+  return `Last seen ${local}`;
 }
 
 function openPlayerFromSearch(name) {
@@ -1648,6 +1920,12 @@ document.getElementById('statsPlayerRenameForm')?.addEventListener('submit', asy
   }
 });
 document.getElementById('tabStats')?.addEventListener('click', (event) => {
+  const abandonBtn = event.target.closest('[data-abandon-match]');
+  if (abandonBtn) {
+    event.preventDefault();
+    abandonInProgressMatch(abandonBtn.getAttribute('data-abandon-match'));
+    return;
+  }
   const editBtn = event.target.closest('[data-edit-match]');
   if (editBtn) {
     event.preventDefault();
@@ -1754,9 +2032,17 @@ document.getElementById('clearSavedLoginBtn')?.addEventListener('click', () => {
 document.getElementById('createKeyBtn').addEventListener('click', async () => {
   try {
     const created = await createApiKey(getServerUrl(), getToken());
-    showApiKeyDisplay(created.key);
     if (created.quota) renderQuota(created.quota);
     await renderDashboard();
+    if (created.key && created.label) {
+      const row = [...document.querySelectorAll('#keyList .token-list-item')].find((el) => {
+        const span = el.querySelector('.api-key-summary');
+        return span && (span.dataset.summary || '').startsWith(`${created.label} —`);
+      });
+      const span = row?.querySelector('.api-key-summary');
+      if (span) revealApiKeyInSummary(span, created.key);
+    }
+    showApiKeyDisplay('');
   } catch (err) {
     setError(err.message);
   }

@@ -3,7 +3,11 @@ import { config } from './config.js';
 import * as sqlite from './db/sqlite.js';
 
 export function isDevAuthConfigured() {
-  return config.allowDevAuth && config.devAuthSecret.length > 0;
+  return (
+    config.allowDevAuth &&
+    config.devAuthSecret.length > 0 &&
+    config.devAuthAccountEmail.length > 0
+  );
 }
 
 export function validateDevSecret(provided) {
@@ -14,7 +18,10 @@ export function validateDevSecret(provided) {
 }
 
 export function ensureDevAccount() {
-  return sqlite.ensureAccountWithRoom(config.devAuthAccountEmail);
+  if (!config.devAuthAccountEmail) {
+    throw new Error('DEV_AUTH_ACCOUNT_EMAIL is required when ALLOW_DEV_AUTH is enabled');
+  }
+  return sqlite.ensureAccount(config.devAuthAccountEmail);
 }
 
 function tokenEpoch(account) {

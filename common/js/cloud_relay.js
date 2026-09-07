@@ -232,9 +232,19 @@
         if (roomId) msg.room_id = roomId;
         const token = getAccessToken();
         const apiKey = getApiKey();
-        if (token) msg.access_token = token;
-        else if (apiKey) msg.api_key = apiKey;
-        else {
+        // Docks must use an OBS Dock Key for seats (hosted + self-host).
+        if (getClientType() === 'dock') {
+            if (!apiKey) {
+                console.warn('cloudRelay: dock requires api_key (OBS Dock Key)');
+                return false;
+            }
+            msg.api_key = apiKey;
+            if (token) msg.access_token = token;
+        } else if (token) {
+            msg.access_token = token;
+        } else if (apiKey) {
+            msg.api_key = apiKey;
+        } else {
             console.warn('cloudRelay: no access_token or api_key');
             return false;
         }
@@ -718,8 +728,8 @@
         if (!getRoomId()) {
             console.warn('cloudRelay: room will be assigned on join (instance: ' + getInstanceKey() + ')');
         }
-        if (!getAccessToken() && !getApiKey()) {
-            console.warn('cloudRelay: cannot connect without credentials');
+        if (!getApiKey()) {
+            console.warn('cloudRelay: cannot connect without OBS Dock Key');
             return;
         }
 
@@ -745,6 +755,9 @@
             ws.onclose = function () {
                 isConnected = false;
                 isJoined = false;
+                // Always refresh toggle/status — otherwise a close that drops the
+                // preceding error frame leaves the dock stuck on "Connected".
+                updateCloudUI();
                 if (isBlockedByServer) return;
                 if (isEnabled && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
                     const delay = Math.min(
@@ -753,6 +766,7 @@
                     );
                     reconnectAttempts++;
                     reconnectTimer = setTimeout(connect, delay);
+                    updateCloudUI();
                 }
             };
         } catch (err) {
@@ -831,15 +845,14 @@
             if (
                 data.code === 'subscription_required' ||
                 data.code === 'invalid_api_key' ||
+                data.code === 'api_key_revoked' ||
+                data.code === 'dock_key_required' ||
+                data.code === 'room_deleted' ||
                 data.code === 'room_limit' ||
                 data.code === 'api_key_in_use'
             ) {
-                // api_key_in_use: this key is already connected elsewhere — stop reconnect fighting.
-                isBlockedByServer = true;
-                blockedReason = data.message;
-                setStorageItem('enabled', 'false');
-                isEnabled = false;
-                updateCloudUI();
+                // Hard auth/seat errors — stop reconnect fighting and sync dock UI.
+                applyServerBlock(data.message);
             }
             console.error('cloudRelay error:', data.code, data.message);
             // unknown_type is often a version skew (e.g. new dock vs old server) — don't alert.
@@ -898,6 +911,30 @@
     function clearBlockedState() {
         isBlockedByServer = false;
         blockedReason = null;
+    }
+
+    /** Disable Cloud, kill the socket, and show Blocked / toggle off. */
+    function applyServerBlock(message) {
+        isBlockedByServer = true;
+        blockedReason = message || 'Access denied';
+        setStorageItem('enabled', 'false');
+        isEnabled = false;
+        if (reconnectTimer) {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = null;
+        }
+        reconnectAttempts = 0;
+        if (ws) {
+            try { ws.onclose = null; } catch (_) { /* ignore */ }
+            try { ws.onerror = null; } catch (_) { /* ignore */ }
+            try { ws.onmessage = null; } catch (_) { /* ignore */ }
+            try { if (ws.readyState === 1 || ws.readyState === 0) ws.close(); } catch (_) { /* ignore */ }
+            ws = null;
+        }
+        isConnected = false;
+        isJoined = false;
+        hadControlClient = false;
+        updateCloudUI();
     }
 
     function setEnabled(enabled) {
@@ -966,6 +1003,12 @@
             else if (isCloudConnected()) statusEl.textContent = 'Connected';
             else if (isEnabled) statusEl.textContent = 'Connecting…';
             else statusEl.textContent = 'Off';
+            const roomId = isCloudConnected() ? getRoomId() : '';
+            if (roomId) {
+                statusEl.title = `OBS Dock UUID: ${roomId}`;
+            } else {
+                statusEl.removeAttribute('title');
+            }
         }
         if (toggle) toggle.checked = isEnabled;
         // Notify listeners (e.g. stats) of cloud connection state change
@@ -981,12 +1024,13 @@
     }
 
     function hasCredentials() {
-        return !!(getAccessToken() || getApiKey());
+        // Dock seats require an OBS Dock Key (JWT alone is not enough).
+        return !!getApiKey();
     }
 
     function init() {
         isEnabled = getStorageItem('enabled') === 'true';
-        if (isEnabled && (getAccessToken() || getApiKey())) {
+        if (isEnabled && getApiKey()) {
             connect();
         }
         updateCloudUI();

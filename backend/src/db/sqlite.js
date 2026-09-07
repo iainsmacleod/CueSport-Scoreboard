@@ -37,7 +37,8 @@ CREATE TABLE IF NOT EXISTS rooms (
 
 CREATE TABLE IF NOT EXISTS match_events (
   id TEXT PRIMARY KEY,
-  room_id TEXT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+  account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  room_id TEXT REFERENCES rooms(id) ON DELETE SET NULL,
   session_id TEXT,
   event_type TEXT NOT NULL,
   payload TEXT NOT NULL DEFAULT '{}',
@@ -64,6 +65,7 @@ CREATE TABLE IF NOT EXISTS room_docks (
   instance_key TEXT NOT NULL,
   room_id TEXT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
   label TEXT NOT NULL DEFAULT 'Table',
+  api_key_id TEXT,
   last_seen_at TEXT,
   PRIMARY KEY (account_id, instance_key)
 );
@@ -87,6 +89,10 @@ CREATE TABLE IF NOT EXISTS account_players (
 
 CREATE INDEX IF NOT EXISTS idx_api_keys_account ON api_keys(account_id);
 CREATE INDEX IF NOT EXISTS idx_rooms_account ON rooms(account_id);
+`;
+
+const MATCH_EVENTS_INDEXES = `
+CREATE INDEX IF NOT EXISTS idx_match_events_account ON match_events(account_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_match_events_room ON match_events(room_id, created_at DESC);
 `;
 
@@ -118,6 +124,43 @@ function ensureApiKeyColumns(database) {
   ).run();
 }
 
+function ensureRoomDockColumns(database) {
+  const cols = new Set(tableColumns(database, 'room_docks'));
+  if (!cols.has('api_key_id')) {
+    database.exec('ALTER TABLE room_docks ADD COLUMN api_key_id TEXT');
+  }
+}
+
+/** Drop legacy room-owned match_events (no backfill — local/test wipe). */
+function ensureMatchEventsAccountScoped(database) {
+  const exists = database.prepare(
+    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='match_events'"
+  ).get();
+  if (!exists) return;
+  const cols = new Set(tableColumns(database, 'match_events'));
+  if (cols.has('account_id')) return;
+
+  console.warn(
+    '[sqlite] Legacy match_events (no account_id) — dropping and recreating account-scoped table. ' +
+      'Match history is cleared; accounts/rooms/keys are kept.'
+  );
+  database.exec('DROP TABLE IF EXISTS match_events');
+  database.exec(`
+    CREATE TABLE match_events (
+      id TEXT PRIMARY KEY,
+      account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+      room_id TEXT REFERENCES rooms(id) ON DELETE SET NULL,
+      session_id TEXT,
+      event_type TEXT NOT NULL,
+      payload TEXT NOT NULL DEFAULT '{}',
+      source_client TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_match_events_account ON match_events(account_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_match_events_room ON match_events(room_id, created_at DESC);
+  `);
+}
+
 export function getDb() {
   if (!db) {
     const dir = path.dirname(config.sqlitePath);
@@ -130,6 +173,9 @@ export function getDb() {
     db.exec(SCHEMA);
     ensureAccountColumns(db);
     ensureApiKeyColumns(db);
+    ensureRoomDockColumns(db);
+    ensureMatchEventsAccountScoped(db);
+    db.exec(MATCH_EVENTS_INDEXES);
   }
   return db;
 }
@@ -140,19 +186,19 @@ export function generateApiKeyPlaintext() {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-/** Next "OBS Dock Key N" for this account (includes revoked keys so numbers stay unique). */
+/** Next "OBS Dock Key N" among active (non-revoked) seats — fills gaps. */
 export function nextObsDockKeyLabel(accountId) {
   const rows = getDb().prepare(
-    'SELECT label FROM api_keys WHERE account_id = ?'
+    `SELECT label FROM api_keys WHERE account_id = ? AND revoked_at IS NULL`
   ).all(accountId);
-  let max = 0;
+  const used = new Set();
   for (const row of rows) {
     const m = String(row.label || '').match(/^OBS Dock Key\s+(\d+)$/i);
-    if (m) {
-      max = Math.max(max, parseInt(m[1], 10) || 0);
-    }
+    if (m) used.add(parseInt(m[1], 10) || 0);
   }
-  return `OBS Dock Key ${max + 1}`;
+  let n = 1;
+  while (used.has(n)) n += 1;
+  return `OBS Dock Key ${n}`;
 }
 
 function shouldAutoNumberApiKeyLabel(label) {
@@ -173,6 +219,39 @@ export function createApiKey(accountId, label) {
   return { id, plaintext, label: resolvedLabel };
 }
 
+/** Rotate secret in place: revoke old row, insert new with the same label. */
+export function regenerateApiKey(keyId, accountId) {
+  const database = getDb();
+  const existing = database.prepare(
+    `SELECT id, label FROM api_keys
+     WHERE id = ? AND account_id = ? AND revoked_at IS NULL`
+  ).get(keyId, accountId);
+  if (!existing) return null;
+  const ok = revokeApiKey(keyId, accountId);
+  if (!ok) return null;
+  const plaintext = generateApiKeyPlaintext();
+  const id = uuidv4();
+  database.prepare(
+    `INSERT INTO api_keys (id, account_id, key_hash, key_plaintext, label) VALUES (?, ?, ?, ?, ?)`
+  ).run(id, accountId, hashApiKey(plaintext), plaintext, existing.label);
+  // Point live room mappings at the new seat id (label unchanged).
+  database.prepare(
+    `UPDATE room_docks SET api_key_id = ? WHERE api_key_id = ? AND account_id = ?`
+  ).run(id, keyId, accountId);
+  return { id, plaintext, label: existing.label, previous_id: keyId };
+}
+
+export function getApiKeyById(keyId) {
+  if (!keyId) return null;
+  return getDb().prepare('SELECT * FROM api_keys WHERE id = ?').get(keyId) || null;
+}
+
+export function connectionLabelForApiKey(apiKeyId) {
+  const key = getApiKeyById(apiKeyId);
+  // Connection title is the seat name itself (OBS Dock Key N).
+  return key?.label || null;
+}
+
 export function hashApiKey(key) {
   return bcrypt.hashSync(key, 10);
 }
@@ -187,8 +266,8 @@ function defaultTierSync() {
   return raw || 'starter';
 }
 
-/** Dev / self-host: ensure account + default room exist for email */
-export function ensureAccountWithRoom(email, authUserId = null) {
+/** Dev / self-host / OAuth: ensure account exists (no default room — rooms are created on dock join). */
+export function ensureAccount(email, authUserId = null) {
   const database = getDb();
   let account = database.prepare('SELECT * FROM accounts WHERE email = ?').get(email);
   if (!account) {
@@ -202,27 +281,55 @@ export function ensureAccountWithRoom(email, authUserId = null) {
     database.prepare('UPDATE accounts SET auth_user_id = ? WHERE id = ?').run(authUserId, account.id);
     account = database.prepare('SELECT * FROM accounts WHERE id = ?').get(account.id);
   }
-
-  let room = database.prepare('SELECT * FROM rooms WHERE account_id = ? ORDER BY created_at LIMIT 1').get(account.id);
-  if (!room) {
-    const roomId = uuidv4();
-    const label = defaultInstanceLabel('default');
-    database.prepare('INSERT INTO rooms (id, account_id, label) VALUES (?, ?, ?)').run(roomId, account.id, label);
-    // Map as instance_key=default so the first single-instance dock reuses this room
-    // instead of creating a second table and burning quota.
-    database.prepare(
-      `INSERT INTO room_docks (account_id, instance_key, room_id, label, last_seen_at)
-       VALUES (?, 'default', ?, ?, datetime('now'))`
-    ).run(account.id, roomId, label);
-    room = database.prepare('SELECT * FROM rooms WHERE id = ?').get(roomId);
-  } else {
-    // Backfill older accounts that got a Default Room with no dock mapping.
-    linkUnmappedRoomToInstance(account.id, room, 'default');
-  }
-  return { account, room };
+  return { account, room: null };
 }
 
-/** Oldest room for this account that is not linked to any OBS instance key. */
+/** @deprecated Use ensureAccount — kept as alias for older imports. */
+export function ensureAccountWithRoom(email, authUserId = null) {
+  return ensureAccount(email, authUserId);
+}
+
+/** Rooms with no room_docks mapping (junk from legacy signup / disabled POST). */
+export function listUnmappedRooms() {
+  return getDb().prepare(`
+    SELECT r.* FROM rooms r
+    WHERE NOT EXISTS (SELECT 1 FROM room_docks d WHERE d.room_id = r.id)
+    ORDER BY r.created_at ASC
+  `).all();
+}
+
+/**
+ * Rooms eligible for idle TTL prune: mapped, last_seen older than cutoff ISO/SQLite datetime.
+ * cutoffSqlite: e.g. datetime('now', '-14 days') equivalent — pass precomputed UTC string.
+ */
+export function listRoomsIdleBefore(cutoffSqlite) {
+  return getDb().prepare(`
+    SELECT r.*, d.instance_key, d.last_seen_at, d.label AS dock_label
+    FROM rooms r
+    JOIN room_docks d ON d.room_id = r.id
+    WHERE d.last_seen_at IS NOT NULL AND d.last_seen_at < ?
+    ORDER BY d.last_seen_at ASC
+  `).all(cutoffSqlite);
+}
+
+/**
+ * Delete a room row. Cascades room_docks / sessions / live_streams / guest tokens.
+ * match_events.room_id becomes NULL — history is kept.
+ */
+export function deleteRoom(roomId) {
+  if (!roomId) return false;
+  const room = getRoom(roomId);
+  if (!room) return false;
+  const result = getDb().prepare('DELETE FROM rooms WHERE id = ?').run(roomId);
+  return result.changes > 0;
+}
+
+export function countActiveGuestTokensForRoom(roomId) {
+  return getDb().prepare(
+    `SELECT COUNT(*) AS n FROM room_guest_tokens WHERE room_id = ? AND revoked_at IS NULL`
+  ).get(roomId)?.n || 0;
+}
+
 export function findUnmappedRoom(accountId) {
   return getDb().prepare(`
     SELECT r.* FROM rooms r
@@ -233,41 +340,14 @@ export function findUnmappedRoom(accountId) {
   `).get(accountId) || null;
 }
 
-/**
- * If instanceKey has no dock mapping yet, claim `preferredRoom` (or any orphan) for it.
- * Returns the linked room, or null if nothing was available to claim.
- */
-function linkUnmappedRoomToInstance(accountId, preferredRoom, instanceKey, label) {
-  const database = getDb();
-  const key = (instanceKey || 'default').trim() || 'default';
-  const existing = peekRoomDock(accountId, key);
-  if (existing) {
-    return getRoom(existing.room_id);
-  }
-
-  let orphan = null;
-  if (preferredRoom) {
-    const alreadyMapped = database.prepare('SELECT 1 FROM room_docks WHERE room_id = ?').get(preferredRoom.id);
-    if (!alreadyMapped) orphan = preferredRoom;
-  }
-  if (!orphan) orphan = findUnmappedRoom(accountId);
-  if (!orphan) return null;
-
-  const roomLabel = label || defaultInstanceLabel(key);
-  database.prepare(
-    `INSERT INTO room_docks (account_id, instance_key, room_id, label, last_seen_at)
-     VALUES (?, ?, ?, ?, datetime('now'))`
-  ).run(accountId, key, orphan.id, roomLabel);
-  if (orphan.label === 'Default Room') {
-    database.prepare('UPDATE rooms SET label = ? WHERE id = ?').run(roomLabel, orphan.id);
-  }
-  return getRoom(orphan.id);
-}
-
 export function findAccountByApiKey(plaintextKey) {
   const database = getDb();
+  // Select ak.id explicitly — `ak.*, a.*` would let accounts.id overwrite api_keys.id.
   const keys = database.prepare(
-    `SELECT ak.*, a.* FROM api_keys ak
+    `SELECT ak.id AS key_id, ak.key_hash, ak.account_id,
+            a.email, a.subscription_status, a.subscription_tier,
+            a.sessions_invalid_after, a.session_epoch
+     FROM api_keys ak
      JOIN accounts a ON a.id = ak.account_id
      WHERE ak.revoked_at IS NULL`
   ).all();
@@ -282,7 +362,7 @@ export function findAccountByApiKey(plaintextKey) {
           sessions_invalid_after: row.sessions_invalid_after,
           session_epoch: row.session_epoch,
         },
-        keyId: row.id,
+        keyId: row.key_id,
       };
     }
   }
@@ -386,11 +466,23 @@ export function invalidateAllSessions(accountId) {
   return getAccountById(accountId);
 }
 
-export function insertMatchEvent({ roomId, sessionId, eventType, payload, sourceClient }) {
+export function insertMatchEvent({ accountId, roomId, sessionId, eventType, payload, sourceClient }) {
+  if (!accountId) {
+    throw new Error('accountId is required to insert match events');
+  }
   const id = uuidv4();
   getDb().prepare(
-    `INSERT INTO match_events (id, room_id, session_id, event_type, payload, source_client) VALUES (?, ?, ?, ?, ?, ?)`
-  ).run(id, roomId, sessionId || null, eventType, JSON.stringify(payload || {}), sourceClient || null);
+    `INSERT INTO match_events (id, account_id, room_id, session_id, event_type, payload, source_client)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    id,
+    accountId,
+    roomId || null,
+    sessionId || null,
+    eventType,
+    JSON.stringify(payload || {}),
+    sourceClient || null
+  );
   return id;
 }
 
@@ -403,17 +495,17 @@ export function getMatchEvents(roomId, limit = 100) {
   }));
 }
 
-/** Newest session start/end events across all rooms for an account (then reversed for pairing). */
+/** Newest session start/end events for an account (then reversed for pairing). */
 export function getAccountSessionEvents(accountId, limit = 5000) {
   const cap = Math.min(Math.max(parseInt(limit, 10) || 5000, 1), 10000);
   return getDb().prepare(
-    `SELECT e.id, e.room_id, e.session_id, e.event_type, e.payload, e.created_at,
+    `SELECT e.id, e.account_id, e.room_id, e.session_id, e.event_type, e.payload, e.created_at,
             r.label AS room_label,
             d.instance_key, d.label AS dock_label
      FROM match_events e
-     JOIN rooms r ON r.id = e.room_id
+     LEFT JOIN rooms r ON r.id = e.room_id
      LEFT JOIN room_docks d ON d.room_id = e.room_id
-     WHERE r.account_id = ?
+     WHERE e.account_id = ?
        AND e.event_type IN ('session:start', 'session:end')
      ORDER BY e.created_at DESC
      LIMIT ?`
@@ -574,8 +666,7 @@ function defaultInstanceLabel(instanceKey) {
 }
 
 /** One room per OBS instance key (URL ?instance=) under an account.
- *  Returns { room } for existing mapping, or creates a new room.
- *  Prefers adopting an unmapped signup room before allocating a new table slot.
+ *  Returns existing mapping or creates a new room + room_docks row.
  *  Callers must enforce room quotas before create (see room-hub).
  */
 export function peekRoomDock(accountId, instanceKey) {
@@ -585,31 +676,49 @@ export function peekRoomDock(accountId, instanceKey) {
   ).get(accountId, key) || null;
 }
 
-export function ensureRoomForInstance(accountId, instanceKey, label) {
+export function ensureRoomForInstance(accountId, instanceKey, label, apiKeyId = null) {
   const database = getDb();
   const key = (instanceKey || 'default').trim() || 'default';
+  const keyLabel = connectionLabelForApiKey(apiKeyId);
+  const resolvedLabel = keyLabel || label || null;
   let row = peekRoomDock(accountId, key);
   if (row) {
     database.prepare(
-      `UPDATE room_docks SET last_seen_at = datetime('now'), label = COALESCE(?, label) WHERE account_id = ? AND instance_key = ?`
-    ).run(label || null, accountId, key);
+      `UPDATE room_docks SET last_seen_at = datetime('now'),
+        label = COALESCE(?, label),
+        api_key_id = CASE WHEN ? IS NOT NULL THEN ? ELSE api_key_id END
+       WHERE account_id = ? AND instance_key = ?`
+    ).run(resolvedLabel, apiKeyId || null, apiKeyId || null, accountId, key);
+    if (resolvedLabel) {
+      database.prepare('UPDATE rooms SET label = ? WHERE id = ?').run(resolvedLabel, row.room_id);
+    }
     return getRoom(row.room_id);
   }
 
-  // Reclaim orphan rooms (e.g. signup Default Room with no room_docks row)
-  // so going single-instance → multi-instance does not burn an extra table slot.
-  const claimed = linkUnmappedRoomToInstance(accountId, null, key, label || null);
-  if (claimed) {
-    return claimed;
-  }
-
   const roomId = uuidv4();
-  const roomLabel = label || defaultInstanceLabel(key);
+  const roomLabel = resolvedLabel || defaultInstanceLabel(key);
   database.prepare('INSERT INTO rooms (id, account_id, label) VALUES (?, ?, ?)').run(roomId, accountId, roomLabel);
   database.prepare(
-    `INSERT INTO room_docks (account_id, instance_key, room_id, label, last_seen_at) VALUES (?, ?, ?, ?, datetime('now'))`
-  ).run(accountId, key, roomId, roomLabel);
+    `INSERT INTO room_docks (account_id, instance_key, room_id, label, api_key_id, last_seen_at)
+     VALUES (?, ?, ?, ?, ?, datetime('now'))`
+  ).run(accountId, key, roomId, roomLabel, apiKeyId || null);
   return getRoom(roomId);
+}
+
+/** Persist which OBS Dock Key owns this room mapping (backfill / reconnect). */
+export function setRoomDockApiKey(roomId, apiKeyId) {
+  if (!roomId || !apiKeyId) return false;
+  const label = connectionLabelForApiKey(apiKeyId);
+  const database = getDb();
+  const dock = database.prepare('SELECT * FROM room_docks WHERE room_id = ?').get(roomId);
+  if (!dock) return false;
+  database.prepare(
+    `UPDATE room_docks SET api_key_id = ?, label = COALESCE(?, label) WHERE room_id = ?`
+  ).run(apiKeyId, label, roomId);
+  if (label) {
+    database.prepare('UPDATE rooms SET label = ? WHERE id = ?').run(label, roomId);
+  }
+  return true;
 }
 
 export function touchRoomDock(accountId, instanceKey) {
@@ -624,12 +733,24 @@ export function getRoomsWithLiveState(accountId) {
   return rooms.map((room) => {
     const dock = getDb().prepare('SELECT * FROM room_docks WHERE room_id = ?').get(room.id);
     const session = getRoomSessionState(room.id);
-    const clients = [];
+    const apiKey = dock?.api_key_id ? getApiKeyById(dock.api_key_id) : null;
+    const apiKeyLabel = apiKey?.label || null;
+    const connectionLabel = apiKeyLabel
+      || (dock?.label && dock.label !== 'Main table' && dock.label !== 'Default Room' && dock.label !== 'Table'
+        ? dock.label
+        : null)
+      || (room.label && room.label !== 'Main table' && room.label !== 'Default Room'
+        ? room.label
+        : null)
+      || 'Unassigned connection';
     return {
       ...room,
       instance_key: dock?.instance_key || null,
-      dock_label: dock?.label || room.label,
+      dock_label: connectionLabel,
+      api_key_id: dock?.api_key_id || null,
+      api_key_label: apiKeyLabel,
       last_seen_at: dock?.last_seen_at || null,
+      guest_link_count: countActiveGuestTokensForRoom(room.id),
       live_state: session.state || {},
       updated_at: getDb().prepare('SELECT updated_at FROM room_sessions WHERE room_id = ?').get(room.id)?.updated_at || null,
     };
@@ -737,8 +858,7 @@ export function syncAccountPlayersFromMatchEvents(accountId) {
   const rows = getDb().prepare(
     `SELECT e.payload
      FROM match_events e
-     JOIN rooms r ON r.id = e.room_id
-     WHERE r.account_id = ?
+     WHERE e.account_id = ?
        AND e.event_type = 'session:start'`
   ).all(accountId);
   for (const row of rows) {

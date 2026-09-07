@@ -3,7 +3,7 @@ import * as sqlite from './db/sqlite.js';
 /** Built-in subscription tier caps — override via TIER_LIMITS_JSON or TIER_{TIER}_MAX_* env.
  *  Option A: 1 OBS Dock Key = 1 dock connection (seat).
  *  maxApiKeys = how many docks you can connect (create one key per dock)
- *  maxRooms = tables (usually aligned with keys; one instance/room per dock)
+ *  maxRooms = safety ceiling on room rows (instance churn); not a user-facing meter
  *  maxControlConnectionsPerRoom = mobile + guest connections per table (dock not counted)
  */
 const BUILTIN_TIERS = {
@@ -141,7 +141,7 @@ export function assertCanCreateApiKey(account) {
     return {
       ok: false,
       code: 'api_key_limit',
-      message: `OBS Dock Key limit reached (${quota.limits.maxApiKeys} on ${quota.tier} plan). Each key connects one dock — revoke an unused key or upgrade your plan.`,
+      message: `OBS Dock Key limit reached (${quota.limits.maxApiKeys} on ${quota.tier} plan). Each key connects one dock — remove an unused key or upgrade your plan.`,
       quota,
     };
   }

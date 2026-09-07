@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import * as sqlite from '../db/sqlite.js';
 import { getAccountStats } from '../stats/account-stats.js';
+import { config } from '../config.js';
 import {
   assertCanCreateRoom,
   getMaxControlConnections,
@@ -13,11 +14,25 @@ const rooms = new Map();
 /** ws -> connection meta */
 const connections = new Map();
 
+/** apiKeyId -> Set<ws> for fast revoke/kick (Option A seats) */
+const docksByApiKeyId = new Map();
+
 /** accountId -> Set<ws> for dashboard live table feeds */
 const accountDashboards = new Map();
 
 /** accountId -> debounce timer for tables push after state churn */
 const tablesNotifyTimers = new Map();
+
+/** roomId -> timeout handle for grace-period cleanup */
+const roomCleanupTimers = new Map();
+
+/** roomId -> epoch ms when grace cleanup is due (for debug UI) */
+const roomCleanupAfter = new Map();
+
+/** roomIds currently being deleted (skip reschedule on WS close) */
+const roomsBeingDeleted = new Set();
+
+let sweeperTimer = null;
 
 function getRoomClients(roomId) {
   if (!rooms.has(roomId)) {
@@ -50,15 +65,39 @@ function send(ws, message) {
   }
 }
 
-/**
- * Option A: one OBS Dock Key may only have one live dock WebSocket.
- * Returns existing dock connection meta using this key, if any.
- */
+function trackDockApiKey(ws, keyId) {
+  if (!ws || !keyId) return;
+  let set = docksByApiKeyId.get(keyId);
+  if (!set) {
+    set = new Set();
+    docksByApiKeyId.set(keyId, set);
+  }
+  set.add(ws);
+}
+
+function untrackDockApiKey(ws, keyId) {
+  if (!ws || !keyId) return;
+  const set = docksByApiKeyId.get(keyId);
+  if (!set) return;
+  set.delete(ws);
+  if (!set.size) docksByApiKeyId.delete(keyId);
+}
+
 function findDockUsingApiKey(keyId, excludeWs = null) {
   if (!keyId) return null;
+  const set = docksByApiKeyId.get(keyId);
+  if (set) {
+    for (const ws of set) {
+      if (excludeWs && ws === excludeWs) continue;
+      if (ws.readyState === 1) {
+        const meta = connections.get(ws);
+        if (meta) return { ws, meta };
+      }
+    }
+  }
+  // Fallback scan (in case index missed an in-flight join)
   for (const [ws, meta] of connections) {
     if (excludeWs && ws === excludeWs) continue;
-    // Match on apiKeyId alone so in-flight joins (client not set yet) still hold the seat.
     if (meta.apiKeyId !== keyId) continue;
     if (ws.readyState === 1) return { ws, meta };
   }
@@ -78,11 +117,42 @@ function apiKeyDockSeatConflict(keyId, incomingWs) {
   return { error: 'api_key_in_use', message: API_KEY_IN_USE_MESSAGE };
 }
 
+function findLiveDockApiKeyId(roomId) {
+  if (!roomId) return null;
+  for (const [, meta] of connections) {
+    if (meta.roomId === roomId && meta.client === 'dock' && meta.apiKeyId) {
+      return meta.apiKeyId;
+    }
+  }
+  return null;
+}
+
+/** Resolve seat key for a room (DB mapping, else live dock) and backfill DB when possible. */
+export function resolveRoomApiKeyId(roomId, existingApiKeyId = null) {
+  const liveKeyId = findLiveDockApiKeyId(roomId);
+  const keyId = existingApiKeyId || liveKeyId;
+  if (liveKeyId && liveKeyId !== existingApiKeyId) {
+    sqlite.setRoomDockApiKey(roomId, liveKeyId);
+  }
+  return keyId || null;
+}
+
 function buildDashboardRooms(accountId) {
-  return sqlite.getRoomsWithLiveState(accountId).map((room) => ({
-    ...room,
-    dock_connected: roomHasConnectedDock(room.id),
-  }));
+  return sqlite.getRoomsWithLiveState(accountId).map((room) => {
+    const keyId = resolveRoomApiKeyId(room.id, room.api_key_id);
+    const apiKey = keyId ? sqlite.getApiKeyById(keyId) : null;
+    const keyLabel = apiKey?.label || room.api_key_label || null;
+    return {
+      ...room,
+      api_key_id: keyId || null,
+      api_key_label: keyLabel,
+      dock_label: keyLabel || room.dock_label,
+      dock_connected: roomHasConnectedDock(room.id),
+      cleanup_after: roomCleanupAfter.get(room.id)
+        ? new Date(roomCleanupAfter.get(room.id)).toISOString()
+        : null,
+    };
+  });
 }
 
 function addAccountDashboard(accountId, ws) {
@@ -148,6 +218,10 @@ export function handleConnection(ws) {
     const meta = connections.get(ws);
     if (!meta) return;
 
+    if (meta.apiKeyId) {
+      untrackDockApiKey(ws, meta.apiKeyId);
+    }
+
     if (meta.client === 'dashboard' && meta.accountId) {
       removeAccountDashboard(meta.accountId, ws);
     }
@@ -155,17 +229,21 @@ export function handleConnection(ws) {
     if (meta.roomId) {
       const wasDock = meta.client === 'dock';
       const accountId = meta.accountId;
-      const clients = getRoomClients(meta.roomId);
+      const roomId = meta.roomId;
+      const clients = getRoomClients(roomId);
       for (const c of clients) {
         if (c.ws === ws) clients.delete(c);
       }
-      broadcast(meta.roomId, {
+      broadcast(roomId, {
         type: 'presence',
-        room_id: meta.roomId,
-        clients: listClientTypes(meta.roomId),
+        room_id: roomId,
+        clients: listClientTypes(roomId),
       });
       if (wasDock && accountId) {
         notifyAccountTables(accountId, { immediate: true });
+        if (!roomsBeingDeleted.has(roomId) && !roomHasConnectedDock(roomId)) {
+          scheduleRoomCleanup(roomId);
+        }
       }
     }
     connections.delete(ws);
@@ -225,11 +303,11 @@ function handleStats(ws, meta, msg) {
   }
 }
 
-/** Commands allowed for guest scorer links (no names, setup, match, or replay). */
+/** Commands allowed for guest scorer links (no names, match end/reset, or replay). */
 const GUEST_ALLOWED_COMMANDS = new Set([
   'score_add', 'score_sub', 'balls_add', 'balls_sub',
   'player_slot', 'select_breaker', 'toggle_pot', 'snooker_ball', 'snooker_foul', 'undo',
-  'set_race', 'set_game_info',
+  'set_race', 'set_game_info', 'set_game_type',
 ]);
 
 function countControlConnections(roomId, excludeWs = null) {
@@ -246,28 +324,26 @@ function resolveRoomIdForJoin(msg, auth, client) {
   let roomId = msg.room_id || msg.room || null;
   if (client === 'dock' && auth?.account && msg.instance_id) {
     const key = String(msg.instance_id || 'default').trim() || 'default';
+    const apiKeyId = auth.keyId || null;
     const existing = sqlite.peekRoomDock(auth.account.id, key);
     if (existing) {
       const room = sqlite.ensureRoomForInstance(
         auth.account.id,
         msg.instance_id,
-        msg.instance_label || null
+        msg.instance_label || null,
+        apiKeyId
       );
       return { roomId: room.id };
     }
-    // Creating a new table counts against quota — reclaiming an unmapped
-    // signup room (Default Room with no room_docks) does not.
-    const canClaimOrphan = !!sqlite.findUnmappedRoom(auth.account.id);
-    if (!canClaimOrphan) {
-      const check = assertCanCreateRoom(auth.account);
-      if (!check.ok) {
-        return { error: check.code, message: check.message, quota: check.quota };
-      }
+    const check = assertCanCreateRoom(auth.account);
+    if (!check.ok) {
+      return { error: check.code, message: check.message, quota: check.quota };
     }
     const room = sqlite.ensureRoomForInstance(
       auth.account.id,
       msg.instance_id,
-      msg.instance_label || null
+      msg.instance_label || null,
+      apiKeyId
     );
     return { roomId: room.id };
   }
@@ -330,6 +406,16 @@ async function handleJoin(ws, meta, msg, authenticateJoin) {
     meta.accountId = accountId;
     meta.guestToken = msg.guest_token;
   } else {
+    // Docks must use an OBS Dock Key (same seat model for hosted + self-host).
+    if (client === 'dock' && !msg.api_key) {
+      send(ws, {
+        type: 'error',
+        code: 'dock_key_required',
+        message: 'OBS docks must connect with an OBS Dock Key from the dashboard (Account → OBS Dock Keys).',
+      });
+      return;
+    }
+
     const auth = await authenticateJoin({
       apiKey: msg.api_key,
       accessToken: msg.access_token,
@@ -351,6 +437,7 @@ async function handleJoin(ws, meta, msg, authenticateJoin) {
       }
       meta.apiKeyId = auth.keyId;
       meta.client = 'dock';
+      trackDockApiKey(ws, auth.keyId);
     }
 
     roomId = resolveRoomIdForJoin(msg, auth, client);
@@ -371,6 +458,9 @@ async function handleJoin(ws, meta, msg, authenticateJoin) {
 
     if (client === 'dock' && msg.instance_id) {
       sqlite.touchRoomDock(accountId, msg.instance_id);
+    }
+    if (client === 'dock' && meta.apiKeyId && roomId) {
+      sqlite.setRoomDockApiKey(roomId, meta.apiKeyId);
     }
   }
 
@@ -429,6 +519,7 @@ async function handleJoin(ws, meta, msg, authenticateJoin) {
     clients: listClientTypes(roomId),
     session_id: sessionId,
     state,
+    ...(client === 'dock' && meta.apiKeyId ? { api_key_id: meta.apiKeyId } : {}),
   });
 
   broadcast(roomId, {
@@ -438,6 +529,7 @@ async function handleJoin(ws, meta, msg, authenticateJoin) {
   }, ws);
 
   if (client === 'dock') {
+    cancelRoomCleanup(roomId);
     notifyAccountTables(accountId || room.account_id, { immediate: true });
   }
 }
@@ -450,9 +542,17 @@ function requireJoined(ws, meta) {
   return true;
 }
 
-function persistEvent(meta, eventType, payload, sourceClient) {
-  const { sessionId } = sqlite.getRoomSessionState(meta.roomId);
+function persistEvent(meta, eventType, payload, sourceClient, sessionIdOverride) {
+  const sessionId = sessionIdOverride !== undefined
+    ? sessionIdOverride
+    : sqlite.getRoomSessionState(meta.roomId).sessionId;
+  let accountId = meta.accountId || null;
+  if (!accountId && meta.roomId) {
+    const room = sqlite.getRoom(meta.roomId);
+    accountId = room?.account_id || null;
+  }
   return sqlite.insertMatchEvent({
+    accountId,
     roomId: meta.roomId,
     sessionId,
     eventType,
@@ -534,8 +634,6 @@ function handleSession(ws, meta, msg) {
   if (action === 'start') {
     sessionId = uuidv4();
     sqlite.setRoomSessionId(meta.roomId, sessionId);
-  } else if (action === 'end') {
-    sqlite.setRoomSessionId(meta.roomId, null);
   } else if (action === 'discard') {
     // Clear Game / abandon: remove the open cloud match from history (not a completed end).
     const matchKey = payload.matchId || payload.sessionId || sessionId || null;
@@ -557,13 +655,17 @@ function handleSession(ws, meta, msg) {
     return;
   }
 
-  persistEvent(meta, `session:${action}`, payload, meta.client);
+  // Persist before clearing room session on end so the end row keeps session_id for pairing.
+  persistEvent(meta, `session:${action}`, payload, meta.client, sessionId);
+  if (action === 'end') {
+    sqlite.setRoomSessionId(meta.roomId, null);
+  }
 
   broadcast(meta.roomId, {
     type: 'session',
     room_id: meta.roomId,
     action,
-    session_id: sessionId,
+    session_id: action === 'end' ? null : sessionId,
     payload,
     source: meta.client,
     ts: new Date().toISOString(),
@@ -592,8 +694,8 @@ async function handleLegacyAuth(ws, meta, msg, authenticateJoin) {
     }
     meta.apiKeyId = auth.keyId;
     meta.client = 'dock';
+    trackDockApiKey(ws, auth.keyId);
   }
-  const accountRooms = sqlite.getRoomsForAccount(auth.account.id);
   if (accountRooms.length === 0) {
     send(ws, { type: 'auth', status: 'error', message: 'No room configured' });
     return;
@@ -659,7 +761,10 @@ function kickConnections(match, payload) {
   }
   for (const ws of targets) {
     send(ws, { type: 'error', ...payload });
-    try { ws.close(); } catch (_) { /* ignore */ }
+    const target = ws;
+    setTimeout(() => {
+      try { target.close(); } catch (_) { /* ignore */ }
+    }, 50);
   }
   return targets.length;
 }
@@ -689,4 +794,159 @@ export function kickAccountGuestClients(accountId) {
     (meta) => meta.accountId === accountId && meta.client === 'mobile_guest',
     { code: 'guest_revoked', message: 'Guest link revoked' },
   );
+}
+
+const API_KEY_REVOKED_MESSAGE =
+  'This OBS Dock Key was revoked. Create a new key in the dashboard and paste it into Connection settings.';
+
+/** Kick any live dock holding this API key (used on revoke). */
+export function kickApiKeyDocks(keyId) {
+  if (!keyId) return 0;
+  const key = String(keyId);
+  const targets = new Set();
+  const indexed = docksByApiKeyId.get(key);
+  if (indexed) {
+    for (const ws of indexed) targets.add(ws);
+  }
+  for (const [ws, meta] of connections) {
+    if (String(meta.apiKeyId || '') === key) targets.add(ws);
+  }
+  let n = 0;
+  for (const ws of targets) {
+    // Send first; brief delay so OBS/browser can process the error before close
+    // (immediate close often drops the last frame and leaves the dock UI stuck).
+    send(ws, { type: 'error', code: 'api_key_revoked', message: API_KEY_REVOKED_MESSAGE });
+    const target = ws;
+    setTimeout(() => {
+      try { target.close(); } catch (_) { /* ignore */ }
+    }, 50);
+    n += 1;
+  }
+  docksByApiKeyId.delete(key);
+  return n;
+}
+
+/** Kick every client currently joined to a room. */
+export function kickRoomClients(roomId, payload = {
+  code: 'room_deleted',
+  message: 'This table was removed. Match history is kept on your account.',
+}) {
+  if (!roomId) return 0;
+  return kickConnections(
+    (meta) => meta.roomId === roomId,
+    payload,
+  );
+}
+
+export function cancelRoomCleanup(roomId) {
+  if (!roomId) return;
+  const timer = roomCleanupTimers.get(roomId);
+  if (timer) {
+    clearTimeout(timer);
+    roomCleanupTimers.delete(roomId);
+  }
+  roomCleanupAfter.delete(roomId);
+}
+
+export function scheduleRoomCleanup(roomId, graceMs = config.roomCleanupGraceMs) {
+  if (!roomId) return;
+  cancelRoomCleanup(roomId);
+  const due = Date.now() + Math.max(0, graceMs);
+  roomCleanupAfter.set(roomId, due);
+  const room = sqlite.getRoom(roomId);
+  if (room?.account_id) {
+    notifyAccountTables(room.account_id, { immediate: true });
+  }
+  const timer = setTimeout(() => {
+    roomCleanupTimers.delete(roomId);
+    roomCleanupAfter.delete(roomId);
+    if (roomHasConnectedDock(roomId)) return;
+    performDeleteRoom(roomId);
+  }, Math.max(0, graceMs));
+  roomCleanupTimers.set(roomId, timer);
+}
+
+/**
+ * Delete room + kick clients. Never deletes match_events (FK sets room_id NULL).
+ * Returns { ok, accountId } for callers that need to refresh dashboards.
+ */
+export function performDeleteRoom(roomId) {
+  if (!roomId) return { ok: false, accountId: null };
+  const room = sqlite.getRoom(roomId);
+  if (!room) {
+    cancelRoomCleanup(roomId);
+    return { ok: false, accountId: null };
+  }
+  const accountId = room.account_id;
+  cancelRoomCleanup(roomId);
+  roomsBeingDeleted.add(roomId);
+  try {
+    kickRoomClients(roomId);
+    sqlite.deleteRoom(roomId);
+    if (rooms.has(roomId)) {
+      rooms.delete(roomId);
+    }
+  } finally {
+    roomsBeingDeleted.delete(roomId);
+  }
+  if (accountId) {
+    notifyAccountTables(accountId, { immediate: true });
+  }
+  return { ok: true, accountId };
+}
+
+function sqliteCutoffFromMsAgo(msAgo) {
+  const d = new Date(Date.now() - msAgo);
+  return d.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, '');
+}
+
+/** Prune unmapped rooms, idle TTL rooms, and rooms whose grace already fired offline. */
+export function sweepStaleRooms() {
+  let deleted = 0;
+
+  for (const room of sqlite.listUnmappedRooms()) {
+    if (roomHasConnectedDock(room.id)) continue;
+    if (performDeleteRoom(room.id).ok) deleted += 1;
+  }
+
+  if (config.roomIdleTtlMs > 0) {
+    const cutoff = sqliteCutoffFromMsAgo(config.roomIdleTtlMs);
+    for (const room of sqlite.listRoomsIdleBefore(cutoff)) {
+      if (roomHasConnectedDock(room.id)) continue;
+      if (performDeleteRoom(room.id).ok) deleted += 1;
+    }
+  }
+
+  // Grace timers that were lost on restart: rooms with no dock and last_seen older than grace.
+  if (config.roomCleanupGraceMs > 0) {
+    const graceCutoff = sqliteCutoffFromMsAgo(config.roomCleanupGraceMs);
+    for (const room of sqlite.listRoomsIdleBefore(graceCutoff)) {
+      if (roomHasConnectedDock(room.id)) continue;
+      if (roomCleanupTimers.has(room.id)) continue;
+      if (performDeleteRoom(room.id).ok) deleted += 1;
+    }
+  }
+
+  return deleted;
+}
+
+export function startRoomCleanupSweeper() {
+  if (sweeperTimer) return;
+  const interval = Math.max(5000, config.roomCleanupSweeperMs || 600000);
+  sweeperTimer = setInterval(() => {
+    try {
+      sweepStaleRooms();
+    } catch (err) {
+      console.error('Room cleanup sweeper error:', err);
+    }
+  }, interval);
+  if (typeof sweeperTimer.unref === 'function') sweeperTimer.unref();
+  // Run once shortly after boot so orphan rooms clear in dev.
+  setTimeout(() => {
+    try { sweepStaleRooms(); } catch (_) { /* ignore */ }
+  }, 2000).unref?.();
+}
+
+export function getRoomCleanupAfter(roomId) {
+  return roomCleanupAfter.get(roomId) || null;
 }

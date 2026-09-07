@@ -89,18 +89,19 @@
       assert('Dashboard CSS', (await fetch(SERVER + '/web/shared/styles.css')).ok);
       assert('Dashboard app.js', (await fetch(SERVER + '/web/dashboard/app.js')).ok);
 
-      const secret = window.prompt('Dev auth secret (DEV_AUTH_SECRET from server .env):', '');
-      if (!secret) throw new Error('Dev auth secret required');
+      const secret = new URLSearchParams(location.search).get('dev_secret')
+        || window.prompt('Dev auth secret (DEV_AUTH_SECRET from server .env):', '');
+      if (!secret) throw new Error('Dev auth secret required (pass ?dev_secret=…)');
       const login = await fetchJson('/api/auth/dev-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ secret }),
       });
       assert('Dev login', login.ok && login.body.access_token?.startsWith('dev:'));
-      assert('Dev login room', !!login.body.room?.id);
+      // Rooms are created on first dock join (seat model), not at login.
+      assert('Dev login room optional', login.body.room == null || !!login.body.room?.id);
 
       const token = login.body.access_token;
-      const roomId = login.body.room.id;
 
       const keyRes = await fetchJson('/api/api-keys', {
         method: 'POST',
@@ -110,21 +111,31 @@
       assert('Create API key', keyRes.ok && keyRes.body.key?.length === 32);
       const apiKey = keyRes.body.key;
 
-      let mobileJoin;
+      let dockJoin;
+      let roomId = null;
       try {
-        mobileJoin = await wsJoin({ room_id: roomId, client: 'mobile', access_token: token });
-        assert('WS join mobile (dev token)', mobileJoin.data.room_id === roomId);
-        mobileJoin.ws.close();
+        dockJoin = await wsJoin({
+          client: 'dock',
+          api_key: apiKey,
+          instance_id: 'browser-relay-' + Date.now(),
+        });
+        roomId = dockJoin.data.room_id;
+        assert('WS join dock creates room', !!roomId);
       } catch (e) {
-        assert('WS join mobile (dev token)', false, e.message);
+        assert('WS join dock creates room', false, e.message);
       }
 
-      let dockJoin;
-      try {
-        dockJoin = await wsJoin({ room_id: roomId, client: 'dock', api_key: apiKey });
-        assert('WS join dock (api key)', dockJoin.data.room_id === roomId);
-      } catch (e) {
-        assert('WS join dock (api key)', false, e.message);
+      let mobileJoin;
+      if (roomId) {
+        try {
+          mobileJoin = await wsJoin({ room_id: roomId, client: 'mobile', access_token: token });
+          assert('WS join mobile (dev token)', mobileJoin.data.room_id === roomId);
+          mobileJoin.ws.close();
+        } catch (e) {
+          assert('WS join mobile (dev token)', false, e.message);
+        }
+      } else {
+        assert('WS join mobile (dev token)', false, 'no room from dock join');
       }
 
       if (dockJoin) {

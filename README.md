@@ -316,9 +316,10 @@ The OBS **dock remains the scoring authority**. Mobile and guest clients send co
 - **Live dashboard** — account WebSocket pushes table list updates when docks connect, disconnect, or publish state (no polling)
 - **Connection gating** — mobile/guest controls pause when the dock is offline or the cloud socket is down, so the UI does not drift out of sync
 - **Match confirmations** — Restart Match, End Match, and Call Match require confirmation on mobile (danger-styled buttons)
-- **Cloud match stats** — completed dock races sync to the account (`session:start` / `session:end`); the dashboard **Stats** tab shows a leaderboard, recent matches, player detail (rename across history, edit/delete matches), and extras (B&R / TR, highest break, longest run, balls). Local dock stats keep a rolling **30-day** window; cloud history is unbounded. When cloud is connected, dock import/export/clear for stats are disabled — manage history on the dashboard.
+- **Cloud match stats** — completed dock races sync to the account (`session:start` / `session:end`); the dashboard **Stats** tab shows a leaderboard, recent matches, player detail (rename across history, edit/delete matches), and extras (B&R / TR, highest break, longest run, balls). Local dock stats keep a rolling **30-day** window; cloud history is unbounded and **survives room cleanup**. When cloud is connected, dock import/export/clear for stats are disabled — manage history on the dashboard.
 - **Event Info** — optional dock Event Information text is stored on cloud matches and shown in the dashboard Event column (preferred over room/table labels for match context)
-- **Google sign-in** (hosted) or **OBS Dock Key** (self-host) via CueSport Cloud **Connection settings** (⚙) in Replay/Share
+- **Google sign-in** (hosted account) **plus an OBS Dock Key** for each dock seat (same seat model as self-host) via CueSport Cloud **Connection settings** (⚙) in Replay/Share
+- **Account → Rooms (debug)** — list all persisted rooms (online/offline) and manually delete a room without wiping match history
 
 ### Quick start (self-host)
 
@@ -338,8 +339,8 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-1. Open **http://localhost:3000/dashboard** (or **:4003** with Docker) and **dev sign-in** with your `DEV_AUTH_SECRET`.
-2. Create an **OBS Dock Key** per table (basic plan: 2 seats). Paste each key into that dock’s CueSport Cloud **Connection settings (⚙)** → **Self-hosting** (Server URL + key). Each key may only be connected on one dock at a time — a second dock gets an error and should use its own key.
+1. Open **http://localhost:3000/dashboard** (or **:4003** with Docker) and **dev sign-in** with your `DEV_AUTH_SECRET` (requires `DEV_AUTH_ACCOUNT_EMAIL` in `.env` too).
+2. Create an **OBS Dock Key** per dock (starter plan: 2 seats). Paste each key into that dock’s CueSport Cloud **Connection settings** (⚙) — managed or Self-hosting. Each key may only be connected on one dock at a time. Rooms are created automatically when the dock connects.
 3. Enable the **CueSport Cloud** toggle on the dock.
 4. On your phone, open **http://localhost:3000/m/{room_id}** — if you already signed in on the dashboard in the same browser, tap **Connect**; on a new device, enter the dev secret once (it is saved for next time).
 5. Optional: from mobile **Share**, create a **guest link** (`/g/{token}`) for helpers who should not change names, game type, or end the match.
@@ -350,7 +351,7 @@ See [`backend/README.md`](backend/README.md) for Supabase/Google OAuth productio
 
 | | Hosted | Self-host |
 |---|--------|-----------|
-| Auth | Sign in with Google via dock Connection settings + dashboard | Dev secret on dashboard; OBS Dock Key + server URL in dock Connection settings → Self-hosting |
+| Auth | Google for account + OBS Dock Key per dock | Dev secret on dashboard; OBS Dock Key + server URL in dock Connection settings → Self-hosting |
 | Backend | `cuesports.macleod.systems` | Your own `backend/` deployment |
 | Cost | Optional paid tier (later) | Free (you run the server) |
 

@@ -17,11 +17,11 @@ Open:
 - **Stream listing:** http://localhost:3000/
 - **WebSocket:** ws://localhost:3000/ws
 
-Default database is **SQLite** at `backend/data/cuesport.db` — no external services required for development. Path is controlled by **`SQLITE_PATH`** (`src/config.js` → `src/db/sqlite.js`).
+Default database is **SQLite** at `backend/data/cuesport.db` — no external services required for development. Path is controlled by **`SQLITE_PATH`** (`src/config.js` → `src/db/sqlite.js`). On startup, a legacy `match_events` table without `account_id` is dropped and recreated (match history cleared; accounts/rooms kept). To fully reset local data, delete `cuesport.db` (and `-wal` / `-shm`) and restart.
 
 > **Note:** Root-level `server.js` / `db.js` are a leftover legacy stream-promotion stack. They use `DB_PATH` → `streams.db` and are **not** used by `npm start` or Docker (`CMD node src/index.js`). Running `node server.js` exits immediately. Old `auth.js` / `logger.js` helpers for that stack were removed.
 
-Set `DEV_AUTH_SECRET` in `.env` (see `.env.example`) before using dev sign-in on the dashboard or mobile.
+Set `DEV_AUTH_SECRET` and `DEV_AUTH_ACCOUNT_EMAIL` in `.env` (see `.env.example`) before using dev sign-in on the dashboard or mobile.
 
 ### Docker (self-host)
 
@@ -77,18 +77,21 @@ See [`.env.example`](.env.example).
 | `SUPABASE_ANON_KEY` | Exposed to web clients for OAuth |
 | `ALLOW_DEV_AUTH` | Enable secret dev-login when Supabase not configured |
 | `DEV_AUTH_SECRET` | Shared secret for dev login (required when dev auth is on) |
-| `DEV_AUTH_ACCOUNT_EMAIL` | Email label for the single self-host account (default `dev@local`) |
+| `DEV_AUTH_ACCOUNT_EMAIL` | Email for the single self-host account (required when dev auth is on; use your Google address to ease later managed migration) |
 | `TIER_DEFAULT` | Default subscription tier name (`starter`, `pro`, `enterprise`, `selfhost`) |
 | `TIER_LIMITS_JSON` | Optional JSON override of the full tier catalog |
-| `TIER_{TIER}_MAX_API_KEYS` | Per-tier OBS Dock Key cap (e.g. `TIER_STARTER_MAX_API_KEYS`) |
-| `TIER_{TIER}_MAX_ROOMS` | Per-tier table (dock instance) cap |
+| `TIER_{TIER}_MAX_API_KEYS` | Per-tier OBS Dock Key (seat) cap |
+| `TIER_{TIER}_MAX_ROOMS` | Safety ceiling on room rows (instance churn); not shown as “tables used” |
 | `TIER_{TIER}_MAX_CONTROL_CONNECTIONS` | Per-tier mobile+guest connections per table |
+| `ROOM_CLEANUP_GRACE_MS` | After last dock leaves, wait before deleting the room (default 45m) |
+| `ROOM_IDLE_TTL_MS` | Delete mapped rooms older than this `last_seen_at` (default 14d) |
+| `ROOM_CLEANUP_SWEEPER_MS` | How often the sweeper runs (default 10m) |
 
 Built-in defaults (all overridable via the env vars above).
-**One OBS Dock Key = one live dock connection** (create a separate key per table and paste into each dock):
+**One OBS Dock Key = one live dock connection** (create a separate key per dock and paste into each). Rooms are created when a dock connects and pruned after idle — match history is never deleted with the room.
 
-| Tier | Dock keys (seats) | Tables | Mobile + guest / table |
-|------|-------------------|--------|------------------------|
+| Tier | Dock keys (seats) | Room safety cap | Mobile + guest / table |
+|------|-------------------|-----------------|------------------------|
 | `starter` | 2 | 2 | 5 |
 | `pro` | 3 | 3 | 5 |
 | `enterprise` | 10 | 10 | 5 |
@@ -102,7 +105,7 @@ Built-in defaults (all overridable via the env vars above).
 4. Add redirect URLs: `{PUBLIC_URL}/web/dashboard/`, `{PUBLIC_URL}/auth/callback`.
 5. Set env vars in `.env` and deploy.
 
-On first Google sign-in, the server links `auth.users.id` to an `accounts` row and creates a default room.
+On first Google sign-in, the server links `auth.users.id` to an `accounts` row. Rooms are created later when an OBS dock connects with a Dock Key.
 
 ## WebSocket protocol
 
@@ -123,7 +126,8 @@ This backend is GPL-licensed alongside the scoreboard. You may run your own inst
 | GET | `/api/me` | Account, rooms, keys, quota (Bearer token) |
 | POST | `/api/api-keys` | Create API key (tier-limited) |
 | GET | `/api/api-keys/:keyId` | View API key plaintext (account owner) |
-| DELETE | `/api/api-keys/:keyId` | Revoke API key |
+| DELETE | `/api/api-keys/:keyId` | Revoke API key (kicks connected dock) |
+| DELETE | `/api/rooms/:roomId` | Delete room/table mapping (keeps match history) |
 | GET | `/api/guest-links` | List guest scorer links |
 | DELETE | `/api/guest-links/:token` | Revoke guest link |
 | POST | `/api/guest-links/revoke-all` | Revoke all guest links and disconnect guests |
@@ -131,7 +135,7 @@ This backend is GPL-licensed alongside the scoreboard. You may run your own inst
 | GET | `/api/rooms/:roomId/events` | Match event log |
 | GET | `/api/stats` | Account match stats (players, matches, summary) |
 | PATCH | `/api/stats/matches/:startEventId` | Edit a completed match (scores, names, extras; winner derived from scores) |
-| DELETE | `/api/stats/matches/:startEventId` | Delete a completed match |
+| DELETE | `/api/stats/matches/:startEventId` | Delete a completed match, or abandon an in-progress (unended) match |
 | PATCH | `/api/stats/players` | Rename a player across all match history + roster |
 | GET | `/api/players` | Account player roster (autocomplete) |
 | GET | `/api/streams` | Active public streams |

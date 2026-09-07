@@ -211,7 +211,7 @@ export async function devLogin(serverUrl, secret) {
 function defaultDevLoginError(status) {
   if (status === 401) return 'Invalid dev auth secret';
   if (status === 403) return 'Dev auth disabled on this server';
-  if (status === 503) return 'Dev auth not configured (set DEV_AUTH_SECRET on the server)';
+  if (status === 503) return 'Dev auth not configured (set DEV_AUTH_SECRET and DEV_AUTH_ACCOUNT_EMAIL on the server)';
   if (status === 400) return 'Dev auth secret required';
   return 'Dev login failed';
 }
@@ -348,7 +348,33 @@ export async function revokeApiKey(serverUrl, token, keyId) {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || 'Failed to revoke API key');
+    throw new Error(err.error || 'Failed to remove API key');
+  }
+  return res.json();
+}
+
+export async function regenerateApiKey(serverUrl, token, keyId) {
+  const base = serverUrl.replace(/\/$/, '');
+  const res = await fetch(`${base}/api/api-keys/${encodeURIComponent(keyId)}/regenerate`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || err.message || 'Failed to regenerate API key');
+  }
+  return res.json();
+}
+
+export async function deleteRoom(serverUrl, token, roomId) {
+  const base = serverUrl.replace(/\/$/, '');
+  const res = await fetch(`${base}/api/rooms/${encodeURIComponent(roomId)}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || err.message || 'Failed to delete room');
   }
   return res.json();
 }
