@@ -199,12 +199,17 @@ function hidePlayer(playerNumber) {
 	document.getElementById("player"+playerNumber+"Name").classList.replace("fadeInElm", "fadeOutElm");
 }
 
+/** Delay before collapsing ball boxes after fadeOutElm (matches CSS opacity transition). */
+var ballsHideCollapseTimer = null;
+/** rAF handle so fade-in can paint opacity 0 after lifting noShow (display:none). */
+var ballsShowFadeRaf = null;
+
 function showScores() {
 	document.getElementById("player1Score").classList.replace("fadeOutElm", "fadeInElm");
 	document.getElementById("player2Score").classList.replace("fadeOutElm", "fadeInElm");
 	document.getElementById("raceInfo").classList.replace("fadeOutElm", "fadeInElm");
-	// Strict dualScoreDisplay only � callers own player/scoreDisplay gating
-	if (getStorageItem("dualScoreDisplay") === "yes") {
+	// Dual ball scores fade with rack/frame scores (Show Scores toggle + game-type changes)
+	if (isDualScoreDisplayActive()) {
 		showBalls();
 	} else {
 		hideBalls();
@@ -226,14 +231,68 @@ function showBalls() {
 	if (!p1Balls || !p2Balls) {
 		return;
 	}
+	if (ballsHideCollapseTimer) {
+		clearTimeout(ballsHideCollapseTimer);
+		ballsHideCollapseTimer = null;
+	}
+	if (ballsShowFadeRaf) {
+		cancelAnimationFrame(ballsShowFadeRaf);
+		ballsShowFadeRaf = null;
+	}
+	if (p1Balls.classList.contains("fadeInElm") && p2Balls.classList.contains("fadeInElm") &&
+		!p1Balls.classList.contains("noShow") && !p2Balls.classList.contains("noShow")) {
+		if (scoreBoard) {
+			scoreBoard.classList.add("dual-score");
+		}
+		syncScoreBoxWidths();
+		return;
+	}
+
+	// noShow uses display:none — must paint at opacity 0 in-layout before fadeInElm or there is no transition
+	const wasCollapsed = p1Balls.classList.contains("noShow") || p2Balls.classList.contains("noShow");
 	p1Balls.classList.remove("noShow");
 	p2Balls.classList.remove("noShow");
-	p1Balls.classList.replace("fadeOutElm", "fadeInElm");
-	p2Balls.classList.replace("fadeOutElm", "fadeInElm");
+	p1Balls.classList.remove("fadeInElm");
+	p2Balls.classList.remove("fadeInElm");
+	p1Balls.classList.add("fadeOutElm");
+	p2Balls.classList.add("fadeOutElm");
 	if (scoreBoard) {
 		scoreBoard.classList.add("dual-score");
 	}
-	syncScoreBoxWidths();
+
+	function applyFadeIn() {
+		ballsShowFadeRaf = null;
+		p1Balls.classList.replace("fadeOutElm", "fadeInElm");
+		p2Balls.classList.replace("fadeOutElm", "fadeInElm");
+		syncScoreBoxWidths();
+	}
+
+	if (wasCollapsed) {
+		void p1Balls.offsetWidth;
+		void p2Balls.offsetWidth;
+		ballsShowFadeRaf = requestAnimationFrame(applyFadeIn);
+	} else {
+		// Already in layout (e.g. mid fade-out) — class swap is enough
+		applyFadeIn();
+	}
+}
+
+function scheduleBallsHideCollapse(p1Balls, p2Balls, scoreBoard) {
+	if (ballsHideCollapseTimer) {
+		clearTimeout(ballsHideCollapseTimer);
+	}
+	ballsHideCollapseTimer = setTimeout(function () {
+		ballsHideCollapseTimer = null;
+		if (p1Balls.classList.contains("fadeInElm") || p2Balls.classList.contains("fadeInElm")) {
+			return;
+		}
+		p1Balls.classList.add("noShow");
+		p2Balls.classList.add("noShow");
+		if (scoreBoard) {
+			scoreBoard.classList.remove("dual-score");
+		}
+		syncScoreBoxWidths();
+	}, 1000);
 }
 
 function hideBalls() {
@@ -243,12 +302,39 @@ function hideBalls() {
 	if (!p1Balls || !p2Balls) {
 		return;
 	}
-	p1Balls.classList.replace("fadeInElm", "fadeOutElm");
-	p2Balls.classList.replace("fadeInElm", "fadeOutElm");
-	p1Balls.classList.add("noShow");
-	p2Balls.classList.add("noShow");
-	if (scoreBoard) {
-		scoreBoard.classList.remove("dual-score");
+	if (ballsShowFadeRaf) {
+		cancelAnimationFrame(ballsShowFadeRaf);
+		ballsShowFadeRaf = null;
+	}
+	const wasVisible = p1Balls.classList.contains("fadeInElm") || p2Balls.classList.contains("fadeInElm");
+	const fadingOut = !wasVisible &&
+		(p1Balls.classList.contains("fadeOutElm") || p2Balls.classList.contains("fadeOutElm")) &&
+		!p1Balls.classList.contains("noShow") &&
+		!p2Balls.classList.contains("noShow");
+	if (wasVisible) {
+		// Fade out like rack scores; keep in layout until transition ends (noShow = display:none kills fade)
+		p1Balls.classList.replace("fadeInElm", "fadeOutElm");
+		p2Balls.classList.replace("fadeInElm", "fadeOutElm");
+		scheduleBallsHideCollapse(p1Balls, p2Balls, scoreBoard);
+	} else if (fadingOut) {
+		// Already fading (e.g. hideScores then syncBallsVisibility) — do not snap with noShow
+		if (!ballsHideCollapseTimer) {
+			scheduleBallsHideCollapse(p1Balls, p2Balls, scoreBoard);
+		}
+		return;
+	} else {
+		// Never shown / already hidden — snap off (no flash on load)
+		if (ballsHideCollapseTimer) {
+			clearTimeout(ballsHideCollapseTimer);
+			ballsHideCollapseTimer = null;
+		}
+		p1Balls.classList.add("noShow", "fadeOutElm");
+		p1Balls.classList.remove("fadeInElm");
+		p2Balls.classList.add("noShow", "fadeOutElm");
+		p2Balls.classList.remove("fadeInElm");
+		if (scoreBoard) {
+			scoreBoard.classList.remove("dual-score");
+		}
 	}
 	syncScoreBoxWidths();
 }
@@ -342,11 +428,23 @@ function setOverlayBallTrackerVisible(show) {
 	const displayEnabled = getStorageItem("enableBallDisplay") === "yes";
 	const visible = !!(show && displayEnabled && !isOverlaySnookerMode());
 	if (visible) {
+		// Same fade as rack/frame scores (fadeInElm / fadeOutElm)
 		ballTracker.classList.remove("noShow");
 		ballTracker.style.display = "flex";
+		if (ballTracker.classList.contains("fadeOutElm")) {
+			ballTracker.classList.replace("fadeOutElm", "fadeInElm");
+		} else {
+			ballTracker.classList.add("fadeInElm");
+			ballTracker.classList.remove("fadeOutElm");
+		}
 		applyOverlayBallTrackerLayout();
+	} else if (ballTracker.classList.contains("fadeInElm")) {
+		// Fade out; keep display:flex so the opacity transition can run
+		ballTracker.classList.replace("fadeInElm", "fadeOutElm");
 	} else {
-		ballTracker.classList.add("noShow");
+		// Never shown / already hidden — snap off (no flash on load)
+		ballTracker.classList.add("noShow", "fadeOutElm");
+		ballTracker.classList.remove("fadeInElm");
 		ballTracker.style.display = "none";
 	}
 }

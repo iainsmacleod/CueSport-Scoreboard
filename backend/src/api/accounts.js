@@ -302,7 +302,7 @@ export async function registerAccountRoutes(app) {
   app.get('/api/config/public', async () => ({
     publicUrl: config.publicUrl,
     supabaseUrl: config.supabaseUrl || null,
-    supabaseAnonKey: process.env.SUPABASE_ANON_KEY || null,
+    supabaseAnonKey: config.supabaseAnonKey || null,
     allowDevAuth: config.allowDevAuth,
     devAuthConfigured: isDevAuthConfigured(),
   }));

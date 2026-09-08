@@ -244,17 +244,17 @@ const handlers = {
             document.getElementById("player1Image").classList.replace("fadeInElm", "fadeOutElm");
             document.getElementById("player2Image").classList.replace("fadeInElm", "fadeOutElm");
             document.getElementById("customLogo" + data.playerNumber).classList.replace("fadeInElm", "fadeOutElm");
-            document.getElementById("ballTracker").classList.add("noShow");
+            setOverlayBallTrackerVisible(false);
         };
     },
 
     scoreDisplay(data) {
+        setStorageItem("scoreDisplay", data.scoreDisplay == "yes" ? "yes" : "no");
         if (data.scoreDisplay == "yes") {
             showScores();
         } else {
             hideScores();
         }
-        syncBallsVisibility();
     },
 
     clockDisplay(data) {

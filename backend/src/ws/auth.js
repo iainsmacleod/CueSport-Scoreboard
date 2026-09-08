@@ -9,7 +9,8 @@ let jwks = null;
 
 function getSupabase() {
   if (!supabase && config.isSupabase()) {
-    supabase = createClient(config.supabaseUrl, config.supabaseServiceKey, {
+    // Publishable anon key only — never initialize with the service role secret.
+    supabase = createClient(config.supabaseUrl, config.supabaseAnonKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
   }
