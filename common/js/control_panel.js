@@ -4945,7 +4945,23 @@ function maybeAwardPocketRack(player) {
     const balls = parseInt(getStorageItem("p" + player + "BallsCtrlPanel"), 10) || 0;
     if (balls >= POCKET_RACK_BALL_TARGET) {
         console.log(`Pocket game: player ${player} reached ${POCKET_RACK_BALL_TARGET} — awarding rack`);
-        postScore('add', player);
+        // Capture B&R / TR before breaker state is cleared for the next-rack prompt.
+        const rackRunClass = isRackBreakerPromptEnabled()
+            ? getRackRunClassification(player)
+            : null;
+        if (isRackBreakerPromptEnabled() && !isGameScoringLocked()) {
+            clearRackBreakerState();
+            updateRackBreakerBallLock();
+        }
+        postScore("add", player, { skipTrackerReset: true, rackRunClass: rackRunClass });
+        if (typeof resetBallTracker === "function") {
+            resetBallTracker();
+        }
+        if (typeof resetBallSet === "function") {
+            resetBallSet();
+        }
+        commitScoringHistoryForBreakerPrompt();
+        maybeShowRackBreakerPickerAfterRackChange();
     }
 }
 

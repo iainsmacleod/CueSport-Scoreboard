@@ -1234,16 +1234,62 @@ body.controls-locked #reconnectBanner {
 }
 .stats-match-racks-wrap {
   margin: 0.15rem 0 0.25rem 0.25rem;
-}
-.stats-rack-detail-table {
-  width: auto;
   max-width: 100%;
-  font-size: 0.85rem;
+  min-width: 0;
 }
-.stats-rack-detail-table th,
-.stats-rack-detail-table td {
-  padding: 0.25rem 0.55rem;
+.stats-rack-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-width: 100%;
+}
+.stats-rack-card {
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 0.85rem;
+  min-width: 0;
+}
+.stats-rack-primary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.65rem;
+  min-width: 0;
+}
+.stats-rack-num {
+  font-weight: 600;
+  opacity: 0.9;
+  flex: 0 0 auto;
+}
+.stats-rack-score {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.stats-rack-outcome {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.stats-rack-dur {
+  margin-left: auto;
+  opacity: 0.85;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+.stats-rack-secondary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.85rem;
+  margin-top: 0.2rem;
+  font-size: 0.8rem;
+  opacity: 0.8;
+  font-variant-numeric: tabular-nums;
+}
+.stats-rack-flag {
+  font-weight: 600;
+  opacity: 1;
+  color: #7dcfff;
 }
 .stats-match-duration-footer {
   margin: 0.35rem 0 0.1rem;

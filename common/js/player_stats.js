@@ -31,8 +31,8 @@
         { id: 'highestRun', label: 'Longest Run', gameTypes: ['game4'] },
         { id: 'ballsPotted', label: 'Balls Potted', gameTypes: ['game1', 'game2', 'game3', 'game5', 'game6', 'game7', 'game8'] },
         { id: 'fouls', label: 'Fouls', gameTypes: ['game1', 'game2', 'game3', 'game4', 'game5', 'game6', 'game7', 'game8'] },
-        { id: 'breakAndRun', label: 'Break & Run', gameTypes: ['game1', 'game2', 'game3'] },
-        { id: 'tableRun', label: 'Table Run', gameTypes: ['game1', 'game2', 'game3'] }
+        { id: 'breakAndRun', label: 'Break & Run', gameTypes: ['game1', 'game2', 'game3', 'game5', 'game6'] },
+        { id: 'tableRun', label: 'Table Run', gameTypes: ['game1', 'game2', 'game3', 'game5', 'game6'] }
     ];
 
     const STATS_VISIBILITY_STORAGE_KEY = 'statsVisibility';
@@ -851,10 +851,6 @@
             return;
         }
         const scores = scoresFromEditorRacks(editorRacks);
-        if (scores.p1 === scores.p2) {
-            alert('Frame/rack wins must differ — only completed matches are recorded.');
-            return;
-        }
         const racks = serializeEditorRacksForCloud(editorRacks);
         const dateVal = document.getElementById('statsMatchDate').value;
         try {
@@ -2034,7 +2030,8 @@
     }
 
     function isTrackerRackWinGameType(gameType) {
-        return gameType === 'game1' || gameType === 'game2' || gameType === 'game3';
+        return gameType === 'game1' || gameType === 'game2' || gameType === 'game3' ||
+            gameType === 'game5' || gameType === 'game6';
     }
 
     function readRackRunClassificationFromStorage(winnerSlot) {
@@ -3811,21 +3808,19 @@
             racks = synthesizeRacksFromScores(match);
         }
 
-        if (scoreP1 === scoreP2) {
-            throw new Error('Frame/rack wins must differ — only completed matches are recorded.');
-        }
-
         match.finalScore = { p1: scoreP1, p2: scoreP2 };
         match.racks = racks;
         match.balls = synthesizeBallsFromCounts(match, ballsP1, ballsP2);
 
         if (scoreP1 > scoreP2) {
             match.winnerId = match.player1Id;
-            match.completedAt = dateIso;
-        } else {
+        } else if (scoreP2 > scoreP1) {
             match.winnerId = match.player2Id;
-            match.completedAt = dateIso;
+        } else {
+            // Draws are valid completed matches (same as Call Match Early with a tied scoreline).
+            match.winnerId = null;
         }
+        match.completedAt = dateIso;
         match.status = 'completed';
 
         if (!match.startedAt) {
@@ -5134,7 +5129,7 @@
         return '\u2014';
     }
 
-    /** Per-rack/frame breakdown for match history (snooker includes frame points + highest breaks). */
+    /** Per-rack/frame breakdown for match history (game-specific extras on secondary line). */
     function renderMatchRackBreakdown(match, options) {
         const timedRacks = enrichRacksWithDuration(match);
         if (timedRacks.length === 0) {
@@ -5144,9 +5139,10 @@
         const viewerId = opts.viewerPlayerId || null;
         const isSnooker = isSnookerGameType(match.gameType);
         const isStraight = isStraightPoolGameType(match.gameType);
-        const p1Name = escapeHtml(match.player1Name || 'Player 1');
-        const p2Name = escapeHtml(match.player2Name || 'Player 2');
+        const isPoolRunGame = isTrackerRackWinGameType(match.gameType);
         const unit = rackFrameWord(match.gameType, false);
+        const viewerIsP1 = !!(viewerId && match.player1Id === viewerId);
+        const viewerIsP2 = !!(viewerId && match.player2Id === viewerId);
 
         function durationCell(r) {
             const label = formatDurationSeconds(r.durationSeconds);
@@ -5173,47 +5169,36 @@
             return '<div class="stats-match-duration-footer">' + escapeHtml(parts.join(' \u00b7 ')) + '</div>';
         }
 
-        let header;
-        let rows;
-        if (isSnooker) {
-            const neutral = !viewerId;
-            header = neutral
-                ? '<tr><th>#</th><th>Points</th><th>HB ' + p1Name + '</th><th>HB ' + p2Name +
-                    '</th><th>Fouls ' + p1Name + '</th><th>Fouls ' + p2Name +
-                    '</th><th>Winner</th><th>Duration</th></tr>'
-                : '<tr><th>#</th><th>Points</th><th>HB</th><th>Fouls</th><th>Result</th><th>Duration</th></tr>';
-            rows = timedRacks.map(function (r) {
-                const num = r.rackNumber || '';
+        function pair(a, b) {
+            return viewerIsP2 ? (b + '\u2013' + a) : (a + '\u2013' + b);
+        }
+
+        function resultLabel(r) {
+            if (viewerId && r.winnerId) {
+                return r.winnerId === viewerId ? 'Won' : 'Lost';
+            }
+            return escapeHtml(winnerDisplayName(match, r.winnerId));
+        }
+
+        const cards = timedRacks.map(function (r) {
+            const num = escapeHtml(String(r.rackNumber || ''));
+            const dur = escapeHtml(durationCell(r));
+            const outcome = resultLabel(r);
+            const primary = ['<span class="stats-rack-num">#' + num + '</span>'];
+            const secondary = [];
+            const f1 = parseInt(r.foulsP1, 10) || 0;
+            const f2 = parseInt(r.foulsP2, 10) || 0;
+
+            if (isSnooker) {
                 const fs = r.frameScore || { p1: 0, p2: 0 };
                 const hb1 = parseInt(r.highestBreakP1, 10) || 0;
                 const hb2 = parseInt(r.highestBreakP2, 10) || 0;
-                const f1 = parseInt(r.foulsP1, 10) || 0;
-                const f2 = parseInt(r.foulsP2, 10) || 0;
-                const dur = durationCell(r);
-                if (neutral) {
-                    return '<tr><td>' + num + '</td><td>' + fs.p1 + '\u2013' + fs.p2 + '</td><td>' + hb1 +
-                        '</td><td>' + hb2 + '</td><td>' + f1 + '</td><td>' + f2 + '</td><td>' +
-                        escapeHtml(winnerDisplayName(match, r.winnerId)) + '</td><td>' + dur + '</td></tr>';
-                }
-                const viewerIsP1 = match.player1Id === viewerId;
-                const pts = viewerIsP1 ? (fs.p1 + '\u2013' + fs.p2) : (fs.p2 + '\u2013' + fs.p1);
-                const hb = viewerIsP1 ? (hb1 + '\u2013' + hb2) : (hb2 + '\u2013' + hb1);
-                const fouls = viewerIsP1 ? (f1 + '\u2013' + f2) : (f2 + '\u2013' + f1);
-                let result = '\u2014';
-                if (r.winnerId) {
-                    result = r.winnerId === viewerId ? 'Won' : 'Lost';
-                }
-                return '<tr><td>' + num + '</td><td>' + pts + '</td><td>' + hb + '</td><td>' + fouls +
-                    '</td><td>' + result + '</td><td>' + dur + '</td></tr>';
-            }).join('');
-        } else if (isStraight) {
-            const neutral = !viewerId;
-            header = neutral
-                ? '<tr><th>#</th><th>Run ' + p1Name + '</th><th>Run ' + p2Name +
-                    '</th><th>Winner</th><th>Duration</th></tr>'
-                : '<tr><th>#</th><th>Run</th><th>Result</th><th>Duration</th></tr>';
-            rows = timedRacks.map(function (r) {
-                const num = r.rackNumber || '';
+                primary.push('<span class="stats-rack-score">' + escapeHtml(pair(fs.p1, fs.p2)) + '</span>');
+                primary.push('<span class="stats-rack-outcome">' + outcome + '</span>');
+                primary.push('<span class="stats-rack-dur">' + dur + '</span>');
+                secondary.push('<span>HB ' + escapeHtml(pair(hb1, hb2)) + '</span>');
+                secondary.push('<span>Fouls ' + escapeHtml(pair(f1, f2)) + '</span>');
+            } else if (isStraight) {
                 const hb1 = parseInt(
                     r.highestRunP1 != null ? r.highestRunP1 : r.highestBreakP1,
                     10
@@ -5222,43 +5207,35 @@
                     r.highestRunP2 != null ? r.highestRunP2 : r.highestBreakP2,
                     10
                 ) || 0;
-                const dur = durationCell(r);
-                if (neutral) {
-                    return '<tr><td>' + num + '</td><td>' + hb1 + '</td><td>' + hb2 + '</td><td>' +
-                        escapeHtml(winnerDisplayName(match, r.winnerId)) + '</td><td>' + dur + '</td></tr>';
+                primary.push('<span class="stats-rack-outcome">' + outcome + '</span>');
+                primary.push('<span class="stats-rack-dur">' + dur + '</span>');
+                secondary.push('<span>Run ' + escapeHtml(pair(hb1, hb2)) + '</span>');
+                secondary.push('<span>Fouls ' + escapeHtml(pair(f1, f2)) + '</span>');
+            } else {
+                primary.push('<span class="stats-rack-outcome">' + outcome + '</span>');
+                primary.push('<span class="stats-rack-dur">' + dur + '</span>');
+                secondary.push('<span>Fouls ' + escapeHtml(pair(f1, f2)) + '</span>');
+                if (isPoolRunGame) {
+                    if (r.breakAndRun) {
+                        secondary.push('<span class="stats-rack-flag">B&amp;R</span>');
+                    }
+                    if (r.tableRun) {
+                        secondary.push('<span class="stats-rack-flag">TR</span>');
+                    }
                 }
-                const viewerIsP1 = match.player1Id === viewerId;
-                const run = viewerIsP1 ? (hb1 + '\u2013' + hb2) : (hb2 + '\u2013' + hb1);
-                let result = '\u2014';
-                if (r.winnerId) {
-                    result = r.winnerId === viewerId ? 'Won' : 'Lost';
-                }
-                return '<tr><td>' + num + '</td><td>' + run + '</td><td>' + result +
-                    '</td><td>' + dur + '</td></tr>';
-            }).join('');
-        } else {
-            header = viewerId
-                ? '<tr><th>#</th><th>Result</th><th>Duration</th></tr>'
-                : '<tr><th>#</th><th>Winner</th><th>Duration</th></tr>';
-            rows = timedRacks.map(function (r) {
-                const num = r.rackNumber || '';
-                const dur = durationCell(r);
-                if (!viewerId) {
-                    return '<tr><td>' + num + '</td><td>' +
-                        escapeHtml(winnerDisplayName(match, r.winnerId)) +
-                        '</td><td>' + dur + '</td></tr>';
-                }
-                let result = '\u2014';
-                if (r.winnerId) {
-                    result = r.winnerId === viewerId ? 'Won' : 'Lost';
-                }
-                return '<tr><td>' + num + '</td><td>' + result + '</td><td>' + dur + '</td></tr>';
-            }).join('');
-        }
+            }
+
+            return '<div class="stats-rack-card">' +
+                '<div class="stats-rack-primary">' + primary.join('') + '</div>' +
+                (secondary.length
+                    ? '<div class="stats-rack-secondary">' + secondary.join('') + '</div>'
+                    : '') +
+                '</div>';
+        }).join('');
 
         return '<div class="stats-match-racks-wrap">' +
-            '<table class="stats-table stats-rack-detail-table"><thead>' + header + '</thead><tbody>' +
-            rows + '</tbody></table>' + durationFooter() + '</div>';
+            '<div class="stats-rack-list">' + cards + '</div>' +
+            durationFooter() + '</div>';
     }
 
     function formatMatchGameCell(match) {

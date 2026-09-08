@@ -880,8 +880,6 @@ function renderMatchRackBreakdown(m, options = {}) {
   const hasViewer = viewerIsP1 || viewerIsP2;
   const isSnooker = m.gameType === 'game8';
   const isStraight = m.gameType === 'game4';
-  const p1Name = escapeHtml(m.player1Name || 'Player 1');
-  const p2Name = escapeHtml(m.player2Name || 'Player 2');
   const unit = isSnooker ? 'Frames' : 'Racks';
 
   const durationCell = (r) => formatDurationSeconds(r.durationSeconds) || '—';
@@ -896,77 +894,65 @@ function renderMatchRackBreakdown(m, options = {}) {
     return `<div class="stats-match-duration-footer">${escapeHtml(parts.join(' · '))}</div>`;
   };
 
-  let header = '';
-  let rows = '';
-  if (isSnooker) {
-    header = hasViewer
-      ? '<tr><th>#</th><th>Points</th><th>HB</th><th>Fouls</th><th>Result</th><th>Duration</th></tr>'
-      : `<tr><th>#</th><th>Points</th><th>HB ${p1Name}</th><th>HB ${p2Name}</th><th>Fouls ${p1Name}</th><th>Fouls ${p2Name}</th><th>Winner</th><th>Duration</th></tr>`;
-    rows = timedRacks.map((r) => {
-      const num = r.rackNumber || '';
+  const resultLabel = (r) => {
+    const slot = r.winnerSlot != null ? String(r.winnerSlot) : '';
+    if (hasViewer && (slot === '1' || slot === '2')) {
+      const won = (slot === '1' && viewerIsP1) || (slot === '2' && viewerIsP2);
+      return won ? 'Won' : 'Lost';
+    }
+    return escapeHtml(rackWinnerName(m, r));
+  };
+
+  const pair = (a, b) => (viewerIsP2 ? `${b}–${a}` : `${a}–${b}`);
+  const isPoolRunGame = m.gameType === 'game1' || m.gameType === 'game2' || m.gameType === 'game3' ||
+    m.gameType === 'game5' || m.gameType === 'game6';
+
+  const cards = timedRacks.map((r) => {
+    const num = escapeHtml(String(r.rackNumber || ''));
+    const dur = escapeHtml(durationCell(r));
+    const outcome = resultLabel(r);
+    const primaryParts = [`<span class="stats-rack-num">#${num}</span>`];
+    const secondaryParts = [];
+    const f1 = Number(r.foulsP1) || 0;
+    const f2 = Number(r.foulsP2) || 0;
+
+    if (isSnooker) {
       const fs = r.frameScore || { p1: 0, p2: 0 };
       const hb1 = Number(r.highestBreakP1) || 0;
       const hb2 = Number(r.highestBreakP2) || 0;
-      const f1 = Number(r.foulsP1) || 0;
-      const f2 = Number(r.foulsP2) || 0;
-      const dur = durationCell(r);
-      if (!hasViewer) {
-        return `<tr><td>${num}</td><td>${fs.p1}–${fs.p2}</td><td>${hb1}</td><td>${hb2}</td><td>${f1}</td><td>${f2}</td><td>${escapeHtml(rackWinnerName(m, r))}</td><td>${dur}</td></tr>`;
-      }
-      const pts = viewerIsP1 ? `${fs.p1}–${fs.p2}` : `${fs.p2}–${fs.p1}`;
-      const hb = viewerIsP1 ? `${hb1}–${hb2}` : `${hb2}–${hb1}`;
-      const fouls = viewerIsP1 ? `${f1}–${f2}` : `${f2}–${f1}`;
-      const slot = r.winnerSlot != null ? String(r.winnerSlot) : '';
-      let result = '—';
-      if (slot === '1' || slot === '2') {
-        const won = (slot === '1' && viewerIsP1) || (slot === '2' && viewerIsP2);
-        result = won ? 'Won' : 'Lost';
-      }
-      return `<tr><td>${num}</td><td>${pts}</td><td>${hb}</td><td>${fouls}</td><td>${result}</td><td>${dur}</td></tr>`;
-    }).join('');
-  } else if (isStraight) {
-    header = hasViewer
-      ? '<tr><th>#</th><th>Run</th><th>Result</th><th>Duration</th></tr>'
-      : `<tr><th>#</th><th>Run ${p1Name}</th><th>Run ${p2Name}</th><th>Winner</th><th>Duration</th></tr>`;
-    rows = timedRacks.map((r) => {
-      const num = r.rackNumber || '';
+      primaryParts.push(`<span class="stats-rack-score">${escapeHtml(pair(fs.p1, fs.p2))}</span>`);
+      primaryParts.push(`<span class="stats-rack-outcome">${outcome}</span>`);
+      primaryParts.push(`<span class="stats-rack-dur">${dur}</span>`);
+      secondaryParts.push(`<span>HB ${escapeHtml(pair(hb1, hb2))}</span>`);
+      secondaryParts.push(`<span>Fouls ${escapeHtml(pair(f1, f2))}</span>`);
+    } else if (isStraight) {
       const hb1 = Number(r.highestRunP1 != null ? r.highestRunP1 : r.highestBreakP1) || 0;
       const hb2 = Number(r.highestRunP2 != null ? r.highestRunP2 : r.highestBreakP2) || 0;
-      const dur = durationCell(r);
-      if (!hasViewer) {
-        return `<tr><td>${num}</td><td>${hb1}</td><td>${hb2}</td><td>${escapeHtml(rackWinnerName(m, r))}</td><td>${dur}</td></tr>`;
+      primaryParts.push(`<span class="stats-rack-outcome">${outcome}</span>`);
+      primaryParts.push(`<span class="stats-rack-dur">${dur}</span>`);
+      secondaryParts.push(`<span>Run ${escapeHtml(pair(hb1, hb2))}</span>`);
+      secondaryParts.push(`<span>Fouls ${escapeHtml(pair(f1, f2))}</span>`);
+    } else {
+      primaryParts.push(`<span class="stats-rack-outcome">${outcome}</span>`);
+      primaryParts.push(`<span class="stats-rack-dur">${dur}</span>`);
+      secondaryParts.push(`<span>Fouls ${escapeHtml(pair(f1, f2))}</span>`);
+      if (isPoolRunGame) {
+        if (r.breakAndRun) secondaryParts.push('<span class="stats-rack-flag">B&amp;R</span>');
+        if (r.tableRun) secondaryParts.push('<span class="stats-rack-flag">TR</span>');
       }
-      const run = viewerIsP1 ? `${hb1}–${hb2}` : `${hb2}–${hb1}`;
-      const slot = r.winnerSlot != null ? String(r.winnerSlot) : '';
-      let result = '—';
-      if (slot === '1' || slot === '2') {
-        const won = (slot === '1' && viewerIsP1) || (slot === '2' && viewerIsP2);
-        result = won ? 'Won' : 'Lost';
-      }
-      return `<tr><td>${num}</td><td>${run}</td><td>${result}</td><td>${dur}</td></tr>`;
-    }).join('');
-  } else {
-    header = hasViewer
-      ? '<tr><th>#</th><th>Result</th><th>Duration</th></tr>'
-      : '<tr><th>#</th><th>Winner</th><th>Duration</th></tr>';
-    rows = timedRacks.map((r) => {
-      const num = r.rackNumber || '';
-      const dur = durationCell(r);
-      if (!hasViewer) {
-        return `<tr><td>${num}</td><td>${escapeHtml(rackWinnerName(m, r))}</td><td>${dur}</td></tr>`;
-      }
-      const slot = r.winnerSlot != null ? String(r.winnerSlot) : '';
-      let result = '—';
-      if (slot === '1' || slot === '2') {
-        const won = (slot === '1' && viewerIsP1) || (slot === '2' && viewerIsP2);
-        result = won ? 'Won' : 'Lost';
-      }
-      return `<tr><td>${num}</td><td>${result}</td><td>${dur}</td></tr>`;
-    }).join('');
-  }
+    }
+
+    const secondary = secondaryParts.length
+      ? `<div class="stats-rack-secondary">${secondaryParts.join('')}</div>`
+      : '';
+    return `<div class="stats-rack-card">
+      <div class="stats-rack-primary">${primaryParts.join('')}</div>
+      ${secondary}
+    </div>`;
+  }).join('');
 
   return `<div class="stats-match-racks-wrap">
-    <table class="stats-table stats-rack-detail-table"><thead>${header}</thead><tbody>${rows}</tbody></table>
+    <div class="stats-rack-list">${cards}</div>
     ${durationFooter()}
   </div>`;
 }
@@ -1116,6 +1102,10 @@ function renderPlayerDetail() {
     const fouls = player ? (player.fouls || 0) : 0;
     if (fouls > 0) {
       cards.push(`<div class="stats-summary-card"><strong>${fouls}</strong><span>Fouls</span></div>`);
+    }
+    const ballsPotted = player ? (player.ballsPotted || 0) : 0;
+    if (ballsPotted > 0) {
+      cards.push(`<div class="stats-summary-card"><strong>${ballsPotted}</strong><span>Balls potted</span></div>`);
     }
     summary.innerHTML = cards.join('');
     summary.classList.toggle('hidden', cards.length === 0);
@@ -1481,10 +1471,6 @@ async function saveMatchModal(event) {
     if (r.winnerId === '1') scores.p1 += 1;
     else if (r.winnerId === '2') scores.p2 += 1;
   });
-  if (scores.p1 === scores.p2) {
-    setMatchModalError('Frame/rack wins must differ — only decisive matches are recorded.');
-    return;
-  }
   try {
     await updateAccountMatch(getServerUrl(), getToken(), startEventId, {
       player1Name: p1,

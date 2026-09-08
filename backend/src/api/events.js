@@ -26,7 +26,7 @@ function toSqliteDateTime(value) {
 function deriveWinnerSlot(p1, p2) {
   if (p1 > p2) return '1';
   if (p2 > p1) return '2';
-  return null;
+  return 'draw';
 }
 
 /** Normalize editable rack/frame rows from the dock/dashboard editor. */
@@ -188,9 +188,6 @@ export async function registerEventRoutes(app) {
       rackExtras = aggregateExtrasFromRacks(normalizedRacks, gameType);
       scores = rackExtras.scores;
       winnerSlot = deriveWinnerSlot(scores.p1, scores.p2);
-      if (!winnerSlot) {
-        return reply.code(400).send({ error: 'Frame/rack wins must differ — only decisive matches are recorded' });
-      }
     } else {
       scores = {
         p1: clampScore(body.scores?.p1 ?? pair.end.payload?.scores?.p1 ?? 0),

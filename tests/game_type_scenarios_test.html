@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CueSport — Game Type Scenario Tests</title>
+  <style>
+    :root { color-scheme: dark; --pass: #3d9a5c; --fail: #c44; --bg: #1a1d24; --panel: #252830; --text: #e8e8e8; --muted: #9aa0aa; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 24px; font-family: Segoe UI, Arial, sans-serif; background: var(--bg); color: var(--text); line-height: 1.45; }
+    h1 { margin: 0 0 8px; font-size: 1.35rem; }
+    .intro { color: var(--muted); margin-bottom: 16px; max-width: 820px; }
+    .intro code { background: var(--panel); padding: 2px 6px; border-radius: 3px; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 16px; }
+    button { cursor: pointer; border: 2px solid #000; background: #3a7; color: #111; font-weight: bold; padding: 8px 16px; border-radius: 0 0 8px 0; }
+    button:disabled { opacity: 0.5; cursor: wait; }
+    button.secondary { background: #556; color: #fff; }
+    label.loops { color: var(--muted); font-size: 0.92rem; }
+    label.loops input { width: 3.5rem; margin-left: 6px; }
+    #summary { padding: 12px 14px; background: var(--panel); border: 1px solid #333; border-radius: 6px; margin-bottom: 16px; max-width: 820px; }
+    #summary.pass { border-color: var(--pass); }
+    #summary.fail { border-color: var(--fail); }
+    table { width: 100%; max-width: 1020px; border-collapse: collapse; font-size: 0.9rem; }
+    th, td { border: 1px solid #333; padding: 6px 10px; text-align: left; vertical-align: top; }
+    th { background: #2b2e38; }
+    tr.pass td:first-child { color: var(--pass); font-weight: bold; }
+    tr.fail td:first-child { color: var(--fail); font-weight: bold; }
+    .suite { color: var(--muted); font-size: 0.82em; }
+    .detail { color: var(--muted); font-family: Consolas, monospace; font-size: 0.85em; word-break: break-word; }
+    iframe { position: absolute; width: 1280px; height: 720px; left: -10000px; top: 0; border: 0; }
+  </style>
+</head>
+<body>
+  <h1>CueSport — Game Type Scenario Tests</h1>
+  <p class="intro">
+    Focused scenarios for rack/frame stats: B&amp;R, TR, multi-inning fouls (8/9/10/Bank/One Pocket),
+    and Snooker (147, golden 167, free balls / fouls). Each match records <strong>at least 5</strong>
+    racks/frames. Loops shuffle game order, rack/frame order, and which player scores;
+    racks also mix object-ball pots, fouls, respots (Bank/One Pocket), and undos.
+    Use <code>?loops=N</code> and optional <code>?seed=123</code> (reproducible). Serve from repo root:
+    <code>python -m http.server 8765</code> →
+    <code>http://localhost:8765/tests/game_type_scenarios_test.html</code>
+  </p>
+  <div class="toolbar">
+    <button type="button" id="runBtn">Run scenarios</button>
+    <button type="button" id="reloadBtn" class="secondary">Reload frames</button>
+    <label class="loops">Loops <input type="number" id="loopsInput" min="1" max="50" value="1" /></label>
+    <span id="status" class="intro" style="margin:0"></span>
+  </div>
+  <div id="summary">Ready.</div>
+  <table>
+    <thead>
+      <tr><th style="width:72px">Result</th><th style="width:160px">Suite</th><th>Test</th><th>Detail</th></tr>
+    </thead>
+    <tbody id="resultsBody"></tbody>
+  </table>
+
+  <iframe id="cpFrame" title="control panel" src="../control_panel.html?instance=scenario-test"></iframe>
+  <iframe id="bsFrame" title="browser source" src="../browser_source.html?instance=scenario-test"></iframe>
+
+  <script>
+  'use strict';
+
+  const cpFrame = document.getElementById('cpFrame');
+  const bsFrame = document.getElementById('bsFrame');
+  const runBtn = document.getElementById('runBtn');
+  const reloadBtn = document.getElementById('reloadBtn');
+  const loopsInput = document.getElementById('loopsInput');
+  const summaryEl = document.getElementById('summary');
+  const resultsBody = document.getElementById('resultsBody');
+  const statusEl = document.getElementById('status');
+
+  const POOL_GAMES = [
+    { id: 'game1', label: '8-Ball', winningBall: 'ball 8', pocket: false },
+    { id: 'game2', label: '9-Ball', winningBall: 'ball 9', pocket: false },
+    { id: 'game3', label: '10-Ball', winningBall: 'ball 10', pocket: false },
+    { id: 'game5', label: 'Bank', winningBall: null, pocket: true },
+    { id: 'game6', label: 'One Pocket', winningBall: null, pocket: true },
+  ];
+
+  /** Mulberry32 — deterministic when ?seed= is set; otherwise seeded from time. */
+  function createRng(seed) {
+    let t = (seed >>> 0) || 1;
+    return function rand() {
+      t += 0x6D2B79F5;
+      let r = Math.imul(t ^ (t >>> 15), 1 | t);
+      r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+      return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function shuffleInPlace(arr, rand) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(rand() * (i + 1));
+      const tmp = arr[i];
+      arr[i] = arr[j];
+      arr[j] = tmp;
+    }
+    return arr;
+  }
+
+  function pick(rand, a, b) {
+    return rand() < 0.5 ? a : b;
+  }
+
+  function randInt(rand, min, max) {
+    return min + Math.floor(rand() * (max - min + 1));
+  }
+
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  function frameLoaded(frame) {
+    return new Promise((resolve) => {
+      if (frame.contentDocument && frame.contentDocument.readyState === 'complete') {
+        resolve();
+        return;
+      }
+      frame.addEventListener('load', () => resolve(), { once: true });
+    });
+  }
+
+  async function waitForCpReady(timeoutMs) {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      const cp = cpFrame.contentWindow;
+      if (cp && typeof cp.gameType === 'function' && cp.PlayerStats &&
+          typeof cp.PlayerStats.ensurePlayer === 'function') {
+        return cp;
+      }
+      await sleep(50);
+    }
+    throw new Error('Control panel not ready');
+  }
+
+  function ensureScoresVisible(cp) {
+    ['usePlayer1Setting', 'usePlayer2Setting'].forEach((id, idx) => {
+      const el = cp.document.getElementById(id);
+      if (el && !el.checked) {
+        el.checked = true;
+        if (typeof cp.playerSetting === 'function') cp.playerSetting(idx + 1);
+      }
+      cp.setStorageItem(idx === 0 ? 'usePlayer1' : 'usePlayer2', 'yes');
+    });
+    const scoreCb = cp.document.getElementById('scoreDisplay');
+    if (scoreCb) {
+      scoreCb.disabled = false;
+      scoreCb.checked = true;
+    }
+    cp.setStorageItem('scoreDisplay', 'yes');
+    if (typeof cp.scoreDisplaySetting === 'function') cp.scoreDisplaySetting();
+  }
+
+  function setBallScoring(cp, enabled) {
+    const cb = cp.document.getElementById('ballTrackerCheckbox');
+    if (cb) {
+      cb.disabled = false;
+      cb.checked = !!enabled;
+    }
+    cp.setStorageItem('enableBallTracker', enabled ? 'yes' : 'no');
+    if (typeof cp.useBallTracker === 'function') cp.useBallTracker();
+  }
+
+  async function setPlayers(cp, p1, p2) {
+    cp.document.getElementById('p1Name').value = p1.name;
+    cp.document.getElementById('p2Name').value = p2.name;
+    cp.document.getElementById('p1Name').setAttribute('data-player-id', p1.id);
+    cp.document.getElementById('p2Name').setAttribute('data-player-id', p2.id);
+    cp.postNames();
+    await sleep(150);
+  }
+
+  async function setupGame(cp, gameType, race) {
+    ensureScoresVisible(cp);
+    setBallScoring(cp, true);
+    const sel = cp.document.getElementById('gameTypeSelect');
+    if (sel) sel.value = gameType;
+    await cp.gameType(gameType);
+    await sleep(80);
+    const raceEl = cp.document.getElementById('raceInfoTxt');
+    if (raceEl) raceEl.value = String(race);
+    cp.setStorageItem('raceInfo', String(race));
+    if (typeof cp.postInfo === 'function') cp.postInfo();
+    cp.setStorageItem('p1ScoreCtrlPanel', 0);
+    cp.setStorageItem('p2ScoreCtrlPanel', 0);
+    cp.setStorageItem('p1BallsCtrlPanel', 0);
+    cp.setStorageItem('p2BallsCtrlPanel', 0);
+    const p1Score = cp.document.getElementById('p1Score');
+    const p2Score = cp.document.getElementById('p2Score');
+    if (p1Score) p1Score.value = '0';
+    if (p2Score) p2Score.value = '0';
+    if (typeof cp.resetBallTracker === 'function') cp.resetBallTracker();
+    if (typeof cp.clearRackBreakerState === 'function') cp.clearRackBreakerState();
+    await sleep(40);
+  }
+
+  function setEarlyGameBall(cp, on) {
+    const cb = cp.document.getElementById('earlyGameBallCheckbox');
+    if (!cb) return;
+    cb.checked = !!on;
+    if (typeof cp.earlyGameBallToggle === 'function') cp.earlyGameBallToggle();
+  }
+
+  function setFouls(cp, f1, f2) {
+    cp.setStorageItem('snookerFrameFoulsP1', String(Math.max(0, f1 || 0)));
+    cp.setStorageItem('snookerFrameFoulsP2', String(Math.max(0, f2 || 0)));
+  }
+
+  async function markOpponentVisited(cp) {
+    if (typeof cp.togglePlayer === 'function') {
+      cp.togglePlayer(false);
+      await sleep(20);
+      cp.togglePlayer(true);
+      await sleep(20);
+    }
+  }
+
+  function activeSlot(cp) {
+    return String(cp.getStorageItem('activePlayer') || '1') === '2' ? '2' : '1';
+  }
+
+  function ensureActiveSlot(cp, slot) {
+    if (activeSlot(cp) === String(slot)) return;
+    if (typeof cp.onPlayerSlotButton === 'function') {
+      cp.onPlayerSlotButton(String(slot));
+    } else if (typeof cp.togglePlayer === 'function') {
+      cp.togglePlayer(String(slot) === '1');
+    }
+  }
+
+  function visibleObjectBalls(cp, excludeWinning) {
+    const winId = excludeWinning || null;
+    return Array.prototype.filter.call(
+      cp.document.querySelectorAll('#ballTrackerDiv .ball'),
+      function (ball) {
+        if (!ball || !ball.id || ball.id.indexOf('ball ') !== 0) return false;
+        if (winId && ball.id === winId) return false;
+        if (ball.classList.contains('noShow') || ball.classList.contains('snooker-spacer')) return false;
+        return true;
+      });
+  }
+
+  function fadedObjectBalls(cp) {
+    return visibleObjectBalls(cp, null).filter((b) => b.classList.contains('faded'));
+  }
+
+  function unfadedObjectBalls(cp, excludeWinning) {
+    return visibleObjectBalls(cp, excludeWinning).filter((b) => !b.classList.contains('faded'));
+  }
+
+  async function potBallEl(cp, el) {
+    if (!el || el.classList.contains('faded') || el.classList.contains('noShow')) return false;
+    if (typeof cp.togglePot === 'function') cp.togglePot(el);
+    await sleep(18);
+    return true;
+  }
+
+  async function undoOnce(cp) {
+    if (typeof cp.undoLastScoringAction !== 'function') return false;
+    await cp.undoLastScoringAction();
+    await sleep(25);
+    return true;
+  }
+
+  async function respotRandom(cp, rand) {
+    if (typeof cp.applyRespotBall !== 'function') return false;
+    if (typeof cp.canApplyPoolRespot === 'function' && !cp.canApplyPoolRespot()) return false;
+    const faded = fadedObjectBalls(cp);
+    if (!faded.length) return false;
+    const ball = faded[randInt(rand, 0, faded.length - 1)];
+    cp.applyRespotBall(ball.id);
+    await sleep(20);
+    return true;
+  }
+
+  async function foulOnce(cp) {
+    if (typeof cp.applyPoolFoul !== 'function') return false;
+    const ok = cp.applyPoolFoul();
+    await sleep(25);
+    return !!ok;
+  }
+
+  function clearUndoStack(cp) {
+    if (typeof cp.clearScoringUndoStack === 'function') cp.clearScoringUndoStack();
+    if (typeof cp.clearSnookerUndoStack === 'function') cp.clearSnookerUndoStack();
+  }
+
+  /**
+   * Interleave object-ball pots, fouls, respots, and undos before the rack-winning sequence.
+   * opts.allowFoul / allowRespot / allowUndo control which action balls may fire.
+   * Caller should clearUndoStack() after breaker/visits so undos cannot unwind setup.
+   */
+  async function scramblePoolActions(cp, game, rand, opts) {
+    const allowFoul = !!(opts && opts.allowFoul);
+    const allowRespot = !!(opts && opts.allowRespot) && !!game.pocket;
+    const allowUndo = opts && opts.allowUndo !== false;
+    const keepSlot = opts && opts.keepSlot ? String(opts.keepSlot) : null;
+    const steps = randInt(rand, opts && opts.minSteps != null ? opts.minSteps : 2,
+      opts && opts.maxSteps != null ? opts.maxSteps : 6);
+    const winId = game.winningBall || null;
+    const log = [];
+
+    for (let s = 0; s < steps; s++) {
+      if (keepSlot) ensureActiveSlot(cp, keepSlot);
+      const roll = rand();
+      if (allowUndo && roll < 0.22 && s > 0) {
+        if (await undoOnce(cp)) log.push('undo');
+        if (keepSlot) ensureActiveSlot(cp, keepSlot);
+        continue;
+      }
+      if (allowRespot && roll < 0.40) {
+        if (await respotRandom(cp, rand)) {
+          log.push('respot');
+          continue;
+        }
+      }
+      if (allowFoul && roll < 0.55) {
+        if (await foulOnce(cp)) {
+          log.push('foul');
+          if (keepSlot) {
+            await sleep(15);
+            ensureActiveSlot(cp, keepSlot);
+          }
+          continue;
+        }
+      }
+      const pool = unfadedObjectBalls(cp, game.pocket ? null : winId);
+      if (pool.length) {
+        const ball = pool[randInt(rand, 0, pool.length - 1)];
+        // Pocket games: stop short of first-to-8 so the finale still awards the rack.
+        if (game.pocket) {
+          const slot = keepSlot || activeSlot(cp);
+          const balls = parseInt(cp.getStorageItem('p' + slot + 'BallsCtrlPanel'), 10) || 0;
+          if (balls >= 7) break;
+        }
+        if (await potBallEl(cp, ball)) log.push('pot:' + ball.id);
+      }
+    }
+    if (keepSlot) ensureActiveSlot(cp, keepSlot);
+    return log;
+  }
+
+  async function potWinningBall(cp, game, rand) {
+    if (game.pocket) {
+      const order = shuffleInPlace(
+        Array.from({ length: 15 }, (_, i) => i + 1),
+        rand || Math.random);
+      let safety = 0;
+      while (safety++ < 48) {
+        const slot = activeSlot(cp);
+        const balls = parseInt(cp.getStorageItem('p' + slot + 'BallsCtrlPanel'), 10) || 0;
+        if (balls >= 8) break;
+        // Occasional respot only — no undo here (undo can unwind the rack award).
+        if (rand && balls > 0 && balls < 7 && rand() < 0.2) {
+          if (await respotRandom(cp, rand)) continue;
+        }
+        let potted = false;
+        for (let i = 0; i < order.length; i++) {
+          const el = cp.document.getElementById('ball ' + order[i]);
+          if (el && !el.classList.contains('faded') && !el.classList.contains('noShow')) {
+            potted = await potBallEl(cp, el);
+            if (potted) break;
+          }
+        }
+        if (!potted) {
+          if (!(await respotRandom(cp, rand || (() => 0.5)))) {
+            if (typeof cp.postBalls === 'function') {
+              while ((parseInt(cp.getStorageItem('p' + slot + 'BallsCtrlPanel'), 10) || 0) < 8) {
+                cp.postBalls('add', slot);
+                await sleep(20);
+              }
+            }
+            break;
+          }
+        }
+      }
+    } else {
+      // Prefer early/win-on-break for a reliable game-ball award.
+      setEarlyGameBall(cp, true);
+      // 8-Ball: any object ball down before the 8 is a loss unless a full group is cleared.
+      // Unfade scramble pots without resetBallTracker (that would clear the breaker).
+      if (game.id === 'game1') {
+        const ballState = JSON.parse(cp.getStorageItem('ballState') || '{}');
+        visibleObjectBalls(cp, game.winningBall).forEach((el) => {
+          if (el.classList.contains('faded')) {
+            el.classList.remove('faded');
+            ballState[el.id] = false;
+          }
+        });
+        cp.setStorageItem('ballState', JSON.stringify(ballState));
+      } else if (rand) {
+        const extras = unfadedObjectBalls(cp, game.winningBall);
+        shuffleInPlace(extras, rand);
+        const n = Math.min(extras.length, randInt(rand, 0, 3));
+        for (let i = 0; i < n; i++) {
+          await potBallEl(cp, extras[i]);
+        }
+      }
+      const el = cp.document.getElementById(game.winningBall);
+      if (el) await potBallEl(cp, el);
+    }
+    await sleep(550);
+    await cp.PlayerStats.flushRackRecordQueue();
+  }
+
+  /** Win a rack for breaker without opponent visit → B&R. */
+  async function winBreakAndRun(cp, game, breakerSlot, rand) {
+    setFouls(cp, 0, 0);
+    cp.selectRackBreaker(breakerSlot);
+    await sleep(30);
+    clearUndoStack(cp);
+    // Pots only — no foul/undo/respot/player-switch (any visit kills B&R).
+    // 8-Ball: skip pre-pots (object balls before 8 ⇒ rack loss while Open).
+    if (game.id !== 'game1') {
+      await scramblePoolActions(cp, game, rand, {
+        allowFoul: false,
+        allowRespot: false,
+        allowUndo: false,
+        keepSlot: breakerSlot,
+        minSteps: 1,
+        maxSteps: 3,
+      });
+    }
+    ensureActiveSlot(cp, breakerSlot);
+    clearUndoStack(cp);
+    await potWinningBall(cp, game, rand);
+  }
+
+  /** Win a rack after opponent has visited → TR. */
+  async function winTableRun(cp, game, breakerSlot, rand) {
+    setFouls(cp, 0, 0);
+    cp.selectRackBreaker(breakerSlot);
+    await sleep(30);
+    await markOpponentVisited(cp);
+    clearUndoStack(cp);
+    await scramblePoolActions(cp, game, rand, {
+      allowFoul: false,
+      allowRespot: !!game.pocket,
+      allowUndo: true,
+      keepSlot: breakerSlot,
+      minSteps: 1,
+      maxSteps: 4,
+    });
+    ensureActiveSlot(cp, breakerSlot);
+    clearUndoStack(cp);
+    await potWinningBall(cp, game, rand);
+  }
+
+  /**
+   * Multi-inning rack: visits + live fouls / respots / undos, then win for winnerSlot.
+   */
+  async function winMultiInningWithFouls(cp, game, opts) {
+    const breaker = opts.breakerSlot || '1';
+    const winner = opts.winnerSlot || '1';
+    const rand = opts.rand || Math.random;
+    cp.selectRackBreaker(breaker);
+    await sleep(30);
+    const visits = randInt(rand, 1, 3);
+    for (let v = 0; v < visits; v++) await markOpponentVisited(cp);
+    clearUndoStack(cp);
+
+    const liveFouls = Math.max(1, opts.liveFouls != null ? opts.liveFouls : randInt(rand, 1, 3));
+    for (let f = 0; f < liveFouls; f++) {
+      ensureActiveSlot(cp, pick(rand, '1', '2'));
+      await foulOnce(cp);
+      if (rand() < 0.35) {
+        await undoOnce(cp);
+        await foulOnce(cp);
+      }
+    }
+
+    await scramblePoolActions(cp, game, rand, {
+      allowFoul: true,
+      allowRespot: !!game.pocket,
+      allowUndo: true,
+      keepSlot: winner,
+      minSteps: 2,
+      maxSteps: 6,
+    });
+
+    const cur1 = parseInt(cp.getStorageItem('snookerFrameFoulsP1'), 10) || 0;
+    const cur2 = parseInt(cp.getStorageItem('snookerFrameFoulsP2'), 10) || 0;
+    setFouls(cp,
+      Math.max(cur1, opts.foulsP1 || 1),
+      Math.max(cur2, opts.foulsP2 || 0));
+
+    ensureActiveSlot(cp, winner);
+    clearUndoStack(cp);
+    await potWinningBall(cp, game, rand);
+  }
+
+  function lastRack(cp) {
+    const pending = cp.PlayerStats.getActivePendingMatch();
+    if (!pending || !pending.racks || !pending.racks.length) return null;
+    return pending.racks[pending.racks.length - 1];
+  }
+
+  function pendingMatch(cp) {
+    return cp.PlayerStats.getActivePendingMatch();
+  }
+
+  async function finishMatch(cp) {
+    if (typeof cp.PlayerStats.callGame === 'function') {
+      await cp.PlayerStats.callGame();
+    } else {
+      cp.performResetScores({ endMatch: true });
+    }
+    await sleep(200);
+  }
+
+  async function runPoolGameScenarios(cp, assert, game, tag, rand) {
+    const suite = game.label;
+    // Names truncate to 20 chars — keep discriminating prefix first so A/B never collide.
+    const p1 = await cp.PlayerStats.ensurePlayer(('A' + tag + game.id).slice(0, 20));
+    const p2 = await cp.PlayerStats.ensurePlayer(('B' + tag + game.id).slice(0, 20));
+    await setPlayers(cp, p1, p2);
+    await setupGame(cp, game.id, 5);
+    cp.document.getElementById('gameInfoTxt').value = suite + ' scenario ' + tag;
+    if (typeof cp.postInfo === 'function') cp.postInfo();
+
+    // Guaranteed mix, then shuffle order; randomize which player scores each pattern.
+    const patterns = shuffleInPlace([
+      { kind: 'br' },
+      { kind: 'tr' },
+      { kind: 'foul' },
+      { kind: 'foul' },
+      { kind: 'br' },
+    ], rand);
+
+    const planDetail = [];
+    for (let i = 0; i < patterns.length; i++) {
+      const kind = patterns[i].kind;
+      const winner = pick(rand, '1', '2');
+      const breaker = kind === 'foul' ? pick(rand, winner, winner === '1' ? '2' : '1') : winner;
+      const foulsP1 = kind === 'foul' ? randInt(rand, 1, 4) : 0;
+      const foulsP2 = kind === 'foul' ? randInt(rand, 0, 3) : 0;
+      planDetail.push(kind + '@P' + winner);
+
+      if (kind === 'br') {
+        await winBreakAndRun(cp, game, winner, rand);
+        const rack = lastRack(cp);
+        assert(suite, 'Rack ' + (i + 1) + ' B&R (P' + winner + ')',
+          !!(rack && rack.breakAndRun && !rack.tableRun),
+          rack && JSON.stringify({ br: rack.breakAndRun, tr: rack.tableRun }));
+      } else if (kind === 'tr') {
+        await winTableRun(cp, game, winner, rand);
+        const rack = lastRack(cp);
+        assert(suite, 'Rack ' + (i + 1) + ' TR (P' + winner + ')',
+          !!(rack && rack.tableRun && !rack.breakAndRun),
+          rack && JSON.stringify({ br: rack.breakAndRun, tr: rack.tableRun }));
+      } else {
+        await winMultiInningWithFouls(cp, game, {
+          breakerSlot: breaker,
+          winnerSlot: winner,
+          foulsP1: foulsP1,
+          foulsP2: Math.max(foulsP2, winner === '2' ? 1 : 0),
+          liveFouls: randInt(rand, 1, 4),
+          rand: rand,
+        });
+        const rack = lastRack(cp);
+        assert(suite, 'Rack ' + (i + 1) + ' fouls (P' + winner + ')',
+          !!(rack && (Number(rack.foulsP1) + Number(rack.foulsP2) >= 1)),
+          rack && JSON.stringify({ foulsP1: rack.foulsP1, foulsP2: rack.foulsP2, winner: rack.winnerId }));
+      }
+    }
+    assert(suite, 'Rack plan randomized', true, planDetail.join(' → '));
+
+    const match = pendingMatch(cp);
+    assert(suite, 'Match has ≥5 racks', !!(match && match.racks && match.racks.length >= 5),
+      match && String(match.racks && match.racks.length));
+
+    const hasBr = (match.racks || []).some((r) => r.breakAndRun);
+    const hasTr = (match.racks || []).some((r) => r.tableRun);
+    const foulSum = (match.racks || []).reduce(
+      (n, r) => n + (Number(r.foulsP1) || 0) + (Number(r.foulsP2) || 0), 0);
+    assert(suite, 'Match includes B&R, TR, and fouls', hasBr && hasTr && foulSum >= 1,
+      JSON.stringify({ hasBr: hasBr, hasTr: hasTr, foulSum: foulSum }));
+
+    const extras = cp.PlayerStats.buildCloudMatchExtras
+      ? cp.PlayerStats.buildCloudMatchExtras(match)
+      : null;
+    if (extras) {
+      assert(suite, 'Cloud extras include B&R and fouls',
+        ((extras.breakAndRunsP1 || 0) + (extras.breakAndRunsP2 || 0) >= 1) &&
+        ((extras.foulsP1 || 0) + (extras.foulsP2 || 0) >= 1),
+        JSON.stringify(extras));
+      assert(suite, 'Cloud extras include TR',
+        (extras.tableRunsP1 || 0) + (extras.tableRunsP2 || 0) >= 1,
+        JSON.stringify({ tr1: extras.tableRunsP1, tr2: extras.tableRunsP2 }));
+    }
+
+    const breakdown = cp.PlayerStats.renderMatchRackBreakdown(match, { viewerPlayerId: p1.id });
+    assert(suite, 'Breakdown shows Fouls and run flags',
+      breakdown && breakdown.indexOf('Fouls') !== -1 &&
+      (breakdown.indexOf('B&R') !== -1 || breakdown.indexOf('B&amp;R') !== -1),
+      breakdown && breakdown.slice(0, 240));
+
+    await finishMatch(cp);
+    const history = await cp.PlayerStats.getMatchesForPlayer(p1.id);
+    const saved = (history || []).find((m) => m.gameType === game.id &&
+      (m.gameInfo || '').indexOf(tag) !== -1);
+    assert(suite, 'Match saved to history with ≥5 racks',
+      !!(saved && saved.racks && saved.racks.length >= 5),
+      saved && String(saved.racks && saved.racks.length));
+
+    const statsP1 = await cp.PlayerStats.getPlayer(p1.id);
+    const statsP2 = await cp.PlayerStats.getPlayer(p2.id);
+    const typed1 = statsP1 && statsP1.stats && statsP1.stats.byGameType && statsP1.stats.byGameType[game.id];
+    const typed2 = statsP2 && statsP2.stats && statsP2.stats.byGameType && statsP2.stats.byGameType[game.id];
+    const careerBr = (typed1 && typed1.breakAndRuns || 0) + (typed2 && typed2.breakAndRuns || 0);
+    assert(suite, 'Career B&R credited to someone', careerBr >= 1,
+      JSON.stringify({ p1: typed1 && typed1.breakAndRuns, p2: typed2 && typed2.breakAndRuns }));
+  }
+
+  function buildSnookerFrames(rand) {
+    // Always include 147 and 167 (random player), plus foul-heavy frames; then shuffle.
+    const maxFor = (slot) => {
+      if (slot === '1') {
+        return { p1Score: 147, p2Score: 0, highBreakP1: 147, highBreakP2: 0, foulsP1: 0, foulsP2: 0, winnerSlot: '1', label: '147 maximum P1' };
+      }
+      return { p1Score: 0, p2Score: 147, highBreakP1: 0, highBreakP2: 147, foulsP1: 0, foulsP2: 0, winnerSlot: '2', label: '147 maximum P2' };
+    };
+    const goldFor = (slot) => {
+      if (slot === '1') {
+        return { p1Score: 167, p2Score: 0, highBreakP1: 167, highBreakP2: 0, foulsP1: 0, foulsP2: 0, winnerSlot: '1', label: '167 golden P1' };
+      }
+      return { p1Score: 0, p2Score: 167, highBreakP1: 0, highBreakP2: 167, foulsP1: 0, foulsP2: 0, winnerSlot: '2', label: '167 golden P2' };
+    };
+    const contest = () => {
+      const winner = pick(rand, '1', '2');
+      let p1 = randInt(rand, 20, 95);
+      let p2 = randInt(rand, 15, 90);
+      if (winner === '1' && p1 <= p2) p1 = p2 + randInt(rand, 1, 25);
+      if (winner === '2' && p2 <= p1) p2 = p1 + randInt(rand, 1, 25);
+      const hb1 = randInt(rand, 12, Math.min(80, p1));
+      const hb2 = randInt(rand, 8, Math.min(70, p2));
+      return {
+        p1Score: p1,
+        p2Score: p2,
+        highBreakP1: hb1,
+        highBreakP2: hb2,
+        foulsP1: randInt(rand, 0, 4),
+        foulsP2: randInt(rand, 0, 4),
+        winnerSlot: winner,
+        label: 'contest P' + winner + ' ' + p1 + '-' + p2,
+      };
+    };
+
+    const maxSlot = pick(rand, '1', '2');
+    const goldSlot = pick(rand, '1', '2');
+    const frames = [
+      maxFor(maxSlot),
+      goldFor(goldSlot),
+      contest(),
+      contest(),
+      contest(),
+    ];
+    // Ensure at least one frame has fouls after randomization of contest fouls
+    if (!frames.some((f) => (f.foulsP1 || 0) + (f.foulsP2 || 0) > 0)) {
+      frames[2].foulsP1 = randInt(rand, 1, 3);
+      frames[2].foulsP2 = randInt(rand, 1, 3);
+    }
+    return shuffleInPlace(frames, rand);
+  }
+
+  async function runSnookerScenarios(cp, assert, tag, rand) {
+    const suite = 'Snooker';
+    const p1 = await cp.PlayerStats.ensurePlayer(('A' + tag + 'sn').slice(0, 20));
+    const p2 = await cp.PlayerStats.ensurePlayer(('B' + tag + 'sn').slice(0, 20));
+    // Scores use slots 1/2 on the dock; names stay unique within the 20-char stats limit.
+    await setPlayers(cp, p1, p2);
+    await setupGame(cp, 'game8', 9); // Best Of 9 → first to 5
+    cp.document.getElementById('gameInfoTxt').value = 'Snooker scenario ' + tag;
+    if (typeof cp.postInfo === 'function') cp.postInfo();
+
+    const goldCb = cp.document.getElementById('snookerGoldCheckbox');
+    if (goldCb) {
+      goldCb.checked = true;
+      if (typeof cp.snookerGoldToggle === 'function') cp.snookerGoldToggle();
+    }
+
+    const liveBreaker = pick(rand, '1', '2');
+    cp.selectRackBreaker(liveBreaker);
+    await sleep(40);
+
+    // Varied live scoring, then a foul that must stick so Free Ball is offered.
+    const colorIds = shuffleInPlace(['ball 2', 'ball 3', 'ball 4', 'ball 5', 'ball 6', 'ball 7'], rand);
+    const red = cp.document.getElementById('ball 1');
+    if (red && typeof cp.handleSnookerBallClick === 'function') {
+      await cp.handleSnookerBallClick(red);
+      await sleep(25);
+      const color = cp.document.getElementById(colorIds[0]);
+      if (color) await cp.handleSnookerBallClick(color);
+      await sleep(25);
+      if (rand() < 0.5) {
+        // Undo color only — still expecting a color next.
+        await undoOnce(cp);
+        await sleep(20);
+        const color2 = cp.document.getElementById(colorIds[1] || colorIds[0]);
+        if (color2) await cp.handleSnookerBallClick(color2);
+        await sleep(20);
+      }
+    }
+    const foulKeys = shuffleInPlace(['black', 'blue', 'pink', 'yellow'], rand);
+    if (typeof cp.openSnookerFoulPicker === 'function') {
+      cp.openSnookerFoulPicker();
+      const foulEl = cp.document.querySelector('[data-foul="' + foulKeys[0] + '"]');
+      if (foulEl && typeof cp.selectSnookerFoul === 'function') {
+        cp.selectSnookerFoul(foulEl);
+        await sleep(50);
+      }
+    }
+    const freeBallOffered = typeof cp.isSnookerFreeBallOffered === 'function' && cp.isSnookerFreeBallOffered();
+    assert(suite, 'Live foul offered Free Ball', freeBallOffered === true);
+    const freeBall = cp.document.getElementById('ball 10');
+    if (freeBallOffered && freeBall && typeof cp.handleSnookerBallClick === 'function') {
+      await cp.handleSnookerBallClick(freeBall);
+      await sleep(40);
+    }
+    cp.setStorageItem('p1BallsCtrlPanel', 0);
+    cp.setStorageItem('p2BallsCtrlPanel', 0);
+
+    const frames = buildSnookerFrames(rand);
+    assert(suite, 'Frame plan randomized', true,
+      frames.map((f) => f.label).join(' → '));
+
+    for (let i = 0; i < frames.length; i++) {
+      const f = frames[i];
+      await cp.PlayerStats.recordSnookerFrame(f);
+      await sleep(40);
+      const rack = lastRack(cp);
+      assert(suite, 'Frame ' + (i + 1) + ': ' + f.label,
+        !!(rack && rack.frameScore &&
+          Number(rack.highestBreakP1) === f.highBreakP1 &&
+          Number(rack.highestBreakP2) === f.highBreakP2 &&
+          Number(rack.foulsP1) === f.foulsP1 &&
+          Number(rack.foulsP2) === f.foulsP2),
+        rack && JSON.stringify({
+          score: rack.frameScore,
+          hb: [rack.highestBreakP1, rack.highestBreakP2],
+          fouls: [rack.foulsP1, rack.foulsP2],
+        }));
+    }
+
+    const match = pendingMatch(cp);
+    assert(suite, 'Match has ≥5 frames', !!(match && match.racks && match.racks.length >= 5),
+      match && String(match.racks && match.racks.length));
+
+    const maxHb = Math.max.apply(null, (match.racks || []).map((r) =>
+      Math.max(Number(r.highestBreakP1) || 0, Number(r.highestBreakP2) || 0)));
+    assert(suite, 'Includes 147 and 167 highs', maxHb >= 167, 'maxHb=' + maxHb);
+
+    const breakdown = cp.PlayerStats.renderMatchRackBreakdown(match, { viewerPlayerId: p1.id });
+    assert(suite, 'Breakdown shows HB and Fouls',
+      breakdown && breakdown.indexOf('HB') !== -1 && breakdown.indexOf('Fouls') !== -1 &&
+      breakdown.indexOf('147') !== -1 && breakdown.indexOf('167') !== -1,
+      breakdown && breakdown.slice(0, 280));
+
+    const extras = cp.PlayerStats.buildCloudMatchExtras
+      ? cp.PlayerStats.buildCloudMatchExtras(match)
+      : null;
+    if (extras) {
+      const hb = Math.max(extras.highestBreakP1 || 0, extras.highestBreakP2 || 0);
+      assert(suite, 'Cloud extras highest break ≥ 167', hb >= 167, JSON.stringify(extras));
+      assert(suite, 'Cloud extras include fouls',
+        (extras.foulsP1 || 0) + (extras.foulsP2 || 0) >= 1, JSON.stringify(extras));
+    }
+
+    await finishMatch(cp);
+    const history = await cp.PlayerStats.getMatchesForPlayer(p1.id);
+    const saved = (history || []).find((m) => m.gameType === 'game8' &&
+      (m.gameInfo || '').indexOf(tag) !== -1);
+    assert(suite, 'Snooker match saved with ≥5 frames',
+      !!(saved && saved.racks && saved.racks.length >= 5),
+      saved && String(saved.racks && saved.racks.length));
+
+    const stats = await cp.PlayerStats.getPlayer(p1.id);
+    const stats2 = await cp.PlayerStats.getPlayer(p2.id);
+    const careerHb = Math.max(
+      (stats && stats.stats.highestBreak) || 0,
+      (stats2 && stats2.stats.highestBreak) || 0);
+    assert(suite, 'Career highest break ≥ 167', careerHb >= 167, 'careerHb=' + careerHb);
+  }
+
+  async function runAllScenarios() {
+    const rows = [];
+    const assert = function (suite, name, cond, detail) {
+      rows.push({ suite: suite, name: name, pass: !!cond, detail: detail || '' });
+    };
+
+    window.__CUESPORT_TEST_RESULT__ = null;
+    resultsBody.innerHTML = '';
+    summaryEl.className = '';
+    summaryEl.textContent = 'Running…';
+    runBtn.disabled = true;
+    reloadBtn.disabled = true;
+
+    const qs = new URLSearchParams(location.search);
+    const qsLoops = parseInt(qs.get('loops') || '', 10);
+    const loops = Math.max(1, Math.min(50, qsLoops || parseInt(loopsInput.value, 10) || 1));
+    loopsInput.value = String(loops);
+    const seedParam = qs.get('seed');
+    const seed = seedParam ? (parseInt(seedParam, 10) || 1) : ((Date.now() ^ (Math.random() * 0x100000000)) >>> 0) || 1;
+    const rand = createRng(seed);
+
+    try {
+      statusEl.textContent = 'Waiting for control panel…';
+      const cp = await waitForCpReady(60000);
+      statusEl.textContent = 'Running ' + loops + ' loop(s), seed=' + seed + '…';
+
+      for (let loop = 1; loop <= loops; loop++) {
+        const tag = 't' + Date.now().toString(36).slice(-5) + 'L' + loop;
+        const loopRand = createRng((seed + loop * 9973) >>> 0);
+        const games = shuffleInPlace(POOL_GAMES.slice(), loopRand);
+        statusEl.textContent = 'Loop ' + loop + '/' + loops + ' (seed ' + seed + ') — ' +
+          games.map((g) => g.label).join(', ') + '…';
+        for (let g = 0; g < games.length; g++) {
+          await runPoolGameScenarios(cp, assert, games[g], tag, loopRand);
+        }
+        statusEl.textContent = 'Loop ' + loop + '/' + loops + ' — Snooker…';
+        await runSnookerScenarios(cp, assert, tag, loopRand);
+      }
+
+      const passed = rows.filter((r) => r.pass).length;
+      const failed = rows.length - passed;
+      rows.forEach((r) => {
+        const tr = document.createElement('tr');
+        tr.className = r.pass ? 'pass' : 'fail';
+        tr.innerHTML =
+          '<td>' + (r.pass ? 'PASS' : 'FAIL') + '</td>' +
+          '<td class="suite">' + r.suite + '</td>' +
+          '<td>' + r.name + '</td>' +
+          '<td class="detail">' + (r.detail || '') + '</td>';
+        resultsBody.appendChild(tr);
+      });
+
+      summaryEl.className = failed ? 'fail' : 'pass';
+      summaryEl.textContent = passed + '/' + rows.length + ' passed' +
+        (failed ? ', ' + failed + ' failed' : '') +
+        ' · loops=' + loops + ' · seed=' + seed;
+      window.__CUESPORT_TEST_RESULT__ = {
+        ok: failed === 0,
+        passed: passed,
+        failed: failed,
+        total: rows.length,
+        loops: loops,
+        seed: seed,
+      };
+      statusEl.textContent = 'Done.';
+    } catch (err) {
+      summaryEl.className = 'fail';
+      summaryEl.textContent = 'Error: ' + (err && err.message ? err.message : err) + ' (seed=' + seed + ')';
+      window.__CUESPORT_TEST_RESULT__ = {
+        ok: false,
+        passed: 0,
+        failed: 1,
+        total: 1,
+        seed: seed,
+        error: String(err && err.message ? err.message : err),
+      };
+      statusEl.textContent = 'Failed.';
+    } finally {
+      runBtn.disabled = false;
+      reloadBtn.disabled = false;
+    }
+  }
+
+  async function reloadFrames() {
+    statusEl.textContent = 'Reloading frames…';
+    cpFrame.src = cpFrame.src.split('?')[0] + '?instance=scenario-test&t=' + Date.now();
+    bsFrame.src = bsFrame.src.split('?')[0] + '?instance=scenario-test&t=' + Date.now();
+    await Promise.all([frameLoaded(cpFrame), frameLoaded(bsFrame)]);
+    await sleep(400);
+    statusEl.textContent = 'Frames ready.';
+  }
+
+  runBtn.addEventListener('click', () => {
+    runAllScenarios().catch((err) => {
+      summaryEl.className = 'fail';
+      summaryEl.textContent = String(err && err.message ? err.message : err);
+    });
+  });
+  reloadBtn.addEventListener('click', () => {
+    reloadFrames().catch((err) => {
+      statusEl.textContent = String(err && err.message ? err.message : err);
+    });
+  });
+
+  (async function boot() {
+    const qs = new URLSearchParams(location.search);
+    if (qs.get('loops')) loopsInput.value = String(Math.max(1, parseInt(qs.get('loops'), 10) || 1));
+    await Promise.all([frameLoaded(cpFrame), frameLoaded(bsFrame)]);
+    await sleep(500);
+    statusEl.textContent = 'Frames ready.';
+    if (qs.get('autorun') === '1') {
+      await runAllScenarios();
+    }
+  })().catch((err) => {
+    statusEl.textContent = String(err && err.message ? err.message : err);
+    window.__CUESPORT_TEST_RESULT__ = { ok: false, passed: 0, failed: 1, total: 1, error: String(err) };
+  });
+  </script>
+</body>
+</html>

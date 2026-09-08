@@ -2226,6 +2226,73 @@ label.switch.toggle-disabled {
 	padding: 3px 8px;
 }
 
+.stats-match-racks-wrap {
+	margin: 4px 0 2px;
+	max-width: 100%;
+	min-width: 0;
+}
+
+.stats-rack-list {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	max-width: 100%;
+}
+
+.stats-rack-card {
+	padding: 6px 8px;
+	border-radius: 6px;
+	background: rgba(255, 255, 255, 0.04);
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	font-size: 0.88em;
+	min-width: 0;
+}
+
+.stats-rack-primary {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 4px 10px;
+	min-width: 0;
+}
+
+.stats-rack-num {
+	font-weight: 600;
+	opacity: 0.9;
+}
+
+.stats-rack-score {
+	font-variant-numeric: tabular-nums;
+	font-weight: 600;
+}
+
+.stats-rack-outcome {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+.stats-rack-dur {
+	margin-left: auto;
+	opacity: 0.85;
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+.stats-rack-secondary {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 12px;
+	margin-top: 3px;
+	font-size: 0.92em;
+	opacity: 0.8;
+	font-variant-numeric: tabular-nums;
+}
+
+.stats-rack-flag {
+	font-weight: 600;
+	opacity: 1;
+}
+
 .stats-match-duration-footer {
 	margin: 6px 0 2px;
 	font-size: 0.85em;

@@ -1233,7 +1233,8 @@
                 savedPoolMatch && savedPoolMatch.gameInfo);
             const poolBreakdown = savedPoolMatch && cp.PlayerStats.renderMatchRackBreakdown(savedPoolMatch, { viewerPlayerId: histP1.id });
             assert('Match History', 'Pool match shows rack breakdown',
-                poolBreakdown && poolBreakdown.indexOf('stats-rack-detail-table') !== -1);
+                poolBreakdown && poolBreakdown.indexOf('stats-rack-list') !== -1 &&
+                poolBreakdown.indexOf('Fouls') !== -1);
             assert('Match History', 'Pool match lists three racks',
                 savedPoolMatch && savedPoolMatch.racks && savedPoolMatch.racks.length === 3,
                 savedPoolMatch && String(savedPoolMatch.racks && savedPoolMatch.racks.length));
@@ -1329,8 +1330,8 @@
                 cp.switchStatsTab('detail');
                 await sleep(250);
             }
-            assert('Match History', 'Player detail renders rack table in UI',
-                cp.document.querySelector('#statsPlayerDetail .stats-rack-detail-table') !== null);
+            assert('Match History', 'Player detail renders rack cards in UI',
+                cp.document.querySelector('#statsPlayerDetail .stats-rack-list') !== null);
             assert('Match History', 'Player detail has no Frames/Racks title above table',
                 cp.document.querySelector('#statsPlayerDetail .stats-match-racks-title') === null);
             assert('Match History', 'Player detail shows rack results',
@@ -3181,10 +3182,11 @@
                 !snMatchesAfterFrame.some(function (m) { return m.id === pendingSnooker.id; }));
             const snFrameBreakdown = pendingSnooker && cp.PlayerStats.renderMatchRackBreakdown(pendingSnooker, { viewerPlayerId: snP1.id });
             assert('Snooker', 'Pending snooker match has frame breakdown data',
-                snFrameBreakdown && snFrameBreakdown.indexOf('stats-rack-detail-table') !== -1,
+                snFrameBreakdown && snFrameBreakdown.indexOf('stats-rack-list') !== -1,
                 snFrameBreakdown);
             assert('Snooker', 'Frame breakdown includes points and HB',
-                snFrameBreakdown && snFrameBreakdown.indexOf('70') !== -1 && snFrameBreakdown.indexOf('55') !== -1,
+                snFrameBreakdown && snFrameBreakdown.indexOf('70') !== -1 && snFrameBreakdown.indexOf('55') !== -1 &&
+                snFrameBreakdown.indexOf('HB') !== -1 && snFrameBreakdown.indexOf('Fouls') !== -1,
                 snFrameBreakdown);
 
             cp.document.getElementById('statsMatchGameType').value = 'game8';

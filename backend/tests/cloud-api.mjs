@@ -520,6 +520,57 @@ async function run() {
           !!updatedMatch && updatedMatch.winnerSlot === '2'
         );
 
+        const drawPatch = await fetchJson(`/api/stats/matches/${editable.startEventId}`, {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${tokenFresh}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            player1Name: 'Alice',
+            player2Name: 'Bob',
+            gameType: 'game1',
+            scores: { p1: 4, p2: 4 },
+          }),
+        });
+        assert('PATCH match draw scores', drawPatch.ok && drawPatch.body.ok === true);
+        const statsAfterDraw = await fetchJson('/api/stats', {
+          headers: { Authorization: `Bearer ${tokenFresh}` },
+        });
+        const drawMatch = (statsAfterDraw.body.matches || []).find((m) => m.startEventId === editable.startEventId);
+        assert(
+          'Draw winnerSlot from equal scores',
+          !!drawMatch && drawMatch.winnerSlot === 'draw' &&
+            drawMatch.scores && drawMatch.scores.p1 === 4 && drawMatch.scores.p2 === 4
+        );
+
+        const drawRacksPatch = await fetchJson(`/api/stats/matches/${editable.startEventId}`, {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${tokenFresh}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            player1Name: 'Alice',
+            player2Name: 'Bob',
+            gameType: 'game1',
+            racks: [
+              { rackNumber: 1, winnerSlot: '1' },
+              { rackNumber: 2, winnerSlot: '2' },
+            ],
+          }),
+        });
+        assert('PATCH match draw via racks', drawRacksPatch.ok && drawRacksPatch.body.ok === true);
+        const statsAfterDrawRacks = await fetchJson('/api/stats', {
+          headers: { Authorization: `Bearer ${tokenFresh}` },
+        });
+        const drawRacksMatch = (statsAfterDrawRacks.body.matches || []).find((m) => m.startEventId === editable.startEventId);
+        assert(
+          'Draw winnerSlot from tied racks',
+          !!drawRacksMatch && drawRacksMatch.winnerSlot === 'draw' &&
+            drawRacksMatch.scores && drawRacksMatch.scores.p1 === 1 && drawRacksMatch.scores.p2 === 1
+        );
+
         const snookerExtras = await fetchJson(`/api/stats/matches/${editable.startEventId}`, {
           method: 'PATCH',
           headers: {
