@@ -10,6 +10,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import WebSocket from 'ws';
 import Database from 'better-sqlite3';
+import { pairSessionEvents } from '../src/stats/account-stats.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
@@ -119,6 +120,59 @@ function wsOnce(ws, timeoutMs = 5000) {
 
 async function run() {
   console.log(`CueSport Cloud API tests → ${BASE}\n`);
+
+  // Unit: pairSessionEvents must clear unmatched stacks using the start's room_id
+  // (end.room_id can differ after room delete / remap).
+  {
+    const events = [
+      // Newest first (as returned by getAccountSessionEvents)
+      {
+        id: 'end-orphan',
+        room_id: 'room-a',
+        event_type: 'session:end',
+        session_id: null,
+        payload: { scores: { p1: 2, p2: 1 }, winnerSlot: '1' },
+      },
+      {
+        id: 'end-s2-cross-room',
+        room_id: null, // room deleted / remapped on the end row
+        event_type: 'session:end',
+        session_id: 's2',
+        payload: { matchId: 's2', scores: { p1: 0, p2: 1 }, winnerSlot: '2' },
+      },
+      {
+        id: 'start-s2',
+        room_id: 'room-a',
+        event_type: 'session:start',
+        session_id: 's2',
+        payload: { sessionId: 's2', player1: 'A', player2: 'B' },
+      },
+      {
+        id: 'start-s1',
+        room_id: 'room-a',
+        event_type: 'session:start',
+        session_id: 's1',
+        payload: { sessionId: 's1', player1: 'A', player2: 'B' },
+      },
+    ];
+    const pairs = pairSessionEvents(events);
+    const s1 = pairs.find((p) => p.start?.id === 'start-s1');
+    const s2 = pairs.find((p) => p.start?.id === 'start-s2');
+    assert(
+      'pairSessionEvents: keyed end pairs when end.room_id differs',
+      !!s2?.end && s2.end.id === 'end-s2-cross-room'
+    );
+    assert(
+      'pairSessionEvents: LIFO end pairs remaining start (not already-ended orphan)',
+      !!s1?.end && s1.end.id === 'end-orphan',
+      s1?.end ? `got end ${s1.end.id}` : 's1 has no end'
+    );
+    assert(
+      'pairSessionEvents: cross-room end does not steal later LIFO end',
+      s2.end?.id === 'end-s2-cross-room',
+      s2.end ? `s2 end overwritten to ${s2.end.id}` : 'missing'
+    );
+  }
 
   // Health & static assets
   const health = await fetchJson('/health');

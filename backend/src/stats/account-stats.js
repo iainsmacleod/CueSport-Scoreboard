@@ -21,10 +21,20 @@ export function pairSessionEvents(events) {
   }
 
   function takeUnmatched(roomId, rec) {
-    const stack = unmatchedByRoom.get(roomId);
-    if (!stack) return;
-    const idx = rec ? stack.indexOf(rec) : stack.length - 1;
-    if (idx >= 0) stack.splice(idx, 1);
+    if (!rec) return;
+    const removeFrom = (stack) => {
+      if (!stack) return false;
+      const idx = stack.indexOf(rec);
+      if (idx < 0) return false;
+      stack.splice(idx, 1);
+      return true;
+    };
+    // Prefer the start event's room stack (where pushUnmatched stored it).
+    if (removeFrom(unmatchedByRoom.get(roomId))) return;
+    // Cross-room / null room_id ends: still drop the orphan from whichever stack holds it.
+    for (const stack of unmatchedByRoom.values()) {
+      if (removeFrom(stack)) return;
+    }
   }
 
   for (const ev of chronological) {
@@ -43,7 +53,8 @@ export function pairSessionEvents(events) {
       }
       if (rec) {
         rec.end = ev;
-        takeUnmatched(ev.room_id, rec);
+        // Always clear from the start's room stack — end.room_id may differ (room delete / remap).
+        takeUnmatched(rec.start?.room_id, rec);
       }
     }
   }
