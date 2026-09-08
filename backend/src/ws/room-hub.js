@@ -41,6 +41,14 @@ function getRoomClients(roomId) {
   return rooms.get(roomId);
 }
 
+/** Remove a ws from a room client Set without mutating during for-of iteration. */
+function removeRoomClientByWs(clients, ws) {
+  if (!clients || !ws) return;
+  for (const c of Array.from(clients)) {
+    if (c.ws === ws) clients.delete(c);
+  }
+}
+
 function broadcast(roomId, message, excludeWs = null) {
   const clients = getRoomClients(roomId);
   const data = JSON.stringify(message);
@@ -231,9 +239,7 @@ export function handleConnection(ws) {
       const accountId = meta.accountId;
       const roomId = meta.roomId;
       const clients = getRoomClients(roomId);
-      for (const c of clients) {
-        if (c.ws === ws) clients.delete(c);
-      }
+      removeRoomClientByWs(clients, ws);
       broadcast(roomId, {
         type: 'presence',
         room_id: roomId,
@@ -401,9 +407,7 @@ async function handleDashboardJoin(ws, meta, msg, authenticateJoin) {
   }
   if (meta.roomId) {
     const old = getRoomClients(meta.roomId);
-    for (const c of old) {
-      if (c.ws === ws) old.delete(c);
-    }
+    removeRoomClientByWs(old, ws);
   }
   const accountId = auth.account.id;
   meta.accountId = accountId;
@@ -529,9 +533,7 @@ async function handleRoomClientJoin(ws, meta, msg, authenticateJoin) {
 
   if (meta.roomId) {
     const old = getRoomClients(meta.roomId);
-    for (const c of old) {
-      if (c.ws === ws) old.delete(c);
-    }
+    removeRoomClientByWs(old, ws);
   }
 
   meta.roomId = roomId;

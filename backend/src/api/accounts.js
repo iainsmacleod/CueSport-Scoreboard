@@ -73,6 +73,8 @@ export async function registerAccountRoutes(app) {
       }
       const created = sqlite.createApiKey(account.id);
       apiKeyPlain = created.plaintext;
+    } else {
+      apiKeyPlain = sqlite.getApiKeyPlaintext(apiKey.id, account.id);
     }
     const firstRoom = sqlite.getRoomsForAccount(account.id)[0] || null;
     return {

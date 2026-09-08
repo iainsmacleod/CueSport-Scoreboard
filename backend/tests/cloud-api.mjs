@@ -163,6 +163,11 @@ async function run() {
     assert('Dev token prefix dev:', login.body.access_token?.startsWith('dev:'));
     // Rooms are created on dock connect — login may return null room.
     assert('Dev login room optional', login.body.room == null || !!login.body.room?.id);
+    assert(
+      'Dev login returns api_key plaintext',
+      typeof login.body.api_key === 'string' && login.body.api_key.length > 0,
+      String(login.body.api_key)
+    );
 
     const badLogin = await fetchJson('/api/auth/dev-login', {
       method: 'POST',
@@ -333,6 +338,11 @@ async function run() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ secret: devSecret }),
     });
+    assert(
+      'Relogin returns existing api_key plaintext',
+      typeof relogin.body.api_key === 'string' && relogin.body.api_key.length > 0,
+      String(relogin.body.api_key)
+    );
     let tokenFresh = relogin.body.access_token;
     const meFresh = await fetchJson('/api/me', { headers: { Authorization: `Bearer ${tokenFresh}` } });
     assert('Fresh login works after invalidate', meFresh.ok);
