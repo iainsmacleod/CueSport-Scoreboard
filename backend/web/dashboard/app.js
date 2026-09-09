@@ -40,6 +40,21 @@ let selectedPlayerKey = '';
 let playerDetailOpponentFilter = '';
 let playerDetailGameFilter = '';
 
+/** Leaderboard: sort full dataset, then paginate (page UI appears when needed). */
+const LEADERBOARD_PAGE_SIZE = 50;
+const LEADERBOARD_SORT_DEFAULTS = {
+  name: 'asc',
+  matches: 'desc',
+  winPct: 'desc',
+  racks: 'desc',
+  lastPlayed: 'desc',
+};
+let leaderboardSortKey = 'matches';
+let leaderboardSortDir = 'desc';
+let leaderboardPage = 1;
+/** Expanded rack/frame breakdowns in match lists (collapsed by default). */
+const expandedMatchRacks = new Set();
+
 function show(id, visible) {
   document.getElementById(id).classList.toggle('hidden', !visible);
   if (id === 'dashboardSection') {
@@ -607,7 +622,7 @@ function getMatchDurationSeconds(match) {
   return sumRackDurationSeconds(match);
 }
 
-/** Recent matches date cell: date on first line, time (+ duration) below. */
+/** Recent matches date cell: date / time / duration on separate lines. */
 function matchDateCellHtml(value, options = {}) {
   const inProgress = !!options.inProgress;
   const duration = !inProgress
@@ -617,26 +632,133 @@ function matchDateCellHtml(value, options = {}) {
     return '<span class="stats-match-date">—</span>';
   }
   if (inProgress) {
-    const dateStr = value ? formatStatsDate(value) : '';
+    const dateStr = value ? formatStatsDate(value) : 'In progress';
     const timeStr = value ? formatStatsTime(value) : '';
-    const started = [dateStr, timeStr].filter(Boolean).join(' · ');
-    return `<span class="stats-match-date">In progress</span>` +
-      (started ? `<span class="stats-match-time">${escapeHtml(started)}</span>` : '');
+    return `<span class="stats-match-date">${escapeHtml(dateStr)}</span>` +
+      (timeStr ? `<span class="stats-match-time">${escapeHtml(timeStr)}</span>` : '') +
+      `<span class="stats-match-duration">Live</span>`;
   }
   const dateStr = formatStatsDate(value);
   const timeStr = formatStatsTime(value);
-  const secondLine = [timeStr, duration].filter(Boolean).join(' · ');
-  if (!secondLine) {
-    return `<span class="stats-match-date">${escapeHtml(dateStr)}</span>`;
-  }
   return `<span class="stats-match-date">${escapeHtml(dateStr)}</span>` +
-    `<span class="stats-match-time">${escapeHtml(secondLine)}</span>`;
+    (timeStr ? `<span class="stats-match-time">${escapeHtml(timeStr)}</span>` : '') +
+    (duration ? `<span class="stats-match-duration">${escapeHtml(duration)}</span>` : '');
 }
 
 function winPct(won, lost, drawn = 0) {
   const total = (won || 0) + (lost || 0) + (drawn || 0);
   if (!total) return 0;
   return Math.round(((won || 0) / total) * 100);
+}
+
+function playerWinPct(player) {
+  return winPct(player.gamesWon, player.gamesLost, player.gamesDrawn || 0);
+}
+
+function compareLeaderboardPlayers(a, b, key, dir) {
+  const mul = dir === 'asc' ? 1 : -1;
+  let cmp = 0;
+  switch (key) {
+    case 'name':
+      cmp = String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' });
+      break;
+    case 'winPct':
+      cmp = playerWinPct(a) - playerWinPct(b);
+      if (!cmp) cmp = (a.gamesWon || 0) - (b.gamesWon || 0);
+      break;
+    case 'racks':
+      cmp = (a.racksWon || 0) - (b.racksWon || 0);
+      if (!cmp) cmp = (b.racksLost || 0) - (a.racksLost || 0);
+      break;
+    case 'lastPlayed':
+      cmp = String(a.lastPlayedAt || '').localeCompare(String(b.lastPlayedAt || ''));
+      break;
+    case 'matches':
+    default:
+      cmp = (a.gamesWon || 0) - (b.gamesWon || 0);
+      if (!cmp) cmp = (a.gamesDrawn || 0) - (b.gamesDrawn || 0);
+      if (!cmp) cmp = (a.racksWon || 0) - (b.racksWon || 0);
+      break;
+  }
+  if (cmp) return cmp * mul;
+  return String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' });
+}
+
+/** Competitive standing is not shown — Pos is the current sorted row order (1-based across pages). */
+function sortLeaderboardPlayers(players, key = leaderboardSortKey, dir = leaderboardSortDir) {
+  const sortKey = LEADERBOARD_SORT_DEFAULTS[key] ? key : 'matches';
+  const sortDir = dir === 'asc' ? 'asc' : 'desc';
+  return players.slice().sort((a, b) => compareLeaderboardPlayers(a, b, sortKey, sortDir));
+}
+
+/** Sort the full list first, then slice — keeps page N correct when data grows. */
+function paginateItems(items, page, pageSize) {
+  const total = items.length;
+  const size = Math.max(1, pageSize || LEADERBOARD_PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(total / size) || 1);
+  const safePage = Math.min(Math.max(1, page || 1), totalPages);
+  const start = (safePage - 1) * size;
+  return {
+    items: items.slice(start, start + size),
+    page: safePage,
+    pageSize: size,
+    totalPages,
+    total,
+    startIndex: total ? start : 0,
+  };
+}
+
+function setLeaderboardSort(key) {
+  if (!LEADERBOARD_SORT_DEFAULTS[key]) return;
+  if (leaderboardSortKey === key) {
+    leaderboardSortDir = leaderboardSortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    leaderboardSortKey = key;
+    leaderboardSortDir = LEADERBOARD_SORT_DEFAULTS[key];
+  }
+  leaderboardPage = 1;
+  renderAccountStats();
+}
+
+function setLeaderboardPage(page) {
+  leaderboardPage = Math.max(1, Number(page) || 1);
+  renderAccountStats();
+}
+
+function updateLeaderboardSortHeaders() {
+  document.querySelectorAll('#statsLeaderboardTable th[data-sort-key]').forEach((th) => {
+    const key = th.getAttribute('data-sort-key');
+    const label = th.getAttribute('data-label') || th.textContent.replace(/[▲▼]\s*$/, '').trim();
+    th.setAttribute('data-label', label);
+    const active = key === leaderboardSortKey;
+    th.classList.toggle('is-sorted', active);
+    th.setAttribute('aria-sort', active
+      ? (leaderboardSortDir === 'asc' ? 'ascending' : 'descending')
+      : 'none');
+    const arrow = active ? (leaderboardSortDir === 'asc' ? '▲' : '▼') : '';
+    th.innerHTML = arrow
+      ? `${escapeHtml(label)}<span class="sort-arrow" aria-hidden="true">${arrow}</span>`
+      : escapeHtml(label);
+  });
+}
+
+function renderLeaderboardPager(pageInfo) {
+  const pager = document.getElementById('statsLeaderboardPager');
+  if (!pager) return;
+  if (!pageInfo || pageInfo.total <= pageInfo.pageSize) {
+    pager.classList.add('hidden');
+    pager.innerHTML = '';
+    return;
+  }
+  pager.classList.remove('hidden');
+  const from = pageInfo.startIndex + 1;
+  const to = Math.min(pageInfo.startIndex + pageInfo.items.length, pageInfo.total);
+  pager.innerHTML = `
+    <span class="stats-pager-label">Showing ${from}–${to} of ${pageInfo.total}</span>
+    <button type="button" class="btn" data-leaderboard-page="${pageInfo.page - 1}" ${pageInfo.page <= 1 ? 'disabled' : ''}>Previous</button>
+    <span>Page ${pageInfo.page} / ${pageInfo.totalPages}</span>
+    <button type="button" class="btn" data-leaderboard-page="${pageInfo.page + 1}" ${pageInfo.page >= pageInfo.totalPages ? 'disabled' : ''}>Next</button>
+  `;
 }
 
 function scoreLine(match) {
@@ -761,12 +883,7 @@ function statsFromMatches(matches) {
       if (!p2.lastPlayedAt || playedAt > p2.lastPlayedAt) p2.lastPlayedAt = playedAt;
     }
   }
-  const players = Array.from(playerMap.values()).sort((a, b) =>
-    b.gamesWon - a.gamesWon ||
-    (b.gamesDrawn || 0) - (a.gamesDrawn || 0) ||
-    b.racksWon - a.racksWon ||
-    a.name.localeCompare(b.name)
-  );
+  const players = Array.from(playerMap.values());
   return { matches, players };
 }
 
@@ -804,6 +921,8 @@ function renderAccountStats() {
     summaryEl.innerHTML = '';
     boardBody.innerHTML = '<tr><td colspan="6" class="dash-stats-empty">No stats loaded.</td></tr>';
     matchBody.innerHTML = '<tr><td colspan="6" class="dash-stats-empty">No stats loaded.</td></tr>';
+    updateLeaderboardSortHeaders();
+    renderLeaderboardPager(null);
     return;
   }
 
@@ -826,19 +945,26 @@ function renderAccountStats() {
     <div class="stats-summary-card"><strong>${racksPlayed}</strong><span>Racks / frames</span></div>
   `;
 
+  updateLeaderboardSortHeaders();
+
   if (!filtered.players.length) {
     boardBody.innerHTML = '<tr><td colspan="6" class="dash-stats-empty">No completed matches yet. Play a race on a connected dock to populate stats.</td></tr>';
+    renderLeaderboardPager(null);
   } else {
-    boardBody.innerHTML = filtered.players.map((p, index) => `
+    const sorted = sortLeaderboardPlayers(filtered.players);
+    const pageInfo = paginateItems(sorted, leaderboardPage, LEADERBOARD_PAGE_SIZE);
+    leaderboardPage = pageInfo.page;
+    boardBody.innerHTML = pageInfo.items.map((p, index) => `
       <tr class="stats-row-clickable" data-player-id="${escapeHtml(p.id)}">
-        <td class="stats-pos">${index + 1}</td>
+        <td class="stats-pos">${pageInfo.startIndex + index + 1}</td>
         <td>${escapeHtml(p.name)}</td>
         <td>${formatMatchRecord(p.gamesWon, p.gamesDrawn, p.gamesLost)}</td>
-        <td>${winPct(p.gamesWon, p.gamesLost, p.gamesDrawn)}%</td>
+        <td>${playerWinPct(p)}%</td>
         <td>${p.racksWon}/${p.racksLost}</td>
         <td>${escapeHtml(formatStatsDate(p.lastPlayedAt))}</td>
       </tr>
     `).join('');
+    renderLeaderboardPager(pageInfo);
   }
 
   if (!matchList.length) {
@@ -850,13 +976,22 @@ function renderAccountStats() {
 }
 
 function matchPairHtml(m) {
-  const p1 = escapeHtml(m.player1Name);
-  const p2 = escapeHtml(m.player2Name);
   const result = resolveMatchResult(m);
-  if (result.winnerSlot === '1') return `<span class="stats-winner">${p1}</span> vs ${p2}`;
-  if (result.winnerSlot === '2') return `${p1} vs <span class="stats-winner">${p2}</span>`;
-  if (result.isDraw) return `${p1} vs ${p2} <span class="stats-draw">(Draw)</span>`;
-  return `${p1} vs ${p2}`;
+  const playerSpan = (name, winner) => {
+    const display = String(name || '').trim();
+    const classes = winner ? 'stats-match-player stats-winner' : 'stats-match-player';
+    if (!display) {
+      return `<span class="${classes}">—</span>`;
+    }
+    return `<button type="button" class="${classes} stats-match-player-link" data-open-player="${escapeHtml(display)}">${escapeHtml(display)}</button>`;
+  };
+  const draw = result.isDraw ? '<span class="stats-match-draw stats-draw">(Draw)</span>' : '';
+  return `<div class="stats-match-pair">
+    ${playerSpan(m.player1Name, result.winnerSlot === '1')}
+    <span class="stats-match-vs">vs</span>
+    ${playerSpan(m.player2Name, result.winnerSlot === '2')}
+    ${draw}
+  </div>`;
 }
 
 function rackWinnerName(m, rack) {
@@ -966,27 +1101,110 @@ function matchDateOptions(m, inProgress) {
   };
 }
 
+function matchRackCount(m) {
+  return enrichRacksWithDuration(m).length;
+}
+
+function isMatchRacksExpanded(startEventId) {
+  return expandedMatchRacks.has(String(startEventId || ''));
+}
+
+function toggleMatchRacksExpanded(startEventId) {
+  const id = String(startEventId || '');
+  if (!id) return;
+  if (expandedMatchRacks.has(id)) expandedMatchRacks.delete(id);
+  else expandedMatchRacks.add(id);
+  if (selectedPlayerKey) renderPlayerDetail();
+  else renderAccountStats();
+}
+
+/** Inline action icons (text label hidden on narrow viewports). */
+function statsActionIcon(kind) {
+  const common = 'class="stats-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"';
+  const stroke = 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+  // Open eye = show racks; closed/slashed = hide
+  if (kind === 'eyeOpen') {
+    return `<svg ${common} ${stroke}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+  }
+  if (kind === 'eyeClosed') {
+    return `<svg ${common} ${stroke}><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
+  }
+  if (kind === 'edit') {
+    return `<svg ${common} ${stroke}><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>`;
+  }
+  if (kind === 'clear') {
+    return `<svg ${common} ${stroke}><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`;
+  }
+  return '';
+}
+
+function statsActionButton({ className = '', attrs = '', icon, label, title }) {
+  const titleAttr = title ? ` title="${escapeHtml(title)}"` : '';
+  return `<button type="button" class="btn stats-action-btn ${className}"${titleAttr} ${attrs}>` +
+    `${statsActionIcon(icon)}<span class="stats-action-label">${escapeHtml(label)}</span>` +
+    `</button>`;
+}
+
+function matchRacksToggleButton(m) {
+  if (!matchRackCount(m) || !m.startEventId) return '';
+  const expanded = isMatchRacksExpanded(m.startEventId);
+  return statsActionButton({
+    className: 'stats-match-racks-toggle',
+    attrs: `data-toggle-racks="${escapeHtml(m.startEventId)}" aria-expanded="${expanded ? 'true' : 'false'}"`,
+    // Collapsed → open eye (show); expanded → closed eye (hide)
+    icon: expanded ? 'eyeClosed' : 'eyeOpen',
+    label: 'Racks',
+    title: expanded ? 'Hide rack details' : 'Show rack details',
+  });
+}
+
+function matchEditButton(startEventId) {
+  return statsActionButton({
+    attrs: `data-edit-match="${escapeHtml(startEventId)}"`,
+    icon: 'edit',
+    label: 'Edit',
+    title: 'Edit match',
+  });
+}
+
+function matchAbandonButton(startEventId) {
+  return statsActionButton({
+    className: 'danger',
+    attrs: `data-abandon-match="${escapeHtml(startEventId)}"`,
+    icon: 'clear',
+    label: 'Abandon',
+    title: 'Remove this unfinished match from cloud stats',
+  });
+}
+
+function matchRacksDetailRow(m, colspan, options = {}) {
+  if (!isMatchRacksExpanded(m.startEventId)) return '';
+  const breakdown = renderMatchRackBreakdown(m, options);
+  if (!breakdown) return '';
+  return `<tr class="stats-match-racks-row"><td colspan="${colspan}">${breakdown}</td></tr>`;
+}
+
 function matchOverviewRow(m) {
   const inProgress = isMatchInProgress(m);
-  const actions = inProgress
-    ? `<span class="stats-match-live-badge">Live</span>` +
-      `<button type="button" class="btn danger" data-abandon-match="${escapeHtml(m.startEventId)}" title="Remove this unfinished match from cloud stats">Abandon</button>`
-    : `<button type="button" class="btn" data-edit-match="${escapeHtml(m.startEventId)}">Edit</button>`;
+  const actions = [];
+  const racksToggle = matchRacksToggleButton(m);
+  if (racksToggle) actions.push(racksToggle);
+  if (inProgress) {
+    actions.push(matchAbandonButton(m.startEventId));
+  } else {
+    actions.push(matchEditButton(m.startEventId));
+  }
   const main = `
     <tr class="${inProgress ? 'stats-match-in-progress' : ''}">
       <td class="stats-match-when">${matchDateCellHtml(m.completedAt || m.startedAt, matchDateOptions(m, inProgress))}</td>
       <td>${escapeHtml(m.gameInfo || '—')}</td>
       <td>${escapeHtml(gameTypeLabel(m.gameType))}</td>
-      <td>${matchPairHtml(m)}</td>
+      <td class="stats-match-pair-cell">${matchPairHtml(m)}</td>
       <td>${escapeHtml(scoreLine(m))}</td>
-      <td class="stats-match-actions">${actions}</td>
+      <td class="stats-match-actions">${actions.join('')}</td>
     </tr>
   `;
-  const breakdown = renderMatchRackBreakdown(m);
-  const detail = breakdown
-    ? `<tr class="stats-match-racks-row"><td colspan="6">${breakdown}</td></tr>`
-    : '';
-  return main + detail;
+  return main + matchRacksDetailRow(m, 6);
 }
 
 function playerMatches(playerKey, options = {}) {
@@ -1122,24 +1340,24 @@ function renderPlayerDetail() {
     const own = isP1 ? (m.scores?.p1 ?? 0) : (m.scores?.p2 ?? 0);
     const opp = isP1 ? (m.scores?.p2 ?? 0) : (m.scores?.p1 ?? 0);
     const scoreText = inProgress && !m.scores ? 'In progress' : `${own} - ${opp}`;
-    const actions = inProgress
-      ? `<span class="stats-match-live-badge">Live</span>` +
-        `<button type="button" class="btn danger" data-abandon-match="${escapeHtml(m.startEventId)}" title="Remove this unfinished match from cloud stats">Abandon</button>`
-      : `<button type="button" class="btn" data-edit-match="${escapeHtml(m.startEventId)}">Edit</button>`;
+    const actions = [];
+    const racksToggle = matchRacksToggleButton(m);
+    if (racksToggle) actions.push(racksToggle);
+    if (inProgress) {
+      actions.push(matchAbandonButton(m.startEventId));
+    } else {
+      actions.push(matchEditButton(m.startEventId));
+    }
     const main = `
       <tr class="${inProgress ? 'stats-match-in-progress' : ''}">
         <td class="stats-match-when">${matchDateCellHtml(m.completedAt || m.startedAt, matchDateOptions(m, inProgress))}</td>
         <td>${escapeHtml(opponent)}</td>
         <td>${formatMatchGameCellHtml(m)}</td>
         <td>${escapeHtml(scoreText)}</td>
-        <td class="stats-match-actions">${actions}</td>
+        <td class="stats-match-actions">${actions.join('')}</td>
       </tr>
     `;
-    const breakdown = renderMatchRackBreakdown(m, { viewerPlayerKey: selectedPlayerKey });
-    const detail = breakdown
-      ? `<tr class="stats-match-racks-row"><td colspan="5">${breakdown}</td></tr>`
-      : '';
-    return main + detail;
+    return main + matchRacksDetailRow(m, 5, { viewerPlayerKey: selectedPlayerKey });
   }).join('');
 }
 
@@ -1694,6 +1912,7 @@ function initStatsPlayerSearch() {
 
   const applyFreeTextFilter = () => {
     selectedPlayerKey = '';
+    leaderboardPage = 1;
     if (statsData) renderAccountStats();
   };
 
@@ -1813,6 +2032,19 @@ document.querySelectorAll('.stats-subtab').forEach((tab) => {
   tab.addEventListener('click', () => setActiveStatsPanel(tab.dataset.statsPanel));
 });
 
+document.getElementById('statsPanelLeaderboard')?.addEventListener('click', (event) => {
+  const pageBtn = event.target.closest('[data-leaderboard-page]');
+  if (pageBtn && !pageBtn.disabled) {
+    event.preventDefault();
+    setLeaderboardPage(pageBtn.getAttribute('data-leaderboard-page'));
+    return;
+  }
+  const th = event.target.closest('th[data-sort-key]');
+  if (!th) return;
+  event.preventDefault();
+  setLeaderboardSort(th.getAttribute('data-sort-key'));
+});
+
 document.getElementById('statsRefreshBtn')?.addEventListener('click', () => {
   loadAccountStats(true);
 });
@@ -1862,6 +2094,18 @@ document.getElementById('tabStats')?.addEventListener('click', (event) => {
   if (editBtn) {
     event.preventDefault();
     openMatchModal(editBtn.getAttribute('data-edit-match'));
+    return;
+  }
+  const racksToggle = event.target.closest('[data-toggle-racks]');
+  if (racksToggle) {
+    event.preventDefault();
+    toggleMatchRacksExpanded(racksToggle.getAttribute('data-toggle-racks'));
+    return;
+  }
+  const openPlayerBtn = event.target.closest('[data-open-player]');
+  if (openPlayerBtn) {
+    event.preventDefault();
+    openPlayerFromSearch(openPlayerBtn.getAttribute('data-open-player') || '');
     return;
   }
   const row = event.target.closest('tr[data-player-id]');

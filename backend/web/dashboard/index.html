@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>CueSport Scoreboard Cloud — Dashboard</title>
-  <link rel="stylesheet" href="/web/shared/styles.css?v=8.0.0.18" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.0.0.25" />
 </head>
 <body>
   <header class="site-header">
@@ -61,20 +61,21 @@
           </div>
           <div id="statsPanelLeaderboard" class="stats-subpanel" role="tabpanel">
             <div class="stats-table-wrap">
-              <table class="dash-stats-table">
+              <table class="dash-stats-table" id="statsLeaderboardTable">
                 <thead>
                   <tr>
-                    <th>Pos</th>
-                    <th>Player</th>
-                    <th>Matches W/D/L</th>
-                    <th>Win %</th>
-                    <th>Racks W/L</th>
-                    <th>Last played</th>
+                    <th scope="col">Pos</th>
+                    <th scope="col" data-sort-key="name" class="stats-sortable" title="Click to sort; click again to reverse">Player</th>
+                    <th scope="col" data-sort-key="matches" class="stats-sortable" title="Click to sort; click again to reverse">Matches W/D/L</th>
+                    <th scope="col" data-sort-key="winPct" class="stats-sortable" title="Click to sort; click again to reverse">Win %</th>
+                    <th scope="col" data-sort-key="racks" class="stats-sortable" title="Click to sort; click again to reverse">Racks W/L</th>
+                    <th scope="col" data-sort-key="lastPlayed" class="stats-sortable" title="Click to sort; click again to reverse">Last played</th>
                   </tr>
                 </thead>
                 <tbody id="statsLeaderboardBody"></tbody>
               </table>
             </div>
+            <div id="statsLeaderboardPager" class="stats-pager hidden" aria-label="Leaderboard pages"></div>
           </div>
           <div id="statsPanelMatches" class="stats-subpanel hidden" role="tabpanel">
             <div class="stats-table-wrap">
@@ -86,7 +87,7 @@
                     <th>Game</th>
                     <th>Match</th>
                     <th>Score</th>
-                    <th></th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody id="statsMatchesBody"></tbody>
@@ -130,7 +131,7 @@
                     <th>Opponent</th>
                     <th>Game</th>
                     <th>Score</th>
-                    <th></th>
+                    <th>Actions</th>
                   </tr>
               </thead>
               <tbody id="statsPlayerMatchesBody"></tbody>
@@ -251,6 +252,6 @@
       </form>
     </div>
   </div>
-  <script type="module" src="/web/dashboard/app.js?v=8.0.0.31"></script>
+  <script type="module" src="/web/dashboard/app.js?v=8.0.0.39"></script>
 </body>
 </html>
