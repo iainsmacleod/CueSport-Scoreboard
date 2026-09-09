@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>CueSport Scoreboard Cloud — Dashboard</title>
-  <link rel="stylesheet" href="/web/shared/styles.css?v=8.0.0.42" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.0.0.43" />
 </head>
 <body>
   <header class="site-header">
@@ -146,9 +146,18 @@
           <p id="userEmail" class="account-email"></p>
           <p id="quotaSummary" class="hint"></p>
           <div class="row account-session-actions">
-            <button type="button" id="signOutBtn" class="btn">Sign Out</button>
-            <button type="button" id="invalidateSessionsBtn" class="btn secondary">Sign Out Everywhere</button>
-            <button type="button" id="revokeAllGuestsBtn" class="btn danger">Revoke All Guest Sessions</button>
+            <button type="button" id="signOutBtn" class="btn dash-action-btn" title="Sign Out" aria-label="Sign Out">
+              <svg class="dash-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+              <span class="dash-action-label">Sign Out</span>
+            </button>
+            <button type="button" id="invalidateSessionsBtn" class="btn secondary dash-action-btn" title="Sign Out Everywhere" aria-label="Sign Out Everywhere">
+              <svg class="dash-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              <span class="dash-action-label">Sign Out Everywhere</span>
+            </button>
+            <button type="button" id="revokeAllGuestsBtn" class="btn danger dash-action-btn" title="Revoke All Guest Sessions" aria-label="Revoke All Guest Sessions">
+              <svg class="dash-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/><line x1="4" y1="4" x2="20" y2="20"/></svg>
+              <span class="dash-action-label">Revoke All Guest Sessions</span>
+            </button>
           </div>
         </div>
         <div class="panel">
@@ -252,6 +261,6 @@
       </form>
     </div>
   </div>
-  <script type="module" src="/web/dashboard/app.js?v=8.0.0.60"></script>
+  <script type="module" src="/web/dashboard/app.js?v=8.0.0.61"></script>
 </body>
 </html>

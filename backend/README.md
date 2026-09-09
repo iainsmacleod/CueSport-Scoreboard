@@ -137,7 +137,7 @@ This backend is GPL-licensed alongside the scoreboard. You may run your own inst
 | GET | `/api/rooms/:roomId/events` | Match event log |
 | GET | `/api/stats` | Account match stats (players, matches, summary) |
 | PATCH | `/api/stats/matches/:startEventId` | Edit a completed match (scores, names, extras; winner derived from scores) |
-| DELETE | `/api/stats/matches/:startEventId` | Delete a completed match, or abandon an in-progress (unended) match |
+| DELETE | `/api/stats/matches/:startEventId` | Delete a completed match, or abandon an in-progress (unended) match. Abandon clears the room session pointer and, when a dock is connected to that room, relays `abandon_match` (`dockNotified` in the response). |
 | PATCH | `/api/stats/players` | Rename a player across all match history + roster |
 | GET | `/api/players` | Account player roster (autocomplete) |
 | GET | `/api/streams` | Active public streams |

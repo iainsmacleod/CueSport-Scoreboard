@@ -118,6 +118,25 @@ function wsOnce(ws, timeoutMs = 5000) {
   });
 }
 
+function waitForWsMessage(ws, predicate, timeoutMs = 5000) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('message timeout')), timeoutMs);
+    const onMessage = (raw) => {
+      let data;
+      try {
+        data = JSON.parse(raw.toString());
+      } catch {
+        return;
+      }
+      if (!predicate(data)) return;
+      clearTimeout(timer);
+      ws.off('message', onMessage);
+      resolve(data);
+    };
+    ws.on('message', onMessage);
+  });
+}
+
 async function run() {
   console.log(`CueSport Cloud API tests → ${BASE}\n`);
 
@@ -712,15 +731,30 @@ async function run() {
       });
       const liveBefore = (beforeAbandon.body.matches || []).find((m) => m.startEventId === abandonStartId);
       assert('Active match appears in stats', !!liveBefore && liveBefore.status === 'active');
+      const abandonCmdP = waitForWsMessage(
+        dock2.ws,
+        (d) => d.type === 'command' && d.action === 'abandon_match'
+      );
       const abandoned = await fetchJson(`/api/stats/matches/${abandonStartId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${tokenFresh}` },
       });
       assert('Abandon in-progress match', abandoned.ok && abandoned.body.ok === true && abandoned.body.abandoned === true);
       assert(
-        'Abandon reports dock notification flag',
-        typeof abandoned.body.dockNotified === 'boolean'
+        'Abandon notifies connected dock',
+        abandoned.body.dockNotified === true
       );
+      try {
+        const abandonCmd = await abandonCmdP;
+        assert(
+          'Abandon relays abandon_match command',
+          abandonCmd.action === 'abandon_match' &&
+            String(abandonCmd.payload?.matchId || '') === abandonSession,
+          JSON.stringify(abandonCmd.payload || {})
+        );
+      } catch (e) {
+        assert('Abandon relays abandon_match command', false, e.message);
+      }
       const afterAbandon = await fetchJson('/api/stats', {
         headers: { Authorization: `Bearer ${tokenFresh}` },
       });

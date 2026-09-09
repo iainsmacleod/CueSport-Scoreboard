@@ -365,8 +365,50 @@ function findApiKeyViewBtn(labelEl) {
 
 function setApiKeyViewButtonState(viewBtn, revealed) {
   if (!viewBtn || viewBtn.disabled) return;
-  viewBtn.textContent = revealed ? 'Hide' : 'View';
-  viewBtn.title = revealed ? 'Hide API key' : 'Show API key inline';
+  setDashActionButtonContent(viewBtn, {
+    icon: revealed ? 'eyeClosed' : 'eyeOpen',
+    label: revealed ? 'Hide' : 'View',
+    title: revealed ? 'Hide API key' : 'Show API key inline',
+  });
+}
+
+/** Compact icon+label control (labels hide on narrow viewports). */
+function dashActionIcon(kind) {
+  const common = 'class="dash-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+  if (kind === 'eyeOpen') {
+    return `<svg ${common}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+  }
+  if (kind === 'eyeClosed') {
+    return `<svg ${common}><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
+  }
+  if (kind === 'refresh') {
+    return `<svg ${common}><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`;
+  }
+  if (kind === 'trash') {
+    return `<svg ${common}><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`;
+  }
+  return '';
+}
+
+function setDashActionButtonContent(btn, { icon, label, title }) {
+  if (!btn) return;
+  const iconHtml = dashActionIcon(icon);
+  const safeLabel = escapeHtml(label || '');
+  btn.innerHTML = `${iconHtml}<span class="dash-action-label">${safeLabel}</span>`;
+  if (title) {
+    btn.title = title;
+    btn.setAttribute('aria-label', title);
+  } else if (label) {
+    btn.setAttribute('aria-label', label);
+  }
+}
+
+function createDashActionButton({ className = '', icon, label, title, type = 'button' }) {
+  const btn = document.createElement('button');
+  btn.type = type;
+  btn.className = `btn dash-action-btn ${className}`.trim();
+  setDashActionButtonContent(btn, { icon, label, title: title || label });
+  return btn;
 }
 
 function revealApiKeyInSummary(labelEl, key) {
@@ -440,14 +482,15 @@ function renderApiKeys(keys) {
       }
     });
 
-    const viewBtn = document.createElement('button');
-    viewBtn.type = 'button';
-    viewBtn.className = 'btn secondary api-key-view-btn';
-    viewBtn.textContent = 'View';
+    const viewBtn = createDashActionButton({
+      className: 'secondary api-key-view-btn',
+      icon: 'eyeOpen',
+      label: 'View',
+      title: k.viewable === false
+        ? 'This key was created before viewable storage. Create a new key to view it later.'
+        : 'Show API key inline',
+    });
     viewBtn.disabled = k.viewable === false;
-    viewBtn.title = k.viewable === false
-      ? 'This key was created before viewable storage. Create a new key to view it later.'
-      : 'Show API key inline';
     viewBtn.addEventListener('click', async () => {
       if (label.dataset.revealedKey) {
         restoreApiKeySummary(label, label.dataset.summary);
@@ -466,11 +509,12 @@ function renderApiKeys(keys) {
       }
     });
 
-    const regenBtn = document.createElement('button');
-    regenBtn.type = 'button';
-    regenBtn.className = 'btn secondary';
-    regenBtn.textContent = 'Regenerate';
-    regenBtn.title = 'Issue a new secret with the same seat name; disconnects docks using the old key';
+    const regenBtn = createDashActionButton({
+      className: 'secondary',
+      icon: 'refresh',
+      label: 'Regenerate',
+      title: 'Issue a new secret with the same seat name; disconnects docks using the old key',
+    });
     regenBtn.addEventListener('click', async () => {
       if (!window.confirm(
         `Regenerate “${k.label}”? The old secret stops working immediately. Paste the new key into the dock.`
@@ -501,11 +545,12 @@ function renderApiKeys(keys) {
       }
     });
 
-    const removeBtn = document.createElement('button');
-    removeBtn.type = 'button';
-    removeBtn.className = 'btn danger';
-    removeBtn.textContent = 'Remove';
-    removeBtn.title = 'Free this dock seat';
+    const removeBtn = createDashActionButton({
+      className: 'danger',
+      icon: 'trash',
+      label: 'Remove',
+      title: 'Free this dock seat',
+    });
     removeBtn.addEventListener('click', async () => {
       if (!window.confirm(
         `Remove “${k.label}”? This frees the seat. Any dock using it will be disconnected.`

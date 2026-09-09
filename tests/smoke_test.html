@@ -496,6 +496,14 @@
             assert('Cloud', 'cloudCommands.runCommand fn', typeof cp.cloudCommands.runCommand === 'function');
             assert('Cloud', 'undoLastScoringAction on dock', typeof cp.undoLastScoringAction === 'function');
             assert('Cloud', 'isDualScoreMode on dock', typeof cp.isDualScoreMode === 'function');
+            assert('Cloud', 'cloudAbandonModal in DOM', !!cp.document.getElementById('cloudAbandonModal'));
+            assert('Cloud', 'applyCloudMatchAbandon exposed', typeof cp.applyCloudMatchAbandon === 'function');
+            assert('Cloud', 'selectControlPanelTab exposed', typeof cp.selectControlPanelTab === 'function');
+            (function () {
+                const src = String(cp.cloudCommands.runCommand);
+                assert('Cloud', 'Dock runCommand supports abandon_match',
+                    src.indexOf("'abandon_match'") !== -1 || src.indexOf('"abandon_match"') !== -1);
+            })();
             (function () {
                 const src = String(cp.cloudCommands.runCommand);
                 const guestSetupActions = [
@@ -521,6 +529,36 @@
                     cp.setStorageItem('gameType', orig || 'game1');
                     return dual && primary && secondary;
                 })());
+
+            // Dashboard Kill → dock clear + Setup tab (OBS-safe modal, not native alert)
+            if (typeof cp.selectControlPanelTab === 'function') {
+                cp.selectControlPanelTab('Controls');
+            } else {
+                cp.document.getElementById('controlsTab')?.click();
+            }
+            await sleep(30);
+            cp.document.getElementById('p1Name').value = 'CloudKillP1';
+            cp.document.getElementById('p2Name').value = 'CloudKillP2';
+            if (typeof cp.applyCloudMatchAbandon === 'function') {
+                cp.applyCloudMatchAbandon({
+                    message: 'Smoke: match killed from CueSport Cloud.',
+                });
+            }
+            const abandonModal = cp.document.getElementById('cloudAbandonModal');
+            assert('Cloud', 'applyCloudMatchAbandon shows in-page modal',
+                !!abandonModal && abandonModal.style.display === 'block');
+            assert('Cloud', 'applyCloudMatchAbandon clears player names',
+                cp.document.getElementById('p1Name').value === '' &&
+                cp.document.getElementById('p2Name').value === '');
+            assert('Cloud', 'applyCloudMatchAbandon returns to Setup tab',
+                cp.document.getElementById('GameInfo')?.style.display === 'block' &&
+                (cp.document.getElementById('gameInfoTab')?.className || '').indexOf('active') !== -1 &&
+                cp.getStorageItem('lastSelectedTab') === 'GameInfo');
+            if (typeof cp.closeCloudAbandonModal === 'function') {
+                cp.closeCloudAbandonModal();
+            } else if (abandonModal) {
+                abandonModal.style.display = 'none';
+            }
 
             // Mobile join should enable both players, Score Display, and Ball Scoring when needed.
             (function () {
@@ -1238,9 +1276,9 @@
             assert('Match History', 'Pool match lists three racks',
                 savedPoolMatch && savedPoolMatch.racks && savedPoolMatch.racks.length === 3,
                 savedPoolMatch && String(savedPoolMatch.racks && savedPoolMatch.racks.length));
-            assert('Match History', 'Pool rack breakdown shows Won/Lost',
-                poolBreakdown && poolBreakdown.indexOf('Won') !== -1 && poolBreakdown.indexOf('Lost') !== -1,
-                poolBreakdown);
+            assert('Match History', 'Pool rack breakdown shows Winner labels',
+                poolBreakdown && poolBreakdown.indexOf('Winner:') !== -1,
+                poolBreakdown && (poolBreakdown.indexOf('Winner:') !== -1 ? 'ok' : poolBreakdown.slice(0, 200)));
 
             assert('StatsTab', 'Stats tab button present', !!cp.document.getElementById('statsTab'));
             assert('StatsTab', 'Player Stats on Stats tab',
@@ -1262,6 +1300,12 @@
             cp.document.getElementById('p2Score').value = '1';
             cp.setStorageItem('raceInfo', 'Race to 5');
             cp.document.getElementById('raceInfoTxt').value = 'Race to 5';
+            if (typeof cp.selectControlPanelTab === 'function') {
+                cp.selectControlPanelTab('Controls');
+            } else {
+                cp.document.getElementById('controlsTab')?.click();
+            }
+            await sleep(30);
             if (typeof cp.resetCurrentGame === 'function') {
                 cp.resetCurrentGame({ skipStatsAbandon: true });
             }
@@ -1271,6 +1315,10 @@
                 parseInt(cp.getStorageItem('p1ScoreCtrlPanel'), 10) === 0 &&
                 parseInt(cp.getStorageItem('p2ScoreCtrlPanel'), 10) === 0 &&
                 cp.getStorageItem('raceInfo') === '');
+            assert('StatsTab', 'resetCurrentGame returns to Setup tab',
+                cp.document.getElementById('GameInfo')?.style.display === 'block' &&
+                (cp.document.getElementById('gameInfoTab')?.className || '').indexOf('active') !== -1 &&
+                cp.getStorageItem('lastSelectedTab') === 'GameInfo');
             assert('StatsTab', 'Stats game type selector present',
                 !!cp.document.getElementById('statsVisibilityGameType'));
             cp.onStatsVisibilityGameTypeChange('game1');
@@ -1330,12 +1378,17 @@
                 cp.switchStatsTab('detail');
                 await sleep(250);
             }
+            const racksToggle = cp.document.querySelector('#statsPlayerDetail [data-toggle-racks]');
+            if (racksToggle) {
+                racksToggle.click();
+                await sleep(150);
+            }
             assert('Match History', 'Player detail renders rack cards in UI',
                 cp.document.querySelector('#statsPlayerDetail .stats-rack-list') !== null);
             assert('Match History', 'Player detail has no Frames/Racks title above table',
                 cp.document.querySelector('#statsPlayerDetail .stats-match-racks-title') === null);
             assert('Match History', 'Player detail shows rack results',
-                (cp.document.getElementById('statsPlayerDetail').textContent || '').indexOf('Won') !== -1);
+                (cp.document.getElementById('statsPlayerDetail').textContent || '').indexOf('Winner:') !== -1);
             // Frame-based match edit: match score is derived from racks
             const frameEditMatch = await cp.PlayerStats.saveMatch({
                 player1Id: histP1.id,
@@ -1675,20 +1728,25 @@
                 ballRow.click();
                 await sleep(250);
             }
-            const detailHeaders = Array.from(cp.document.querySelectorAll('#statsTab-detail .stats-player-stats-table th'))
-                .map(function (th) { return th.textContent.trim(); });
-            assert('Ball Stats', 'Player detail has Balls Potted', detailHeaders.indexOf('Balls Potted') !== -1, detailHeaders.join('|'));
-            assert('Ball Stats', 'Player detail Matches Won label', detailHeaders.indexOf('Matches Won') !== -1);
-            assert('Ball Stats', 'Every player stats table uses Matches Won',
-                detailHeaders.length > 0 &&
-                detailHeaders.filter(function (h) { return h === 'Matches Won'; }).length >= 1 &&
-                detailHeaders.indexOf('Games W/L') === -1,
-                detailHeaders.join('|'));
-            assert('Ball Stats', 'Player detail Racks W/L label', detailHeaders.indexOf('Racks W/L') !== -1);
-            const overallCells = Array.from(cp.document.querySelectorAll('#statsTab-detail .stats-overall-row td'))
-                .map(function (td) { return td.textContent.trim(); });
+            const detailRoot = cp.document.getElementById('statsTab-detail') || cp.document.getElementById('statsPlayerDetail');
+            const detailText = (detailRoot && detailRoot.textContent) || '';
+            assert('Ball Stats', 'Player detail has Balls Potted',
+                /Balls potted/i.test(detailText), detailText.slice(0, 200));
+            assert('Ball Stats', 'Player detail Matches Won label',
+                /Matches W\/D\/L|Matches Won/i.test(detailText));
+            assert('Ball Stats', 'Every player stats summary uses match record wording',
+                detailText.length > 0 &&
+                /Matches W\/D\/L|Matches Won/i.test(detailText) &&
+                detailText.indexOf('Games W/L') === -1,
+                detailText.slice(0, 200));
+            assert('Ball Stats', 'Player detail Racks W/L label', /Racks W\/L/i.test(detailText));
+            const ballsCard = Array.from((detailRoot || cp.document).querySelectorAll('.stats-summary-card'))
+                .find(function (card) {
+                    return /Balls potted/i.test(card.textContent || '');
+                });
+            const ballsValue = ballsCard ? (ballsCard.querySelector('strong')?.textContent || '').trim() : '';
             assert('Ball Stats', 'Player detail Balls Potted is numeric total',
-                overallCells.length >= 3 && /^\d+$/.test(overallCells[2]), overallCells.join('|'));
+                /^\d+$/.test(ballsValue), ballsValue || detailText.slice(0, 120));
             cp.closeStatsModal();
 
             cp.document.getElementById('statsMatchGameType').value = 'game1';
@@ -2497,6 +2555,50 @@
             cp.document.getElementById('p1Score').value = '0';
             cp.document.getElementById('p2Score').value = '0';
             cp.resetBallTracker();
+            // Regression: Ball Set off + stale opposite group used to credit Win on Break
+            // B&R to the opponent (getEightBallGroupBallNumbersForSlot ignored useBallSet).
+            cp.setStorageItem('useBallSet', 'no');
+            cp.document.getElementById('ballSetCheckbox').checked = false;
+            cp.useBallSetToggle();
+            cp.setStorageItem('playerBallSet', 'p1yellow/bigs');
+            cp.document.getElementById('earlyGameBallCheckbox').checked = true;
+            cp.earlyGameBallToggle();
+            cp.selectRackBreaker('1');
+            await sleep(30);
+            assert('RackWin', 'B&R setup: P1 is breaker and active',
+                cp.getStorageItem('rackBreakerSlot') === '1' &&
+                cp.getStorageItem('activePlayer') === '1');
+            cp.togglePot(cp.document.getElementById('ball 8'));
+            await sleep(600);
+            await cp.PlayerStats.flushRackRecordQueue();
+            let brPending = cp.PlayerStats.getActivePendingMatch();
+            let brLastRack = brPending && brPending.racks && brPending.racks[brPending.racks.length - 1];
+            assert('RackWin', 'Win on Break B&R awards breaker (not opposite) with stale group',
+                parseInt(cp.getStorageItem('p1ScoreCtrlPanel'), 10) === 1 &&
+                parseInt(cp.getStorageItem('p2ScoreCtrlPanel'), 10) === 0,
+                'p1=' + cp.getStorageItem('p1ScoreCtrlPanel') +
+                ' p2=' + cp.getStorageItem('p2ScoreCtrlPanel') +
+                ' set=' + cp.getStorageItem('playerBallSet') +
+                ' useBallSet=' + cp.getStorageItem('useBallSet'));
+            assert('RackWin', 'Win on Break B&R flag on rack with Ball Set off',
+                !!(brLastRack && brLastRack.breakAndRun && !brLastRack.tableRun &&
+                    String(brLastRack.breakerSlot) === '1'),
+                brLastRack && JSON.stringify(brLastRack));
+            let brStats = await cp.PlayerStats.getPlayer(brP1.id);
+            assert('RackWin', 'Breaker career B&R increments (stale-group regression)',
+                brStats && (brStats.stats.byGameType.game1.breakAndRuns || 0) >= 1,
+                brStats && JSON.stringify(brStats.stats.byGameType.game1));
+            const brP2AfterStale = await cp.PlayerStats.getPlayer(brP2.id);
+            assert('RackWin', 'Opponent does not receive B&R from stale group',
+                !brP2AfterStale || (brP2AfterStale.stats.byGameType.game1.breakAndRuns || 0) === 0,
+                brP2AfterStale && JSON.stringify(brP2AfterStale.stats.byGameType.game1));
+
+            // Standard B&R / TR sequence (Ball Set irrelevant; Win on Break still on)
+            cp.setStorageItem('p1ScoreCtrlPanel', 0);
+            cp.setStorageItem('p2ScoreCtrlPanel', 0);
+            cp.document.getElementById('p1Score').value = '0';
+            cp.document.getElementById('p2Score').value = '0';
+            cp.resetBallTracker();
             cp.document.getElementById('earlyGameBallCheckbox').checked = true;
             cp.earlyGameBallToggle();
             cp.selectRackBreaker('1');
@@ -2504,14 +2606,14 @@
             cp.togglePot(cp.document.getElementById('ball 8'));
             await sleep(600);
             await cp.PlayerStats.flushRackRecordQueue();
-            let brPending = cp.PlayerStats.getActivePendingMatch();
-            let brLastRack = brPending && brPending.racks && brPending.racks[brPending.racks.length - 1];
+            brPending = cp.PlayerStats.getActivePendingMatch();
+            brLastRack = brPending && brPending.racks && brPending.racks[brPending.racks.length - 1];
             assert('RackWin', '8-Ball B&R flag on rack entry',
                 !!(brLastRack && brLastRack.breakAndRun && !brLastRack.tableRun),
                 brLastRack && JSON.stringify(brLastRack));
-            let brStats = await cp.PlayerStats.getPlayer(brP1.id);
+            brStats = await cp.PlayerStats.getPlayer(brP1.id);
             assert('RackWin', 'Break and run recorded when breaker runs out',
-                brStats && (brStats.stats.byGameType.game1.breakAndRuns || 0) >= 1,
+                brStats && (brStats.stats.byGameType.game1.breakAndRuns || 0) >= 2,
                 brStats && JSON.stringify(brStats.stats.byGameType.game1));
             cp.selectRackBreaker('1');
             await sleep(30);
@@ -2536,6 +2638,8 @@
                 brStats && JSON.stringify(brStats.stats.byGameType.game1));
 
             // Breaker wins after a visit is neither B&R nor TR.
+            // Wait out game-ball cooldown from the prior rack win before potting again.
+            await sleep(550);
             cp.selectRackBreaker('1');
             await sleep(30);
             cp.togglePlayer(false);
