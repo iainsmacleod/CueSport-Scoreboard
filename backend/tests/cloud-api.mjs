@@ -717,6 +717,10 @@ async function run() {
         headers: { Authorization: `Bearer ${tokenFresh}` },
       });
       assert('Abandon in-progress match', abandoned.ok && abandoned.body.ok === true && abandoned.body.abandoned === true);
+      assert(
+        'Abandon reports dock notification flag',
+        typeof abandoned.body.dockNotified === 'boolean'
+      );
       const afterAbandon = await fetchJson('/api/stats', {
         headers: { Authorization: `Bearer ${tokenFresh}` },
       });

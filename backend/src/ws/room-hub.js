@@ -714,6 +714,23 @@ function handleSession(ws, meta, msg) {
   }
 }
 
+/** Relay a command into a room (e.g. dashboard Kill → dock abandon_match). */
+export function broadcastRoomCommand(roomId, action, payload = {}, source = 'dashboard') {
+  if (!roomId || !action) return false;
+  if (!rooms.has(roomId)) return false;
+  const envelope = {
+    type: 'command',
+    room_id: roomId,
+    action,
+    payload: payload || {},
+    source,
+    source_id: null,
+    ts: new Date().toISOString(),
+  };
+  broadcast(roomId, envelope);
+  return true;
+}
+
 export function getConnectionCount() {
   return connections.size;
 }

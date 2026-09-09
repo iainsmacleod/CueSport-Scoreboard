@@ -5,6 +5,7 @@ import {
   clampScore,
   normalizePlayerDisplayName,
 } from '../lib/scoreboard-helpers.js';
+import { broadcastRoomCommand } from '../ws/room-hub.js';
 
 const GAME_TYPE_IDS = new Set(['game1', 'game2', 'game3', 'game4', 'game5', 'game6', 'game7', 'game8']);
 
@@ -267,8 +268,31 @@ export async function registerEventRoutes(app) {
       return reply.code(404).send({ error: 'Match not found' });
     }
     const abandoned = !pair.end;
+    const roomId = pair.start.room_id || null;
+    const dockMatchId = pair.start.payload?.sessionId
+      || pair.start.payload?.matchId
+      || null;
+    const cloudSessionId = pair.start.session_id || null;
+    const matchKey = dockMatchId || cloudSessionId || null;
     const deleted = sqlite.deleteMatchEvents([pair.start.id, pair.end?.id]);
-    return { ok: true, deleted, abandoned };
+
+    let dockNotified = false;
+    if (abandoned && roomId) {
+      // Open cloud match is gone; clear room session pointer so a later dock end
+      // does not pair against a deleted start.
+      sqlite.setRoomSessionId(roomId, null);
+      // Relay when the room has live sockets (dock must be on this same process).
+      dockNotified = broadcastRoomCommand(roomId, 'abandon_match', {
+        matchId: matchKey,
+        sessionId: matchKey,
+        dockMatchId,
+        cloudSessionId,
+        startEventId: pair.start.id,
+        message: 'This match was killed from CueSport Cloud. The game has been cleared.',
+      });
+    }
+
+    return { ok: true, deleted, abandoned, dockNotified };
   });
 
   app.patch('/api/stats/players', async (request, reply) => {

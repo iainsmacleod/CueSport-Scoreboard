@@ -3123,8 +3123,11 @@
         broadcastOverlayStatsIfEnabled();
     }
 
-    async function onClearGame() {
-        await abandonActivePendingMatch({ cloudReason: 'clear_game' });
+    async function onClearGame(options) {
+        await abandonActivePendingMatch({
+            cloudReason: 'clear_game',
+            skipCloudDiscard: !!(options && options.skipCloudDiscard)
+        });
         await resetSessionState();
     }
 
@@ -3150,9 +3153,12 @@
         } else if (activeMatchSession.matchId) {
             const match = getActivePendingMatch();
             // Restart Match: drop cloud "In progress" (breaker-only or scored).
+            // Cloud Kill already removed the row — skip discard when requested.
             if (activeMatchSession.cloudSessionStarted) {
                 const matchId = (match && match.id) || activeMatchSession.matchId;
-                emitCloudSessionDiscard(matchId, 'restart_match');
+                if (!(options && options.skipCloudDiscard)) {
+                    emitCloudSessionDiscard(matchId, 'restart_match');
+                }
                 activeMatchSession.cloudSessionStarted = false;
             }
             if (match && (match.racks.length > 0 || (match.balls && match.balls.length > 0))) {
@@ -5424,9 +5430,7 @@
         const isStraight = isStraightPoolGameType(match.gameType);
         const isPoolRunGame = isTrackerRackWinGameType(match.gameType);
         const showBalls = !isSnooker && !isStraight;
-        const viewerIsP1 = !!(viewerId && match.player1Id === viewerId);
         const viewerIsP2 = !!(viewerId && match.player2Id === viewerId);
-        const hasViewer = viewerIsP1 || viewerIsP2;
 
         function durationCell(r) {
             const label = formatDurationSeconds(r.durationSeconds);
@@ -5456,13 +5460,7 @@
         }
 
         function winnerLabel(r) {
-            const name = winnerDisplayName(match, r.winnerId);
-            if (viewerId && r.winnerId) {
-                return r.winnerId === viewerId
-                    ? 'Winner: You'
-                    : ('Winner: ' + escapeHtml(name));
-            }
-            return 'Winner: ' + escapeHtml(name);
+            return 'Winner: ' + escapeHtml(winnerDisplayName(match, r.winnerId));
         }
 
         function rackBallCounts(r, rackIndex) {
@@ -5542,9 +5540,6 @@
                 const name = isP1
                     ? (match.player1Name || 'Player 1')
                     : (match.player2Name || 'Player 2');
-                const displayName = (hasViewer && (
-                    (isP1 && viewerIsP1) || (!isP1 && viewerIsP2)
-                )) ? 'You' : name;
                 const nameParts = [];
                 if (breakerSlot === slot) {
                     nameParts.push(
@@ -5552,7 +5547,7 @@
                     );
                 }
                 nameParts.push(
-                    '<span class="stats-rack-player-name">' + escapeHtml(displayName) + '</span>'
+                    '<span class="stats-rack-player-name">' + escapeHtml(name) + '</span>'
                 );
                 const parts = [
                     '<span class="stats-rack-player-id">' + nameParts.join('') + '</span>'
@@ -5611,6 +5606,14 @@
         return label + '<div class="stats-match-game-info">' + escapeHtml(info) + '</div>';
     }
 
+    function scoreStackHtml(top, bottom) {
+        return '<div class="stats-match-score-stack">' +
+            '<span>' + escapeHtml(String(top)) + '</span>' +
+            '<span class="stats-match-score-sep" aria-hidden="true">-</span>' +
+            '<span>' + escapeHtml(String(bottom)) + '</span>' +
+            '</div>';
+    }
+
     function renderMatchHistoryRows(matches, options) {
         const opts = options || {};
         const viewerId = opts.viewerPlayerId;
@@ -5630,22 +5633,20 @@
                 matchDateOptions(m, inProgress)
             );
             const pairHtml = matchPairHtml(m, { linkPlayers: linkPlayers && !h2h });
-            let scoreText;
-            if (h2h) {
+            let scoreHtml;
+            if (inProgress && !m.finalScore && !m.scores) {
+                scoreHtml = '<span class="stats-match-live-label">Live</span>';
+            } else if (h2h) {
                 const id1 = h2h.id1;
                 const p1Score = m.player1Id === id1 ? score.p1 : score.p2;
                 const p2Score = m.player1Id === id1 ? score.p2 : score.p1;
-                scoreText = escapeHtml(String(p1Score) + ' - ' + String(p2Score));
+                scoreHtml = scoreStackHtml(p1Score, p2Score);
             } else if (viewerId) {
                 const viewerScore = m.player1Id === viewerId ? score.p1 : score.p2;
                 const oppScore = m.player1Id === viewerId ? score.p2 : score.p1;
-                scoreText = inProgress && !m.finalScore && !m.scores
-                    ? 'In progress'
-                    : (escapeHtml(String(viewerScore) + ' - ' + String(oppScore)));
+                scoreHtml = scoreStackHtml(viewerScore, oppScore);
             } else {
-                scoreText = inProgress && !m.finalScore && !m.scores
-                    ? 'In progress'
-                    : escapeHtml(String(score.p1 || 0) + ' - ' + String(score.p2 || 0));
+                scoreHtml = scoreStackHtml(score.p1 || 0, score.p2 || 0);
             }
 
             const mainRow = '<tr class="stats-match-row' +
@@ -5653,7 +5654,7 @@
                 '<td class="stats-match-when">' + dateHtml + '</td>' +
                 '<td class="stats-match-pair-cell">' + pairHtml + '</td>' +
                 '<td>' + formatMatchGameCell(m) + '</td>' +
-                '<td>' + scoreText + '</td>' +
+                '<td class="stats-match-score">' + scoreHtml + '</td>' +
                 renderMatchActionButtons(m) +
                 '</tr>';
 

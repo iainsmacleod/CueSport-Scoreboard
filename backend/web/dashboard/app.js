@@ -990,7 +990,7 @@ function renderAccountStats() {
   if (!statsData) {
     summaryEl.innerHTML = '';
     boardBody.innerHTML = '<tr><td colspan="6" class="dash-stats-empty">No stats loaded.</td></tr>';
-    matchBody.innerHTML = '<tr><td colspan="6" class="dash-stats-empty">No stats loaded.</td></tr>';
+    matchBody.innerHTML = '<tr><td colspan="5" class="dash-stats-empty">No stats loaded.</td></tr>';
     updateLeaderboardSortHeaders();
     renderLeaderboardPager(null);
     return;
@@ -1038,7 +1038,7 @@ function renderAccountStats() {
   }
 
   if (!matchList.length) {
-    matchBody.innerHTML = '<tr><td colspan="6" class="dash-stats-empty">No match history yet.</td></tr>';
+    matchBody.innerHTML = '<tr><td colspan="5" class="dash-stats-empty">No match history yet.</td></tr>';
   } else {
     matchBody.innerHTML = matchList.slice(0, 50).map((m) => matchOverviewRow(m)).join('');
   }
@@ -1125,9 +1125,7 @@ function renderMatchRackBreakdown(m, options = {}) {
     : '';
   const p1Key = String(m.player1Name || '').toLowerCase();
   const p2Key = String(m.player2Name || '').toLowerCase();
-  const viewerIsP1 = viewerKey && viewerKey === p1Key;
   const viewerIsP2 = viewerKey && viewerKey === p2Key;
-  const hasViewer = viewerIsP1 || viewerIsP2;
   const isSnooker = m.gameType === 'game8';
   const isStraight = m.gameType === 'game4';
   const isPoolRunGame = m.gameType === 'game1' || m.gameType === 'game2' || m.gameType === 'game3' ||
@@ -1142,15 +1140,7 @@ function renderMatchRackBreakdown(m, options = {}) {
   };
 
   const winnerLabel = (r) => {
-    const name = rackWinnerName(m, r);
-    if (hasViewer) {
-      const slot = r.winnerSlot != null ? String(r.winnerSlot) : '';
-      const won = (slot === '1' && viewerIsP1) || (slot === '2' && viewerIsP2);
-      if (slot === '1' || slot === '2') {
-        return `Winner: ${won ? 'You' : escapeHtml(name)}`;
-      }
-    }
-    return `Winner: ${escapeHtml(name)}`;
+    return `Winner: ${escapeHtml(rackWinnerName(m, r))}`;
   };
 
   const playerOrder = viewerIsP2 ? ['2', '1'] : ['1', '2'];
@@ -1186,16 +1176,13 @@ function renderMatchRackBreakdown(m, options = {}) {
     const playerLines = playerOrder.map((slot) => {
       const isP1 = slot === '1';
       const name = isP1 ? (m.player1Name || 'Player 1') : (m.player2Name || 'Player 2');
-      const displayName = (hasViewer && ((isP1 && viewerIsP1) || (!isP1 && viewerIsP2)))
-        ? 'You'
-        : name;
       const nameParts = [];
       if (bSlot === slot) {
         nameParts.push(
           '<img class="stats-rack-broke-icon" src="/web/images/balls/snooker-white-small.png" alt="" title="Broke" />'
         );
       }
-      nameParts.push(`<span class="stats-rack-player-name">${escapeHtml(displayName)}</span>`);
+      nameParts.push(`<span class="stats-rack-player-name">${escapeHtml(name)}</span>`);
       const parts = [`<span class="stats-rack-player-id">${nameParts.join('')}</span>`];
       if (isSnooker) {
         parts.push(`<span>Points: ${escapeHtml(String(isP1 ? fs.p1 : fs.p2))}</span>`);
@@ -1319,6 +1306,17 @@ function matchRacksDetailRow(m, colspan, options = {}) {
   return `<tr class="stats-match-racks-row"><td colspan="${colspan}">${breakdown}</td></tr>`;
 }
 
+function formatMatchEventCellHtml(m) {
+  const game = escapeHtml(gameTypeLabel(m.gameType));
+  const info = String(m.gameInfo || '').trim();
+  return `<div class="stats-match-event-cell">` +
+    `<div class="stats-match-event-game">${game}</div>` +
+    (info
+      ? `<div class="stats-match-event-name">${escapeHtml(info)}</div>`
+      : '') +
+    `</div>`;
+}
+
 function matchOverviewRow(m) {
   const inProgress = isMatchInProgress(m);
   const actions = [];
@@ -1332,14 +1330,13 @@ function matchOverviewRow(m) {
   const main = `
     <tr class="${inProgress ? 'stats-match-in-progress' : ''}">
       <td class="stats-match-when">${matchDateCellHtml(m.completedAt || m.startedAt, matchDateOptions(m, inProgress))}</td>
-      <td class="stats-match-event"><span class="stats-match-event-text">${escapeHtml(m.gameInfo || '—')}</span></td>
-      <td>${escapeHtml(gameTypeLabel(m.gameType))}</td>
+      <td class="stats-match-event">${formatMatchEventCellHtml(m)}</td>
       <td class="stats-match-pair-cell">${matchPairHtml(m)}</td>
       <td class="stats-match-score">${scoreCellHtml(m)}</td>
       <td class="stats-match-actions">${actions.join('')}</td>
     </tr>
   `;
-  return main + matchRacksDetailRow(m, 6);
+  return main + matchRacksDetailRow(m, 5);
 }
 
 function playerMatches(playerKey, options = {}) {
@@ -1881,9 +1878,15 @@ async function saveMatchModal(event) {
 async function abandonInProgressMatch(startEventId) {
   const id = String(startEventId || '').trim();
   if (!id) return;
-  if (!window.confirm(
-    'Kill this unfinished match? It will be removed from cloud stats (no winner recorded). The OBS dock is not notified.'
-  )) return;
+  const match = findMatchByStartId(id);
+  const room = match && match.roomId
+    ? (lastDashboardRooms || []).find((r) => r && r.id === match.roomId)
+    : null;
+  const dockOnline = !!(room && room.dock_connected);
+  const confirmMsg = dockOnline
+    ? 'Kill this unfinished match? It will be removed from cloud stats and the live dock will clear the game (no winner recorded).'
+    : 'Kill this unfinished match? It will be removed from cloud stats (no winner recorded). No live dock is connected — if a dock still has this match open, clear it there.';
+  if (!window.confirm(confirmMsg)) return;
   try {
     setError('');
     await deleteAccountMatch(getServerUrl(), getToken(), id);

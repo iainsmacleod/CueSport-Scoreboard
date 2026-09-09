@@ -5452,12 +5452,20 @@ function clockDisplay(opt3) {
 
 function resetCurrentGame(options) {
     const skipStatsAbandon = !!(options && options.skipStatsAbandon);
+    const fromCloudAbandon = !!(options && options.fromCloudAbandon);
 
     console.log("Resetting current game");
-    if (!skipStatsAbandon && window.PlayerStats) {
-        window.PlayerStats.onClearGame().catch(function (err) {
-            console.error("PlayerStats onClearGame error:", err);
-        });
+    if (window.PlayerStats) {
+        if (fromCloudAbandon) {
+            // Cloud already deleted the open match — clear local session without another discard.
+            window.PlayerStats.onClearGame({ skipCloudDiscard: true }).catch(function (err) {
+                console.error("PlayerStats onClearGame error:", err);
+            });
+        } else if (!skipStatsAbandon) {
+            window.PlayerStats.onClearGame().catch(function (err) {
+                console.error("PlayerStats onClearGame error:", err);
+            });
+        }
     }
     document.getElementById("raceInfoTxt").value = "";
     document.getElementById("gameInfoTxt").value = "";
@@ -5469,7 +5477,7 @@ function resetCurrentGame(options) {
     setStorageItem("p2NameCtrlPanel", "");
     setStorageItem("raceInfo", "");
     setStorageItem("gameInfo", "");
-    performResetScores({ endMatch: false });
+    performResetScores({ endMatch: false, fromCloudAbandon: fromCloudAbandon });
     clearAllScoringUndoHistory();
     postNames();
     pushScores();
@@ -5484,6 +5492,63 @@ function clearGame() {
     resetCurrentGame();
 }
 window.resetCurrentGame = resetCurrentGame;
+
+function showCloudAbandonModal(message) {
+    const modal = document.getElementById("cloudAbandonModal");
+    const msgEl = document.getElementById("cloudAbandonModalMessage");
+    const text = message || "This match was killed from CueSport Cloud. The game has been cleared.";
+    if (msgEl) {
+        msgEl.textContent = text;
+    }
+    if (modal) {
+        modal.style.display = "block";
+        return;
+    }
+    try {
+        window.alert(text);
+    } catch (_) { /* ignore */ }
+}
+
+function closeCloudAbandonModal() {
+    const modal = document.getElementById("cloudAbandonModal");
+    if (modal) {
+        modal.style.display = "none";
+    }
+}
+
+function cloudAbandonModalBackdrop(event) {
+    if (event && event.target && event.target.id === "cloudAbandonModal") {
+        closeCloudAbandonModal();
+    }
+}
+
+/** Cloud Kill: clear the board like Clear Game and notify the operator. */
+function applyCloudMatchAbandon(options) {
+    const opts = options || {};
+    const candidates = [];
+    [opts.matchId, opts.sessionId, opts.dockMatchId].forEach(function (v) {
+        if (v != null && String(v)) candidates.push(String(v));
+    });
+    const active = (window.PlayerStats
+        && typeof window.PlayerStats.getActivePendingMatch === "function")
+        ? window.PlayerStats.getActivePendingMatch()
+        : null;
+    const activeId = active && active.id ? String(active.id) : "";
+    // Don't clear if the dock already moved on to a different live match.
+    if (candidates.length && activeId && candidates.indexOf(activeId) < 0) {
+        console.warn("cloud abandon ignored: matchId mismatch", candidates, activeId);
+        return false;
+    }
+    // No pending match (or id already cleared) — still clear the board; cloud already deleted the row.
+    const message = opts.message
+        || "This match was killed from CueSport Cloud. The game has been cleared.";
+    showCloudAbandonModal(message);
+    resetCurrentGame({ fromCloudAbandon: true });
+    return true;
+}
+window.applyCloudMatchAbandon = applyCloudMatchAbandon;
+window.closeCloudAbandonModal = closeCloudAbandonModal;
+window.cloudAbandonModalBackdrop = cloudAbandonModalBackdrop;
 
 function postNames() {
     p1namemsg = document.getElementById("p1Name").value.substring(0, 20);
@@ -6588,7 +6653,11 @@ function performResetScores(options) {
 
         if (window.PlayerStats) {
             // End Match / Call Match Early keeps recorded stats; mid-match Restart Match undoes the open session.
-            const opts = endMatch ? { endMatch: true } : undefined;
+            // Cloud Kill already deleted the open session — skip a second discard.
+            const fromCloudAbandon = !!(options && options.fromCloudAbandon);
+            const opts = endMatch
+                ? { endMatch: true }
+                : (fromCloudAbandon ? { skipCloudDiscard: true } : undefined);
             window.PlayerStats.onResetScores(opts).then(function () {
                 updateScoreControlAvailability();
                 restoreRackBreakerPromptAfterScoreReset();

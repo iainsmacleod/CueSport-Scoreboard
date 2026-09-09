@@ -2418,6 +2418,44 @@ label.switch.toggle-disabled {
 	font-variant-numeric: tabular-nums;
 }
 
+.stats-match-score {
+	white-space: nowrap;
+	vertical-align: middle;
+	text-align: center;
+}
+
+.stats-match-score-stack {
+	display: inline-flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 1px;
+	line-height: 1.15;
+	font-variant-numeric: tabular-nums;
+	font-weight: 600;
+	min-width: 3ch;
+	width: 3ch;
+	margin: 0 auto;
+	text-align: center;
+}
+
+.stats-match-score-stack > span {
+	display: block;
+	width: 100%;
+	text-align: center;
+}
+
+.stats-match-score-sep {
+	opacity: 0.55;
+	font-weight: 600;
+	line-height: 1;
+}
+
+.stats-match-live-label {
+	font-weight: 700;
+	color: #7dcfff;
+}
+
 .stats-match-pair-cell {
 	vertical-align: middle;
 	text-align: center;
@@ -2492,31 +2530,43 @@ label.switch.toggle-disabled {
 }
 
 .stats-match-actions {
-	display: flex;
-	flex-direction: row;
-	flex-wrap: nowrap;
-	align-items: stretch;
-	justify-content: flex-end;
-	gap: 4px;
+	width: 1%;
+	white-space: nowrap;
 	vertical-align: middle;
-	min-width: 7.5rem;
+	text-align: right;
+	padding-left: 6px;
+	padding-right: 6px;
 }
 
-.stats-match-actions > .stats-action-btn {
-	flex: 0 0 auto;
-	min-width: 3.4rem;
+#statsModal .stats-match-actions > .stats-action-btn {
 	display: inline-flex;
-	flex-direction: column;
+	flex-direction: row;
 	align-items: center;
 	justify-content: center;
-	gap: 2px;
-	text-align: center;
-	white-space: normal;
-	line-height: 1.15;
-	margin: 0;
-	padding: 4px 6px;
+	gap: 4px;
+	min-width: 0;
+	width: auto;
+	height: auto;
+	min-height: 28px;
+	margin: 0 0 0 5px;
+	padding: 4px 8px;
 	box-sizing: border-box;
-	font-size: 0.75em;
+	line-height: 1.2;
+	font-size: 0.8em;
+	vertical-align: middle;
+	white-space: nowrap;
+}
+
+#statsModal .stats-match-actions > .stats-action-btn .stats-action-icon {
+	width: 1rem;
+	height: 1rem;
+	flex-shrink: 0;
+	display: block;
+}
+
+#statsModal .stats-match-actions > .stats-action-btn .stats-action-label {
+	font-size: inherit;
+	line-height: 1;
 }
 
 .stats-action-icon {

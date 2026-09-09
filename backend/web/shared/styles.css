@@ -1382,9 +1382,33 @@ body.controls-locked #reconnectBanner {
   font-variant-numeric: tabular-nums;
 }
 .stats-match-event {
-  max-width: 8.5rem;
-  min-width: 3.5rem;
+  max-width: 10rem;
+  min-width: 4.5rem;
   vertical-align: middle;
+}
+.stats-match-event-cell {
+  min-width: 0;
+}
+.stats-match-event-game {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.25;
+}
+.stats-match-event-name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  margin-top: 0.15rem;
+  font-size: 0.82em;
+  opacity: 0.8;
+  line-height: 1.25;
 }
 .stats-match-event-text {
   display: -webkit-box;

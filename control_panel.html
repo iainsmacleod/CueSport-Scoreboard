@@ -21,7 +21,7 @@ for more information about Salotto please visit https://salotto.app
     <link rel="stylesheet" href="./common/css/control_panel/grey.css?v=8.0.0" />
     <link rel="stylesheet" href="./common/css/control_panel/light.css?v=8.0.0" />
     <link rel="stylesheet" href="./common/css/control_panel/rachni.css?v=8.0.0" />
-    <link rel="stylesheet" href="./common/css/control_panel/required.css?v=8.0.0.21" />
+    <link rel="stylesheet" href="./common/css/control_panel/required.css?v=8.0.0.24" />
     <script>
         //---------------------------------------------------------------------------------------------
         var versionNum = "8.0.0";
@@ -33,9 +33,9 @@ for more information about Salotto please visit https://salotto.app
     <script src="./common/js/match_racks.js?v=8.0.0"></script>
     <script src="./common/js/cloud_relay.js?v=8.0.0.12"></script>
     <script src="./common/js/stream_sharing.js?v=8.0.0"></script>
-    <script src="./common/js/player_stats.js?v=8.0.0.28"></script>
-    <script src="./common/js/control_panel.js?v=8.0.0.30"></script>
-    <script src="./common/js/cloud_commands.js?v=8.0.0.4"></script>
+    <script src="./common/js/player_stats.js?v=8.0.0.33"></script>
+    <script src="./common/js/control_panel.js?v=8.0.0.33"></script>
+    <script src="./common/js/cloud_commands.js?v=8.0.0.7"></script>
     <script src="./common/js/cloud_auth.js?v=8.0.0.1"></script>
     <script src="hotkeys.js?v=8.0.0"></script>
 
@@ -1248,6 +1248,24 @@ for more information about Salotto please visit https://salotto.app
                     <button type="button" class="modal-save-btn hover obs28 button danger-btn" id="resetScoresModalConfirm"
                         onclick="confirmResetScores()">Confirm</button>
                     <button type="button" class="modal-cancel-btn hover obs28 button" onclick="cancelResetScores()">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cloud Kill / abandon notice (in-page; native alert() is unreliable in OBS docks) -->
+    <div id="cloudAbandonModal" class="modal" onclick="cloudAbandonModalBackdrop(event)">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="cloudAbandonModalTitle">Match Abandoned</h2>
+                <span class="modal-close" onclick="closeCloudAbandonModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p id="cloudAbandonModalMessage" style="margin: 0; color: lightgrey;"></p>
+            </div>
+            <div class="modal-footer">
+                <div class="modal-footer-buttons">
+                    <button type="button" class="modal-save-btn hover obs28 button" onclick="closeCloudAbandonModal()">OK</button>
                 </div>
             </div>
         </div>
