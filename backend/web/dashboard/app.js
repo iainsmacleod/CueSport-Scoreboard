@@ -37,6 +37,8 @@ let lastQuota = null;
 let statsData = null;
 let statsLoaded = false;
 let statsLoading = false;
+let statsRefreshQueued = false;
+let statsRefreshTimer = null;
 let selectedPlayerKey = '';
 let playerRenameEditing = false;
 let playerDetailOpponentFilter = '';
@@ -1910,7 +1912,10 @@ async function deleteMatchFromModal() {
 }
 
 async function loadAccountStats(force = false) {
-  if (statsLoading) return;
+  if (statsLoading) {
+    if (force) statsRefreshQueued = true;
+    return;
+  }
   if (statsLoaded && !force) {
     renderAccountStats();
     return;
@@ -1928,7 +1933,25 @@ async function loadAccountStats(force = false) {
     if (statusEl) statusEl.textContent = err.message || 'Could not load cloud stats.';
   } finally {
     statsLoading = false;
+    if (statsRefreshQueued) {
+      statsRefreshQueued = false;
+      loadAccountStats(true);
+    }
   }
+}
+
+/** Debounced stats reload when the live tables feed signals match/session changes. */
+function scheduleAccountStatsRefreshFromLiveFeed() {
+  if (!getToken()) return;
+  const statsTab = document.getElementById('tabStats');
+  const statsTabVisible = !!(statsTab && !statsTab.classList.contains('hidden'));
+  // Keep Recent Matches warm once opened, and always while Stats is visible.
+  if (!statsLoaded && !statsTabVisible) return;
+  if (statsRefreshTimer) clearTimeout(statsRefreshTimer);
+  statsRefreshTimer = setTimeout(() => {
+    statsRefreshTimer = null;
+    loadAccountStats(true);
+  }, 350);
 }
 
 function clearReconnect() {
@@ -1995,6 +2018,7 @@ async function connectLiveFeed() {
     lastDashboardRooms = rooms || [];
     renderTableCards(rooms);
     renderDebugRooms(rooms);
+    scheduleAccountStatsRefreshFromLiveFeed();
   });
   client.on('error', (e) => {
     if (e.code === 'invalid_token' || e.code === 'room_forbidden' || e.code === 'session_revoked') {

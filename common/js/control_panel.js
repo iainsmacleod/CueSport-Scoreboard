@@ -192,7 +192,9 @@ function initControlPanelTooltips() {
     window.addEventListener("scroll", refreshOpen, true);
 }
 
-function openTab(evt, tabName) {
+/** Switch dock tabs without requiring a click event (e.g. Clear Game → Setup). */
+function selectControlPanelTab(tabName) {
+    if (!tabName || !document.getElementById(tabName)) return false;
     var i, tabcontent, tablinks;
     tabcontent = document.getElementsByClassName("tabcontent");
     for (i = 0; i < tabcontent.length; i++) {
@@ -203,10 +205,23 @@ function openTab(evt, tabName) {
         tablinks[i].className = tablinks[i].className.replace(" active", "");
     }
     document.getElementById(tabName).style.display = "block";
-    evt.currentTarget.className += " active";
-
-    // Save the selected tab to localStorage
+    var tabButton = document.getElementById(getTabButtonId(tabName));
+    if (tabButton) {
+        tabButton.className += " active";
+    }
     setStorageItem("lastSelectedTab", tabName);
+    return true;
+}
+
+function openTab(evt, tabName) {
+    selectControlPanelTab(tabName);
+    if (evt && evt.currentTarget) {
+        // selectControlPanelTab already marked the mapped button; keep click target in sync
+        // when it is the same control (no-op if already active).
+        if (evt.currentTarget.className.indexOf(" active") === -1) {
+            evt.currentTarget.className += " active";
+        }
+    }
     console.log(`Last Stored Tab- ${tabName}`);
 }
 
@@ -5482,6 +5497,7 @@ function resetCurrentGame(options) {
     postNames();
     pushScores();
     postInfo();
+    selectControlPanelTab("GameInfo");
 }
 
 function clearGame() {

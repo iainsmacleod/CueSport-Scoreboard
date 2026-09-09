@@ -176,7 +176,7 @@ function removeAccountDashboard(accountId, ws) {
 }
 
 /** Push full tables snapshot to any open dashboards for this account. */
-function notifyAccountTables(accountId, { immediate = false } = {}) {
+export function notifyAccountTables(accountId, { immediate = false } = {}) {
   if (!accountId || !accountDashboards.has(accountId)) return;
 
   const flush = () => {

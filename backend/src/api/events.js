@@ -5,7 +5,7 @@ import {
   clampScore,
   normalizePlayerDisplayName,
 } from '../lib/scoreboard-helpers.js';
-import { broadcastRoomCommand } from '../ws/room-hub.js';
+import { broadcastRoomCommand, notifyAccountTables } from '../ws/room-hub.js';
 
 const GAME_TYPE_IDS = new Set(['game1', 'game2', 'game3', 'game4', 'game5', 'game6', 'game7', 'game8']);
 
@@ -291,6 +291,7 @@ export async function registerEventRoutes(app) {
         message: 'This match was killed from CueSport Cloud. The game has been cleared.',
       });
     }
+    notifyAccountTables(account.id, { immediate: true });
 
     return { ok: true, deleted, abandoned, dockNotified };
   });
