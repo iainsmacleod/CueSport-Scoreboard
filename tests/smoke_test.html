@@ -2298,6 +2298,30 @@
                 parseInt(cp.getStorageItem('p1ScoreCtrlPanel'), 10) === 1 &&
                 parseInt(cp.getStorageItem('p2ScoreCtrlPanel'), 10) === 0,
                 'p1=' + cp.getStorageItem('p1ScoreCtrlPanel') + ' p2=' + cp.getStorageItem('p2ScoreCtrlPanel'));
+
+            // Chosen Ball off: clearing one full group + 8 must award Active Player (not opponent).
+            // Also ignore a stale playerBallSet left from a prior Ball Set session.
+            cp.setStorageItem('p1ScoreCtrlPanel', 0);
+            cp.setStorageItem('p2ScoreCtrlPanel', 0);
+            cp.document.getElementById('p1Score').value = '0';
+            cp.document.getElementById('p2Score').value = '0';
+            cp.resetBallTracker();
+            cp.selectRackBreaker('1');
+            await sleep(30);
+            cp.setStorageItem('useBallSet', 'no');
+            cp.document.getElementById('ballSetCheckbox').checked = false;
+            cp.useBallSetToggle();
+            cp.setStorageItem('playerBallSet', 'p1yellow/bigs'); // stale opposite group
+            for (let n = 1; n <= 7; n++) {
+                cp.togglePot(cp.document.getElementById('ball ' + n));
+            }
+            await sleep(50);
+            cp.togglePot(cp.document.getElementById('ball 8'));
+            await sleep(100);
+            assert('RackWin', 'Without Ball Set, solids clear + 8 awards Active (ignores stale group)',
+                parseInt(cp.getStorageItem('p1ScoreCtrlPanel'), 10) === 1 &&
+                parseInt(cp.getStorageItem('p2ScoreCtrlPanel'), 10) === 0,
+                'p1=' + cp.getStorageItem('p1ScoreCtrlPanel') + ' p2=' + cp.getStorageItem('p2ScoreCtrlPanel'));
             await sleep(250);
             cp.maybeShowRackBreakerPickerAfterRackChange();
             await sleep(30);
@@ -2359,9 +2383,77 @@
             await sleep(30);
             assert('RackWin', 'Breaker choice blocked when race complete',
                 String(cp.getStorageItem('rackBreakerSlot')) !== '2');
+            assert('RackWin', 'End Match locks ball tracker grid',
+                cp.document.getElementById('ballTrackerDiv').classList.contains('ball-tracker-locked') &&
+                cp.document.getElementById('ballTrackerDiv').classList.contains('ball-tracker-awaiting-breaker'));
+            assert('RackWin', 'Balls stay disabled at End Match',
+                cp.document.getElementById('ball 1').classList.contains('snooker-ball-disabled') &&
+                cp.document.getElementById('ball 8').classList.contains('snooker-ball-disabled'));
+
+            // Race-to-1 win via tracker: cooldown must not revive the grid for End Match.
             cp.document.getElementById('raceInfoTxt').value = '5';
             cp.setStorageItem('raceInfo', '5');
             cp.updateScoreControlAvailability();
+            cp.performResetScores({ endMatch: false });
+            await sleep(50);
+            cp.document.getElementById('raceInfoTxt').value = '1';
+            cp.setStorageItem('raceInfo', '1');
+            cp.updateScoreControlAvailability();
+            cp.selectRackBreaker('1');
+            await sleep(30);
+            for (let n = 1; n <= 15; n++) {
+                if (n === 8) {
+                    continue;
+                }
+                const objBall = cp.document.getElementById('ball ' + n);
+                if (objBall && !objBall.classList.contains('noShow') && !objBall.classList.contains('faded')) {
+                    cp.togglePot(objBall);
+                }
+            }
+            await sleep(50);
+            cp.togglePot(cp.document.getElementById('ball 8'));
+            await sleep(150);
+            assert('RackWin', 'Race-to-1 tracker win reaches End Match',
+                cp.isGameScoringLocked() === true &&
+                parseInt(cp.getStorageItem('p1ScoreCtrlPanel'), 10) === 1);
+            assert('RackWin', 'Race-winning rack keeps object balls deactivated',
+                cp.document.getElementById('ball 1').classList.contains('snooker-ball-disabled') &&
+                (cp.document.getElementById('ball 1').classList.contains('faded') ||
+                    cp.document.getElementById('ballTrackerDiv').classList.contains('ball-tracker-locked')));
+            await sleep(550);
+            assert('RackWin', 'Cooldown does not revive balls at End Match',
+                cp.document.getElementById('ball 8').classList.contains('faded') &&
+                cp.document.getElementById('ball 8').classList.contains('snooker-ball-disabled') &&
+                !cp.document.getElementById('ball 8').classList.contains('ball-win-cooldown') &&
+                cp.document.getElementById('ballTrackerDiv').classList.contains('ball-tracker-locked'));
+            const lockedBall1 = cp.document.getElementById('ball 1');
+            const fadedBeforeClick = lockedBall1.classList.contains('faded');
+            cp.togglePot(lockedBall1);
+            await sleep(50);
+            assert('RackWin', 'Locked ball click is ignored at End Match',
+                lockedBall1.classList.contains('faded') === fadedBeforeClick &&
+                parseInt(cp.getStorageItem('p1ScoreCtrlPanel'), 10) === 1);
+
+            // Mid-match cooldown revive (race still open).
+            cp.performResetScores({ endMatch: false });
+            await sleep(50);
+            cp.document.getElementById('raceInfoTxt').value = '5';
+            cp.setStorageItem('raceInfo', '5');
+            cp.updateScoreControlAvailability();
+            cp.selectRackBreaker('1');
+            await sleep(30);
+            for (let n = 1; n <= 15; n++) {
+                if (n === 8) {
+                    continue;
+                }
+                const objBall = cp.document.getElementById('ball ' + n);
+                if (objBall && !objBall.classList.contains('noShow') && !objBall.classList.contains('faded')) {
+                    cp.togglePot(objBall);
+                }
+            }
+            await sleep(50);
+            cp.togglePot(cp.document.getElementById('ball 8'));
+            await sleep(100);
             assert('RackWin', 'Game ball on cooldown after rack win',
                 cp.document.getElementById('ball 8').classList.contains('ball-win-cooldown'));
             assert('RackWin', 'Other balls cleared after rack win',
@@ -2425,6 +2517,29 @@
             await sleep(30);
             cp.togglePlayer(false);
             await sleep(30);
+            cp.togglePot(cp.document.getElementById('ball 8'));
+            await sleep(200);
+            await cp.PlayerStats.flushRackRecordQueue();
+            brPending = cp.PlayerStats.getActivePendingMatch();
+            brLastRack = brPending && brPending.racks && brPending.racks[brPending.racks.length - 1];
+            assert('RackWin', '8-Ball TR flag on rack entry (non-breaker first visit)',
+                !!(brLastRack && brLastRack.tableRun && !brLastRack.breakAndRun &&
+                    String(brLastRack.breakerSlot) === '1'),
+                brLastRack && JSON.stringify(brLastRack));
+            let brP2Stats = await cp.PlayerStats.getPlayer(brP2.id);
+            assert('RackWin', 'Table run recorded for non-breaker on first visit',
+                brP2Stats && (brP2Stats.stats.byGameType.game1.tableRuns || 0) >= 1,
+                brP2Stats && JSON.stringify(brP2Stats.stats.byGameType.game1));
+            brStats = await cp.PlayerStats.getPlayer(brP1.id);
+            assert('RackWin', 'Breaker does not receive TR when opponent runs out',
+                brStats && (brStats.stats.byGameType.game1.tableRuns || 0) === 0,
+                brStats && JSON.stringify(brStats.stats.byGameType.game1));
+
+            // Breaker wins after a visit is neither B&R nor TR.
+            cp.selectRackBreaker('1');
+            await sleep(30);
+            cp.togglePlayer(false);
+            await sleep(30);
             cp.togglePlayer(true);
             await sleep(30);
             cp.togglePot(cp.document.getElementById('ball 8'));
@@ -2432,19 +2547,16 @@
             await cp.PlayerStats.flushRackRecordQueue();
             brPending = cp.PlayerStats.getActivePendingMatch();
             brLastRack = brPending && brPending.racks && brPending.racks[brPending.racks.length - 1];
-            assert('RackWin', '8-Ball TR flag on rack entry',
-                !!(brLastRack && brLastRack.tableRun && !brLastRack.breakAndRun),
+            assert('RackWin', 'Breaker win after visit is not B&R or TR',
+                !!(brLastRack && !brLastRack.tableRun && !brLastRack.breakAndRun),
                 brLastRack && JSON.stringify(brLastRack));
-            brStats = await cp.PlayerStats.getPlayer(brP1.id);
-            assert('RackWin', 'Table run recorded after opponent visit',
-                brStats && (brStats.stats.byGameType.game1.tableRuns || 0) >= 1,
-                brStats && JSON.stringify(brStats.stats.byGameType.game1));
+
             const cloudExtras8 = cp.PlayerStats.buildCloudMatchExtras
                 ? cp.PlayerStats.buildCloudMatchExtras(brPending)
                 : null;
             if (cloudExtras8) {
                 assert('RackWin', 'Cloud extras include 8-Ball B&R / TR',
-                    cloudExtras8.breakAndRunsP1 >= 1 && cloudExtras8.tableRunsP1 >= 1,
+                    cloudExtras8.breakAndRunsP1 >= 1 && cloudExtras8.tableRunsP2 >= 1,
                     JSON.stringify(cloudExtras8));
             }
 
@@ -2545,13 +2657,11 @@
             await sleep(30);
             cp.togglePlayer(false);
             await sleep(30);
-            cp.togglePlayer(true);
-            await sleep(30);
             cp.togglePot(cp.document.getElementById('ball 9'));
             await sleep(200);
             await cp.PlayerStats.flushRackRecordQueue();
-            br9Stats = await cp.PlayerStats.getPlayer(br9P1.id);
-            assert('RackWin', '9-Ball table run recorded after opponent visit',
+            br9Stats = await cp.PlayerStats.getPlayer(br9P2.id);
+            assert('RackWin', '9-Ball table run recorded for non-breaker first visit',
                 br9Stats && (br9Stats.stats.byGameType.game2.tableRuns || 0) >= 1,
                 br9Stats && JSON.stringify(br9Stats.stats.byGameType.game2));
 
@@ -2611,13 +2721,11 @@
             await sleep(30);
             cp.togglePlayer(false);
             await sleep(30);
-            cp.togglePlayer(true);
-            await sleep(30);
             cp.togglePot(cp.document.getElementById('ball 10'));
             await sleep(200);
             await cp.PlayerStats.flushRackRecordQueue();
-            br10Stats = await cp.PlayerStats.getPlayer(br10P1.id);
-            assert('RackWin', '10-Ball table run recorded after opponent visit',
+            br10Stats = await cp.PlayerStats.getPlayer(br10P2.id);
+            assert('RackWin', '10-Ball table run recorded for non-breaker first visit',
                 br10Stats && (br10Stats.stats.byGameType.game3.tableRuns || 0) >= 1,
                 br10Stats && JSON.stringify(br10Stats.stats.byGameType.game3));
 

@@ -354,9 +354,19 @@ function setRackOpponentVisited(yes) {
     setStorageItem("rackOpponentVisited", yes ? "yes" : "no");
 }
 
+/** Non-breaker surrendered the table after their first visit (miss / foul / loss of turn). */
+function isRackIncomingLostTurn() {
+    return getStorageItem("rackIncomingLostTurn") === "yes";
+}
+
+function setRackIncomingLostTurn(yes) {
+    setStorageItem("rackIncomingLostTurn", yes ? "yes" : "no");
+}
+
 function clearRackBreakerState(clearLastKnown) {
     setStorageItem("rackBreakerSlot", "");
     setRackOpponentVisited(false);
+    setRackIncomingLostTurn(false);
     if (clearLastKnown) {
         setStorageItem("lastRackBreakerSlot", "");
     }
@@ -437,10 +447,12 @@ function updateRackBreakerBallLock() {
     if (!tracker) {
         return;
     }
-    const awaiting = isRackBreakerBallGridLockEnabled() &&
-        !getRackBreakerSlot() &&
-        !isGameScoringLocked();
-    tracker.classList.toggle("ball-tracker-awaiting-breaker", awaiting);
+    // Lock the grid while awaiting a breaker pick, and also once the race is
+    // complete (End Match) so post-rack reset/cooldown cannot re-activate balls.
+    const trackerEnabled = getStorageItem("enableBallTracker") === "yes";
+    const lockForBreaker = isRackBreakerBallGridLockEnabled() && !getRackBreakerSlot();
+    const lockForMatchEnd = trackerEnabled && isGameScoringLocked();
+    tracker.classList.toggle("ball-tracker-awaiting-breaker", lockForBreaker || lockForMatchEnd);
 }
 
 function isPlayerSlotPickerBreakerMode() {
@@ -622,6 +634,7 @@ function captureBreakerPickUndoBefore() {
     return {
         rackBreakerSlot: getStorageItem("rackBreakerSlot") || "",
         rackOpponentVisited: getStorageItem("rackOpponentVisited") || "no",
+        rackIncomingLostTurn: getStorageItem("rackIncomingLostTurn") || "no",
         activePlayer: getActivePlayerSlot(),
         lastRackBreakerSlot: getStorageItem("lastRackBreakerSlot") || ""
     };
@@ -638,7 +651,6 @@ function selectRackBreaker(slot) {
     const beforeBreakerPick = breakerPickUndo ? captureBreakerPickUndoBefore() : null;
     setStorageItem("rackBreakerSlot", slot);
     setStorageItem("lastRackBreakerSlot", slot);
-    setRackOpponentVisited(false);
     const checkbox = document.getElementById("playerToggleCheckbox");
     if (checkbox) {
         checkbox.checked = slot === "1";
@@ -647,6 +659,9 @@ function selectRackBreaker(slot) {
         pushScoringUndo({ type: "breakerPick", slot: slot, before: beforeBreakerPick });
     }
     togglePlayer(slot === "1", { skipUndo: true, force: true });
+    // Fresh rack: visit flags must stay clear after forcing active player onto the breaker.
+    setRackOpponentVisited(false);
+    setRackIncomingLostTurn(false);
     hideRackBreakerPicker();
     syncRackBreakerPlayerToggleVisibility();
     updatePlayerBallControlVisibility();
@@ -660,30 +675,45 @@ function selectRackBreaker(slot) {
     }
 }
 
-function noteRackOpponentVisitForSlot(activeSlot) {
+/**
+ * Track visits for B&R / TR.
+ * Compusport TR: non-breaker clears on their first continuous visit after the breaker
+ * left balls (a miss / foul / loss of turn by the incoming player ends the attempt).
+ */
+function noteRackVisitTransition(prevSlot, nextSlot) {
     if (!isRackBreakerPromptEnabled()) {
         return;
     }
     const breaker = getRackBreakerSlot();
-    if (!breaker || (activeSlot !== "1" && activeSlot !== "2")) {
+    if (!breaker || (nextSlot !== "1" && nextSlot !== "2")) {
         return;
     }
-    if (activeSlot !== breaker) {
+    if (prevSlot && prevSlot !== nextSlot &&
+        (prevSlot === "1" || prevSlot === "2") &&
+        prevSlot !== breaker) {
+        setRackIncomingLostTurn(true);
+    }
+    if (nextSlot !== breaker) {
         setRackOpponentVisited(true);
     }
 }
 
-/** Classify rack outcome for stats (8/9/10-ball ball tracker). */
+/**
+ * Classify rack outcome for stats (8/9/10-ball / bank / one-pocket).
+ * B&R: breaker wins with no opponent visit.
+ * TR: non-breaker wins on first continuous visit after breaker left balls.
+ */
 function getRackRunClassification(winnerSlot) {
     const breaker = getRackBreakerSlot();
     if (!breaker || (winnerSlot !== "1" && winnerSlot !== "2")) {
         return { breakAndRun: false, tableRun: false, breakerSlot: null };
     }
     const opponentVisited = isRackOpponentVisited();
+    const incomingLostTurn = isRackIncomingLostTurn();
     if (winnerSlot === breaker && !opponentVisited) {
         return { breakAndRun: true, tableRun: false, breakerSlot: breaker };
     }
-    if (opponentVisited) {
+    if (winnerSlot !== breaker && opponentVisited && !incomingLostTurn) {
         return { breakAndRun: false, tableRun: true, breakerSlot: breaker };
     }
     return { breakAndRun: false, tableRun: false, breakerSlot: breaker };
@@ -1614,6 +1644,7 @@ function captureScoringUndoSnapshot(options) {
         playerBallSet: getStorageItem("playerBallSet") || "p1Open",
         rackBreakerSlot: getStorageItem("rackBreakerSlot") || "",
         rackOpponentVisited: getStorageItem("rackOpponentVisited") || "no",
+        rackIncomingLostTurn: getStorageItem("rackIncomingLostTurn") || "no",
         activePlayer: getActivePlayerSlot(),
         // Use finite parse (not || 0) so foul penalties below 0 survive undo snapshots.
         p1Score: parseStoredInt("p1ScoreCtrlPanel"),
@@ -1728,6 +1759,7 @@ function restoreTrackerFromScoringSnapshot(before) {
 
     setStorageItem("rackBreakerSlot", before.rackBreakerSlot || "");
     setStorageItem("rackOpponentVisited", before.rackOpponentVisited === "yes" ? "yes" : "no");
+    setStorageItem("rackIncomingLostTurn", before.rackIncomingLostTurn === "yes" ? "yes" : "no");
     if (before.activePlayer === "1" || before.activePlayer === "2") {
         setSnookerActivePlayerFromUndo(before.activePlayer);
     }
@@ -1992,6 +2024,7 @@ async function applyScoringUndoEntry(entry) {
         setStorageItem("rackBreakerSlot", before.rackBreakerSlot || "");
         setStorageItem("lastRackBreakerSlot", before.lastRackBreakerSlot || "");
         setRackOpponentVisited(before.rackOpponentVisited === "yes");
+        setRackIncomingLostTurn(before.rackIncomingLostTurn === "yes");
         setSnookerActivePlayerFromUndo(before.activePlayer === "2" ? "2" : "1");
         syncRackBreakerPickerVisibility();
         syncPlayerSlotPickerUI();
@@ -2002,6 +2035,7 @@ async function applyScoringUndoEntry(entry) {
     if (entry.type === "playerSwitch") {
         const before = entry.before || {};
         setRackOpponentVisited(before.rackOpponentVisited === "yes");
+        setRackIncomingLostTurn(before.rackIncomingLostTurn === "yes");
         setSnookerActivePlayerFromUndo(before.activePlayer === "2" ? "2" : "1");
         if (isSnookerBallMode() && before.snookerCurrentBreak != null) {
             setSnookerCurrentBreak(before.snookerCurrentBreak || 0);
@@ -2041,6 +2075,7 @@ async function applyScoringUndoEntry(entry) {
             setBallsScoreAbsolute("2", before.p2Balls);
         }
         setRackOpponentVisited(before.rackOpponentVisited === "yes");
+        setRackIncomingLostTurn(before.rackIncomingLostTurn === "yes");
         setSnookerActivePlayerFromUndo(before.activePlayer === "2" ? "2" : "1");
         syncPlayerSlotPickerUI();
         updateRackBreakerBallLock();
@@ -2422,6 +2457,8 @@ function updateBallTrackerLockState() {
     if (locked) {
         cancelSnookerFoul();
     }
+    // Keep awaiting-breaker styling in sync when race lock flips (End Match).
+    updateRackBreakerBallLock();
 }
 
 /** Mid-match reset label (race complete → End Match). */
@@ -2987,6 +3024,25 @@ function arePrecedingObjectBallsPotted() {
     return true;
 }
 
+/**
+ * True when every visible ball in `numbers` is faded on the tracker.
+ */
+function isEightBallGroupFullyPotted(numbers) {
+    if (!numbers || !numbers.length) {
+        return false;
+    }
+    for (let i = 0; i < numbers.length; i++) {
+        const ball = document.getElementById("ball " + numbers[i]);
+        if (!ball || ball.classList.contains("noShow")) {
+            continue;
+        }
+        if (!ball.classList.contains("faded")) {
+            return false;
+        }
+    }
+    return true;
+}
+
 /** All visible 8-Ball object balls (1–7, 9–15) are faded — table cleared for a legal 8. */
 function areAllEightBallObjectBallsPotted() {
     for (let n = 1; n <= 15; n++) {
@@ -3008,9 +3064,13 @@ function areAllEightBallObjectBallsPotted() {
  * Ball numbers for one player's 8-Ball group from the P1-centric playerBallSet.
  * American/Unity: red/smalls = 1–7 (solids), yellow/bigs = 9–15 (stripes).
  * International: red/smalls = 9–15 (reds), yellow/bigs = 1–7 (yellows).
- * Returns null while the table is still Open.
+ * Returns null while Chosen Ball is off, or the table is still Open.
  */
 function getEightBallGroupBallNumbersForSlot(slot) {
+    // Never apply a stale group when Chosen Ball / Ball Set is disabled.
+    if (getStorageItem("useBallSet") !== "yes") {
+        return null;
+    }
     const set = getStorageItem("playerBallSet") || "p1Open";
     if (set !== "p1red/smalls" && set !== "p1yellow/bigs") {
         return null;
@@ -3034,22 +3094,28 @@ function areActivePlayerEightBallGroupPotted() {
     if (!group) {
         return false;
     }
-    for (let i = 0; i < group.length; i++) {
-        const ball = document.getElementById("ball " + group[i]);
-        if (!ball || ball.classList.contains("noShow")) {
-            continue;
-        }
-        if (!ball.classList.contains("faded")) {
-            return false;
-        }
+    return isEightBallGroupFullyPotted(group);
+}
+
+/**
+ * When groups are not tracked (Chosen Ball off / still Open), a legal 8 requires
+ * at least one full group down (solids or stripes), or the whole table.
+ */
+function isUnassignedEightBallClearForWin() {
+    if (getEightBallGroupBallNumbersForSlot(getActivePlayerSlot())) {
+        return false;
     }
-    return true;
+    const lowGroup = [1, 2, 3, 4, 5, 6, 7];
+    const highGroup = [9, 10, 11, 12, 13, 14, 15];
+    return isEightBallGroupFullyPotted(lowGroup) ||
+        isEightBallGroupFullyPotted(highGroup) ||
+        areAllEightBallObjectBallsPotted();
 }
 
 /**
  * Resolve potting the game ball for 8 / 9 / 10-Ball.
  * 9/10: Early Game Ball/Win on Break on → early win; off → require all lower balls (else reject).
- * 8: Win on Break on + first ball → win; own group (or all objects) down → win; otherwise out of sequence → loss.
+ * 8: Win on Break on + first ball → win; own group (or unassigned clear) → win; otherwise out of sequence → loss.
  * 8 with Win on Break off + first ball → reject (no win on break).
  */
 function resolveTrackerGameBallPot(ballId) {
@@ -3074,12 +3140,15 @@ function resolveTrackerGameBallPot(ballId) {
             }
             return;
         }
-        // Legal win: Active Player cleared their group, or (no groups / both sides) full table clear.
-        if (areActivePlayerEightBallGroupPotted() || areAllEightBallObjectBallsPotted()) {
+        // Legal win: Active Player cleared their assigned group, or (no group tracked)
+        // one full group / whole table is down, or every object ball is down.
+        if (areActivePlayerEightBallGroupPotted() ||
+            isUnassignedEightBallClearForWin() ||
+            areAllEightBallObjectBallsPotted()) {
             creditTrackerRackWin(ballId);
             return;
         }
-        // 8 potted with own group (or any objects while Open) still up — loss of rack.
+        // 8 potted with own group (or neither group while Open) still up — loss of rack.
         creditTrackerRackLoss(ballId);
         return;
     }
@@ -3963,6 +4032,9 @@ function syncBallSetSettingsVisibility() {
     ballSetCheckbox.checked = getStorageItem("useBallSet") === "yes";
     syncBallSetControlsVisibility();
     if (!ballSetCheckbox.checked) {
+        // Drop any leftover group from a prior session so 8-ball win checks stay Open.
+        document.getElementById("p1colorOpen") && (document.getElementById("p1colorOpen").checked = true);
+        setStorageItem("playerBallSet", "p1Open");
         return;
     }
     const savedBallSet = getStorageItem("playerBallSet");
@@ -4613,11 +4685,12 @@ function creditTrackerRackWin(ballId) {
         clearRackBreakerState();
         updateRackBreakerBallLock();
     }
+    // Record the game-ball pot before the rack write so per-rack ball counts include it.
+    recordTrackerBallPot(player);
     postScore("add", player, { skipTrackerReset: true, rackRunClass: rackRunClass });
     resetBallTrackerKeepingBall(ballId, player);
     setStorageItem("trackerRackWinBall", ballId);
     startTrackerRackWinCooldown(ballId);
-    recordTrackerBallPot(player);
     // Commit in-rack undo history; Breaking Player prompt also clears (idempotent).
     commitScoringHistoryForBreakerPrompt();
     maybeShowRackBreakerPickerAfterRackChange();
@@ -4626,13 +4699,18 @@ function creditTrackerRackWin(ballId) {
 
 /**
  * 8-Ball: game ball potted out of sequence — Active Player loses the rack (opponent scores).
+ * Gift racks are not break-and-runs or table runs (opponent did not clear the table).
  */
 function creditTrackerRackLoss(ballId) {
     const active = getActivePlayerSlot();
     const opponent = active === "1" ? "2" : "1";
-    // Classification is for the player who receives the rack (opponent).
+    const breaker = getRackBreakerSlot();
     const rackRunClass = isRackBreakerPromptEnabled()
-        ? getRackRunClassification(opponent)
+        ? {
+            breakAndRun: false,
+            tableRun: false,
+            breakerSlot: (breaker === "1" || breaker === "2") ? breaker : null
+        }
         : null;
     const owners = getPocketBallOwners();
     owners[ballId] = opponent;
@@ -4641,12 +4719,12 @@ function creditTrackerRackLoss(ballId) {
         clearRackBreakerState();
         updateRackBreakerBallLock();
     }
+    // Shooter's illegal/early 8 still counts as a pot before the rack write.
+    recordTrackerBallPot(active);
     postScore("add", opponent, { skipTrackerReset: true, rackRunClass: rackRunClass });
     resetBallTrackerKeepingBall(ballId, opponent);
     setStorageItem("trackerRackWinBall", ballId);
     startTrackerRackWinCooldown(ballId);
-    // Still counts as a pot for the shooter who sank the 8.
-    recordTrackerBallPot(active);
     // Commit in-rack undo history; Breaking Player prompt also clears (idempotent).
     commitScoringHistoryForBreakerPrompt();
     maybeShowRackBreakerPickerAfterRackChange();
@@ -4773,12 +4851,16 @@ function releaseEarlyGameBallReject(ballId) {
 
 /**
  * After the win cooldown, clear the game-ball fade without debiting so it can win the next rack.
+ * When the race is already complete, leave the grid deactivated for End Match.
  */
 function releaseTrackerRackWinBall(ballId) {
+    const matchLocked = isGameScoringLocked();
     const ball = document.getElementById(ballId);
     if (ball) {
         ball.classList.remove("ball-win-cooldown");
-        ball.removeAttribute("aria-disabled");
+        if (!matchLocked) {
+            ball.removeAttribute("aria-disabled");
+        }
     }
     const pending = getStorageItem("trackerRackWinBall");
     if (pending && pending !== ballId) {
@@ -4789,24 +4871,38 @@ function releaseTrackerRackWinBall(ballId) {
     delete owners[ballId];
     setPocketBallOwners(owners);
     clearTrackerRackWinPending();
-    if (ball && ball.classList.contains("faded")) {
+    // Do not revive the table after a race-winning rack — wait for End Match.
+    if (!matchLocked && ball && ball.classList.contains("faded")) {
         ball.classList.remove("faded");
         ballState[ballId] = false;
         setStorageItem("ballState", JSON.stringify(ballState));
         bc.postMessage({ resetBall: ballId });
     }
+    updateBallTrackerLockState();
     publishCloudStateAfterTrackerChange();
 }
 
 /**
  * After a tracker rack win, clear all fades except the game ball (held through the cooldown).
+ * If the race is already complete, keep every ball deactivated for End Match.
  */
 function resetBallTrackerKeepingBall(keepBallId, ownerPlayer) {
+    const matchLocked = isGameScoringLocked();
     const ballState = JSON.parse(getStorageItem("ballState") || "{}");
     const ballElements = document.querySelectorAll("#ballTrackerDiv .ball");
 
     ballElements.forEach(function (ball) {
         if (isTrackerActionBallId(ball.id)) {
+            return;
+        }
+        if (matchLocked) {
+            // Race complete — leave the table visually settled and disabled.
+            ball.classList.add("snooker-ball-disabled");
+            ball.setAttribute("aria-disabled", "true");
+            if (ball.id === keepBallId) {
+                ball.classList.add("faded");
+                ballState[ball.id] = true;
+            }
             return;
         }
         if (ball.id === keepBallId) {
@@ -4829,7 +4925,10 @@ function resetBallTrackerKeepingBall(keepBallId, ownerPlayer) {
         owners[keepBallId] = ownerPlayer;
     }
     setPocketBallOwners(owners);
-    resetBallSet();
+    if (!matchLocked) {
+        resetBallSet();
+    }
+    updateBallTrackerLockState();
 }
 
 /**
@@ -6102,7 +6201,8 @@ function togglePlayer(isChecked, options) {
         if (isSnookerBallMode() || (isRackBreakerPromptEnabled() && getRackBreakerSlot())) {
             playerSwitchBefore = {
                 activePlayer: prevSlot,
-                rackOpponentVisited: getStorageItem("rackOpponentVisited") || "no"
+                rackOpponentVisited: getStorageItem("rackOpponentVisited") || "no",
+                rackIncomingLostTurn: getStorageItem("rackIncomingLostTurn") || "no"
             };
             if (isSnookerBallMode()) {
                 playerSwitchBefore.snookerCurrentBreak = getSnookerCurrentBreak();
@@ -6115,7 +6215,7 @@ function togglePlayer(isChecked, options) {
         }
     }
 
-    noteRackOpponentVisitForSlot(playerSlot);
+    noteRackVisitTransition(prevSlot, playerSlot);
     const player = isChecked ? 1 : 2; // Determine active player based on checkbox state
     const useToggleCheckbox = document.getElementById("useToggleSetting");
     if (useToggleCheckbox.checked) {

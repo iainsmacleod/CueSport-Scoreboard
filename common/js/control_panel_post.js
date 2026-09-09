@@ -110,6 +110,9 @@ window.onload = function () {
 	if (getStorageItem("rackOpponentVisited") === null) {
 		setStorageItem("rackOpponentVisited", "no");
 	}
+	if (getStorageItem("rackIncomingLostTurn") === null) {
+		setStorageItem("rackIncomingLostTurn", "no");
+	}
 	if (!getStorageItem("lastRackBreakerSlot") && getStorageItem("rackBreakerSlot")) {
 		const legacySlot = getStorageItem("rackBreakerSlot");
 		if (legacySlot === "1" || legacySlot === "2") {

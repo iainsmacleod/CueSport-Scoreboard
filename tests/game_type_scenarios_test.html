@@ -427,22 +427,25 @@
     await potWinningBall(cp, game, rand);
   }
 
-  /** Win a rack after opponent has visited → TR. */
-  async function winTableRun(cp, game, breakerSlot, rand) {
+  /** Win a rack for non-breaker on their first continuous visit → TR. */
+  async function winTableRun(cp, game, winnerSlot, rand) {
+    const breakerSlot = String(winnerSlot) === '1' ? '2' : '1';
     setFouls(cp, 0, 0);
     cp.selectRackBreaker(breakerSlot);
     await sleep(30);
-    await markOpponentVisited(cp);
+    // Breaker leaves balls; incoming player gets the table and must stay on it.
+    ensureActiveSlot(cp, winnerSlot);
+    await sleep(20);
     clearUndoStack(cp);
     await scramblePoolActions(cp, game, rand, {
       allowFoul: false,
       allowRespot: !!game.pocket,
-      allowUndo: true,
-      keepSlot: breakerSlot,
+      allowUndo: false,
+      keepSlot: winnerSlot,
       minSteps: 1,
-      maxSteps: 4,
+      maxSteps: 3,
     });
-    ensureActiveSlot(cp, breakerSlot);
+    ensureActiveSlot(cp, winnerSlot);
     clearUndoStack(cp);
     await potWinningBall(cp, game, rand);
   }

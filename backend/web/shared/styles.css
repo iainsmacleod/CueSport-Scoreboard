@@ -1065,8 +1065,13 @@ body.controls-locked #reconnectBanner {
   gap: 0.5rem;
   margin: 0 0 0.85rem;
 }
+.stats-divider {
+  border: none;
+  border-top: 1px solid #292e42;
+  margin: 0 0 0.85rem;
+}
 #statsPlayerSummary.stats-summary {
-  grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+  grid-template-columns: repeat(var(--stats-summary-cols, 3), minmax(0, 1fr));
 }
 .stats-summary-card {
   background: #1a1b26;
@@ -1088,14 +1093,116 @@ body.controls-locked #reconnectBanner {
   display: flex;
   flex-wrap: wrap;
   gap: 0.55rem;
-  align-items: flex-end;
+  align-items: center;
   margin-bottom: 0.75rem;
 }
-.stats-player-rename {
+.stats-player-search {
+  min-width: 12rem;
+  flex: 1 1 12rem;
+  max-width: 18rem;
+}
+.stats-player-search input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  background: #1a1b26;
+  color: #c0caf5;
+  border: 1px solid #414868;
+  border-radius: 6px;
+  font-size: 1rem;
+  line-height: 1.15;
+  padding: 0.55rem 0.75rem;
+  min-height: 2.25rem;
+  margin: 0.25rem 0;
+}
+.stats-player-heading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0.35rem 0 0.85rem;
+  min-height: 2.25rem;
+}
+.stats-player-title-view {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  max-width: 100%;
+}
+.stats-player-title-view.hidden {
+  display: none;
+}
+#statsPlayerTitle {
+  margin: 0;
+  text-align: center;
+  overflow-wrap: anywhere;
+  font-size: 1.55rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+.stats-player-edit-btn {
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: #a9b1d6;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.stats-player-edit-btn:hover {
+  color: #c0caf5;
+  background: rgba(122, 162, 247, 0.12);
+}
+.stats-player-edit-btn svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  display: block;
+}
+.stats-player-rename-inline {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.55rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  width: 100%;
+  max-width: 28rem;
+}
+.stats-player-rename-inline.hidden {
+  display: none;
+}
+.stats-player-rename-inline input {
+  flex: 1 1 10rem;
+  min-width: 8rem;
+  background: #1a1b26;
+  color: #c0caf5;
+  border: 1px solid #414868;
+  border-radius: 6px;
+  padding: 0.4rem 0.55rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  text-align: center;
+}
+.stats-player-filters {
+  justify-content: space-between;
   align-items: flex-end;
+  width: 100%;
+  flex-wrap: nowrap;
+}
+@media (max-width: 640px) {
+  .stats-player-filters {
+    flex-wrap: wrap;
+  }
+}
+.stats-player-filters .stats-filter-end {
+  margin-left: auto;
+  text-align: right;
+}
+.stats-player-filters .stats-filter-end select {
+  text-align: left;
 }
 .stats-filter {
   display: flex;
@@ -1132,14 +1239,17 @@ body.controls-locked #reconnectBanner {
 }
 .stats-subtab {
   flex: 1;
-  padding: 0.45rem 0.65rem;
+  box-sizing: border-box;
+  padding: 0.55rem 1rem;
   border: none;
   border-radius: 6px;
   background: #414868;
   color: #c0caf5;
   cursor: pointer;
-  font-size: 0.8rem;
+  font-size: 1rem;
   font-weight: 600;
+  min-height: 2.25rem;
+  line-height: 1.15;
 }
 .stats-subtab.active {
   background: #7aa2f7;
@@ -1175,16 +1285,37 @@ body.controls-locked #reconnectBanner {
 .dash-stats-table th.stats-sortable {
   cursor: pointer;
   user-select: none;
-  white-space: nowrap;
+  white-space: normal;
+  line-height: 1.15;
+  vertical-align: bottom;
+  max-width: 5.5rem;
+}
+.dash-stats-table th.stats-sortable[data-sort-key="name"] {
+  max-width: 8rem;
 }
 .dash-stats-table th.stats-sortable:hover,
 .dash-stats-table th.stats-sortable.is-sorted {
   opacity: 1;
   color: #c0caf5;
 }
+.dash-stats-table th.stats-sortable .stats-th-lines {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.05rem;
+}
+.dash-stats-table th.stats-sortable .stats-th-primary {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.15rem;
+}
+.dash-stats-table th.stats-sortable .stats-th-secondary {
+  font-weight: 500;
+  opacity: 0.85;
+  font-size: 0.92em;
+}
 .dash-stats-table th.stats-sortable .sort-arrow {
   display: inline-block;
-  margin-left: 0.28em;
   font-size: 0.85em;
   opacity: 0.95;
   vertical-align: middle;
@@ -1262,10 +1393,18 @@ body.controls-locked #reconnectBanner {
   gap: 0.1rem;
   line-height: 1.25;
   min-width: 0;
+  /* Keep stacked names compact on narrow screens (≈4 content lines). */
+  max-height: calc(1.25em * 4 + 0.35rem);
+  overflow: hidden;
 }
 .stats-match-player {
-  display: block;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
   overflow-wrap: anywhere;
+  max-width: 100%;
 }
 .stats-match-player-link {
   appearance: none;
@@ -1328,7 +1467,9 @@ body.controls-locked #reconnectBanner {
 }
 .stats-match-actions > .btn,
 .stats-match-actions > .stats-match-live-badge {
-  flex: 1 1 0;
+  flex: 0 0 4.55rem;
+  width: 4.55rem;
+  max-width: 4.55rem;
   align-self: stretch;
   display: inline-flex;
   flex-direction: column;
@@ -1341,6 +1482,7 @@ body.controls-locked #reconnectBanner {
   margin: 0.2rem 0;
   min-height: 3.25rem;
   padding: 0.35rem 0.45rem;
+  box-sizing: border-box;
 }
 .stats-action-icon {
   width: 1.15rem;
@@ -1362,7 +1504,9 @@ body.controls-locked #reconnectBanner {
     min-width: 0;
   }
   .stats-match-actions > .btn {
-    flex: 0 0 auto;
+    flex: 0 0 2.75rem;
+    width: 2.75rem;
+    max-width: 2.75rem;
     min-width: 2.6rem;
     padding: 0.45rem 0.5rem;
   }
@@ -1420,6 +1564,7 @@ body.controls-locked #reconnectBanner {
   font-weight: 600;
 }
 .stats-rack-outcome {
+  font-weight: 600;
   min-width: 0;
   overflow-wrap: anywhere;
 }
@@ -1428,6 +1573,42 @@ body.controls-locked #reconnectBanner {
   opacity: 0.85;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+.stats-rack-players {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin-top: 0.3rem;
+  font-size: 0.8rem;
+  opacity: 0.88;
+  font-variant-numeric: tabular-nums;
+}
+.stats-rack-player-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.2rem 0.75rem;
+  min-width: 0;
+}
+.stats-rack-player-name {
+  font-weight: 600;
+  opacity: 0.95;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.stats-rack-player-id {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 0;
+}
+.stats-rack-broke-icon {
+  width: 0.95em;
+  height: 0.95em;
+  object-fit: contain;
+  flex: 0 0 auto;
+  vertical-align: middle;
 }
 .stats-rack-secondary {
   display: flex;
@@ -1442,6 +1623,12 @@ body.controls-locked #reconnectBanner {
   font-weight: 600;
   opacity: 1;
   color: #7dcfff;
+}
+.stats-rack-breaker {
+  font-weight: 400;
+  opacity: 0.9;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .stats-match-duration-footer {
   margin: 0.35rem 0 0.1rem;

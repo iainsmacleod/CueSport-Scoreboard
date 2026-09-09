@@ -544,6 +544,9 @@ export function deleteMatchEvents(ids) {
 /**
  * Delete session:start / session:end rows for a room that belong to one match/session key.
  * Used when Clear Game discards an in-progress cloud match (do not leave "active" history).
+ *
+ * When matchKey is provided: delete only events that match that key (never fall back).
+ * When matchKey is omitted: delete the newest unpaired session:start for this room.
  */
 export function discardRoomSessionEvents(roomId, matchKey) {
   if (!roomId) return 0;
@@ -557,53 +560,51 @@ export function discardRoomSessionEvents(roomId, matchKey) {
      LIMIT 200`
   ).all(roomId);
 
-  const ids = [];
-  for (const row of rows) {
-    let payload = {};
+  function payloadOf(row) {
     try {
-      payload = JSON.parse(row.payload || '{}') || {};
+      return JSON.parse(row.payload || '{}') || {};
     } catch (_) {
-      payload = {};
+      return {};
     }
-    const candidates = [
+  }
+
+  function rowKeys(row) {
+    const payload = payloadOf(row);
+    return [
       row.session_id,
       payload.sessionId,
       payload.matchId,
     ].filter(Boolean).map(String);
+  }
 
-    if (key) {
-      if (candidates.includes(key)) ids.push(row.id);
+  // Explicit key: only delete matching rows. A miss deletes nothing.
+  if (key) {
+    const ids = [];
+    for (const row of rows) {
+      if (rowKeys(row).includes(key)) ids.push(row.id);
+    }
+    return deleteMatchEvents(ids);
+  }
+
+  // No key: drop the newest unpaired session:start for this room.
+  const ended = new Set();
+  const starts = [];
+  for (const row of rows) {
+    const payload = payloadOf(row);
+    if (row.event_type === 'session:end') {
+      const endKey = String(payload.matchId || payload.sessionId || row.session_id || '');
+      if (endKey) ended.add(endKey);
       continue;
     }
+    starts.push({ row, payload });
+  }
+  for (const { row, payload } of starts) {
+    const startKey = String(payload.sessionId || payload.matchId || row.session_id || '');
+    if (startKey && ended.has(startKey)) continue;
+    return deleteMatchEvents([row.id]);
   }
 
-  // No key (or no payload match): drop the newest unpaired session:start for this room.
-  if (!ids.length) {
-    const starts = [];
-    const ended = new Set();
-    for (const row of rows) {
-      let payload = {};
-      try {
-        payload = JSON.parse(row.payload || '{}') || {};
-      } catch (_) {
-        payload = {};
-      }
-      if (row.event_type === 'session:end') {
-        const endKey = String(payload.matchId || payload.sessionId || row.session_id || '');
-        if (endKey) ended.add(endKey);
-        continue;
-      }
-      starts.push({ row, payload });
-    }
-    for (const { row, payload } of starts) {
-      const startKey = String(payload.sessionId || payload.matchId || row.session_id || '');
-      if (startKey && ended.has(startKey)) continue;
-      ids.push(row.id);
-      break;
-    }
-  }
-
-  return deleteMatchEvents(ids);
+  return 0;
 }
 
 export function upsertLiveStream(roomId, streamUrl, state) {

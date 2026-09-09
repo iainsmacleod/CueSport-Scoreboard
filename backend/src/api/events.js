@@ -69,6 +69,10 @@ function normalizeCloudRacks(rawRacks) {
     if (raw.breakerSlot === '1' || raw.breakerSlot === '2') {
       entry.breakerSlot = String(raw.breakerSlot);
     }
+    if (raw.ballsP1 != null || raw.ballsP2 != null) {
+      entry.ballsP1 = clampScore(raw.ballsP1);
+      entry.ballsP2 = clampScore(raw.ballsP2);
+    }
     racks.push(entry);
   });
   // Re-number sequentially after filtering incomplete rows.

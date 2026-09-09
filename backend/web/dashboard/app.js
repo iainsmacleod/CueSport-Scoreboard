@@ -37,6 +37,7 @@ let statsData = null;
 let statsLoaded = false;
 let statsLoading = false;
 let selectedPlayerKey = '';
+let playerRenameEditing = false;
 let playerDetailOpponentFilter = '';
 let playerDetailGameFilter = '';
 
@@ -544,7 +545,8 @@ function setActiveDashTab(which) {
     selectedPlayerKey = '';
     playerDetailOpponentFilter = '';
     playerDetailGameFilter = '';
-    loadAccountStats();
+    playerRenameEditing = false;
+    loadAccountStats(true);
   }
 }
 
@@ -725,6 +727,21 @@ function setLeaderboardPage(page) {
   renderAccountStats();
 }
 
+/** Split leaderboard headers onto two lines for narrower columns. */
+function leaderboardHeaderLines(label) {
+  const raw = String(label || '').trim();
+  const known = {
+    'Matches W/D/L': ['Matches', 'W/D/L'],
+    'Win %': ['Win', '%'],
+    'Racks W/L': ['Racks', 'W/L'],
+    'Last played': ['Last', 'played'],
+  };
+  if (known[raw]) return known[raw];
+  const idx = raw.lastIndexOf(' ');
+  if (idx > 0) return [raw.slice(0, idx), raw.slice(idx + 1)];
+  return [raw, ''];
+}
+
 function updateLeaderboardSortHeaders() {
   document.querySelectorAll('#statsLeaderboardTable th[data-sort-key]').forEach((th) => {
     const key = th.getAttribute('data-sort-key');
@@ -736,9 +753,17 @@ function updateLeaderboardSortHeaders() {
       ? (leaderboardSortDir === 'asc' ? 'ascending' : 'descending')
       : 'none');
     const arrow = active ? (leaderboardSortDir === 'asc' ? '▲' : '▼') : '';
-    th.innerHTML = arrow
-      ? `${escapeHtml(label)}<span class="sort-arrow" aria-hidden="true">${arrow}</span>`
-      : escapeHtml(label);
+    const [primary, secondary] = leaderboardHeaderLines(label);
+    const secondaryHtml = secondary
+      ? `<span class="stats-th-secondary">${escapeHtml(secondary)}</span>`
+      : '';
+    const arrowHtml = arrow
+      ? `<span class="sort-arrow" aria-hidden="true">${arrow}</span>`
+      : '';
+    th.innerHTML = `<span class="stats-th-lines">` +
+      `<span class="stats-th-primary">${escapeHtml(primary)}${arrowHtml}</span>` +
+      secondaryHtml +
+      `</span>`;
   });
 }
 
@@ -1001,6 +1026,51 @@ function rackWinnerName(m, rack) {
   return '—';
 }
 
+function rackBreakerSlot(rack) {
+  const slot = rack && rack.breakerSlot != null ? String(rack.breakerSlot) : '';
+  return slot === '1' || slot === '2' ? slot : '';
+}
+
+/** Per-rack ball counts when stored on the rack or attributable from match.balls. */
+function rackBallCounts(m, rack, rackIndex, timedRacks) {
+  if (rack && (rack.ballsP1 != null || rack.ballsP2 != null)) {
+    return {
+      p1: Number(rack.ballsP1) || 0,
+      p2: Number(rack.ballsP2) || 0,
+    };
+  }
+  const balls = Array.isArray(m && m.balls) ? m.balls : [];
+  if (!balls.length || !rack) return null;
+  const startMs = rack.startedAt ? Date.parse(rack.startedAt) : NaN;
+  const endMs = rack.timestamp ? Date.parse(rack.timestamp) : NaN;
+  const prev = rackIndex > 0 ? timedRacks[rackIndex - 1] : null;
+  const prevEndMs = prev && prev.timestamp ? Date.parse(prev.timestamp) : NaN;
+  const windowStart = Number.isFinite(startMs)
+    ? startMs
+    : (Number.isFinite(prevEndMs) ? prevEndMs : NaN);
+  const windowEnd = Number.isFinite(endMs) ? endMs : NaN;
+  if (!Number.isFinite(windowEnd)) return null;
+
+  let p1 = 0;
+  let p2 = 0;
+  const p1Key = String(m.player1Name || '').toLowerCase();
+  const p2Key = String(m.player2Name || '').toLowerCase();
+  balls.forEach((b) => {
+    const ts = b && b.timestamp ? Date.parse(b.timestamp) : NaN;
+    if (!Number.isFinite(ts) || ts > windowEnd) return;
+    if (Number.isFinite(windowStart) && ts <= windowStart) return;
+    const winnerId = b.winnerId != null ? String(b.winnerId) : '';
+    if (winnerId === '1' || winnerId === String(m.player1Id || '')) p1 += 1;
+    else if (winnerId === '2' || winnerId === String(m.player2Id || '')) p2 += 1;
+    else {
+      const wName = String(b.winnerName || '').toLowerCase();
+      if (wName && wName === p1Key) p1 += 1;
+      else if (wName && wName === p2Key) p2 += 1;
+    }
+  });
+  return { p1, p2 };
+}
+
 /** Dock-equivalent per-rack/frame breakdown for cloud matches. */
 function renderMatchRackBreakdown(m, options = {}) {
   const timedRacks = enrichRacksWithDuration(m);
@@ -1015,74 +1085,94 @@ function renderMatchRackBreakdown(m, options = {}) {
   const hasViewer = viewerIsP1 || viewerIsP2;
   const isSnooker = m.gameType === 'game8';
   const isStraight = m.gameType === 'game4';
-  const unit = isSnooker ? 'Frames' : 'Racks';
+  const isPoolRunGame = m.gameType === 'game1' || m.gameType === 'game2' || m.gameType === 'game3' ||
+    m.gameType === 'game5' || m.gameType === 'game6';
+  const showBalls = !isSnooker && !isStraight;
 
   const durationCell = (r) => formatDurationSeconds(r.durationSeconds) || '—';
   const durationFooter = () => {
-    const playingLabel = formatDurationSeconds(sumRackDurationSeconds(m));
-    const matchLabel = formatDurationSeconds(getMatchDurationSeconds(m));
-    if (!playingLabel && !matchLabel) return '';
-    const parts = [];
-    if (playingLabel) parts.push(`${unit} total ${playingLabel}`);
-    if (matchLabel && matchLabel !== playingLabel) parts.push(`Match ${matchLabel}`);
-    else if (matchLabel && !playingLabel) parts.push(`Match ${matchLabel}`);
-    return `<div class="stats-match-duration-footer">${escapeHtml(parts.join(' · '))}</div>`;
+    const matchLabel = formatDurationSeconds(sumRackDurationSeconds(m));
+    if (!matchLabel) return '';
+    return `<div class="stats-match-duration-footer">${escapeHtml(`Match ${matchLabel}`)}</div>`;
   };
 
-  const resultLabel = (r) => {
-    const slot = r.winnerSlot != null ? String(r.winnerSlot) : '';
-    if (hasViewer && (slot === '1' || slot === '2')) {
+  const winnerLabel = (r) => {
+    const name = rackWinnerName(m, r);
+    if (hasViewer) {
+      const slot = r.winnerSlot != null ? String(r.winnerSlot) : '';
       const won = (slot === '1' && viewerIsP1) || (slot === '2' && viewerIsP2);
-      return won ? 'Won' : 'Lost';
-    }
-    return escapeHtml(rackWinnerName(m, r));
-  };
-
-  const pair = (a, b) => (viewerIsP2 ? `${b}–${a}` : `${a}–${b}`);
-  const isPoolRunGame = m.gameType === 'game1' || m.gameType === 'game2' || m.gameType === 'game3' ||
-    m.gameType === 'game5' || m.gameType === 'game6';
-
-  const cards = timedRacks.map((r) => {
-    const num = escapeHtml(String(r.rackNumber || ''));
-    const dur = escapeHtml(durationCell(r));
-    const outcome = resultLabel(r);
-    const primaryParts = [`<span class="stats-rack-num">#${num}</span>`];
-    const secondaryParts = [];
-    const f1 = Number(r.foulsP1) || 0;
-    const f2 = Number(r.foulsP2) || 0;
-
-    if (isSnooker) {
-      const fs = r.frameScore || { p1: 0, p2: 0 };
-      const hb1 = Number(r.highestBreakP1) || 0;
-      const hb2 = Number(r.highestBreakP2) || 0;
-      primaryParts.push(`<span class="stats-rack-score">${escapeHtml(pair(fs.p1, fs.p2))}</span>`);
-      primaryParts.push(`<span class="stats-rack-outcome">${outcome}</span>`);
-      primaryParts.push(`<span class="stats-rack-dur">${dur}</span>`);
-      secondaryParts.push(`<span>HB ${escapeHtml(pair(hb1, hb2))}</span>`);
-      secondaryParts.push(`<span>Fouls ${escapeHtml(pair(f1, f2))}</span>`);
-    } else if (isStraight) {
-      const hb1 = Number(r.highestRunP1 != null ? r.highestRunP1 : r.highestBreakP1) || 0;
-      const hb2 = Number(r.highestRunP2 != null ? r.highestRunP2 : r.highestBreakP2) || 0;
-      primaryParts.push(`<span class="stats-rack-outcome">${outcome}</span>`);
-      primaryParts.push(`<span class="stats-rack-dur">${dur}</span>`);
-      secondaryParts.push(`<span>Run ${escapeHtml(pair(hb1, hb2))}</span>`);
-      secondaryParts.push(`<span>Fouls ${escapeHtml(pair(f1, f2))}</span>`);
-    } else {
-      primaryParts.push(`<span class="stats-rack-outcome">${outcome}</span>`);
-      primaryParts.push(`<span class="stats-rack-dur">${dur}</span>`);
-      secondaryParts.push(`<span>Fouls ${escapeHtml(pair(f1, f2))}</span>`);
-      if (isPoolRunGame) {
-        if (r.breakAndRun) secondaryParts.push('<span class="stats-rack-flag">B&amp;R</span>');
-        if (r.tableRun) secondaryParts.push('<span class="stats-rack-flag">TR</span>');
+      if (slot === '1' || slot === '2') {
+        return `Winner: ${won ? 'You' : escapeHtml(name)}`;
       }
     }
+    return `Winner: ${escapeHtml(name)}`;
+  };
 
-    const secondary = secondaryParts.length
-      ? `<div class="stats-rack-secondary">${secondaryParts.join('')}</div>`
-      : '';
+  const playerOrder = viewerIsP2 ? ['2', '1'] : ['1', '2'];
+
+  const cards = timedRacks.map((r, rackIndex) => {
+    const num = escapeHtml(String(r.rackNumber || ''));
+    const dur = escapeHtml(durationCell(r));
+    const primaryParts = [`<span class="stats-rack-num">#${num}</span>`];
+    const f1 = Number(r.foulsP1) || 0;
+    const f2 = Number(r.foulsP2) || 0;
+    const winnerSlot = r.winnerSlot != null ? String(r.winnerSlot) : '';
+    const bSlot = rackBreakerSlot(r);
+    // B&R only counts when breaker and winner match; otherwise don't mis-attribute.
+    const isBreakAndRun = !!(r.breakAndRun && (!bSlot || bSlot === winnerSlot));
+    const isTableRun = !!(r.tableRun && !isBreakAndRun);
+    const ballCounts = showBalls ? rackBallCounts(m, r, rackIndex, timedRacks) : null;
+    const fs = r.frameScore || { p1: 0, p2: 0 };
+    const hb1 = isStraight
+      ? (Number(r.highestRunP1 != null ? r.highestRunP1 : r.highestBreakP1) || 0)
+      : (Number(r.highestBreakP1) || 0);
+    const hb2 = isStraight
+      ? (Number(r.highestRunP2 != null ? r.highestRunP2 : r.highestBreakP2) || 0)
+      : (Number(r.highestBreakP2) || 0);
+
+    if (isSnooker) {
+      primaryParts.push(
+        `<span class="stats-rack-score">${escapeHtml(`${fs.p1}–${fs.p2}`)}</span>`
+      );
+    }
+    primaryParts.push(`<span class="stats-rack-outcome">${winnerLabel(r)}</span>`);
+    primaryParts.push(`<span class="stats-rack-dur">${dur}</span>`);
+
+    const playerLines = playerOrder.map((slot) => {
+      const isP1 = slot === '1';
+      const name = isP1 ? (m.player1Name || 'Player 1') : (m.player2Name || 'Player 2');
+      const displayName = (hasViewer && ((isP1 && viewerIsP1) || (!isP1 && viewerIsP2)))
+        ? 'You'
+        : name;
+      const nameParts = [];
+      if (bSlot === slot) {
+        nameParts.push(
+          '<img class="stats-rack-broke-icon" src="/web/images/balls/snooker-white-small.png" alt="" title="Broke" />'
+        );
+      }
+      nameParts.push(`<span class="stats-rack-player-name">${escapeHtml(displayName)}</span>`);
+      const parts = [`<span class="stats-rack-player-id">${nameParts.join('')}</span>`];
+      if (isSnooker) {
+        parts.push(`<span>Points: ${escapeHtml(String(isP1 ? fs.p1 : fs.p2))}</span>`);
+      } else if (showBalls && ballCounts) {
+        parts.push(`<span>Balls Potted: ${escapeHtml(String(isP1 ? ballCounts.p1 : ballCounts.p2))}</span>`);
+      }
+      parts.push(`<span>Fouls: ${escapeHtml(String(isP1 ? f1 : f2))}</span>`);
+      if (isSnooker) {
+        parts.push(`<span>HB: ${escapeHtml(String(isP1 ? hb1 : hb2))}</span>`);
+      } else if (isStraight) {
+        parts.push(`<span>Run: ${escapeHtml(String(isP1 ? hb1 : hb2))}</span>`);
+      }
+      if (isPoolRunGame && winnerSlot === slot) {
+        if (isBreakAndRun) parts.push('<span class="stats-rack-flag">B&amp;R</span>');
+        if (isTableRun) parts.push('<span class="stats-rack-flag">TR</span>');
+      }
+      return `<div class="stats-rack-player-line">${parts.join('')}</div>`;
+    }).join('');
+
     return `<div class="stats-rack-card">
       <div class="stats-rack-primary">${primaryParts.join('')}</div>
-      ${secondary}
+      <div class="stats-rack-players">${playerLines}</div>
     </div>`;
   }).join('');
 
@@ -1172,7 +1262,7 @@ function matchAbandonButton(startEventId) {
     className: 'danger',
     attrs: `data-abandon-match="${escapeHtml(startEventId)}"`,
     icon: 'clear',
-    label: 'Abandon',
+    label: 'Kill',
     title: 'Remove this unfinished match from cloud stats',
   });
 }
@@ -1266,6 +1356,29 @@ function populatePlayerDetailFilters(matches) {
   }
 }
 
+function setPlayerRenameEditing(editing, { focus = true } = {}) {
+  playerRenameEditing = !!editing;
+  const titleView = document.getElementById('statsPlayerTitleView');
+  const form = document.getElementById('statsPlayerRenameForm');
+  titleView?.classList.toggle('hidden', playerRenameEditing);
+  form?.classList.toggle('hidden', !playerRenameEditing);
+  if (playerRenameEditing && focus) {
+    const input = document.getElementById('statsPlayerRenameInput');
+    if (input) {
+      input.focus();
+      input.select();
+    }
+  }
+}
+
+function balancedSummaryColumns(count, maxPerRow = 4) {
+  const n = Math.max(0, Number(count) || 0);
+  if (n <= 1) return 1;
+  if (n <= maxPerRow) return n;
+  const rows = Math.ceil(n / maxPerRow);
+  return Math.ceil(n / rows);
+}
+
 function renderPlayerDetail() {
   const allMatches = playerMatches(selectedPlayerKey);
   const matches = playerMatches(selectedPlayerKey, {
@@ -1286,6 +1399,7 @@ function renderPlayerDetail() {
   }
   if (title) title.textContent = unfilteredName;
   if (rename && document.activeElement !== rename) rename.value = unfilteredName;
+  setPlayerRenameEditing(playerRenameEditing, { focus: false });
   populatePlayerDetailFilters(allMatches);
   if (summary) {
     const cards = [];
@@ -1327,6 +1441,11 @@ function renderPlayerDetail() {
     }
     summary.innerHTML = cards.join('');
     summary.classList.toggle('hidden', cards.length === 0);
+    if (cards.length) {
+      summary.style.setProperty('--stats-summary-cols', String(balancedSummaryColumns(cards.length)));
+    } else {
+      summary.style.removeProperty('--stats-summary-cols');
+    }
   }
   if (!body) return;
   if (!matches.length) {
@@ -1335,7 +1454,6 @@ function renderPlayerDetail() {
   }
   body.innerHTML = matches.map((m) => {
     const isP1 = String(m.player1Name || '').toLowerCase() === selectedPlayerKey;
-    const opponent = isP1 ? m.player2Name : m.player1Name;
     const inProgress = isMatchInProgress(m);
     const own = isP1 ? (m.scores?.p1 ?? 0) : (m.scores?.p2 ?? 0);
     const opp = isP1 ? (m.scores?.p2 ?? 0) : (m.scores?.p1 ?? 0);
@@ -1351,7 +1469,7 @@ function renderPlayerDetail() {
     const main = `
       <tr class="${inProgress ? 'stats-match-in-progress' : ''}">
         <td class="stats-match-when">${matchDateCellHtml(m.completedAt || m.startedAt, matchDateOptions(m, inProgress))}</td>
-        <td>${escapeHtml(opponent)}</td>
+        <td class="stats-match-pair-cell">${matchPairHtml(m)}</td>
         <td>${formatMatchGameCellHtml(m)}</td>
         <td>${escapeHtml(scoreText)}</td>
         <td class="stats-match-actions">${actions.join('')}</td>
@@ -1495,6 +1613,8 @@ function collectDashMatchRacksFromEditor() {
     if (!winnerId) return;
     const entry = { winnerId };
     Object.assign(entry, readRackExtraFieldsFromRow(row));
+    const breaker = row.getAttribute('data-breaker-slot');
+    if (breaker === '1' || breaker === '2') entry.breakerSlot = breaker;
     racks.push(entry);
   });
   return racks;
@@ -1506,6 +1626,8 @@ function preserveDashRackEditorRows() {
   editor?.querySelectorAll('tr.stats-rack-edit-row').forEach((row) => {
     const entry = { winnerId: row.querySelector('.stats-rack-winner')?.value || '' };
     Object.assign(entry, readRackExtraFieldsFromRow(row));
+    const breaker = row.getAttribute('data-breaker-slot');
+    if (breaker === '1' || breaker === '2') entry.breakerSlot = breaker;
     preserved.push(entry);
   });
   return preserved;
@@ -1554,7 +1676,8 @@ function renderDashMatchRacksEditor(racks) {
     if (slot === '1' || r.winnerId === '1' || r.winnerId === 1) winnerSlot = '1';
     else if (slot === '2' || r.winnerId === '2' || r.winnerId === 2) winnerSlot = '2';
     const fs = r.frameScore || {};
-    html += `<tr class="stats-rack-edit-row"><td>${index + 1}</td><td>
+    const breakerSlot = r.breakerSlot === '1' || r.breakerSlot === '2' ? r.breakerSlot : '';
+    html += `<tr class="stats-rack-edit-row"${breakerSlot ? ` data-breaker-slot="${breakerSlot}"` : ''}><td>${index + 1}</td><td>
       <select class="stats-rack-winner">
         <option value="">—</option>
         <option value="1"${winnerSlot === '1' ? ' selected' : ''}>${p1}</option>
@@ -1617,6 +1740,9 @@ function serializeDashEditorRacksForCloud(editorRacks) {
     if (r.highestRunP1 != null || r.highestRunP2 != null) {
       out.highestRunP1 = clampDashScore(r.highestRunP1);
       out.highestRunP2 = clampDashScore(r.highestRunP2);
+    }
+    if (r.breakerSlot === '1' || r.breakerSlot === '2') {
+      out.breakerSlot = String(r.breakerSlot);
     }
     return out;
   }).filter(Boolean);
@@ -1712,7 +1838,7 @@ async function abandonInProgressMatch(startEventId) {
   const id = String(startEventId || '').trim();
   if (!id) return;
   if (!window.confirm(
-    'Abandon this unfinished match? It will be removed from cloud stats (no winner recorded). The OBS dock is not notified.'
+    'Kill this unfinished match? It will be removed from cloud stats (no winner recorded). The OBS dock is not notified.'
   )) return;
   try {
     setError('');
@@ -1889,6 +2015,7 @@ function openPlayerFromSearch(name) {
   selectedPlayerKey = trimmed.toLowerCase();
   playerDetailOpponentFilter = '';
   playerDetailGameFilter = '';
+  playerRenameEditing = false;
   renderAccountStats();
 }
 
@@ -2045,13 +2172,11 @@ document.getElementById('statsPanelLeaderboard')?.addEventListener('click', (eve
   setLeaderboardSort(th.getAttribute('data-sort-key'));
 });
 
-document.getElementById('statsRefreshBtn')?.addEventListener('click', () => {
-  loadAccountStats(true);
-});
 document.getElementById('statsPlayerBackBtn')?.addEventListener('click', () => {
   selectedPlayerKey = '';
   playerDetailOpponentFilter = '';
   playerDetailGameFilter = '';
+  playerRenameEditing = false;
   renderAccountStats();
 });
 document.getElementById('statsPlayerOpponentFilter')?.addEventListener('change', (event) => {
@@ -2062,6 +2187,18 @@ document.getElementById('statsPlayerGameFilter')?.addEventListener('change', (ev
   playerDetailGameFilter = event.target.value || '';
   renderPlayerDetail();
 });
+document.getElementById('statsPlayerRenameEditBtn')?.addEventListener('click', () => {
+  const rename = document.getElementById('statsPlayerRenameInput');
+  const title = document.getElementById('statsPlayerTitle');
+  if (rename && title) rename.value = title.textContent || '';
+  setPlayerRenameEditing(true);
+});
+document.getElementById('statsPlayerRenameCancelBtn')?.addEventListener('click', () => {
+  const rename = document.getElementById('statsPlayerRenameInput');
+  const title = document.getElementById('statsPlayerTitle');
+  if (rename && title) rename.value = title.textContent || '';
+  setPlayerRenameEditing(false);
+});
 document.getElementById('statsPlayerRenameForm')?.addEventListener('submit', async (event) => {
   event.preventDefault();
   const fromPlayer = statsFromMatches(completedMatches(statsData || {})).players.find((p) => p.id === selectedPlayerKey);
@@ -2071,6 +2208,7 @@ document.getElementById('statsPlayerRenameForm')?.addEventListener('submit', asy
   try {
     const result = await renameAccountPlayer(getServerUrl(), getToken(), fromName, toName);
     selectedPlayerKey = toName.toLowerCase();
+    playerRenameEditing = false;
     await loadAccountStats(true);
     const updated = Number(result?.updated) || 0;
     const statusEl = document.getElementById('statsStatus');
@@ -2113,6 +2251,7 @@ document.getElementById('tabStats')?.addEventListener('click', (event) => {
     selectedPlayerKey = row.getAttribute('data-player-id') || '';
     playerDetailOpponentFilter = '';
     playerDetailGameFilter = '';
+    playerRenameEditing = false;
     renderAccountStats();
   }
 });

@@ -175,6 +175,10 @@
             if (r.breakerSlot === '1' || r.breakerSlot === '2') {
                 out.breakerSlot = String(r.breakerSlot);
             }
+            if (r.ballsP1 != null || r.ballsP2 != null) {
+                out.ballsP1 = clampScore(r.ballsP1);
+                out.ballsP2 = clampScore(r.ballsP2);
+            }
             return out;
         });
     }
@@ -643,11 +647,14 @@
             lastPlayedAt: cloudPlayer.lastPlayedAt,
             stats: {
                 gamesWon: cloudPlayer.gamesWon || 0,
+                gamesDrawn: cloudPlayer.gamesDrawn || 0,
                 gamesLost: cloudPlayer.gamesLost || 0,
                 racksWon: cloudPlayer.racksWon || 0,
                 racksLost: cloudPlayer.racksLost || 0,
                 highestBreak: cloudPlayer.highestBreak || 0,
                 highestRun: cloudPlayer.highestRun || 0,
+                breakAndRuns: cloudPlayer.breakAndRuns || 0,
+                tableRuns: cloudPlayer.tableRuns || 0,
                 ballsWon: cloudPlayer.ballsPotted || 0,
                 fouls: cloudPlayer.fouls || 0,
                 byGameType: byGameType
@@ -784,6 +791,10 @@
             }
             if (r.breakerSlot === '1' || r.breakerSlot === '2') {
                 out.breakerSlot = String(r.breakerSlot);
+            }
+            if (r.ballsP1 != null || r.ballsP2 != null) {
+                out.ballsP1 = clampScore(r.ballsP1);
+                out.ballsP2 = clampScore(r.ballsP2);
             }
             return out;
         }).filter(Boolean);
@@ -2037,13 +2048,16 @@
     function readRackRunClassificationFromStorage(winnerSlot) {
         const breaker = getStorageItem('rackBreakerSlot');
         const opponentVisited = getStorageItem('rackOpponentVisited') === 'yes';
+        const incomingLostTurn = getStorageItem('rackIncomingLostTurn') === 'yes';
         if (breaker !== '1' && breaker !== '2') {
             return { breakAndRun: false, tableRun: false, breakerSlot: null };
         }
-        if (winnerSlot === breaker && !opponentVisited) {
+        // B&R: breaker wins with no opponent visit.
+        if (String(winnerSlot) === breaker && !opponentVisited) {
             return { breakAndRun: true, tableRun: false, breakerSlot: breaker };
         }
-        if (opponentVisited) {
+        // TR: non-breaker wins on first continuous visit after breaker left balls.
+        if (String(winnerSlot) !== breaker && opponentVisited && !incomingLostTurn) {
             return { breakAndRun: false, tableRun: true, breakerSlot: breaker };
         }
         return { breakAndRun: false, tableRun: false, breakerSlot: breaker };
@@ -2233,19 +2247,33 @@
         }
         if (isTrackerRackWinGameType(context.gameType)) {
             // Prefer classification captured before breaker state was cleared for next rack.
-            const runClass = (options && options.rackRunClass)
+            let runClass = (options && options.rackRunClass)
                 ? options.rackRunClass
                 : readRackRunClassificationFromStorage(playerSlot);
-            if (runClass.breakerSlot) {
+            // Invariant: B&R belongs only to the breaker who also won the rack.
+            if (runClass && runClass.breakAndRun &&
+                runClass.breakerSlot && String(runClass.breakerSlot) !== String(playerSlot)) {
+                runClass = {
+                    breakAndRun: false,
+                    tableRun: !!runClass.tableRun,
+                    breakerSlot: runClass.breakerSlot
+                };
+            }
+            if (runClass && runClass.breakerSlot) {
                 rackEntry.breakerSlot = runClass.breakerSlot;
             }
-            rackEntry.breakAndRun = !!runClass.breakAndRun;
-            rackEntry.tableRun = !!runClass.tableRun;
+            rackEntry.breakAndRun = !!(runClass && runClass.breakAndRun);
+            rackEntry.tableRun = !!(runClass && runClass.tableRun);
         }
         const foulsP1 = Math.max(0, parseInt(getStorageItem('snookerFrameFoulsP1') || '0', 10) || 0);
         const foulsP2 = Math.max(0, parseInt(getStorageItem('snookerFrameFoulsP2') || '0', 10) || 0);
         rackEntry.foulsP1 = foulsP1;
         rackEntry.foulsP2 = foulsP2;
+        if (showsBallStats(context.gameType)) {
+            const rackBalls = countBallsForRackWindow(match, rackEntry);
+            rackEntry.ballsP1 = rackBalls.p1;
+            rackEntry.ballsP2 = rackBalls.p2;
+        }
         match.racks.push(rackEntry);
 
         const p1Score = parseInt(getStorageItem('p1ScoreCtrlPanel'), 10) || 0;
@@ -4997,6 +5025,34 @@
         return (match && match.startedAt) || new Date().toISOString();
     }
 
+    /** Count match.balls attributed to each slot within a rack's time window. */
+    function countBallsForRackWindow(match, rackEntry) {
+        const p1Id = match && match.player1Id;
+        const p2Id = match && match.player2Id;
+        const startMs = parseIsoMs(rackEntry && rackEntry.startedAt);
+        const endMs = parseIsoMs(rackEntry && rackEntry.timestamp);
+        let p1 = 0;
+        let p2 = 0;
+        (match && match.balls ? match.balls : []).forEach(function (b) {
+            if (!b) {
+                return;
+            }
+            const ts = parseIsoMs(b.timestamp);
+            if (Number.isFinite(startMs) && Number.isFinite(ts) && ts <= startMs) {
+                return;
+            }
+            if (Number.isFinite(endMs) && Number.isFinite(ts) && ts > endMs) {
+                return;
+            }
+            if (b.winnerId === p1Id) {
+                p1 += 1;
+            } else if (b.winnerId === p2Id) {
+                p2 += 1;
+            }
+        });
+        return { p1: p1, p2: p2 };
+    }
+
     /** Stamp startedAt / timestamp / durationSeconds and advance the live interval. */
     function applyRackTiming(match, rackEntry) {
         const endedAt = new Date().toISOString();
@@ -5098,18 +5154,245 @@
         return formatDurationSeconds(secs);
     }
 
-    function formatMatchDateLabel(match) {
-        const inProgress = match && match.status !== 'completed';
-        let label = inProgress
-            ? ('In progress' + (match.startedAt ? ' \u00b7 ' + formatDateTime(match.startedAt) : ''))
-            : formatDateTime(match.completedAt || match.startedAt);
-        if (!inProgress) {
-            const duration = formatDurationSeconds(getMatchDurationSeconds(match));
-            if (duration) {
-                label += ' \u00b7 ' + duration;
-            }
+    function formatStatsDate(iso) {
+        if (!iso) {
+            return '\u2014';
         }
-        return label;
+        try {
+            const d = new Date(iso);
+            if (Number.isNaN(d.getTime())) {
+                return String(iso);
+            }
+            return d.toLocaleDateString();
+        } catch (e) {
+            return String(iso);
+        }
+    }
+
+    function formatStatsTime(iso) {
+        if (!iso) {
+            return '';
+        }
+        try {
+            const d = new Date(iso);
+            if (Number.isNaN(d.getTime())) {
+                return '';
+            }
+            return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+        } catch (e) {
+            return '';
+        }
+    }
+
+    /** Match history date cell: date / time / duration on separate lines. */
+    function matchDateCellHtml(value, options) {
+        const opts = options || {};
+        const inProgress = !!opts.inProgress;
+        const duration = !inProgress
+            ? formatMatchDuration(opts.startedAt, opts.completedAt, opts.durationSeconds)
+            : '';
+        if (!value && !inProgress) {
+            return '<span class="stats-match-date">\u2014</span>';
+        }
+        if (inProgress) {
+            const dateStr = value ? formatStatsDate(value) : 'In progress';
+            const timeStr = value ? formatStatsTime(value) : '';
+            return '<span class="stats-match-date">' + escapeHtml(dateStr) + '</span>' +
+                (timeStr ? '<span class="stats-match-time">' + escapeHtml(timeStr) + '</span>' : '') +
+                '<span class="stats-match-duration">Live</span>';
+        }
+        const dateStr = formatStatsDate(value);
+        const timeStr = formatStatsTime(value);
+        return '<span class="stats-match-date">' + escapeHtml(dateStr) + '</span>' +
+            (timeStr ? '<span class="stats-match-time">' + escapeHtml(timeStr) + '</span>' : '') +
+            (duration ? '<span class="stats-match-duration">' + escapeHtml(duration) + '</span>' : '');
+    }
+
+    function matchDateOptions(match, inProgress) {
+        return {
+            inProgress: !!inProgress,
+            startedAt: match && match.startedAt,
+            completedAt: match && match.completedAt,
+            durationSeconds: getMatchDurationSeconds(match)
+        };
+    }
+
+    function resolveMatchResult(match) {
+        const raw = match && match.winnerSlot != null ? String(match.winnerSlot) : '';
+        if (raw === '1' || raw === '2') {
+            return { winnerSlot: raw, isDraw: false };
+        }
+        if (raw === 'draw' || raw === 'tie' || raw === '0') {
+            return { winnerSlot: null, isDraw: true };
+        }
+        const scores = match && (match.scores || match.finalScore);
+        if (!scores || typeof scores !== 'object') {
+            return { winnerSlot: null, isDraw: false };
+        }
+        const p1 = Number(scores.p1) || 0;
+        const p2 = Number(scores.p2) || 0;
+        if (p1 > p2) {
+            return { winnerSlot: '1', isDraw: false };
+        }
+        if (p2 > p1) {
+            return { winnerSlot: '2', isDraw: false };
+        }
+        return { winnerSlot: null, isDraw: true };
+    }
+
+    function matchPairHtml(match, options) {
+        const opts = options || {};
+        const result = resolveMatchResult(match);
+        const linkable = opts.linkPlayers !== false;
+        function playerBtn(name, playerId, isWinner) {
+            const display = String(name || '').trim();
+            const classes = (isWinner ? 'stats-match-player stats-winner' : 'stats-match-player') +
+                (linkable && playerId ? ' stats-match-player-link' : '');
+            if (!display) {
+                return '<span class="' + classes + '">\u2014</span>';
+            }
+            if (linkable && playerId) {
+                return '<button type="button" class="' + classes + '" data-open-player="' +
+                    escapeHtml(String(playerId)) + '">' + escapeHtml(display) + '</button>';
+            }
+            return '<span class="' + classes + '">' + escapeHtml(display) + '</span>';
+        }
+        const draw = result.isDraw
+            ? '<span class="stats-match-draw stats-draw">(Draw)</span>'
+            : '';
+        return '<div class="stats-match-pair">' +
+            playerBtn(match.player1Name, match.player1Id, result.winnerSlot === '1') +
+            '<span class="stats-match-vs">vs</span>' +
+            playerBtn(match.player2Name, match.player2Id, result.winnerSlot === '2') +
+            draw +
+            '</div>';
+    }
+
+    const expandedMatchRacks = new Set();
+
+    function matchRackCount(match) {
+        return enrichRacksWithDuration(match).length;
+    }
+
+    function isMatchRacksExpanded(matchId) {
+        return expandedMatchRacks.has(String(matchId || ''));
+    }
+
+    function matchHistoryKey(match) {
+        return String((match && (match.id || match.startEventId)) || '');
+    }
+
+    async function toggleMatchRacksExpanded(matchId) {
+        const id = String(matchId || '');
+        if (!id) {
+            return;
+        }
+        if (expandedMatchRacks.has(id)) {
+            expandedMatchRacks.delete(id);
+        } else {
+            expandedMatchRacks.add(id);
+        }
+        const detailTab = document.getElementById('statsTab-detail');
+        const h2hTab = document.getElementById('statsTab-h2h');
+        if (detailTab && !detailTab.classList.contains('noShow') && statsModalSelectedPlayerId) {
+            await showPlayerDetail(statsModalSelectedPlayerId);
+        } else if (h2hTab && !h2hTab.classList.contains('noShow')) {
+            await refreshH2HView();
+        }
+    }
+
+    function balancedSummaryColumns(count, maxPerRow) {
+        const max = maxPerRow == null ? 4 : maxPerRow;
+        const n = Math.max(0, Number(count) || 0);
+        if (n <= 1) {
+            return 1;
+        }
+        if (n <= max) {
+            return n;
+        }
+        const rows = Math.ceil(n / max);
+        return Math.ceil(n / rows);
+    }
+
+    function formatMatchRecord(won, drawn, lost) {
+        return (won || 0) + '/' + (drawn || 0) + '/' + (lost || 0);
+    }
+
+    function winPct(won, lost, drawn) {
+        const total = (won || 0) + (lost || 0) + (drawn || 0);
+        if (!total) {
+            return 0;
+        }
+        return Math.round(((won || 0) / total) * 100);
+    }
+
+    function statsActionIcon(kind) {
+        const common = 'class="stats-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"';
+        const stroke = 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+        if (kind === 'eyeOpen') {
+            return '<svg ' + common + ' ' + stroke + '><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+        }
+        if (kind === 'eyeClosed') {
+            return '<svg ' + common + ' ' + stroke + '><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+        }
+        if (kind === 'edit') {
+            return '<svg ' + common + ' ' + stroke + '><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>';
+        }
+        if (kind === 'clear') {
+            return '<svg ' + common + ' ' + stroke + '><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>';
+        }
+        return '';
+    }
+
+    function statsActionButton(options) {
+        const opts = options || {};
+        const titleAttr = opts.title ? (' title="' + escapeHtml(opts.title) + '"') : '';
+        const attrs = opts.attrs ? (' ' + opts.attrs) : '';
+        const extraClass = opts.className ? (' ' + opts.className) : '';
+        return '<button type="button" class="stats-action-btn hover obs28 button' + extraClass + '"' +
+            titleAttr + attrs + '>' +
+            statsActionIcon(opts.icon) +
+            '<span class="stats-action-label">' + escapeHtml(opts.label || '') + '</span>' +
+            '</button>';
+    }
+
+    function matchRacksToggleButton(match) {
+        const key = matchHistoryKey(match);
+        if (!matchRackCount(match) || !key) {
+            return '';
+        }
+        const expanded = isMatchRacksExpanded(key);
+        return statsActionButton({
+            className: 'stats-match-racks-toggle',
+            attrs: 'data-toggle-racks="' + escapeHtml(key) + '" aria-expanded="' +
+                (expanded ? 'true' : 'false') + '"',
+            icon: expanded ? 'eyeClosed' : 'eyeOpen',
+            label: 'Racks',
+            title: expanded ? 'Hide rack details' : 'Show rack details'
+        });
+    }
+
+    function bindStatsMatchInteractions(root) {
+        if (!root) {
+            return;
+        }
+        root.querySelectorAll('[data-toggle-racks]').forEach(function (btn) {
+            btn.addEventListener('click', function (ev) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                toggleMatchRacksExpanded(btn.getAttribute('data-toggle-racks'));
+            });
+        });
+        root.querySelectorAll('[data-open-player]').forEach(function (btn) {
+            btn.addEventListener('click', function (ev) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                const id = btn.getAttribute('data-open-player');
+                if (id) {
+                    showPlayerDetail(id);
+                }
+            });
+        });
     }
 
     function rackFrameWord(gameType, plural) {
@@ -5129,7 +5412,7 @@
         return '\u2014';
     }
 
-    /** Per-rack/frame breakdown for match history (game-specific extras on secondary line). */
+    /** Per-rack/frame breakdown for match history (Winner/Breaker + per-player lines). */
     function renderMatchRackBreakdown(match, options) {
         const timedRacks = enrichRacksWithDuration(match);
         if (timedRacks.length === 0) {
@@ -5140,9 +5423,10 @@
         const isSnooker = isSnookerGameType(match.gameType);
         const isStraight = isStraightPoolGameType(match.gameType);
         const isPoolRunGame = isTrackerRackWinGameType(match.gameType);
-        const unit = rackFrameWord(match.gameType, false);
+        const showBalls = !isSnooker && !isStraight;
         const viewerIsP1 = !!(viewerId && match.player1Id === viewerId);
         const viewerIsP2 = !!(viewerId && match.player2Id === viewerId);
+        const hasViewer = viewerIsP1 || viewerIsP2;
 
         function durationCell(r) {
             const label = formatDurationSeconds(r.durationSeconds);
@@ -5150,86 +5434,166 @@
         }
 
         function durationFooter() {
-            const playingSecs = sumRackDurationSeconds(match);
-            const matchSecs = getMatchDurationSeconds(match);
-            const playingLabel = formatDurationSeconds(playingSecs);
-            const matchLabel = formatDurationSeconds(matchSecs);
-            if (!playingLabel && !matchLabel) {
+            const matchLabel = formatDurationSeconds(sumRackDurationSeconds(match));
+            if (!matchLabel) {
                 return '';
             }
-            const parts = [];
-            if (playingLabel) {
-                parts.push(unit + 's total ' + playingLabel);
-            }
-            if (matchLabel && matchLabel !== playingLabel) {
-                parts.push('Match ' + matchLabel);
-            } else if (matchLabel && !playingLabel) {
-                parts.push('Match ' + matchLabel);
-            }
-            return '<div class="stats-match-duration-footer">' + escapeHtml(parts.join(' \u00b7 ')) + '</div>';
+            return '<div class="stats-match-duration-footer">' +
+                escapeHtml('Match ' + matchLabel) + '</div>';
         }
 
-        function pair(a, b) {
-            return viewerIsP2 ? (b + '\u2013' + a) : (a + '\u2013' + b);
+        function resolveWinnerSlot(r) {
+            if (r.winnerSlot != null) {
+                return String(r.winnerSlot);
+            }
+            if (r.winnerId === match.player1Id) {
+                return '1';
+            }
+            if (r.winnerId === match.player2Id) {
+                return '2';
+            }
+            return '';
         }
 
-        function resultLabel(r) {
+        function winnerLabel(r) {
+            const name = winnerDisplayName(match, r.winnerId);
             if (viewerId && r.winnerId) {
-                return r.winnerId === viewerId ? 'Won' : 'Lost';
+                return r.winnerId === viewerId
+                    ? 'Winner: You'
+                    : ('Winner: ' + escapeHtml(name));
             }
-            return escapeHtml(winnerDisplayName(match, r.winnerId));
+            return 'Winner: ' + escapeHtml(name);
         }
 
-        const cards = timedRacks.map(function (r) {
+        function rackBallCounts(r, rackIndex) {
+            if (r && (r.ballsP1 != null || r.ballsP2 != null)) {
+                return {
+                    p1: parseInt(r.ballsP1, 10) || 0,
+                    p2: parseInt(r.ballsP2, 10) || 0
+                };
+            }
+            const balls = Array.isArray(match.balls) ? match.balls : [];
+            if (!balls.length || !r) {
+                return null;
+            }
+            const startMs = r.startedAt ? Date.parse(r.startedAt) : NaN;
+            const endMs = r.timestamp ? Date.parse(r.timestamp) : NaN;
+            const prev = rackIndex > 0 ? timedRacks[rackIndex - 1] : null;
+            const prevEndMs = prev && prev.timestamp ? Date.parse(prev.timestamp) : NaN;
+            const windowStart = Number.isFinite(startMs)
+                ? startMs
+                : (Number.isFinite(prevEndMs) ? prevEndMs : NaN);
+            const windowEnd = Number.isFinite(endMs) ? endMs : NaN;
+            if (!Number.isFinite(windowEnd)) {
+                return null;
+            }
+            let p1 = 0;
+            let p2 = 0;
+            balls.forEach(function (b) {
+                const ts = b && b.timestamp ? Date.parse(b.timestamp) : NaN;
+                if (!Number.isFinite(ts) || ts > windowEnd) {
+                    return;
+                }
+                if (Number.isFinite(windowStart) && ts <= windowStart) {
+                    return;
+                }
+                if (b.winnerId === match.player1Id) {
+                    p1 += 1;
+                } else if (b.winnerId === match.player2Id) {
+                    p2 += 1;
+                }
+            });
+            return { p1: p1, p2: p2 };
+        }
+
+        const playerOrder = viewerIsP2 ? ['2', '1'] : ['1', '2'];
+
+        const cards = timedRacks.map(function (r, rackIndex) {
             const num = escapeHtml(String(r.rackNumber || ''));
             const dur = escapeHtml(durationCell(r));
-            const outcome = resultLabel(r);
             const primary = ['<span class="stats-rack-num">#' + num + '</span>'];
-            const secondary = [];
             const f1 = parseInt(r.foulsP1, 10) || 0;
             const f2 = parseInt(r.foulsP2, 10) || 0;
+            const winnerSlot = resolveWinnerSlot(r);
+            const breakerSlot = r.breakerSlot != null ? String(r.breakerSlot) : '';
+            const isBreakAndRun = !!(r.breakAndRun && (!breakerSlot || breakerSlot === winnerSlot));
+            const isTableRun = !!(r.tableRun && !isBreakAndRun);
+            const ballCounts = showBalls ? rackBallCounts(r, rackIndex) : null;
+            const fs = r.frameScore || { p1: 0, p2: 0 };
+            const hb1 = isStraight
+                ? (parseInt(r.highestRunP1 != null ? r.highestRunP1 : r.highestBreakP1, 10) || 0)
+                : (parseInt(r.highestBreakP1, 10) || 0);
+            const hb2 = isStraight
+                ? (parseInt(r.highestRunP2 != null ? r.highestRunP2 : r.highestBreakP2, 10) || 0)
+                : (parseInt(r.highestBreakP2, 10) || 0);
 
             if (isSnooker) {
-                const fs = r.frameScore || { p1: 0, p2: 0 };
-                const hb1 = parseInt(r.highestBreakP1, 10) || 0;
-                const hb2 = parseInt(r.highestBreakP2, 10) || 0;
-                primary.push('<span class="stats-rack-score">' + escapeHtml(pair(fs.p1, fs.p2)) + '</span>');
-                primary.push('<span class="stats-rack-outcome">' + outcome + '</span>');
-                primary.push('<span class="stats-rack-dur">' + dur + '</span>');
-                secondary.push('<span>HB ' + escapeHtml(pair(hb1, hb2)) + '</span>');
-                secondary.push('<span>Fouls ' + escapeHtml(pair(f1, f2)) + '</span>');
-            } else if (isStraight) {
-                const hb1 = parseInt(
-                    r.highestRunP1 != null ? r.highestRunP1 : r.highestBreakP1,
-                    10
-                ) || 0;
-                const hb2 = parseInt(
-                    r.highestRunP2 != null ? r.highestRunP2 : r.highestBreakP2,
-                    10
-                ) || 0;
-                primary.push('<span class="stats-rack-outcome">' + outcome + '</span>');
-                primary.push('<span class="stats-rack-dur">' + dur + '</span>');
-                secondary.push('<span>Run ' + escapeHtml(pair(hb1, hb2)) + '</span>');
-                secondary.push('<span>Fouls ' + escapeHtml(pair(f1, f2)) + '</span>');
-            } else {
-                primary.push('<span class="stats-rack-outcome">' + outcome + '</span>');
-                primary.push('<span class="stats-rack-dur">' + dur + '</span>');
-                secondary.push('<span>Fouls ' + escapeHtml(pair(f1, f2)) + '</span>');
-                if (isPoolRunGame) {
-                    if (r.breakAndRun) {
-                        secondary.push('<span class="stats-rack-flag">B&amp;R</span>');
+                primary.push(
+                    '<span class="stats-rack-score">' +
+                    escapeHtml(String(fs.p1) + '\u2013' + String(fs.p2)) +
+                    '</span>'
+                );
+            }
+            primary.push('<span class="stats-rack-outcome">' + winnerLabel(r) + '</span>');
+            primary.push('<span class="stats-rack-dur">' + dur + '</span>');
+
+            const playerLines = playerOrder.map(function (slot) {
+                const isP1 = slot === '1';
+                const name = isP1
+                    ? (match.player1Name || 'Player 1')
+                    : (match.player2Name || 'Player 2');
+                const displayName = (hasViewer && (
+                    (isP1 && viewerIsP1) || (!isP1 && viewerIsP2)
+                )) ? 'You' : name;
+                const nameParts = [];
+                if (breakerSlot === slot) {
+                    nameParts.push(
+                        '<img class="stats-rack-broke-icon" src="./common/images/snooker-white-small.png" alt="" title="Broke" />'
+                    );
+                }
+                nameParts.push(
+                    '<span class="stats-rack-player-name">' + escapeHtml(displayName) + '</span>'
+                );
+                const parts = [
+                    '<span class="stats-rack-player-id">' + nameParts.join('') + '</span>'
+                ];
+                if (isSnooker) {
+                    parts.push(
+                        '<span>Points: ' + escapeHtml(String(isP1 ? fs.p1 : fs.p2)) + '</span>'
+                    );
+                } else if (showBalls && ballCounts) {
+                    parts.push(
+                        '<span>Balls Potted: ' +
+                        escapeHtml(String(isP1 ? ballCounts.p1 : ballCounts.p2)) +
+                        '</span>'
+                    );
+                }
+                parts.push(
+                    '<span>Fouls: ' + escapeHtml(String(isP1 ? f1 : f2)) + '</span>'
+                );
+                if (isSnooker) {
+                    parts.push(
+                        '<span>HB: ' + escapeHtml(String(isP1 ? hb1 : hb2)) + '</span>'
+                    );
+                } else if (isStraight) {
+                    parts.push(
+                        '<span>Run: ' + escapeHtml(String(isP1 ? hb1 : hb2)) + '</span>'
+                    );
+                }
+                if (isPoolRunGame && winnerSlot === slot) {
+                    if (isBreakAndRun) {
+                        parts.push('<span class="stats-rack-flag">B&amp;R</span>');
                     }
-                    if (r.tableRun) {
-                        secondary.push('<span class="stats-rack-flag">TR</span>');
+                    if (isTableRun) {
+                        parts.push('<span class="stats-rack-flag">TR</span>');
                     }
                 }
-            }
+                return '<div class="stats-rack-player-line">' + parts.join('') + '</div>';
+            }).join('');
 
             return '<div class="stats-rack-card">' +
                 '<div class="stats-rack-primary">' + primary.join('') + '</div>' +
-                (secondary.length
-                    ? '<div class="stats-rack-secondary">' + secondary.join('') + '</div>'
-                    : '') +
+                '<div class="stats-rack-players">' + playerLines + '</div>' +
                 '</div>';
         }).join('');
 
@@ -5252,35 +5616,51 @@
         const viewerId = opts.viewerPlayerId;
         const h2h = opts.h2h;
         const colspan = opts.colspan || 5;
+        const linkPlayers = opts.linkPlayers !== false;
 
         if (matches.length === 0) {
             return '<tr><td colspan="' + colspan + '" class="stats-empty">No matches recorded.</td></tr>';
         }
 
         return matches.map(function (m) {
-            const score = m.finalScore || { p1: 0, p2: 0 };
-            const dateLabel = formatMatchDateLabel(m);
-            let mainRow;
+            const score = m.finalScore || m.scores || { p1: 0, p2: 0 };
+            const inProgress = !!(m && m.status && m.status !== 'completed');
+            const dateHtml = matchDateCellHtml(
+                m.completedAt || m.startedAt,
+                matchDateOptions(m, inProgress)
+            );
+            const pairHtml = matchPairHtml(m, { linkPlayers: linkPlayers && !h2h });
+            let scoreText;
             if (h2h) {
                 const id1 = h2h.id1;
                 const p1Score = m.player1Id === id1 ? score.p1 : score.p2;
                 const p2Score = m.player1Id === id1 ? score.p2 : score.p1;
-                mainRow = '<tr class="stats-match-row"><td>' + dateLabel + '</td>' +
-                    '<td>' + formatMatchGameCell(m) + '</td>' +
-                    '<td>' + escapeHtml(h2h.name1) + ' ' + p1Score + ' - ' + p2Score + ' ' + escapeHtml(h2h.name2) + '</td>' +
-                    renderMatchActionButtons(m.id) + '</tr>';
-            } else {
-                const opponent = m.player1Id === viewerId ? m.player2Name : m.player1Name;
+                scoreText = escapeHtml(String(p1Score) + ' - ' + String(p2Score));
+            } else if (viewerId) {
                 const viewerScore = m.player1Id === viewerId ? score.p1 : score.p2;
                 const oppScore = m.player1Id === viewerId ? score.p2 : score.p1;
-                mainRow = '<tr class="stats-match-row"><td>' + dateLabel + '</td>' +
-                    '<td>' + escapeHtml(opponent) + '</td>' +
-                    '<td>' + formatMatchGameCell(m) + '</td>' +
-                    '<td>' + viewerScore + ' - ' + oppScore + '</td>' +
-                    renderMatchActionButtons(m.id) + '</tr>';
+                scoreText = inProgress && !m.finalScore && !m.scores
+                    ? 'In progress'
+                    : (escapeHtml(String(viewerScore) + ' - ' + String(oppScore)));
+            } else {
+                scoreText = inProgress && !m.finalScore && !m.scores
+                    ? 'In progress'
+                    : escapeHtml(String(score.p1 || 0) + ' - ' + String(score.p2 || 0));
             }
 
-            const breakdown = renderMatchRackBreakdown(m, h2h ? {} : { viewerPlayerId: viewerId });
+            const mainRow = '<tr class="stats-match-row' +
+                (inProgress ? ' stats-match-in-progress' : '') + '">' +
+                '<td class="stats-match-when">' + dateHtml + '</td>' +
+                '<td class="stats-match-pair-cell">' + pairHtml + '</td>' +
+                '<td>' + formatMatchGameCell(m) + '</td>' +
+                '<td>' + scoreText + '</td>' +
+                renderMatchActionButtons(m) +
+                '</tr>';
+
+            const key = matchHistoryKey(m);
+            const breakdown = (key && isMatchRacksExpanded(key))
+                ? renderMatchRackBreakdown(m, h2h ? {} : { viewerPlayerId: viewerId })
+                : '';
             const detailRow = breakdown
                 ? '<tr class="stats-match-racks-row"><td colspan="' + colspan + '">' + breakdown + '</td></tr>'
                 : '';
@@ -5289,11 +5669,27 @@
     }
 
     // --- Stats Modal UI ---
-    function renderMatchActionButtons(matchId) {
-        return '<td class="stats-actions-col">' +
-            '<button type="button" class="stats-edit-btn hover obs28 button" onclick="openMatchEditModal(\'' + matchId + '\')">Edit</button> ' +
-            '<button type="button" class="stats-delete-btn hover obs28 button" onclick="confirmDeleteMatch(\'' + matchId + '\')">Del</button>' +
-            '</td>';
+    function renderMatchActionButtons(match) {
+        const matchId = matchHistoryKey(match);
+        const actions = [];
+        const racksToggle = matchRacksToggleButton(match);
+        if (racksToggle) {
+            actions.push(racksToggle);
+        }
+        actions.push(statsActionButton({
+            attrs: 'onclick="openMatchEditModal(\'' + String(matchId).replace(/'/g, "\\'") + '\')"',
+            icon: 'edit',
+            label: 'Edit',
+            title: 'Edit match'
+        }));
+        actions.push(statsActionButton({
+            className: 'stats-delete-btn',
+            attrs: 'onclick="confirmDeleteMatch(\'' + String(matchId).replace(/'/g, "\\'") + '\')"',
+            icon: 'clear',
+            label: 'Del',
+            title: 'Delete match'
+        }));
+        return '<td class="stats-match-actions">' + actions.join('') + '</td>';
     }
 
     let matchEditPlayerNames = { p1: 'Player 1', p2: 'Player 2' };
@@ -6123,100 +6519,97 @@
         return html;
     }
 
-    function renderPlayerStatsTable(player, winStreak) {
-        const showBalls = (player.stats.ballsWon || 0) > 0 ||
-            Object.keys(player.stats.byGameType || {}).some(function (gt) {
-                return gameTypeHasBallScoring(gt) && (player.stats.byGameType[gt].ballsWon || 0) > 0;
-            });
-        const showFouls = (player.stats.fouls || 0) > 0 ||
-            !!(player.stats.byGameType && player.stats.byGameType.game8 &&
-                (player.stats.byGameType.game8.fouls || 0) > 0);
-        const showBreak = (player.stats.highestBreak || 0) > 0 ||
-            (player.stats.highestRun || 0) > 0 ||
-            !!(player.stats.byGameType && (
-                (player.stats.byGameType.game8 && player.stats.byGameType.game8.highestBreak) ||
-                (player.stats.byGameType.game4 && (
-                    player.stats.byGameType.game4.highestRun ||
-                    player.stats.byGameType.game4.highestBreak
-                ))
-            ));
-
-        const overallHeaders = ['Matches Won', racksWlHeaderForGameType()];
-        const overallCells = [
-            formatWLWithPct(player.stats.gamesWon, player.stats.gamesLost),
-            formatWLWithPct(player.stats.racksWon, player.stats.racksLost)
-        ];
-        if (showBreak) {
-            if ((player.stats.highestBreak || 0) > 0) {
-                overallHeaders.push('Highest Break');
-                overallCells.push(String(player.stats.highestBreak || 0));
-            }
-            if ((player.stats.highestRun || 0) > 0 ||
-                (player.stats.byGameType && player.stats.byGameType.game4 &&
-                    ((player.stats.byGameType.game4.highestRun || 0) > 0 ||
-                        (player.stats.byGameType.game4.highestBreak || 0) > 0))) {
-                overallHeaders.push('Longest Run');
-                overallCells.push(String(Math.max(
-                    player.stats.highestRun || 0,
-                    (player.stats.byGameType && player.stats.byGameType.game4 &&
-                        Math.max(
-                            player.stats.byGameType.game4.highestRun || 0,
-                            player.stats.byGameType.game4.highestBreak || 0
-                        )) || 0
-                )));
-            }
-        }
-        if (showBalls) {
-            overallHeaders.push('Balls Potted');
-            overallCells.push(String(player.stats.ballsWon || 0));
-        }
-        if (showFouls) {
-            overallHeaders.push('Fouls');
-            overallCells.push(String(player.stats.fouls || 0));
-        }
-        overallHeaders.push('Last');
-        overallCells.push(formatDate(player.lastPlayedAt));
-
-        let html = '<div class="stats-player-game-block">' +
-            '<h4 class="stats-section-title">Overall</h4>' +
-            buildPlayerStatsDataTable(overallHeaders, overallCells, 'stats-overall-row') +
-            '</div>';
-
-        Object.keys(GAME_TYPE_LABELS).forEach(function (gt) {
-            const ts = player.stats.byGameType[gt];
-            const typeBalls = ts ? (ts.ballsWon || 0) : 0;
-            const typeBreak = breakValueForGameType(ts, gt);
-            const typeFouls = ts ? (ts.fouls || 0) : 0;
-            if (!ts || (ts.gamesWon + ts.gamesLost + ts.racksWon + typeBalls + typeBreak + typeFouls) === 0) {
-                return;
-            }
-            const gameHeaders = ['Matches Won', racksWlHeaderForGameType(gt)];
-            const gameCells = [
-                formatWLWithPct(ts.gamesWon, ts.gamesLost),
-                formatWLWithPct(ts.racksWon, ts.racksLost)
-            ];
-            const showGameBreak = showBreak && (gt === 'game8' || gt === 'game4' || typeBreak > 0);
-            if (showGameBreak) {
-                gameHeaders.push(breakHeaderForGameType(gt));
-                gameCells.push((gt === 'game8' || gt === 'game4' || typeBreak) ? String(typeBreak) : '\u2014');
-            }
-            if (showBalls) {
-                gameHeaders.push('Balls Potted');
-                gameCells.push(gameTypeHasBallScoring(gt) ? String(typeBalls) : '\u2014');
-            }
-            if (showFouls) {
-                gameHeaders.push('Fouls');
-                gameCells.push(String(typeFouls));
-            }
-            html += '<div class="stats-player-game-block">' +
-                '<h4 class="stats-section-title">' + GAME_TYPE_LABELS[gt] + '</h4>' +
-                buildPlayerStatsDataTable(gameHeaders, gameCells) +
-                '</div>';
-        });
-
+    function renderPlayerSummaryCards(player, winStreak) {
+        const stats = (player && player.stats) || createEmptyStats();
+        const gamesWon = stats.gamesWon || 0;
+        const gamesDrawn = stats.gamesDrawn || 0;
+        const gamesLost = stats.gamesLost || 0;
+        const racksWon = stats.racksWon || 0;
+        const racksLost = stats.racksLost || 0;
+        const highestBreak = stats.highestBreak || 0;
+        const highestRun = stats.highestRun || 0;
+        const breakAndRuns = stats.breakAndRuns || 0;
+        const tableRuns = stats.tableRuns || 0;
+        const fouls = stats.fouls || 0;
+        const ballsPotted = stats.ballsWon || 0;
         const streak = typeof winStreak === 'number' ? winStreak : 0;
-        html += '<p class="stats-win-streak">Win Streak: ' + streak + '</p>';
-        return html;
+        const cards = [];
+
+        if (gamesWon + gamesDrawn + gamesLost > 0) {
+            cards.push(
+                '<div class="stats-summary-card"><strong>' +
+                escapeHtml(formatMatchRecord(gamesWon, gamesDrawn, gamesLost)) +
+                '</strong><span>Matches W/D/L</span></div>'
+            );
+            cards.push(
+                '<div class="stats-summary-card"><strong>' +
+                winPct(gamesWon, gamesLost, gamesDrawn) +
+                '%</strong><span>Win %</span></div>'
+            );
+        }
+        if (racksWon + racksLost > 0) {
+            cards.push(
+                '<div class="stats-summary-card"><strong>' +
+                escapeHtml(String(racksWon) + '/' + String(racksLost)) +
+                '</strong><span>Racks W/L</span></div>'
+            );
+        }
+        if (highestBreak > 0) {
+            cards.push(
+                '<div class="stats-summary-card"><strong>' +
+                escapeHtml(String(highestBreak)) +
+                '</strong><span>Highest break</span></div>'
+            );
+        }
+        if (highestRun > 0) {
+            cards.push(
+                '<div class="stats-summary-card"><strong>' +
+                escapeHtml(String(highestRun)) +
+                '</strong><span>Longest run</span></div>'
+            );
+        }
+        if (breakAndRuns > 0) {
+            cards.push(
+                '<div class="stats-summary-card"><strong>' +
+                escapeHtml(String(breakAndRuns)) +
+                '</strong><span>B&amp;R</span></div>'
+            );
+        }
+        if (tableRuns > 0) {
+            cards.push(
+                '<div class="stats-summary-card"><strong>' +
+                escapeHtml(String(tableRuns)) +
+                '</strong><span>Table runs</span></div>'
+            );
+        }
+        if (fouls > 0) {
+            cards.push(
+                '<div class="stats-summary-card"><strong>' +
+                escapeHtml(String(fouls)) +
+                '</strong><span>Fouls</span></div>'
+            );
+        }
+        if (ballsPotted > 0) {
+            cards.push(
+                '<div class="stats-summary-card"><strong>' +
+                escapeHtml(String(ballsPotted)) +
+                '</strong><span>Balls potted</span></div>'
+            );
+        }
+        if (streak > 0) {
+            cards.push(
+                '<div class="stats-summary-card"><strong>' +
+                escapeHtml(String(streak)) +
+                '</strong><span>Win streak</span></div>'
+            );
+        }
+
+        if (!cards.length) {
+            return '<div class="stats-summary hidden"></div>';
+        }
+        const cols = balancedSummaryColumns(cards.length);
+        return '<div class="stats-summary" style="--stats-summary-cols:' + cols + '">' +
+            cards.join('') + '</div>';
     }
 
     function renderH2HComparisonTable(viewerId, opponentId, h2h) {
@@ -6390,7 +6783,7 @@
             '<div class="hover obs28 button stats-edit-btn" onclick="promptRenamePlayer()">Edit Name</div>' +
             '<div class="hover obs28 button stats-edit-btn stats-danger-btn" onclick="confirmDeletePlayer()">Delete Player</div>' +
             '</div></div>' +
-            '<div class="stats-section">' + renderPlayerStatsTable(player, winStreak) + '</div>' +
+            '<div class="stats-section">' + renderPlayerSummaryCards(player, winStreak) + '</div>' +
             '<div class="stats-section stats-opponent-row">' +
             '<label>Opponent:' +
             '<select id="statsPlayerOpponentSelect" onchange="refreshPlayerOpponentH2H()">' +
@@ -6403,9 +6796,10 @@
             '<div class="stats-section">' +
             '<h4 class="stats-section-title">Match History</h4>' +
             '<div class="stats-scroll-panel">' +
-            '<table class="stats-table"><thead><tr><th>Date / time</th><th>Opponent</th><th>Game</th><th>Score</th><th>Actions</th></tr></thead><tbody>' +
+            '<table class="stats-table"><thead><tr><th>Date</th><th>Match</th><th>Game</th><th>Score</th><th>Actions</th></tr></thead><tbody>' +
             matchRows + '</tbody></table></div></div>';
 
+        bindStatsMatchInteractions(detailPanel);
         const opponentSelect = document.getElementById('statsPlayerOpponentSelect');
         if (opponentSelect && prevOpponentId && prevOpponentId !== playerId &&
             opponentSelect.querySelector('option[value="' + prevOpponentId + '"]')) {
@@ -6464,7 +6858,7 @@
             '<div class="stats-player-header-actions">' +
             '<div class="hover obs28 button stats-edit-btn" onclick="promptRenamePlayer()">Edit Name</div>' +
             '</div></div>' +
-            '<div class="stats-section">' + renderPlayerStatsTable(player, winStreak) + '</div>' +
+            '<div class="stats-section">' + renderPlayerSummaryCards(player, winStreak) + '</div>' +
             '<div class="stats-section stats-opponent-row">' +
             '<label>Opponent:' +
             '<select id="statsPlayerOpponentSelect" onchange="refreshPlayerOpponentH2H()">' +
@@ -6475,9 +6869,10 @@
             '<div class="stats-section">' +
             '<h4 class="stats-section-title">Match History</h4>' +
             '<div class="stats-scroll-panel">' +
-            '<table class="stats-table"><thead><tr><th>Date / time</th><th>Opponent</th><th>Game</th><th>Score</th><th>Actions</th></tr></thead><tbody>' +
+            '<table class="stats-table"><thead><tr><th>Date</th><th>Match</th><th>Game</th><th>Score</th><th>Actions</th></tr></thead><tbody>' +
             matchRows + '</tbody></table></div></div>';
 
+        bindStatsMatchInteractions(detailPanel);
         const opponentSelect = document.getElementById('statsPlayerOpponentSelect');
         if (opponentSelect && prevOpponentId && prevOpponentId !== key &&
             opponentSelect.querySelector('option[value="' + prevOpponentId + '"]')) {
@@ -6574,15 +6969,17 @@
             return;
         }
 
-        container.innerHTML = '<table class="stats-table"><thead><tr><th>Date / time</th><th>Game</th><th>Score</th><th>Actions</th></tr></thead><tbody>' +
+        container.innerHTML = '<table class="stats-table"><thead><tr><th>Date</th><th>Match</th><th>Game</th><th>Score</th><th>Actions</th></tr></thead><tbody>' +
             renderMatchHistoryRows(h2h.matches, {
-                colspan: 4,
+                colspan: 5,
+                linkPlayers: true,
                 h2h: {
                     id1: id1,
                     name1: h2h.player1.name,
                     name2: h2h.player2.name
                 }
             }) + '</tbody></table>';
+        bindStatsMatchInteractions(container);
     }
 
     async function exportStatsJson() {
@@ -6757,6 +7154,7 @@
     window.updateMatchScoreSummary = updateMatchScoreSummary;
     window.addMatchRackRow = addMatchRackRow;
     window.removeMatchRackRow = removeMatchRackRow;
+    window.toggleMatchRacksExpanded = toggleMatchRacksExpanded;
     window.openMatchEditModal = openMatchEditModal;
     window.closeMatchEditModal = closeMatchEditModal;
     window.saveMatchFromModal = saveMatchFromModal;
