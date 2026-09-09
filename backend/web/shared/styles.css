@@ -793,23 +793,6 @@ a.table-card:focus-visible {
   margin-top: 0.1rem;
 }
 .user-email { opacity: 0.9; margin-bottom: 0.25rem; }
-.key-display {
-  background: #1a1b26;
-  padding: 0.75rem;
-  border-radius: 6px;
-  overflow-x: auto;
-  font-size: 0.8rem;
-  cursor: pointer;
-  user-select: all;
-  border: 1px solid transparent;
-  transition: border-color 0.15s ease, background 0.15s ease;
-}
-.key-display:hover,
-.key-display:focus-visible {
-  border-color: #7aa2f7;
-  background: #1f2335;
-  outline: none;
-}
 .copy-notice {
   margin: 0.35rem 0 0.5rem;
   font-size: 0.85rem;
@@ -1775,6 +1758,24 @@ body.controls-locked #reconnectBanner {
 }
 .dash-modal.hidden {
   display: none;
+}
+.dash-confirm-card {
+  max-width: 28rem;
+  width: 100%;
+  margin-top: 12vh;
+}
+.dash-confirm-message {
+  margin: 0 0 1rem;
+  line-height: 1.45;
+  opacity: 0.92;
+  white-space: pre-wrap;
+}
+.dash-confirm-actions {
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+.dash-confirm-actions .btn {
+  margin: 0;
 }
 .stats-match-game-info {
   margin-top: 0.15rem;

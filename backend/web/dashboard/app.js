@@ -76,6 +76,50 @@ function setError(msg) {
   });
 }
 
+let dashConfirmResolver = null;
+
+/**
+ * In-page confirm (more reliable than window.confirm on mobile / embedded browsers).
+ * @returns {Promise<boolean>}
+ */
+function confirmDashAction({
+  title = 'Confirm',
+  message = '',
+  confirmLabel = 'Confirm',
+  danger = false,
+} = {}) {
+  const modal = document.getElementById('dashConfirmModal');
+  const titleEl = document.getElementById('dashConfirmTitle');
+  const msgEl = document.getElementById('dashConfirmMessage');
+  const okBtn = document.getElementById('dashConfirmOkBtn');
+  const cancelBtn = document.getElementById('dashConfirmCancelBtn');
+  if (!modal || !okBtn || !cancelBtn) {
+    return Promise.resolve(window.confirm(message || title));
+  }
+  if (dashConfirmResolver) {
+    dashConfirmResolver(false);
+    dashConfirmResolver = null;
+  }
+  if (titleEl) titleEl.textContent = title;
+  if (msgEl) msgEl.textContent = message;
+  okBtn.textContent = confirmLabel || 'Confirm';
+  okBtn.classList.toggle('danger', !!danger);
+  okBtn.classList.toggle('primary', !danger);
+  modal.classList.remove('hidden');
+  okBtn.focus();
+  return new Promise((resolve) => {
+    dashConfirmResolver = resolve;
+  });
+}
+
+function closeDashConfirm(result) {
+  const modal = document.getElementById('dashConfirmModal');
+  if (modal) modal.classList.add('hidden');
+  const resolve = dashConfirmResolver;
+  dashConfirmResolver = null;
+  if (resolve) resolve(!!result);
+}
+
 let keyCopyNoticeTimer = null;
 
 function showKeyCopyNotice(msg) {
@@ -119,33 +163,14 @@ async function copyTextToClipboard(text) {
   }
 }
 
-function showApiKeyDisplay(apiKey) {
-  const el = document.getElementById('newKeyDisplay');
-  if (!el) return;
-  const key = String(apiKey || '').trim();
-  if (!key) {
-    el.dataset.apiKey = '';
-    el.textContent = '';
-    show('newKeyDisplay', false);
-    return;
-  }
-  el.dataset.apiKey = key;
-  el.textContent = `API Key (Click to copy): ${key}`;
-  show('newKeyDisplay', true);
-}
-
-async function copyDisplayedApiKey() {
-  const el = document.getElementById('newKeyDisplay');
-  if (!el || el.classList.contains('hidden')) return;
-  const key = el.dataset.apiKey || '';
-  if (!key) return;
-  const ok = await copyTextToClipboard(key);
-  if (ok) {
-    showKeyCopyNotice('API key copied to clipboard');
-    setError('');
-  } else {
-    setError('Unable to copy automatically — select and copy the key manually.');
-  }
+function revealKeyInList(labelPrefix, key) {
+  if (!key || !labelPrefix) return;
+  const row = [...document.querySelectorAll('#keyList .token-list-item')].find((el) => {
+    const span = el.querySelector('.api-key-summary');
+    return span && (span.dataset.summary || '').startsWith(`${labelPrefix} —`);
+  });
+  const span = row?.querySelector('.api-key-summary');
+  if (span) revealApiKeyInSummary(span, key);
 }
 
 function getServerUrl() {
@@ -318,15 +343,22 @@ function renderDebugRooms(rooms) {
       `<span>guest links: ${Number(room.guest_link_count) || 0}</span>`;
     const actions = document.createElement('div');
     actions.className = 'token-list-actions';
-    const kickBtn = document.createElement('button');
-    kickBtn.type = 'button';
-    kickBtn.className = 'btn danger';
-    kickBtn.textContent = 'Kick';
-    kickBtn.title = 'Disconnect clients and remove this connection mapping';
+    const kickBtn = createDashActionButton({
+      className: 'danger',
+      icon: 'kick',
+      label: 'Kick',
+      title: 'Disconnect clients and remove this connection mapping',
+    });
     kickBtn.addEventListener('click', async () => {
-      if (!window.confirm(
-        `Kick “${title}”? Clients disconnect and this connection mapping is removed. Match history is kept.`
-      )) return;
+      const ok = await confirmDashAction({
+        title: 'Kick Connection',
+        message:
+          `Kick “${title}”?\n\n` +
+          'Clients disconnect and this connection mapping is removed. Match history is kept.',
+        confirmLabel: 'Kick',
+        danger: true,
+      });
+      if (!ok) return;
       try {
         setError('');
         const result = await deleteRoom(getServerUrl(), getToken(), room.id);
@@ -386,6 +418,9 @@ function dashActionIcon(kind) {
   }
   if (kind === 'trash') {
     return `<svg ${common}><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`;
+  }
+  if (kind === 'kick') {
+    return `<svg ${common}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="17" y1="8" x2="22" y2="13"/><line x1="22" y1="8" x2="17" y2="13"/></svg>`;
   }
   return '';
 }
@@ -494,7 +529,6 @@ function renderApiKeys(keys) {
     viewBtn.addEventListener('click', async () => {
       if (label.dataset.revealedKey) {
         restoreApiKeySummary(label, label.dataset.summary);
-        showApiKeyDisplay('');
         return;
       }
       try {
@@ -503,7 +537,6 @@ function renderApiKeys(keys) {
         const key = String(data.key || '').trim();
         if (!key) throw new Error('Key not available');
         revealApiKeyInSummary(label, key);
-        showApiKeyDisplay('');
       } catch (err) {
         setError(err.message);
       }
@@ -516,9 +549,16 @@ function renderApiKeys(keys) {
       title: 'Issue a new secret with the same seat name; disconnects docks using the old key',
     });
     regenBtn.addEventListener('click', async () => {
-      if (!window.confirm(
-        `Regenerate “${k.label}”? The old secret stops working immediately. Paste the new key into the dock.`
-      )) return;
+      const ok = await confirmDashAction({
+        title: 'Regenerate Dock Key',
+        message:
+          `Regenerate “${k.label}”?\n\n` +
+          'The old secret stops working immediately and any dock using it will disconnect. ' +
+          'Paste the new key into the dock to reconnect.',
+        confirmLabel: 'Regenerate',
+        danger: true,
+      });
+      if (!ok) return;
       try {
         setError('');
         const result = await regenerateApiKey(getServerUrl(), getToken(), k.id);
@@ -533,12 +573,7 @@ function renderApiKeys(keys) {
         }
         await renderDashboard();
         if (result.key && result.label) {
-          const row = [...document.querySelectorAll('#keyList .token-list-item')].find((el) => {
-            const span = el.querySelector('.api-key-summary');
-            return span && (span.dataset.summary || '').startsWith(`${result.label} —`);
-          });
-          const span = row?.querySelector('.api-key-summary');
-          if (span) revealApiKeyInSummary(span, result.key);
+          revealKeyInList(result.label, result.key);
         }
       } catch (err) {
         setError(err.message);
@@ -552,9 +587,15 @@ function renderApiKeys(keys) {
       title: 'Free this dock seat',
     });
     removeBtn.addEventListener('click', async () => {
-      if (!window.confirm(
-        `Remove “${k.label}”? This frees the seat. Any dock using it will be disconnected.`
-      )) return;
+      const ok = await confirmDashAction({
+        title: 'Remove Dock Key',
+        message:
+          `Remove “${k.label}”?\n\n` +
+          'This frees the seat. Any dock using this key will be disconnected.',
+        confirmLabel: 'Remove',
+        danger: true,
+      });
+      if (!ok) return;
       try {
         setError('');
         const result = await revokeApiKey(getServerUrl(), getToken(), k.id);
@@ -2413,10 +2454,6 @@ async function submitDevLogin() {
     const data = await devLogin(getServerUrl(), secret);
     localStorage.setItem(TOKEN_KEY, data.access_token);
     localStorage.setItem(SERVER_KEY, getServerUrl());
-    if (data.api_key) {
-      showApiKeyDisplay(data.api_key);
-      setActiveDashTab('account');
-    }
     lastTablesFingerprint = '';
     await renderDashboard();
   } catch (err) {
@@ -2468,31 +2505,21 @@ document.getElementById('createKeyBtn').addEventListener('click', async () => {
     if (created.quota) renderQuota(created.quota);
     await renderDashboard();
     if (created.key && created.label) {
-      const row = [...document.querySelectorAll('#keyList .token-list-item')].find((el) => {
-        const span = el.querySelector('.api-key-summary');
-        return span && (span.dataset.summary || '').startsWith(`${created.label} —`);
-      });
-      const span = row?.querySelector('.api-key-summary');
-      if (span) revealApiKeyInSummary(span, created.key);
+      revealKeyInList(created.label, created.key);
+      showKeyCopyNotice('New dock key created — click the key to copy, or use Hide when done.');
     }
-    showApiKeyDisplay('');
   } catch (err) {
     setError(err.message);
   }
 });
 
-document.getElementById('newKeyDisplay')?.addEventListener('click', () => {
-  copyDisplayedApiKey();
-});
-document.getElementById('newKeyDisplay')?.addEventListener('keydown', (event) => {
-  if (event.key === 'Enter' || event.key === ' ') {
-    event.preventDefault();
-    copyDisplayedApiKey();
-  }
-});
-
-document.getElementById('signOutBtn').addEventListener('click', () => {
-  if (!window.confirm('Sign out of this dashboard on this device?')) return;
+document.getElementById('signOutBtn').addEventListener('click', async () => {
+  const ok = await confirmDashAction({
+    title: 'Sign Out',
+    message: 'Sign out of this dashboard on this device?',
+    confirmLabel: 'Sign Out',
+  });
+  if (!ok) return;
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(SERVER_KEY);
   stopLiveFeed();
@@ -2500,9 +2527,16 @@ document.getElementById('signOutBtn').addEventListener('click', () => {
 });
 
 document.getElementById('invalidateSessionsBtn')?.addEventListener('click', async () => {
-  if (!window.confirm('Sign out everywhere? This dashboard, other admin devices, and admin mobile control will be signed out and disconnected. Guest links are not affected.')) {
-    return;
-  }
+  const ok = await confirmDashAction({
+    title: 'Sign Out Everywhere',
+    message:
+      'Sign out on every device?\n\n' +
+      'This dashboard, other admin browsers, and admin mobile control will be signed out and disconnected. ' +
+      'Guest links are not affected.',
+    confirmLabel: 'Sign Out Everywhere',
+    danger: true,
+  });
+  if (!ok) return;
   try {
     await invalidateAllSessions(getServerUrl(), getToken());
   } catch (err) {
@@ -2515,9 +2549,15 @@ document.getElementById('invalidateSessionsBtn')?.addEventListener('click', asyn
 });
 
 document.getElementById('revokeAllGuestsBtn')?.addEventListener('click', async () => {
-  if (!window.confirm('Revoke all guest links and disconnect every guest scorer? They will need a new link to reconnect.')) {
-    return;
-  }
+  const ok = await confirmDashAction({
+    title: 'Revoke All Guest Sessions',
+    message:
+      'Revoke every guest link and disconnect all guest scorers?\n\n' +
+      'They will need a new link to reconnect.',
+    confirmLabel: 'Revoke All',
+    danger: true,
+  });
+  if (!ok) return;
   try {
     const result = await revokeAllGuestLinks(getServerUrl(), getToken());
     setError('');
@@ -2526,6 +2566,20 @@ document.getElementById('revokeAllGuestsBtn')?.addEventListener('click', async (
     await renderDashboard();
   } catch (err) {
     setError(err.message);
+  }
+});
+
+document.getElementById('dashConfirmOkBtn')?.addEventListener('click', () => closeDashConfirm(true));
+document.getElementById('dashConfirmCancelBtn')?.addEventListener('click', () => closeDashConfirm(false));
+document.getElementById('dashConfirmModal')?.addEventListener('click', (event) => {
+  if (event.target && event.target.id === 'dashConfirmModal') closeDashConfirm(false);
+});
+document.addEventListener('keydown', (event) => {
+  const modal = document.getElementById('dashConfirmModal');
+  if (!modal || modal.classList.contains('hidden')) return;
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closeDashConfirm(false);
   }
 });
 

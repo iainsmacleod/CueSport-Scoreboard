@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>CueSport Scoreboard Cloud — Dashboard</title>
-  <link rel="stylesheet" href="/web/shared/styles.css?v=8.0.0.43" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.0.0.45" />
 </head>
 <body>
   <header class="site-header">
@@ -165,7 +165,6 @@
           <p class="hint">One key per dock seat. Create a key for each table, paste it into that dock’s CueSport Cloud settings. A second dock using the same key is rejected. <strong>Regenerate</strong> rotates the secret and keeps the same seat name (OBS Dock Key 1, 2, …). <strong>Remove</strong> frees the seat. Connections are listed by that same key name.</p>
           <button id="createKeyBtn" class="btn">Create Dock Key</button>
           <p id="apiKeyLimitHint" class="hint hidden"></p>
-          <pre id="newKeyDisplay" class="key-display hidden" role="button" tabindex="0" title="Click to copy API key" aria-label="API key — click to copy"></pre>
           <p id="keyCopyNotice" class="copy-notice hidden" aria-live="polite"></p>
           <p id="keyRevokeNotice" class="hint hidden" aria-live="polite"></p>
           <ul id="keyList"></ul>
@@ -261,6 +260,16 @@
       </form>
     </div>
   </div>
-  <script type="module" src="/web/dashboard/app.js?v=8.0.0.61"></script>
+  <div id="dashConfirmModal" class="dash-modal hidden" role="dialog" aria-modal="true" aria-labelledby="dashConfirmTitle">
+    <div class="dash-modal-card panel dash-confirm-card">
+      <h2 id="dashConfirmTitle">Confirm</h2>
+      <p id="dashConfirmMessage" class="dash-confirm-message"></p>
+      <div class="stats-toolbar dash-confirm-actions">
+        <button type="button" id="dashConfirmOkBtn" class="btn primary">Confirm</button>
+        <button type="button" id="dashConfirmCancelBtn" class="btn">Cancel</button>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/web/dashboard/app.js?v=8.0.0.64"></script>
 </body>
 </html>
