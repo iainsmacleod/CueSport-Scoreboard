@@ -1381,9 +1381,26 @@ body.controls-locked #reconnectBanner {
   opacity: 0.65;
   font-variant-numeric: tabular-nums;
 }
+.stats-match-event {
+  max-width: 8.5rem;
+  min-width: 3.5rem;
+  vertical-align: middle;
+}
+.stats-match-event-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 .stats-match-pair-cell {
   vertical-align: middle;
   text-align: center;
+  white-space: nowrap;
+  min-width: 7rem;
 }
 .stats-match-pair {
   display: flex;
@@ -1393,18 +1410,14 @@ body.controls-locked #reconnectBanner {
   gap: 0.1rem;
   line-height: 1.25;
   min-width: 0;
-  /* Keep stacked names compact on narrow screens (≈4 content lines). */
-  max-height: calc(1.25em * 4 + 0.35rem);
-  overflow: hidden;
+  max-width: 100%;
 }
 .stats-match-player {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  overflow: hidden;
-  overflow-wrap: anywhere;
+  display: block;
   max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .stats-match-player-link {
   appearance: none;
@@ -1442,6 +1455,49 @@ body.controls-locked #reconnectBanner {
 }
 .stats-match-in-progress td {
   background: rgba(122, 162, 247, 0.08);
+}
+.stats-match-score {
+  white-space: nowrap;
+  vertical-align: middle;
+  text-align: center;
+}
+.stats-match-score-stack {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.05rem;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  /* Fixed width so 1-digit and 3-digit scores share the same center axis. */
+  min-width: 3ch;
+  width: 3ch;
+  margin: 0 auto;
+  text-align: center;
+}
+.stats-match-score-stack > span {
+  display: block;
+  width: 100%;
+  text-align: center;
+}
+.stats-match-score-sep {
+  opacity: 0.55;
+  font-weight: 600;
+  line-height: 1;
+}
+.stats-match-live-label {
+  font-weight: 700;
+  color: #7aa2f7;
+}
+.stats-match-live-link {
+  font-weight: 700;
+  color: #7aa2f7;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.stats-match-live-link:hover {
+  opacity: 0.85;
 }
 .stats-match-live-badge {
   display: flex;

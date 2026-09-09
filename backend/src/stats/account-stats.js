@@ -253,5 +253,12 @@ export function summarizeAccountStats(events) {
 /** Account stats for HTTP and WebSocket dock clients. */
 export function getAccountStats(accountId, limit = 5000) {
   const events = sqlite.getAccountSessionEvents(accountId, limit);
-  return summarizeAccountStats(events);
+  const stats = summarizeAccountStats(events);
+  for (const match of stats.matches || []) {
+    if (!match || match.status === 'completed' || !match.roomId) continue;
+    const { state } = sqlite.getRoomSessionState(match.roomId);
+    const url = String(state?.streamUrl || '').trim();
+    if (url) match.streamUrl = url;
+  }
+  return stats;
 }

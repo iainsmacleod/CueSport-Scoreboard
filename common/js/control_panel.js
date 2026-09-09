@@ -822,7 +822,7 @@ const SNOOKER_BALL_META = {
     6: { file: "snooker-pink-small.png", title: "Pink Ball (6-point)", points: 6 },
     7: { file: "snooker-black-small.png", title: "Black Ball (7-point)", points: 7 },
     8: { file: "snooker-gold-small.png", title: "Golden Ball (20-point)", points: 20 },
-    // Slot 9 was a visual gap before Free/Foul lived on the object row; now unused in snooker.
+    // Slot 9 is the visual gap between object colors and Free / Foul / Undo.
     9: { spacer: true, title: "" },
     10: { file: "snooker-freeball-small.png", title: "Free Ball", points: null },
     11: { file: "foul-small.png", title: "Foul Ball", foul: true }
@@ -1787,32 +1787,28 @@ function syncBallTrackerRows() {
     const undo = document.getElementById("snookerUndoBtn");
 
     if (isSnookerBallMode()) {
-        // Object colors stay in the first row; Free / Foul / Undo on the second;
-        // rack/frame foul totals on their own row below.
-        for (let i = 1; i <= 8; i++) {
+        // Game colors + Free / Foul / Undo on one row (spacer between groups).
+        // Rack/frame foul totals stay on their own row below.
+        for (let i = 1; i <= 9; i++) {
             const el = document.getElementById("ball " + i);
             if (el) {
                 objectRow.appendChild(el);
             }
         }
-        const b9 = document.getElementById("ball 9");
-        if (b9) {
-            objectRow.appendChild(b9);
-        }
         if (b10) {
-            actionRow.appendChild(b10);
+            objectRow.appendChild(b10);
         }
         if (b11) {
-            actionRow.appendChild(b11);
+            objectRow.appendChild(b11);
+        }
+        if (undo) {
+            objectRow.appendChild(undo);
         }
         if (poolFoul) {
             actionRow.appendChild(poolFoul);
         }
         if (poolRespot) {
             actionRow.appendChild(poolRespot);
-        }
-        if (undo) {
-            actionRow.appendChild(undo);
         }
     } else {
         // Pool: numbered object balls in order; Foul / Respot / Undo on the second row.
@@ -3173,8 +3169,13 @@ function applySnookerTrackerLayout() {
             ball.removeAttribute("aria-disabled");
             continue;
         }
-        if (i >= 12 || i === 9) {
-            // 9 was the Free/Foul spacer; action controls are on their own row now.
+        if (i === 9) {
+            // Visual gap between object colors and Free / Foul / Undo.
+            ball.classList.remove("noShow");
+            ball.classList.add("snooker-spacer");
+            continue;
+        }
+        if (i >= 12) {
             ball.classList.add("noShow");
             ball.classList.remove("snooker-spacer");
             continue;

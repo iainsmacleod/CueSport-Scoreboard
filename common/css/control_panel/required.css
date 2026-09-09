@@ -1179,8 +1179,12 @@ a.cp-text-link:hover {
 #ballTrackerDiv .ball.snooker-spacer {
 	visibility: hidden;
 	pointer-events: none;
-	min-width: 40px;
-	min-height: 40px;
+	min-width: 28px;
+	width: 28px;
+	min-height: 1px;
+	height: 1px;
+	overflow: hidden;
+	flex: 0 0 28px;
 }
 
 #ballTrackerDiv.ball-tracker-locked {

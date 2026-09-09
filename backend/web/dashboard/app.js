@@ -31,6 +31,7 @@ let dashClient = null;
 let reconnectTimer = null;
 let reconnectAttempt = 0;
 let lastTablesFingerprint = '';
+let lastDashboardRooms = [];
 let wantLiveFeed = false;
 let lastQuota = null;
 let statsData = null;
@@ -787,9 +788,53 @@ function renderLeaderboardPager(pageInfo) {
 }
 
 function scoreLine(match) {
-  if (isMatchInProgress(match) && !match.scores) return 'In progress';
+  if (isMatchInProgress(match) && !match.scores) return 'Live';
   if (!match.scores) return '—';
   return `${match.scores.p1 ?? 0}–${match.scores.p2 ?? 0}`;
+}
+
+function safeHttpUrl(value) {
+  const url = String(value || '').trim();
+  if (!/^https?:\/\//i.test(url)) return '';
+  return url;
+}
+
+/** Prefer match.streamUrl from stats API; fall back to live room state on dashboard. */
+function resolveMatchStreamUrl(match) {
+  const direct = safeHttpUrl(match && match.streamUrl);
+  if (direct) return direct;
+  const roomId = match && match.roomId;
+  if (!roomId) return '';
+  const room = (lastDashboardRooms || []).find((r) => r && r.id === roomId);
+  return safeHttpUrl(room && room.live_state && room.live_state.streamUrl);
+}
+
+function scoreStackHtml(top, bottom) {
+  return `<div class="stats-match-score-stack">` +
+    `<span>${escapeHtml(String(top))}</span>` +
+    `<span class="stats-match-score-sep" aria-hidden="true">-</span>` +
+    `<span>${escapeHtml(String(bottom))}</span>` +
+    `</div>`;
+}
+
+function scoreCellHtml(match, options = {}) {
+  const inProgress = isMatchInProgress(match);
+  if (inProgress && !match.scores) {
+    const url = resolveMatchStreamUrl(match);
+    if (url) {
+      return `<a class="stats-match-live-link" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" title="Open stream">Live</a>`;
+    }
+    return '<span class="stats-match-live-label">Live</span>';
+  }
+  if (options.viewerRelative && options.playerKey) {
+    const key = String(options.playerKey || '').toLowerCase();
+    const isP1 = String(match.player1Name || '').toLowerCase() === key;
+    const own = isP1 ? (match.scores?.p1 ?? 0) : (match.scores?.p2 ?? 0);
+    const opp = isP1 ? (match.scores?.p2 ?? 0) : (match.scores?.p1 ?? 0);
+    return scoreStackHtml(own, opp);
+  }
+  if (!match.scores) return escapeHtml('—');
+  return scoreStackHtml(match.scores.p1 ?? 0, match.scores.p2 ?? 0);
 }
 
 /** Normalize stored winner / scores into a decisive result or draw. */
@@ -1287,10 +1332,10 @@ function matchOverviewRow(m) {
   const main = `
     <tr class="${inProgress ? 'stats-match-in-progress' : ''}">
       <td class="stats-match-when">${matchDateCellHtml(m.completedAt || m.startedAt, matchDateOptions(m, inProgress))}</td>
-      <td>${escapeHtml(m.gameInfo || '—')}</td>
+      <td class="stats-match-event"><span class="stats-match-event-text">${escapeHtml(m.gameInfo || '—')}</span></td>
       <td>${escapeHtml(gameTypeLabel(m.gameType))}</td>
       <td class="stats-match-pair-cell">${matchPairHtml(m)}</td>
-      <td>${escapeHtml(scoreLine(m))}</td>
+      <td class="stats-match-score">${scoreCellHtml(m)}</td>
       <td class="stats-match-actions">${actions.join('')}</td>
     </tr>
   `;
@@ -1453,11 +1498,7 @@ function renderPlayerDetail() {
     return;
   }
   body.innerHTML = matches.map((m) => {
-    const isP1 = String(m.player1Name || '').toLowerCase() === selectedPlayerKey;
     const inProgress = isMatchInProgress(m);
-    const own = isP1 ? (m.scores?.p1 ?? 0) : (m.scores?.p2 ?? 0);
-    const opp = isP1 ? (m.scores?.p2 ?? 0) : (m.scores?.p1 ?? 0);
-    const scoreText = inProgress && !m.scores ? 'In progress' : `${own} - ${opp}`;
     const actions = [];
     const racksToggle = matchRacksToggleButton(m);
     if (racksToggle) actions.push(racksToggle);
@@ -1471,7 +1512,10 @@ function renderPlayerDetail() {
         <td class="stats-match-when">${matchDateCellHtml(m.completedAt || m.startedAt, matchDateOptions(m, inProgress))}</td>
         <td class="stats-match-pair-cell">${matchPairHtml(m)}</td>
         <td>${formatMatchGameCellHtml(m)}</td>
-        <td>${escapeHtml(scoreText)}</td>
+        <td class="stats-match-score">${scoreCellHtml(m, {
+          viewerRelative: true,
+          playerKey: selectedPlayerKey,
+        })}</td>
         <td class="stats-match-actions">${actions.join('')}</td>
       </tr>
     `;
@@ -1945,6 +1989,7 @@ async function connectLiveFeed() {
   dashClient = client;
 
   client.on('tables', (rooms) => {
+    lastDashboardRooms = rooms || [];
     renderTableCards(rooms);
     renderDebugRooms(rooms);
   });
@@ -1985,6 +2030,7 @@ async function renderDashboard() {
     document.getElementById('userEmail').textContent = me.account.email;
     renderQuota(me.quota);
     renderApiKeys(me.api_keys);
+    lastDashboardRooms = me.rooms || [];
     renderTableCards(me.rooms);
     renderDebugRooms(me.rooms);
     wantLiveFeed = true;
