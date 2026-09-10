@@ -596,10 +596,9 @@ select.dropdown option,
 
 .feature-settings-grid {
 	display: flex;
-	flex-flow: row nowrap;
-	justify-content: space-between;
-	align-items: flex-start;
-	gap: var(--field-gap);
+	flex-direction: column;
+	align-items: stretch;
+	gap: 8px;
 	width: 100%;
 	max-width: 100%;
 	padding: var(--row-padding);
@@ -607,43 +606,13 @@ select.dropdown option,
 	box-sizing: border-box;
 }
 
-.feature-settings-column {
+.feature-settings-row {
 	display: flex;
-	flex-direction: column;
-	gap: 8px;
-	flex: 0 0 auto;
-}
-
-.settings-ball-column {
-	padding-bottom: 0;
-}
-
-.settings-ball-row {
-	display: flex;
-	flex-flow: row wrap;
+	flex-flow: row nowrap;
 	justify-content: space-between;
 	align-items: center;
 	gap: var(--field-gap);
 	width: 100%;
-}
-
-.settings-ball-row .settings-ball-option {
-	flex: 0 0 auto;
-}
-
-.settings-ball-direction-row {
-	display: flex;
-	justify-content: flex-start;
-	align-items: center;
-	width: 100%;
-	padding-top: 4px;
-}
-
-.settings-ball-option {
-	display: flex;
-	align-items: center;
-	gap: var(--pair-gap);
-	min-height: 32px;
 }
 
 /* Horizontal control row — label/field pairs use gap; not space-between */
@@ -1371,7 +1340,25 @@ label.switch.toggle-disabled {
 	cursor: not-allowed;
 }
 
-.section-header-with-controls.stream-promotion-unavailable .settings-cog-btn {
+.stream-promotion-field {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--field-gap);
+	width: 100%;
+	min-width: 0;
+}
+
+.stream-promotion-field #streamSharingLabel {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+#streamPromotionRow.stream-promotion-unavailable #streamSharingLabel {
+	opacity: 0.6 !important;
+}
+
+#streamPromotionRow.stream-promotion-unavailable .settings-cog-btn {
 	opacity: 1; /* keep settings reachable */
 }
 
@@ -1446,6 +1433,13 @@ label.switch.toggle-disabled {
 	text-transform: uppercase;
 	font-weight: bold;
 	font-size: 16px;
+}
+
+.tablinks.tablinks-disabled,
+.tablinks[aria-disabled="true"] {
+	opacity: 0.4;
+	pointer-events: none;
+	cursor: not-allowed;
 }
 
 .zoom-controls {
@@ -2684,6 +2678,12 @@ label.switch.toggle-disabled {
 	margin-top: 4px;
 	max-width: 100%;
 	min-width: 0;
+}
+
+/* Single scrollbar in the stats modal — let the modal body scroll the full player/H2H content. */
+#statsModal .stats-scroll-panel {
+	max-height: none;
+	overflow: visible;
 }
 
 .stats-scroll-panel > .stats-table-wrap {

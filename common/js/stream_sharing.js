@@ -321,10 +321,9 @@
             }
         }
 
-        const section = document.getElementById('streamSharingLabel');
-        const header = section && section.closest('.section-header-with-controls');
-        if (header) {
-            header.classList.toggle('stream-promotion-unavailable', !usable);
+        const row = document.getElementById('streamPromotionRow');
+        if (row) {
+            row.classList.toggle('stream-promotion-unavailable', !usable);
         }
     }
 
@@ -333,18 +332,9 @@
         const section = document.getElementById('streamSharingLabel');
         if (!section) return;
 
-        const switchLabel = document.querySelector('#streamPromotionToggle')?.closest('label.switch, label.toggle');
-        const streamElements = [section];
-        if (switchLabel) streamElements.push(switchLabel);
-
-        streamElements.forEach(el => {
-            if (!el) return;
-            if (!isCloudEnabled() || !isObsStreaming) {
-                el.style.opacity = '0.6';
-            } else {
-                el.style.opacity = '1';
-            }
-        });
+        // Match replay-source disabled opacity (single 0.6 pass; cog stays fully opaque).
+        const usable = canUseStreamPromotion();
+        section.style.setProperty('opacity', usable ? '1' : '0.6', 'important');
     }
 
     function clearPromotionEnabled() {

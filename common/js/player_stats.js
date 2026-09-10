@@ -218,6 +218,44 @@
         return payload;
     }
 
+    /** Cloud toggle is on but WS join is not finished — local vs cloud stats are in flux. */
+    function isCloudStatsTransient() {
+        return !!(window.cloudRelay &&
+            typeof window.cloudRelay.isEnabled === 'function' &&
+            window.cloudRelay.isEnabled() &&
+            typeof window.cloudRelay.isConnected === 'function' &&
+            !window.cloudRelay.isConnected());
+    }
+
+    function isStatsTabAvailable() {
+        return !isCloudStatsTransient();
+    }
+
+    /** Disable Stats tab while CueSport Cloud is connecting; leave the tab if needed. */
+    function updateStatsTabAvailability() {
+        const pending = isCloudStatsTransient();
+        const tab = document.getElementById('statsTab');
+        if (tab) {
+            tab.classList.toggle('tablinks-disabled', pending);
+            tab.setAttribute('aria-disabled', pending ? 'true' : 'false');
+            if (pending) {
+                tab.title = 'Stats unlocks when CueSport Cloud finishes connecting';
+            } else {
+                tab.removeAttribute('title');
+            }
+        }
+        if (!pending) {
+            return;
+        }
+        closeStatsModal();
+        const panel = document.getElementById('StatsSettings');
+        if (panel && panel.style.display === 'block') {
+            if (typeof selectControlPanelTab === 'function') {
+                selectControlPanelTab('GeneralSettings');
+            }
+        }
+    }
+
     /** True when cloud relay is enabled and connected — stats should come from backend. */
     function isCloudStatsMode() {
         return !!(window.cloudRelay &&
@@ -5301,12 +5339,17 @@
         } else {
             expandedMatchRacks.add(id);
         }
+        const body = document.querySelector('#statsModal .stats-modal-body');
+        const scrollTop = body ? body.scrollTop : 0;
         const detailTab = document.getElementById('statsTab-detail');
         const h2hTab = document.getElementById('statsTab-h2h');
         if (detailTab && !detailTab.classList.contains('noShow') && statsModalSelectedPlayerId) {
             await showPlayerDetail(statsModalSelectedPlayerId);
         } else if (h2hTab && !h2hTab.classList.contains('noShow')) {
             await refreshH2HView();
+        }
+        if (body) {
+            body.scrollTop = scrollTop;
         }
     }
 
@@ -6348,6 +6391,9 @@
     let statsModalSelectedPlayerId = null;
 
     async function openStatsModal() {
+        if (!isStatsTabAvailable()) {
+            return;
+        }
         const modal = document.getElementById('statsModal');
         if (!modal) {
             return;
@@ -6407,14 +6453,20 @@
         if (!allowed[tabName]) {
             tabName = 'leaderboard';
         }
+        const previousBtn = document.querySelector('.stats-tab-btn.active');
+        const previousTab = previousBtn ? previousBtn.dataset.tab : null;
+        const tabChanged = previousTab !== tabName;
+
         document.querySelectorAll('.stats-tab-btn').forEach(function (btn) {
             btn.classList.toggle('active', btn.dataset.tab === tabName);
         });
         document.querySelectorAll('.stats-tab-panel').forEach(function (panel) {
             panel.classList.toggle('noShow', panel.id !== 'statsTab-' + tabName);
         });
+        // Only jump to top when switching tabs — not when refreshing the same panel
+        // (e.g. expand/collapse rack details on Player detail).
         const body = document.querySelector('#statsModal .stats-modal-body');
-        if (body) {
+        if (body && tabChanged) {
             body.scrollTop = 0;
         }
         if (tabName === 'h2h') {
@@ -7150,6 +7202,8 @@
     };
 
     window.openStatsModal = openStatsModal;
+    window.isStatsTabAvailable = isStatsTabAvailable;
+    window.updateStatsTabAvailability = updateStatsTabAvailability;
     window.closeStatsModal = closeStatsModal;
     window.switchStatsTab = switchStatsTab;
     window.onStatVisibilityToggle = onStatVisibilityToggle;
@@ -7195,6 +7249,7 @@
     // Refresh stats UI when cloud connection state changes
     function onCloudStateChange() {
         invalidateCloudStatsCache();
+        updateStatsTabAvailability();
         var cloud = isCloudStatsMode();
         updateStatsActionButtons(cloud);
         var banner = document.getElementById('statsCloudBanner');
@@ -7203,6 +7258,11 @@
         if (cta) cta.style.display = cloud ? '' : 'none';
     }
     window.addEventListener('cloudRelayStateChange', onCloudStateChange);
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', updateStatsTabAvailability);
+    } else {
+        updateStatsTabAvailability();
+    }
 
     openDatabase().then(function () {
         return repairPlayerRecords();

@@ -21,7 +21,7 @@ for more information about Salotto please visit https://salotto.app
     <link rel="stylesheet" href="./common/css/control_panel/grey.css?v=8.0.0" />
     <link rel="stylesheet" href="./common/css/control_panel/light.css?v=8.0.0" />
     <link rel="stylesheet" href="./common/css/control_panel/rachni.css?v=8.0.0" />
-    <link rel="stylesheet" href="./common/css/control_panel/required.css?v=8.0.0.26" />
+    <link rel="stylesheet" href="./common/css/control_panel/required.css?v=8.0.0.33" />
     <script>
         //---------------------------------------------------------------------------------------------
         var versionNum = "8.0.0";
@@ -32,9 +32,9 @@ for more information about Salotto please visit https://salotto.app
     <script src="./common/js/scoreboard_helpers.js?v=8.0.0"></script>
     <script src="./common/js/match_racks.js?v=8.0.0"></script>
     <script src="./common/js/cloud_relay.js?v=8.0.0.12"></script>
-    <script src="./common/js/stream_sharing.js?v=8.0.0"></script>
-    <script src="./common/js/player_stats.js?v=8.0.0.37"></script>
-    <script src="./common/js/control_panel.js?v=8.0.0.35"></script>
+    <script src="./common/js/stream_sharing.js?v=8.0.0.2"></script>
+    <script src="./common/js/player_stats.js?v=8.0.0.40"></script>
+    <script src="./common/js/control_panel.js?v=8.0.0.39"></script>
     <script src="./common/js/cloud_commands.js?v=8.0.0.7"></script>
     <script src="./common/js/cloud_auth.js?v=8.0.0.1"></script>
     <script src="hotkeys.js?v=8.0.0"></script>
@@ -65,7 +65,6 @@ for more information about Salotto please visit https://salotto.app
             <button id="gameInfoTab" class="tablinks" onclick="openTab(event, 'GameInfo')">Setup</button>
             <button id="controlsTab" class="tablinks" onclick="openTab(event, 'Controls')">Controls</button>
             <button id="imagesTab" class="tablinks" onclick="openTab(event, 'Images')">Images</button>
-            <button id="replaySettingsTab" class="tablinks" onclick="openTab(event, 'ReplaySettings')">Replay/Share</button>
             <button id="statsTab" class="tablinks" onclick="openTab(event, 'StatsSettings')">Stats</button>
             <button id="generalSettingsTab" class="tablinks" onclick="openTab(event, 'GeneralSettings')">Settings</button>
         </div>
@@ -563,8 +562,119 @@ for more information about Salotto please visit https://salotto.app
                 <label id="logoSettingsLabel">Player/Team logos should be square</label>
             </div>
         </div> <!-- Images Tab-->
-        <!-- Replay Settings Tab -->
-        <div id="ReplaySettings" class="tabcontent">
+        <!-- Stats Tab -->
+        <div id="StatsSettings" class="tabcontent">
+            <div class="section-header">Player Statistics</div>
+            <div class="column stats-main-actions">
+                <div class="hover obs28 button" id="statsBtn" onclick="openStatsModal()">
+                    Player Stats
+                </div>
+                <div class="hover obs28 button" id="statsImportBtn" onclick="importStatsJsonFile()">
+                    Import
+                </div>
+                <div class="hover obs28 button" id="statsExportBtn" onclick="exportStatsJson()">
+                    Export
+                </div>
+                <div class="hover obs28 button stats-danger-btn" id="statsClearBtn" onclick="clearAllStatsConfirmed()">
+                    Clear
+                </div>
+                <input type="file" id="statsImportFile" accept=".json,application/json" class="noShow" onchange="handleStatsImportFile(this)" />
+            </div>
+            <p class="stats-hint" id="statsActionHint">Export creates a backup file. Import replaces all current statistics after confirmation. Clear permanently deletes statistics history and resets the current game (names, race/event info, and scoreline).</p>
+            <div class="section-header">Overlay Stats Display</div>
+            <p class="stats-tab-help">Choose which stats appear on the P1 / P2 / H2H overlay panels for the selected game type.</p>
+            <div class="stats-visibility-toolbar">
+                <label for="statsVisibilityGameType">Game variant</label>
+                <select class="dropdown" id="statsVisibilityGameType" onchange="onStatsVisibilityGameTypeChange(this.value)"></select>
+            </div>
+            <div id="statsVisibilityPanel" class="stats-visibility-panel"></div>
+        </div>
+        <!-- General Settings Tab -->
+        <div id="GeneralSettings" class="tabcontent">
+            <div class="section-header" id="uiSettingLabel">UI Setting</div>
+            <div class="panel-stack">
+                <div class="panel-row">
+                    <label for="obsTheme">OBS Theme</label>
+                    <select class="dropdown" id="obsTheme" onchange="obsThemeChange()">
+                        <option value="28">Default</option>
+                        <option value="27" selected>Classic</option>
+                        <option value="acri">Acri</option>
+                        <option value="grey">Grey</option>
+                        <option value="light">Light</option>
+                        <option value="rachni">Rachni</option>
+                    </select>
+                    <span></span>
+                </div>
+                <div class="panel-row">
+                    <label for="uiScaling">Overlay Scaling</label>
+                    <input type="range" min="40" max="100" value="100" class="uiScalingSlider" id="uiScaling"
+                        onchange="saveScaling()" />
+                    <span id="sliderUiScalingValue">100%</span>
+                </div>
+                <div class="panel-row">
+                    <label class="slidecontainer" id="opacityLabel" for="scoreOpacity">Overlay Opacity</label>
+                    <input type="range" min="0" max="100" value="100" class="slider" id="scoreOpacity"
+                        onchange="saveOpacity()" />
+                    <span id="sliderValue">100%</span>
+                </div>
+            </div>
+            <div class="section-header" id="feaureSettingLabel">
+                Feature Settings
+            </div>
+            <div class="feature-settings-grid">
+                <div class="feature-settings-row">
+                    <div class="field-inline">
+                        <label for="usePlayer1Setting">Player 1</label>
+                        <input type="checkbox" class="smallSize" id="usePlayer1Setting" onchange="playerSetting(1)"
+                            checked />
+                    </div>
+                    <div class="field-inline">
+                        <label for="usePlayer2Setting">Player 2</label>
+                        <input type="checkbox" class="smallSize" id="usePlayer2Setting" onchange="playerSetting(2)"
+                            checked />
+                    </div>
+                    <div class="field-inline">
+                        <label for="scoreDisplay">Show Scores</label>
+                        <input type="checkbox" class="smallSize" id="scoreDisplay"
+                            onchange="scoreDisplaySetting()" checked />
+                    </div>
+                </div>
+                <div class="feature-settings-row">
+                    <div class="field-inline">
+                        <label for="useToggleSetting" id="labelForUseToggleSetting">Active Player Indicator</label>
+                        <input type="checkbox" class="smallSize" id="useToggleSetting" onchange="toggleSetting()" />
+                    </div>
+                    <div class="field-inline">
+                        <label for="useClockSetting" id="labelForUseClockSetting">Shot Clock</label>
+                        <input type="checkbox" class="smallSize" id="useClockSetting" onchange="clockSetting()" />
+                    </div>
+                    <div class="field-inline" id="winAnimationDiv">
+                        <label for="winAnimation">Win Animation</label>
+                        <input type="checkbox" class="smallSize" id="winAnimation"
+                            onchange="toggleAnimationSetting()" />
+                    </div>
+                </div>
+                <div class="feature-settings-row">
+                    <div class="field-inline">
+                        <label for="ballTrackerCheckbox" id="labelForBallTrackerCheckbox">Ball Scoring</label>
+                        <input type="checkbox" class="smallSize" id="ballTrackerCheckbox" onchange="useBallTracker()" />
+                    </div>
+                    <div class="field-inline" id="ballDisplayDiv">
+                        <label for="ballDisplayCheckbox" id="labelForBallDisplayCheckbox">Display Balls</label>
+                        <input type="checkbox" class="smallSize" id="ballDisplayCheckbox" onchange="useBallDisplay()" />
+                    </div>
+                    <div class="field-inline" id="ballSetDiv">
+                        <label for="ballSetCheckbox" id="labelForBallSetCheckbox">Ball Set Toggle</label>
+                        <input type="checkbox" class="smallSize" id="ballSetCheckbox" onchange="useBallSetToggle()" />
+                    </div>
+                    <div class="hover obs28 button noShow" id="ballTrackerDirectionDiv"
+                        onclick="toggleBallTrackerDirection()">
+                        Vertical Ball Display
+                    </div>
+                </div>
+            </div>
+
+            <!-- CueSport Cloud / Replay / Stream Promotion -->
             <!-- CueSport Cloud Section -->
             <div class="section-header-with-controls">
                 <span id="cloudRelayLabel">
@@ -592,9 +702,9 @@ for more information about Salotto please visit https://salotto.app
                 </div>
             </div>
 
-            <!-- Enable Replay and Promotion Function Section -->
+            <!-- Enable Replay Function Section -->
             <div class="section-header-with-controls">
-                <span id="replaySettingsLabel">Enable Replay and Promotion Function</span>
+                <span id="replaySettingsLabel">Enable Replay Function</span>
                 <div class="section-controls">
                     <button class="settings-cog-btn" id="websocketSettingsCog" onclick="openWebSocketSettingsModal()" title="WebSocket Settings">
                         &#x2699;
@@ -606,9 +716,8 @@ for more information about Salotto please visit https://salotto.app
                 </div>
             </div>
 
-            <div class="column form-rows">
-                <div class="section-header" id="replaySourceSettingsLabel">Replay Source Settings</div>
-                <div class="form-row">
+            <div class="column form-rows" id="replayFormRows">
+                <div class="form-row replay-source-row">
                     <div class="field">
                         <label>Media Source Name *: </label>
                         <input style="width: 150px" type="text" id="replayVideoSourceName" placeholder="" />
@@ -618,7 +727,7 @@ for more information about Salotto please visit https://salotto.app
                         <input style="width: 150px" type="text" id="replayIndicatorSourceName" placeholder="" />
                     </div>
                 </div>
-                <div class="form-row">
+                <div class="form-row replay-source-row">
                     <div class="field">
                     <label>Auto-resume Monitoring: </label>
                     <input class="smallSize" type="checkbox" id="autoResumeReplayBuffer" onchange="autoResumeReplayBuffer()"/>
@@ -629,26 +738,24 @@ for more information about Salotto please visit https://salotto.app
                         </div>
                     </div>
                 </div>
-                <div class="form-row" style="margin-top: 15px;">
-                    <div class="field">
-                        *Required Fields
+                <div class="form-row" id="streamPromotionRow">
+                    <div class="field stream-promotion-field">
+                        <span id="streamSharingLabel">Promote Live Stream</span>
+                        <div class="section-controls">
+                            <button class="settings-cog-btn" id="streamPromotionSettingsCog" onclick="openStreamPromotionSettingsModal()" title="Promote Live Stream settings">
+                                &#x2699;
+                            </button>
+                            <label class="switch toggle">
+                                <input type="checkbox" id="streamPromotionToggle" onchange="toggleStreamPromotion()" />
+                                <span class="slider_round"></span>
+                            </label>
+                        </div>
                     </div>
                 </div>
-            </div>
-
-            <!-- Stream Promotion Section -->
-            <div class="section-header-with-controls">
-                <span id="streamSharingLabel">
-                    Promote Live Stream (<a href="https://cuesports.macleod.systems/streams" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: underline;">cuesports.macleod.systems</a>)
-                </span>
-                <div class="section-controls">
-                    <button class="settings-cog-btn" id="streamPromotionSettingsCog" onclick="openStreamPromotionSettingsModal()" title="Promote Live Stream settings">
-                        &#x2699;
-                    </button>
-                    <label class="switch toggle">
-                        <input type="checkbox" id="streamPromotionToggle" onchange="toggleStreamPromotion()" />
-                        <span class="slider_round"></span>
-                    </label>
+                <div class="form-row replay-source-row">
+                    <div class="field" style="width: 100%; text-align: right;">
+                        *Required Fields
+                    </div>
                 </div>
             </div>
             
@@ -656,7 +763,7 @@ for more information about Salotto please visit https://salotto.app
             <div id="websocketSettingsModal" class="modal">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h2>Enable Replay and Promotion Function</h2>
+                        <h2>Enable Replay Function</h2>
                         <span class="modal-close" onclick="closeWebSocketSettingsModal()">&times;</span>
                     </div>
                     <div class="modal-body">
@@ -700,6 +807,14 @@ for more information about Salotto please visit https://salotto.app
                         <span class="modal-close" onclick="closeStreamPromotionSettingsModal()">&times;</span>
                     </div>
                     <div class="modal-body">
+                        <p class="stats-hint" style="margin: 0 0 0.75rem;">
+                            OBS WebSocket must be connected to verify that OBS is streaming, and streaming must be on.
+                            Turn on <strong>Enable Replay Function</strong> above to connect, then enable Promote Live Stream once you are live.
+                        </p>
+                        <p class="stats-hint" style="margin: 0 0 0.75rem;">
+                            Promoted streams are listed on
+                            <a href="https://cuesports.macleod.systems/streams" target="_blank" rel="noopener noreferrer" class="cp-text-link">cuesports.macleod.systems</a>.
+                        </p>
                         <div class="form-row">
                             <div class="field">
                                 <label for="manualStreamUrlModal">Stream URL:</label>
@@ -778,127 +893,7 @@ for more information about Salotto please visit https://salotto.app
                     </div>
                 </div>
             </div>
-        </div> <!-- Replay Settings Tab-->
-        <!-- Stats Tab -->
-        <div id="StatsSettings" class="tabcontent">
-            <div class="section-header">Player Statistics</div>
-            <div class="column stats-main-actions">
-                <div class="hover obs28 button" id="statsBtn" onclick="openStatsModal()">
-                    Player Stats
-                </div>
-                <div class="hover obs28 button" id="statsImportBtn" onclick="importStatsJsonFile()">
-                    Import
-                </div>
-                <div class="hover obs28 button" id="statsExportBtn" onclick="exportStatsJson()">
-                    Export
-                </div>
-                <div class="hover obs28 button stats-danger-btn" id="statsClearBtn" onclick="clearAllStatsConfirmed()">
-                    Clear
-                </div>
-                <input type="file" id="statsImportFile" accept=".json,application/json" class="noShow" onchange="handleStatsImportFile(this)" />
-            </div>
-            <p class="stats-hint" id="statsActionHint">Export creates a backup file. Import replaces all current statistics after confirmation. Clear permanently deletes statistics history and resets the current game (names, race/event info, and scoreline).</p>
-            <div class="section-header">Overlay Stats Display</div>
-            <p class="stats-tab-help">Choose which stats appear on the P1 / P2 / H2H overlay panels for the selected game type.</p>
-            <div class="stats-visibility-toolbar">
-                <label for="statsVisibilityGameType">Game variant</label>
-                <select class="dropdown" id="statsVisibilityGameType" onchange="onStatsVisibilityGameTypeChange(this.value)"></select>
-            </div>
-            <div id="statsVisibilityPanel" class="stats-visibility-panel"></div>
-        </div>
-        <!-- General Settings Tab -->
-        <div id="GeneralSettings" class="tabcontent">
-            <div class="section-header" id="uiSettingLabel">UI Setting</div>
-            <div class="panel-stack">
-                <div class="panel-row">
-                    <label for="obsTheme">OBS Theme</label>
-                    <select class="dropdown" id="obsTheme" onchange="obsThemeChange()">
-                        <option value="28">Default</option>
-                        <option value="27" selected>Classic</option>
-                        <option value="acri">Acri</option>
-                        <option value="grey">Grey</option>
-                        <option value="light">Light</option>
-                        <option value="rachni">Rachni</option>
-                    </select>
-                    <span></span>
-                </div>
-                <div class="panel-row">
-                    <label for="uiScaling">Overlay Scaling</label>
-                    <input type="range" min="40" max="100" value="100" class="uiScalingSlider" id="uiScaling"
-                        onchange="saveScaling()" />
-                    <span id="sliderUiScalingValue">100%</span>
-                </div>
-                <div class="panel-row">
-                    <label class="slidecontainer" id="opacityLabel" for="scoreOpacity">Overlay Opacity</label>
-                    <input type="range" min="0" max="100" value="100" class="slider" id="scoreOpacity"
-                        onchange="saveOpacity()" />
-                    <span id="sliderValue">100%</span>
-                </div>
-            </div>
-            <div class="section-header" id="feaureSettingLabel">
-                Feature Settings
-            </div>
-            <div class="feature-settings-grid">
-                <div class="feature-settings-column">
-                    <div class="field-inline">
-                        <label for="usePlayer1Setting">Player 1</label>
-                        <input type="checkbox" class="smallSize" id="usePlayer1Setting" onchange="playerSetting(1)"
-                            checked />
-                    </div>
-                    <div class="field-inline">
-                        <label for="usePlayer2Setting">Player 2</label>
-                        <input type="checkbox" class="smallSize" id="usePlayer2Setting" onchange="playerSetting(2)"
-                            checked />
-                    </div>
-                </div>
-                <div class="feature-settings-column">
-                    <div class="field-inline">
-                        <label for="scoreDisplay">Show Scores</label>
-                        <input type="checkbox" class="smallSize" id="scoreDisplay"
-                            onchange="scoreDisplaySetting()" checked />
-                    </div>
-                    <div class="field-inline">
-                        <label for="useToggleSetting" id="labelForUseToggleSetting">Active Player Indicator</label>
-                        <input type="checkbox" class="smallSize" id="useToggleSetting" onchange="toggleSetting()" />
-                    </div>
-                </div>
-                <div class="feature-settings-column">
-                    <div class="field-inline">
-                        <label for="useClockSetting" id="labelForUseClockSetting">Shot Clock</label>
-                        <input type="checkbox" class="smallSize" id="useClockSetting" onchange="clockSetting()" />
-                    </div>
-                    <div class="field-inline" id="winAnimationDiv">
-                        <label for="winAnimation">Win Animation</label>
-                        <input type="checkbox" class="smallSize" id="winAnimation"
-                            onchange="toggleAnimationSetting()" />
-                    </div>
-                </div>
-            </div>
-            <div class="section-header" id="ballSettingLabel">
-                Ball Settings
-            </div>
-            <div class="panel-stack settings-ball-column">
-                <div class="settings-ball-row">
-                    <div class="settings-ball-option">
-                        <label for="ballTrackerCheckbox" id="labelForBallTrackerCheckbox">Ball Scoring</label>
-                        <input type="checkbox" class="smallSize" id="ballTrackerCheckbox" onchange="useBallTracker()" />
-                    </div>
-                    <div class="settings-ball-option" id="ballDisplayDiv">
-                        <label for="ballDisplayCheckbox" id="labelForBallDisplayCheckbox">Display Balls</label>
-                        <input type="checkbox" class="smallSize" id="ballDisplayCheckbox" onchange="useBallDisplay()" />
-                    </div>
-                    <div class="settings-ball-option" id="ballSetDiv">
-                        <label for="ballSetCheckbox" id="labelForBallSetCheckbox">Ball Set Toggle</label>
-                        <input type="checkbox" class="smallSize" id="ballSetCheckbox" onchange="useBallSetToggle()" />
-                    </div>
-                </div>
-                <div class="settings-ball-direction-row">
-                    <div class="hover obs28 button noShow" id="ballTrackerDirectionDiv"
-                        onclick="toggleBallTrackerDirection()">
-                        Vertical Ball Display
-                    </div>
-                </div>
-            </div>
+        
             <div class="section-header" id="updateCheckLabel">Version Check</div>
             <div class="column">
                 <div class="hover obs28 button" id="updateCheck" onclick="checkForUpdate()">

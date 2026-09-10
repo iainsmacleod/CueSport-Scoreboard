@@ -206,6 +206,11 @@ function initControlPanelTooltips() {
 /** Switch dock tabs without requiring a click event (e.g. Clear Game → Setup). */
 function selectControlPanelTab(tabName) {
     if (!tabName || !document.getElementById(tabName)) return false;
+    if (tabName === "StatsSettings" &&
+        typeof window.isStatsTabAvailable === "function" &&
+        !window.isStatsTabAvailable()) {
+        return false;
+    }
     var i, tabcontent, tablinks;
     tabcontent = document.getElementsByClassName("tabcontent");
     for (i = 0; i < tabcontent.length; i++) {
@@ -225,6 +230,11 @@ function selectControlPanelTab(tabName) {
 }
 
 function openTab(evt, tabName) {
+    if (tabName === "StatsSettings" &&
+        typeof window.isStatsTabAvailable === "function" &&
+        !window.isStatsTabAvailable()) {
+        return;
+    }
     selectControlPanelTab(tabName);
     if (evt && evt.currentTarget) {
         // selectControlPanelTab already marked the mapped button; keep click target in sync
@@ -240,7 +250,6 @@ const TAB_BUTTON_BY_CONTENT = {
     GameInfo: "gameInfoTab",
     Controls: "controlsTab",
     Images: "imagesTab",
-    ReplaySettings: "replaySettingsTab",
     StatsSettings: "statsTab",
     GeneralSettings: "generalSettingsTab"
 };
@@ -255,9 +264,21 @@ function getTabButtonId(tabContentId) {
 document.addEventListener("DOMContentLoaded", function () {
     // Try to get the last selected tab from localStorage
     const lastSelectedTab = getStorageItem("lastSelectedTab");
+    let tabToOpen = lastSelectedTab;
 
-    if (lastSelectedTab && document.getElementById(lastSelectedTab)) {
-        const tabButton = document.getElementById(getTabButtonId(lastSelectedTab));
+    // Replay/Share was retired into Settings.
+    if (tabToOpen === "ReplaySettings") {
+        tabToOpen = "GeneralSettings";
+    }
+
+    if (tabToOpen === "StatsSettings" &&
+        typeof window.isStatsTabAvailable === "function" &&
+        !window.isStatsTabAvailable()) {
+        tabToOpen = "GameInfo";
+    }
+
+    if (tabToOpen && document.getElementById(tabToOpen)) {
+        const tabButton = document.getElementById(getTabButtonId(tabToOpen));
 
         if (tabButton) {
             tabButton.click();
@@ -7307,96 +7328,21 @@ function updateWebSocketToggle() {
 
 // Update replay source settings visibility based on WebSocket connection
 function updateReplaySourceSettingsVisibility() {
-    // Find the "Replay Source Settings" section header specifically (not WebSocket Settings)
-    // We'll find it by looking for the section header that contains this text
-    const allSectionHeaders = document.querySelectorAll('.section-header');
-    let replaySourceHeader = null;
-    
-    for (let header of allSectionHeaders) {
-        if (header.textContent && header.textContent.trim() === 'Replay Source Settings') {
-            replaySourceHeader = header;
-            break;
-        }
-    }
-    
-    if (!replaySourceHeader) return;
-    
-    // Find all replay source settings elements
-    const replayElements = [];
-    replayElements.push(replaySourceHeader);
-    
-    // Find form rows - get all form-row elements after the section header
-    let currentElement = replaySourceHeader.nextElementSibling;
-    while (currentElement) {
-        if (currentElement.classList && currentElement.classList.contains('form-row')) {
-            replayElements.push(currentElement);
-        } else if (currentElement.classList && currentElement.classList.contains('section-header')) {
-            // Stop if we hit another section header
-            break;
-        }
-        currentElement = currentElement.nextElementSibling;
-    }
-    
-    // Find inputs and button
+    const isConnected = getStorageItem('isConnected') === 'true';
+    const opacity = isConnected ? '1' : '0.6';
+
+    document.querySelectorAll('#replayFormRows .replay-source-row').forEach((row) => {
+        row.style.setProperty('opacity', opacity, 'important');
+    });
+
     const videoSourceInput = document.getElementById('replayVideoSourceName');
     const indicatorSourceInput = document.getElementById('replayIndicatorSourceName');
     const autoResumeCheckbox = document.getElementById('autoResumeReplayBuffer');
     const sendSourceBtn = document.getElementById('sendSourceInfo');
-    
-    // Apply styling based on WebSocket connection state
-    const isConnected = getStorageItem('isConnected') === 'true';
-    
-    // Apply opacity to section header and form rows
-    replayElements.forEach(el => {
-        if (el) {
-            if (!isConnected) {
-                el.style.setProperty('opacity', '0.6', 'important');
-            } else {
-                el.style.setProperty('opacity', '1', 'important');
-            }
-        }
-    });
-    
-    // Also directly target labels with !important to ensure they get dimmed
-    // Find all form-rows after the section header and get their labels
-    let currentRow = replaySourceHeader.nextElementSibling;
-    while (currentRow) {
-        if (currentRow.classList && currentRow.classList.contains('form-row')) {
-            const labels = currentRow.querySelectorAll('label');
-            labels.forEach(label => {
-                if (!isConnected) {
-                    label.style.setProperty('opacity', '0.6', 'important');
-                } else {
-                    label.style.setProperty('opacity', '1', 'important');
-                }
-            });
-            
-            // Also dim the "*Required Fields" text if it exists in this row
-            const requiredFieldsText = currentRow.querySelector('.field');
-            if (requiredFieldsText && requiredFieldsText.textContent && requiredFieldsText.textContent.includes('*Required Fields')) {
-                if (!isConnected) {
-                    requiredFieldsText.style.setProperty('opacity', '0.6', 'important');
-                } else {
-                    requiredFieldsText.style.setProperty('opacity', '1', 'important');
-                }
-            }
-        } else if (currentRow.classList && currentRow.classList.contains('section-header')) {
-            // Stop if we hit another section header
-            break;
-        }
-        currentRow = currentRow.nextElementSibling;
-    }
-    
-    // Disable/enable inputs and button
-    if (videoSourceInput) {
-        videoSourceInput.disabled = !isConnected;
-    }
-    if (indicatorSourceInput) {
-        indicatorSourceInput.disabled = !isConnected;
-    }
-    if (autoResumeCheckbox) {
-        autoResumeCheckbox.disabled = !isConnected;
-    }
+
+    if (videoSourceInput) videoSourceInput.disabled = !isConnected;
+    if (indicatorSourceInput) indicatorSourceInput.disabled = !isConnected;
+    if (autoResumeCheckbox) autoResumeCheckbox.disabled = !isConnected;
     if (sendSourceBtn) {
         sendSourceBtn.disabled = !isConnected;
         sendSourceBtn.style.cursor = isConnected ? 'pointer' : 'not-allowed';
@@ -7931,7 +7877,7 @@ async function toggleReplayMonitoring() {
     if(!isConnected){
         const reconnected = await obsReConnect();
         if (!reconnected) {
-			alert('Replay monitoring requires an active OBS WebSocket connection. Please configure a websocket connection in OBS under Tools, as well as connection settings on the Replay/Share tab before toggling monitoring.');
+			alert('Replay monitoring requires an active OBS WebSocket connection. Please configure a websocket connection in OBS under Tools, as well as connection settings on the Settings tab before toggling monitoring.');
             return;
         }
         toggleReplayClipsVisibility();
@@ -7940,7 +7886,7 @@ async function toggleReplayMonitoring() {
     const { videoSource } = getReplaySettings();
 
 	if (!videoSource) {
-		alert('Replay monitoring requires a configured OBS media source. Please set the Replay Video Source on the Replay/Share tab before toggling monitoring.');
+		alert('Replay monitoring requires a configured OBS media source. Please set the Replay Video Source on the Settings tab before toggling monitoring.');
         return;
     }
     try {

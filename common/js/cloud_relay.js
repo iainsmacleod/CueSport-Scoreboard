@@ -514,7 +514,7 @@
                 state.playerSlotMode = 'off';
             }
             state.obsConnected = dockStorage('isConnected', 'false') === 'true';
-            // "Enable Replay and Promotion Function" toggle (persists across reconnects).
+            // Enable Replay Function toggle (persists across reconnects).
             state.replayEnabled = dockStorage('websocketEnabled', 'false') === 'true' || state.obsConnected;
             // Prefer storage; also trust control_panel Monitor / Instant Replay button labels.
             const monitorBtn = document.getElementById('btnMonitorGame');

@@ -14,6 +14,8 @@ import * as sqlite from './db/sqlite.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const webRoot = path.join(__dirname, '..', 'web');
 
+const app = Fastify({ logger: true });
+
 function sendWebHtml(reply, relativePath) {
   const filePath = path.join(webRoot, relativePath);
   if (!fs.existsSync(filePath)) {
@@ -31,8 +33,6 @@ function sendWebHtml(reply, relativePath) {
   reply.header('Cache-Control', 'no-store');
   reply.type('text/html').send(html);
 }
-
-const app = Fastify({ logger: true });
 
 // Dock control panel often loads from file:// or a different host than the API.
 function applyCorsHeaders(request, reply) {
