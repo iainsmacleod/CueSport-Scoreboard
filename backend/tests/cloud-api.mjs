@@ -771,6 +771,30 @@ async function run() {
           body: JSON.stringify({ from: 'Alice', to: 'Alicia' }),
         });
         assert('PATCH /api/stats/players', renamed.ok && renamed.body.updated >= 1);
+        const caseOnlyRename = await fetchJson('/api/stats/players', {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${tokenFresh}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ from: 'Alicia', to: 'ALICIA' }),
+        });
+        assert(
+          'PATCH /api/stats/players case-only',
+          caseOnlyRename.ok && caseOnlyRename.body.updated >= 1,
+          JSON.stringify(caseOnlyRename.body),
+        );
+        const statsAfterCase = await fetchJson('/api/stats', {
+          headers: { Authorization: `Bearer ${tokenFresh}` },
+        });
+        const aliciaPlayer = (statsAfterCase.body.players || []).find(
+          (p) => String(p.name || '').toLowerCase() === 'alicia',
+        );
+        assert(
+          'Case-only rename updates roster display',
+          !!aliciaPlayer && aliciaPlayer.name === 'ALICIA',
+          aliciaPlayer ? aliciaPlayer.name : 'missing',
+        );
         const deleted = await fetchJson(`/api/stats/matches/${editable.startEventId}`, {
           method: 'DELETE',
           headers: { Authorization: `Bearer ${tokenFresh}` },

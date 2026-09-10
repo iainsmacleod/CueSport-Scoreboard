@@ -311,12 +311,15 @@ export async function registerEventRoutes(app) {
   app.patch('/api/stats/players', async (request, reply) => {
     const account = await resolveAccountFromRequest(request);
     if (!account) return reply.code(401).send({ error: 'Unauthorized' });
-    const fromName = normalizePlayerName(request.body?.from);
-    const toName = normalizePlayerName(request.body?.to);
+    // Display form for event payloads + roster label (trim, max 20, preserve case).
+    // Matching is case-insensitive via namesEqual / sqlite name_normalized keys.
+    const fromName = normalizePlayerDisplayName(request.body?.from);
+    const toName = normalizePlayerDisplayName(request.body?.to);
     if (!fromName || !toName) {
       return reply.code(400).send({ error: 'from and to names are required' });
     }
-    if (namesEqual(fromName, toName)) {
+    // Identical display → no-op. Case-only changes still update payloads + roster label.
+    if (fromName === toName) {
       return { ok: true, updated: 0 };
     }
     const events = sqlite.getAccountSessionEvents(account.id, 10000);
@@ -339,6 +342,7 @@ export async function registerEventRoutes(app) {
         updated += 1;
       }
     }
+    // Roster keys are lowercased inside sqlite; pass display names, not pre-lowercased keys.
     sqlite.renameAccountPlayerRoster(account.id, fromName, toName);
     return { ok: true, updated };
   });
