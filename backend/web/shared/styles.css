@@ -1336,6 +1336,14 @@ body.controls-locked #reconnectBanner {
   font-weight: 600;
   text-align: center;
 }
+.stats-player-rename-inline.is-busy {
+  cursor: wait;
+  opacity: 0.85;
+}
+.stats-player-rename-inline.is-busy input,
+.stats-player-rename-inline.is-busy .btn {
+  cursor: wait;
+}
 .stats-player-filters {
   justify-content: space-between;
   align-items: flex-end;
@@ -1895,6 +1903,13 @@ body.controls-locked #reconnectBanner {
   padding: 1.25rem 1rem;
   background: rgba(0, 0, 0, 0.55);
   overflow: auto;
+}
+.dash-modal.is-busy {
+  cursor: wait;
+}
+.dash-modal.is-busy .btn {
+  cursor: wait;
+  opacity: 0.75;
 }
 .dash-modal.hidden {
   display: none;

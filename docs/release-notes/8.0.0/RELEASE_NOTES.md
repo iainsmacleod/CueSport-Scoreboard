@@ -18,7 +18,7 @@ Major release: **CueSport Cloud match stats** on the web dashboard, clearer brea
 - Edit-match labels use player names; roster autocomplete when changing names.
 - Save is enabled only when the form has changes.
 - When cloud is connected, dock stats import/export/clear are disabled — manage history on the dashboard.
-- Local dock stats keep a rolling **30-day** window; cloud history is unbounded.
+- Local dock and cloud match history are kept until cleared.
 - **Kill** on an unfinished match removes it from cloud stats and notifies the live dock (`abandon_match`) to clear the board and return to Setup.
 - Dashboard **Stats** Recent Matches refresh from the live tables WebSocket feed (no manual reload for new In progress rows).
 

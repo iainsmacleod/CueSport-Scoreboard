@@ -1535,7 +1535,7 @@
             cp.closeStatsModal();
 
             const dataCol = Array.from(cp.document.querySelectorAll('.column')).find(function (c) {
-                return c.textContent.indexOf('Clear Instance Data') !== -1;
+                return c.textContent.indexOf('Clear Instance Settings') !== -1;
             });
             const hint = Array.from(cp.document.querySelectorAll('p.stats-hint')).find(function (p) {
                 return p.textContent.indexOf('does not effect player statistics') !== -1;

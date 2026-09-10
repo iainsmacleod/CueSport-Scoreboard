@@ -893,6 +893,9 @@
     }
 
     async function saveCloudMatchFromModal() {
+        if (matchEditBusy) {
+            return;
+        }
         const modal = document.getElementById('statsMatchEditModal');
         if (!modal) return;
         const startEventId = modal.dataset.matchId;
@@ -909,6 +912,7 @@
         const gameType = document.getElementById('statsMatchGameType').value;
         const racks = serializeEditorRacksForCloud(editorRacks, gameType);
         const dateVal = document.getElementById('statsMatchDate').value;
+        setMatchEditBusy(true, 'save');
         try {
             await cloudApiFetch('/api/stats/matches/' + encodeURIComponent(startEventId), {
                 method: 'PATCH',
@@ -924,27 +928,35 @@
                     ballsP2: readNumInput('statsMatchBallsP2')
                 }
             });
+            matchEditBusy = false;
             closeMatchEditModal();
             invalidateCloudStatsCache();
             await refreshStatsUI();
         } catch (err) {
+            setMatchEditBusy(false);
             alert('Save failed: ' + err.message);
         }
     }
 
     async function deleteCloudMatchFromModal() {
+        if (matchEditBusy) {
+            return;
+        }
         const modal = document.getElementById('statsMatchEditModal');
         const startEventId = modal && modal.dataset.matchId;
         if (!startEventId) return;
         if (!confirm('Delete this match from cloud stats? This cannot be undone.')) return;
+        setMatchEditBusy(true, 'delete');
         try {
             await cloudApiFetch('/api/stats/matches/' + encodeURIComponent(startEventId), {
                 method: 'DELETE'
             });
+            matchEditBusy = false;
             closeMatchEditModal();
             invalidateCloudStatsCache();
             await refreshStatsUI();
         } catch (err) {
+            setMatchEditBusy(false);
             alert('Delete failed: ' + err.message);
         }
     }
@@ -3565,48 +3577,6 @@
         return summary;
     }
 
-    const LOCAL_RETENTION_DAYS = 30;
-
-    /**
-     * Remove completed matches older than the retention window from local IndexedDB,
-     * then recompute aggregates for affected players. Skipped when cloud mode is active
-     * since the backend is the stats source of truth in that case.
-     */
-    async function pruneOldMatches() {
-        if (isCloudStatsMode()) return;
-        await openDatabase();
-        const cutoff = new Date();
-        cutoff.setDate(cutoff.getDate() - LOCAL_RETENTION_DAYS);
-        const cutoffIso = cutoff.toISOString();
-
-        const all = await promisifyRequest(
-            tx(['matches'], 'readonly').objectStore('matches').getAll()
-        );
-        const toDelete = all.filter(function (m) {
-            if (m.status !== 'completed') return false;
-            const date = m.completedAt || m.startedAt || '';
-            return date && date < cutoffIso;
-        });
-        if (!toDelete.length) return;
-
-        const affectedPlayerIds = new Set();
-        const store = tx(['matches'], 'readwrite').objectStore('matches');
-        for (const m of toDelete) {
-            store.delete(m.id);
-            if (m.player1Id) affectedPlayerIds.add(m.player1Id);
-            if (m.player2Id) affectedPlayerIds.add(m.player2Id);
-        }
-        await new Promise(function (resolve, reject) {
-            store.transaction.oncomplete = resolve;
-            store.transaction.onerror = function () { reject(store.transaction.error); };
-        });
-
-        for (const pid of affectedPlayerIds) {
-            await recomputePlayerStats(pid);
-        }
-        console.log('PlayerStats: pruned ' + toDelete.length + ' matches older than ' + LOCAL_RETENTION_DAYS + ' days');
-    }
-
     async function getAllMatches() {
         await openDatabase();
         const store = tx(['matches'], 'readonly').objectStore('matches');
@@ -6131,6 +6101,9 @@
     }
 
     function closeMatchEditModal() {
+        if (matchEditBusy) {
+            return;
+        }
         const modal = document.getElementById('statsMatchEditModal');
         if (modal) {
             modal.style.display = 'none';
@@ -6142,6 +6115,7 @@
             modal.dataset.inProgress = '';
             modal.dataset.cloud = '';
         }
+        setMatchEditBusy(false);
         setMatchEditMode(false);
         setMatchEditGameTypeLocked(false);
         const deleteBtn = document.getElementById('statsMatchDeleteBtn');
@@ -6150,7 +6124,53 @@
         }
     }
 
+    let matchEditBusy = false;
+
+    function setMatchEditBusy(busy, action) {
+        matchEditBusy = !!busy;
+        const modal = document.getElementById('statsMatchEditModal');
+        const saveBtn = modal && modal.querySelector('.modal-save-btn');
+        const cancelBtn = modal && modal.querySelector('.modal-cancel-btn');
+        const deleteBtn = document.getElementById('statsMatchDeleteBtn');
+        const closeBtn = modal && modal.querySelector('.modal-close');
+        const inProgress = modal && modal.dataset.inProgress === '1';
+        if (modal) {
+            modal.classList.toggle('is-busy', matchEditBusy);
+            modal.setAttribute('aria-busy', matchEditBusy ? 'true' : 'false');
+            modal.querySelectorAll('.modal-body input, .modal-body select, .modal-body button, .modal-body textarea').forEach(function (el) {
+                if (matchEditBusy) {
+                    el.disabled = true;
+                } else if (el.id === 'statsMatchGameType' && inProgress) {
+                    el.disabled = true;
+                } else {
+                    el.disabled = false;
+                }
+            });
+        }
+        if (saveBtn) {
+            saveBtn.disabled = matchEditBusy;
+            saveBtn.textContent = (matchEditBusy && action === 'save') ? 'Saving\u2026' : 'Save';
+        }
+        if (cancelBtn) {
+            cancelBtn.disabled = matchEditBusy;
+        }
+        if (deleteBtn) {
+            deleteBtn.disabled = matchEditBusy;
+            if (matchEditBusy && action === 'delete') {
+                deleteBtn.textContent = 'Deleting\u2026';
+            } else if (!matchEditBusy) {
+                deleteBtn.textContent = inProgress ? 'Discard Match' : 'Delete Match';
+            }
+        }
+        if (closeBtn) {
+            closeBtn.setAttribute('aria-disabled', matchEditBusy ? 'true' : 'false');
+        }
+    }
+
     async function saveMatchFromModal() {
+        if (matchEditBusy) {
+            return;
+        }
         const modal = document.getElementById('statsMatchEditModal');
         if (!modal) {
             return;
@@ -6169,6 +6189,7 @@
             return;
         }
 
+        setMatchEditBusy(true, 'save');
         try {
             const payload = {
                 id: matchId || undefined,
@@ -6186,29 +6207,34 @@
             } else {
                 await saveMatch(payload);
             }
+            matchEditBusy = false;
             closeMatchEditModal();
             await refreshStatsUI();
         } catch (err) {
+            setMatchEditBusy(false);
             alert('Save failed: ' + err.message);
         }
     }
 
     async function confirmDeleteMatch(matchId) {
-        if (!matchId) {
+        if (!matchId || matchEditBusy) {
             return;
         }
         if (isCloudStatsMode()) {
             if (!confirm('Delete this match from cloud stats? This cannot be undone.')) {
                 return;
             }
+            setMatchEditBusy(true, 'delete');
             try {
                 await cloudApiFetch('/api/stats/matches/' + encodeURIComponent(matchId), {
                     method: 'DELETE'
                 });
+                matchEditBusy = false;
                 closeMatchEditModal();
                 invalidateCloudStatsCache();
                 await refreshStatsUI();
             } catch (err) {
+                setMatchEditBusy(false);
                 alert('Delete failed: ' + err.message);
             }
             return;
@@ -6220,20 +6246,26 @@
         if (!confirm(message)) {
             return;
         }
+        setMatchEditBusy(true, 'delete');
         try {
             if (inProgress) {
                 await discardPendingMatch();
             } else {
                 await deleteMatch(matchId);
             }
+            matchEditBusy = false;
             closeMatchEditModal();
             await refreshStatsUI();
         } catch (err) {
+            setMatchEditBusy(false);
             alert('Delete failed: ' + err.message);
         }
     }
 
     async function deleteMatchFromModal() {
+        if (matchEditBusy) {
+            return;
+        }
         const modal = document.getElementById('statsMatchEditModal');
         if (!modal || !modal.dataset.matchId) {
             return;
@@ -6304,21 +6336,57 @@
         modal.dataset.playerId = statsModalSelectedPlayerId;
         modal.dataset.fromName = playerName;
         input.value = playerName;
+        setPlayerRenameBusy(false);
         modal.style.display = 'block';
         input.focus();
         input.select();
     }
 
+    let playerRenameBusy = false;
+
+    function setPlayerRenameBusy(busy) {
+        playerRenameBusy = !!busy;
+        const modal = document.getElementById('statsPlayerRenameModal');
+        const input = document.getElementById('statsPlayerRenameInput');
+        const saveBtn = modal && modal.querySelector('.modal-save-btn');
+        const cancelBtn = modal && modal.querySelector('.modal-cancel-btn');
+        const closeBtn = modal && modal.querySelector('.modal-close');
+        if (modal) {
+            modal.classList.toggle('is-busy', playerRenameBusy);
+            modal.setAttribute('aria-busy', playerRenameBusy ? 'true' : 'false');
+        }
+        if (input) {
+            input.disabled = playerRenameBusy;
+        }
+        if (saveBtn) {
+            saveBtn.disabled = playerRenameBusy;
+            saveBtn.textContent = playerRenameBusy ? 'Saving\u2026' : 'Save';
+        }
+        if (cancelBtn) {
+            cancelBtn.disabled = playerRenameBusy;
+        }
+        if (closeBtn) {
+            closeBtn.setAttribute('aria-disabled', playerRenameBusy ? 'true' : 'false');
+        }
+    }
+
     function closePlayerRenameModal() {
+        if (playerRenameBusy) {
+            return;
+        }
         const modal = document.getElementById('statsPlayerRenameModal');
         if (modal) {
             modal.style.display = 'none';
             modal.dataset.playerId = '';
             modal.dataset.fromName = '';
         }
+        setPlayerRenameBusy(false);
     }
 
     async function savePlayerRenameFromModal() {
+        if (playerRenameBusy) {
+            return;
+        }
         const modal = document.getElementById('statsPlayerRenameModal');
         const input = document.getElementById('statsPlayerRenameInput');
         if (!modal || !input) {
@@ -6333,6 +6401,7 @@
             alert('Name is required.');
             return;
         }
+        setPlayerRenameBusy(true);
         try {
             if (isCloudStatsMode()) {
                 const fromName = modal.dataset.fromName || '';
@@ -6348,12 +6417,14 @@
                     postNames();
                 }
             }
+            playerRenameBusy = false;
             closePlayerRenameModal();
             await refreshStatsUI();
             if (statsModalSelectedPlayerId) {
                 await showPlayerDetail(statsModalSelectedPlayerId);
             }
         } catch (err) {
+            setPlayerRenameBusy(false);
             alert('Rename failed: ' + err.message);
         }
     }
@@ -6417,7 +6488,7 @@
         if (cloud) {
             banner.textContent = 'Showing cloud-backed stats. Click a player to view and edit matches.';
         } else {
-            banner.textContent = 'Showing local stats (last ' + LOCAL_RETENTION_DAYS + ' days).';
+            banner.textContent = 'Showing local stats.';
         }
         banner.classList.remove('noShow');
         updateStatsActionButtons(cloud);
@@ -7058,6 +7129,18 @@
         bindStatsMatchInteractions(container);
     }
 
+    async function estimateStatsStorage() {
+        await openDatabase();
+        const players = await getAllPlayers();
+        const matches = await getAllMatches();
+        const payload = JSON.stringify({ players: players, matches: matches });
+        return {
+            bytes: new Blob([payload]).size,
+            players: players.length,
+            matches: matches.length
+        };
+    }
+
     async function exportStatsJson() {
         const data = await exportData();
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -7141,7 +7224,6 @@
         await openDatabase();
         await repairPlayerRecords();
         await restorePendingSession();
-        await pruneOldMatches();
         playerStatsReady = true;
         // Set initial cloud stats UI state
         var cloud = isCloudStatsMode();
@@ -7184,6 +7266,7 @@
         exportData: exportData,
         importData: importData,
         clearAllStats: clearAllStats,
+        estimateStatsStorage: estimateStatsStorage,
         broadcastOverlayStatsIfEnabled: broadcastOverlayStatsIfEnabled,
         publishSnookerOverlayLiveStats: publishSnookerOverlayLiveStats,
         onScoreModeChanged: onScoreModeChanged,

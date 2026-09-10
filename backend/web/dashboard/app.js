@@ -481,6 +481,10 @@ function startDebugRoomRename(room, titleRow, currentTitle) {
       setError('');
       saveBtn.disabled = true;
       cancelBtn.disabled = true;
+      input.disabled = true;
+      saveBtn.textContent = 'Saving…';
+      form.classList.add('is-busy');
+      form.setAttribute('aria-busy', 'true');
       const result = await renameApiKey(getServerUrl(), getToken(), room.api_key_id, next);
       if (result.api_keys) renderApiKeys(result.api_keys);
       if (result.rooms) {
@@ -498,6 +502,10 @@ function startDebugRoomRename(room, titleRow, currentTitle) {
       setError(err.message);
       saveBtn.disabled = false;
       cancelBtn.disabled = false;
+      input.disabled = false;
+      saveBtn.textContent = 'Save';
+      form.classList.remove('is-busy');
+      form.removeAttribute('aria-busy');
     }
   });
 }
@@ -1925,10 +1933,48 @@ function setMatchModalError(msg) {
 }
 
 function closeMatchModal() {
+  if (matchModalBusy) return;
   const modal = document.getElementById('statsMatchModal');
   if (modal) modal.classList.add('hidden');
   matchModalBaseline = null;
+  setDashMatchModalBusy(false);
   syncMatchModalSaveEnabled();
+}
+
+let matchModalBusy = false;
+
+function setDashMatchModalBusy(busy, action = 'save') {
+  matchModalBusy = !!busy;
+  const modal = document.getElementById('statsMatchModal');
+  const form = document.getElementById('statsMatchForm');
+  const saveBtn = document.getElementById('statsMatchSaveBtn');
+  const cancelBtn = document.getElementById('statsMatchCancelBtn');
+  const deleteBtn = document.getElementById('statsMatchDeleteBtn');
+  modal?.classList.toggle('is-busy', matchModalBusy);
+  modal?.setAttribute('aria-busy', matchModalBusy ? 'true' : 'false');
+  form?.querySelectorAll('input, select, textarea, button').forEach((el) => {
+    if (el.id === 'statsMatchSaveBtn' || el.id === 'statsMatchCancelBtn' || el.id === 'statsMatchDeleteBtn') return;
+    el.disabled = matchModalBusy;
+  });
+  if (saveBtn) {
+    saveBtn.disabled = matchModalBusy ? true : !matchModalHasChanges();
+    saveBtn.textContent = matchModalBusy && action === 'save' ? 'Saving…' : 'Save';
+  }
+  if (cancelBtn) cancelBtn.disabled = matchModalBusy;
+  if (deleteBtn) {
+    deleteBtn.disabled = matchModalBusy;
+    deleteBtn.textContent = matchModalBusy && action === 'delete' ? 'Deleting…' : 'Delete';
+  }
+}
+
+function syncMatchModalSaveEnabled() {
+  const btn = document.getElementById('statsMatchSaveBtn');
+  if (!btn) return;
+  if (matchModalBusy) {
+    btn.disabled = true;
+    return;
+  }
+  btn.disabled = !matchModalHasChanges();
 }
 
 function matchModalPlayerName(slot) {
@@ -2142,12 +2188,6 @@ function matchModalHasChanges() {
   return JSON.stringify(readMatchModalSnapshot()) !== JSON.stringify(matchModalBaseline);
 }
 
-function syncMatchModalSaveEnabled() {
-  const btn = document.getElementById('statsMatchSaveBtn');
-  if (!btn) return;
-  btn.disabled = !matchModalHasChanges();
-}
-
 function openMatchModal(startEventId) {
   const match = findMatchByStartId(startEventId);
   if (!match || isMatchInProgress(match)) return;
@@ -2167,6 +2207,7 @@ function openMatchModal(startEventId) {
   renderDashMatchRacksEditor(match.racks || []);
   syncMatchExtrasVisibility(match.gameType || 'game1');
   setMatchModalError('');
+  setDashMatchModalBusy(false);
   matchModalBaseline = readMatchModalSnapshot();
   syncMatchModalSaveEnabled();
   document.getElementById('statsMatchModal')?.classList.remove('hidden');
@@ -2174,6 +2215,7 @@ function openMatchModal(startEventId) {
 
 async function saveMatchModal(event) {
   event.preventDefault();
+  if (matchModalBusy) return;
   if (!matchModalHasChanges()) return;
   const startEventId = document.getElementById('statsMatchEventId')?.value;
   if (!startEventId) return;
@@ -2191,6 +2233,7 @@ async function saveMatchModal(event) {
     if (r.winnerId === '1') scores.p1 += 1;
     else if (r.winnerId === '2') scores.p2 += 1;
   });
+  setDashMatchModalBusy(true, 'save');
   try {
     await updateAccountMatch(getServerUrl(), getToken(), startEventId, {
       player1Name: p1,
@@ -2203,9 +2246,11 @@ async function saveMatchModal(event) {
       ballsP1: document.getElementById('statsMatchBallsP1').value,
       ballsP2: document.getElementById('statsMatchBallsP2').value,
     });
+    matchModalBusy = false;
     closeMatchModal();
     await loadAccountStats(true);
   } catch (err) {
+    setDashMatchModalBusy(false);
     setMatchModalError(err.message);
   }
 }
@@ -2232,14 +2277,18 @@ async function abandonInProgressMatch(startEventId) {
 }
 
 async function deleteMatchFromModal() {
+  if (matchModalBusy) return;
   const startEventId = document.getElementById('statsMatchEventId')?.value;
   if (!startEventId) return;
   if (!window.confirm('Delete this match from cloud stats? This cannot be undone.')) return;
+  setDashMatchModalBusy(true, 'delete');
   try {
     await deleteAccountMatch(getServerUrl(), getToken(), startEventId);
+    matchModalBusy = false;
     closeMatchModal();
     await loadAccountStats(true);
   } catch (err) {
+    setDashMatchModalBusy(false);
     setMatchModalError(err.message);
   }
 }
@@ -2600,6 +2649,8 @@ document.getElementById('statsPlayerRenameEditBtn')?.addEventListener('click', (
   setPlayerRenameEditing(true);
 });
 document.getElementById('statsPlayerRenameCancelBtn')?.addEventListener('click', () => {
+  const form = document.getElementById('statsPlayerRenameForm');
+  if (form?.dataset.busy === '1') return;
   const rename = document.getElementById('statsPlayerRenameInput');
   const title = document.getElementById('statsPlayerTitle');
   if (rename && title) rename.value = title.textContent || '';
@@ -2607,11 +2658,28 @@ document.getElementById('statsPlayerRenameCancelBtn')?.addEventListener('click',
 });
 document.getElementById('statsPlayerRenameForm')?.addEventListener('submit', async (event) => {
   event.preventDefault();
+  const form = event.currentTarget;
+  if (form?.dataset.busy === '1') return;
   const fromPlayer = statsFromMatches(completedMatches(statsData || {})).players.find((p) => p.id === selectedPlayerKey);
   const fromName = fromPlayer?.name || selectedPlayerKey;
   const toName = document.getElementById('statsPlayerRenameInput')?.value.trim();
   if (!fromName || !toName) return;
+  const input = document.getElementById('statsPlayerRenameInput');
+  const saveBtn = form.querySelector('button[type="submit"]');
+  const cancelBtn = document.getElementById('statsPlayerRenameCancelBtn');
+  const setBusy = (busy) => {
+    form.dataset.busy = busy ? '1' : '0';
+    form.classList.toggle('is-busy', !!busy);
+    form.setAttribute('aria-busy', busy ? 'true' : 'false');
+    if (input) input.disabled = !!busy;
+    if (saveBtn) {
+      saveBtn.disabled = !!busy;
+      saveBtn.textContent = busy ? 'Saving…' : 'Save';
+    }
+    if (cancelBtn) cancelBtn.disabled = !!busy;
+  };
   try {
+    setBusy(true);
     const result = await renameAccountPlayer(getServerUrl(), getToken(), fromName, toName);
     selectedPlayerKey = toName.toLowerCase();
     playerRenameEditing = false;
@@ -2625,6 +2693,8 @@ document.getElementById('statsPlayerRenameForm')?.addEventListener('submit', asy
     }
   } catch (err) {
     setError(err.message);
+  } finally {
+    setBusy(false);
   }
 });
 document.getElementById('tabStats')?.addEventListener('click', (event) => {
@@ -2667,7 +2737,10 @@ document.getElementById('statsMatchForm')?.addEventListener('input', () => {
   syncMatchModalSaveEnabled();
 });
 document.getElementById('statsMatchForm')?.addEventListener('change', syncMatchModalSaveEnabled);
-document.getElementById('statsMatchCancelBtn')?.addEventListener('click', closeMatchModal);
+document.getElementById('statsMatchCancelBtn')?.addEventListener('click', () => {
+  if (matchModalBusy) return;
+  closeMatchModal();
+});
 document.getElementById('statsMatchDeleteBtn')?.addEventListener('click', deleteMatchFromModal);
 document.getElementById('statsMatchGameType')?.addEventListener('change', (event) => {
   const preserved = preserveDashRackEditorRows();

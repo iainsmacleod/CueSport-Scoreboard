@@ -226,7 +226,62 @@ function selectControlPanelTab(tabName) {
         tabButton.className += " active";
     }
     setStorageItem("lastSelectedTab", tabName);
+    if (tabName === "GeneralSettings") {
+        refreshLocalStorageUsage();
+    }
     return true;
+}
+
+function formatStorageBytes(bytes) {
+    const n = Number(bytes) || 0;
+    if (n < 1024) return n + " B";
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " KB";
+    return (n / (1024 * 1024)).toFixed(2) + " MB";
+}
+
+function measureLocalStorageBytes() {
+    let total = 0;
+    try {
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (!key) continue;
+            const value = localStorage.getItem(key) || "";
+            // UTF-16 code units (DOMString) — typical browser accounting for localStorage.
+            total += (key.length + value.length) * 2;
+        }
+    } catch (err) {
+        console.warn("Could not measure localStorage:", err);
+    }
+    return total;
+}
+
+async function refreshLocalStorageUsage() {
+    const body = document.getElementById("localStorageUsageBody");
+    if (!body) return;
+    body.textContent = "Measuring…";
+
+    const lines = [];
+    const localBytes = measureLocalStorageBytes();
+    lines.push("Instance Settings / localStorage: " + formatStorageBytes(localBytes));
+
+    try {
+        if (window.PlayerStats && typeof window.PlayerStats.estimateStatsStorage === "function") {
+            const stats = await window.PlayerStats.estimateStatsStorage();
+            lines.push(
+                "Player stats (IndexedDB, approx.): " + formatStorageBytes(stats.bytes) +
+                " — " + stats.players + " player(s), " + stats.matches + " match(es)"
+            );
+        } else {
+            lines.push("Player stats (IndexedDB): unavailable");
+        }
+    } catch (err) {
+        console.warn("Could not measure IndexedDB stats:", err);
+        lines.push("Player stats (IndexedDB): unavailable");
+    }
+
+    body.innerHTML = lines.map(function (line) {
+        return "<div>" + line + "</div>";
+    }).join("");
 }
 
 function openTab(evt, tabName) {

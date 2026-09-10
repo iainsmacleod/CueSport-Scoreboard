@@ -21,7 +21,7 @@ for more information about Salotto please visit https://salotto.app
     <link rel="stylesheet" href="./common/css/control_panel/grey.css?v=8.0.0" />
     <link rel="stylesheet" href="./common/css/control_panel/light.css?v=8.0.0" />
     <link rel="stylesheet" href="./common/css/control_panel/rachni.css?v=8.0.0" />
-    <link rel="stylesheet" href="./common/css/control_panel/required.css?v=8.0.0.33" />
+    <link rel="stylesheet" href="./common/css/control_panel/required.css?v=8.0.0.38" />
     <script>
         //---------------------------------------------------------------------------------------------
         var versionNum = "8.0.0";
@@ -33,8 +33,8 @@ for more information about Salotto please visit https://salotto.app
     <script src="./common/js/match_racks.js?v=8.0.0"></script>
     <script src="./common/js/cloud_relay.js?v=8.0.0.12"></script>
     <script src="./common/js/stream_sharing.js?v=8.0.0.2"></script>
-    <script src="./common/js/player_stats.js?v=8.0.0.40"></script>
-    <script src="./common/js/control_panel.js?v=8.0.0.39"></script>
+    <script src="./common/js/player_stats.js?v=8.0.0.44"></script>
+    <script src="./common/js/control_panel.js?v=8.0.0.41"></script>
     <script src="./common/js/cloud_commands.js?v=8.0.0.7"></script>
     <script src="./common/js/cloud_auth.js?v=8.0.0.1"></script>
     <script src="hotkeys.js?v=8.0.0"></script>
@@ -678,7 +678,7 @@ for more information about Salotto please visit https://salotto.app
             <!-- CueSport Cloud Section -->
             <div class="section-header-with-controls">
                 <span id="cloudRelayLabel">
-                    CueSport Cloud (<a href="https://cuesports.macleod.systems" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: underline;">remote control + stats</a>)
+                    CueSport Cloud (<a href="https://cuesports.macleod.systems" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: underline;">cloud stats and control</a>)
                 </span>
                 <div class="section-controls">
                     <button class="settings-cog-btn" id="cloudSelfHostCog" onclick="openCloudConnectionModal()" title="Connection settings">
@@ -752,8 +752,8 @@ for more information about Salotto please visit https://salotto.app
                         </div>
                     </div>
                 </div>
-                <div class="form-row replay-source-row">
-                    <div class="field" style="width: 100%; text-align: right;">
+                <div class="form-row replay-source-row replay-required-fields-row">
+                    <div class="field">
                         *Required Fields
                     </div>
                 </div>
@@ -767,6 +767,11 @@ for more information about Salotto please visit https://salotto.app
                         <span class="modal-close" onclick="closeWebSocketSettingsModal()">&times;</span>
                     </div>
                     <div class="modal-body">
+                        <p class="stats-hint" style="margin: 0 0 0.75rem;">
+                            Enabling replay control allows you to capture streaming clips for replay.
+                            Clip length is based on your OBS Replay Buffer settings.
+                            <strong>NOTE:</strong> Captured clips need to be cleaned up manually; clip replay buttons are merely references to actual files.
+                        </p>
                         <div class="form-row">
                             <div class="field">
                                 <label for="obsAddressModal">OBS WebSocket Address *:</label>
@@ -835,14 +840,26 @@ for more information about Salotto please visit https://salotto.app
             <div id="cloudConnectionModal" class="modal">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h2>CueSport Cloud — Connection</h2>
+                        <h2>CueSport Scoreboard Cloud Control</h2>
                         <span class="modal-close" onclick="closeCloudConnectionModal()">&times;</span>
                     </div>
                     <div class="modal-body">
                         <div id="cloudManagedPane">
-                            <p style="font-size: 0.9em; opacity: 0.9; margin-bottom: 0.75rem;">
-                                Sign in to manage your account, then paste an <strong>OBS Dock Key</strong> from the dashboard (Account → OBS Dock Keys). Every dock needs its own key — same seat model as self-host.
-                            </p>
+                            <div class="cloud-connection-intro" style="font-size: 0.9em; opacity: 0.9; margin-bottom: 0.75rem;">
+                                <p style="margin: 0 0 0.65rem;">
+                                    CueSport Scoreboard Cloud Control allows desktop and mobile control of the OBS CueSport Scoreboard overlay, giving you freedom from your streaming machine.
+                                </p>
+                                <p style="margin: 0 0 0.35rem;">
+                                    There are two implementation options: self-hosted or managed.
+                                </p>
+                                <ul style="margin: 0 0 0.65rem; padding-left: 1.25rem;">
+                                    <li>Managed provides a simpler setup with various subscription levels.</li>
+                                    <li>Self-hosting allows you to take full control of the deployment yourself.</li>
+                                </ul>
+                                <p style="margin: 0;">
+                                    Sign in to manage your account. From the account page retrieve an <strong>OBS Dock Key</strong>, if you haven&rsquo;t already, and paste below.
+                                </p>
+                            </div>
                             <div class="form-row">
                                 <div class="field">
                                     <div class="hover obs28 button" onclick="signInWithGoogle()">Sign in with Google</div>
@@ -905,14 +922,18 @@ for more information about Salotto please visit https://salotto.app
                 Local Data Settings
             </div>
             <div class="column button-row">
-                <div class="hover obs28 button" onclick="resetInstance()" id="resetDataBtn" style="color: white">
-                    Clear Instance Data
+                <div class="hover obs28 button reset-data-btn" onclick="resetInstance()" id="resetInstanceBtn" style="color: white">
+                    Clear Instance Settings
                 </div>
-                <div class="hover obs28 button" onclick="resetAll()" id="resetDataBtn" style="color: white">
-                    Clear All Data
+                <div class="hover obs28 button reset-data-btn" onclick="resetAll()" id="resetAllInstancesBtn" style="color: white">
+                    Clear All Instance Settings
                 </div>
             </div>
             <p class="stats-hint">Clears scoreboard settings - does not effect player statistics - use Stats &gt; Clear to remove statistics history.</p>
+            <div id="localStorageUsage" class="local-storage-usage" aria-live="polite">
+                <div class="local-storage-usage-title">Local Storage Use (This Browser)</div>
+                <div id="localStorageUsageBody" class="local-storage-usage-body">Measuring…</div>
+            </div>
         </div> <!-- General Settings Tab-->
     </div> <!-- End of tab content -->
 
