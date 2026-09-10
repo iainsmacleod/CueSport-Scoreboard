@@ -1641,9 +1641,6 @@ body.controls-locked #reconnectBanner {
   display: block;
   margin-top: 0.1rem;
 }
-.stats-match-in-progress td {
-  background: rgba(122, 162, 247, 0.08);
-}
 .stats-match-score {
   white-space: nowrap;
   vertical-align: middle;
