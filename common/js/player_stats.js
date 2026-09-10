@@ -5899,6 +5899,7 @@
         const editor = document.getElementById('statsMatchRacksEditor');
         const label = document.getElementById('statsMatchRacksEditorLabel');
         const addBtn = document.getElementById('statsMatchAddRackBtn');
+        const removeBtn = document.getElementById('statsMatchRemoveRackBtn');
         const select = document.getElementById('statsMatchGameType');
         if (!editor) {
             return;
@@ -5914,11 +5915,15 @@
         if (addBtn) {
             addBtn.textContent = 'Add ' + word;
         }
+        if (removeBtn) {
+            removeBtn.textContent = 'Remove Last ' + word;
+        }
 
         const list = Array.isArray(racks) ? racks.slice() : [];
         if (list.length === 0) {
             editor.innerHTML = '<p class="stats-empty">No ' + words.toLowerCase() + ' yet. Use Add ' + word + '.</p>';
             updateMatchScoreSummary();
+            syncMatchRackRemoveBtn();
             return;
         }
 
@@ -5935,7 +5940,7 @@
         }
         html += '<th>Fouls ' + escapeHtml(matchEditPlayerNames.p1) + '</th>' +
             '<th>Fouls ' + escapeHtml(matchEditPlayerNames.p2) + '</th>';
-        html += '<th></th></tr></thead><tbody>';
+        html += '</tr></thead><tbody>';
 
         list.forEach(function (r, index) {
             let winnerSlot = '';
@@ -5978,12 +5983,12 @@
                 clampScore(r.foulsP1) + '" /></td>' +
                 '<td><input type="number" class="stats-rack-fouls-p2" min="0" max="999" value="' +
                 clampScore(r.foulsP2) + '" /></td>';
-            html += '<td><button type="button" class="stats-delete-btn hover obs28 button" onclick="removeMatchRackRow(this)">Del</button></td>' +
-                '</tr>';
+            html += '</tr>';
         });
         html += '</tbody></table>';
         editor.innerHTML = html;
         updateMatchScoreSummary();
+        syncMatchRackRemoveBtn();
     }
 
     function readRackExtraFieldsFromRow(row) {
@@ -6052,19 +6057,22 @@
         renderMatchRacksEditor(preserved);
     }
 
-    function removeMatchRackRow(btn) {
-        const row = btn && btn.closest ? btn.closest('tr.stats-rack-edit-row') : null;
-        if (!row) {
+    function syncMatchRackRemoveBtn() {
+        const removeBtn = document.getElementById('statsMatchRemoveRackBtn');
+        if (!removeBtn) {
             return;
         }
-        row.remove();
+        const editor = document.getElementById('statsMatchRacksEditor');
+        const count = editor ? editor.querySelectorAll('tr.stats-rack-edit-row').length : 0;
+        removeBtn.disabled = count < 1;
+    }
+
+    function removeLastMatchRackRow() {
         const editor = document.getElementById('statsMatchRacksEditor');
         const allRows = editor ? editor.querySelectorAll('tr.stats-rack-edit-row') : [];
         if (!allRows.length) {
-            renderMatchRacksEditor([]);
             return;
         }
-        // Renumber and refresh summary without dropping empty winner rows
         const preserved = [];
         allRows.forEach(function (r) {
             const winnerSel = r.querySelector('.stats-rack-winner');
@@ -6072,6 +6080,7 @@
             Object.assign(entry, readRackExtraFieldsFromRow(r));
             preserved.push(entry);
         });
+        preserved.pop();
         renderMatchRacksEditor(preserved);
     }
 
@@ -7154,7 +7163,7 @@
     window.onStatsMatchGameTypeChange = onStatsMatchGameTypeChange;
     window.updateMatchScoreSummary = updateMatchScoreSummary;
     window.addMatchRackRow = addMatchRackRow;
-    window.removeMatchRackRow = removeMatchRackRow;
+    window.removeLastMatchRackRow = removeLastMatchRackRow;
     window.toggleMatchRacksExpanded = toggleMatchRacksExpanded;
     window.openMatchEditModal = openMatchEditModal;
     window.closeMatchEditModal = closeMatchEditModal;

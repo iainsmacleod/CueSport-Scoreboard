@@ -257,6 +257,33 @@ export async function registerAccountRoutes(app) {
     return { id: keyId, key };
   });
 
+  /** Rename seat label (who you shared the key with). Does not rotate the secret. */
+  app.patch('/api/api-keys/:keyId', async (request, reply) => {
+    const account = await resolveAccountFromRequest(request);
+    if (!account) return reply.code(401).send({ error: 'Unauthorized' });
+    const { keyId } = request.params;
+    const { label } = request.body || {};
+    const next = String(label || '').trim();
+    if (!next) {
+      return reply.code(400).send({ error: 'Enter a name (1–40 characters) for this dock key.' });
+    }
+    const existing = sqlite.getApiKeyById(keyId);
+    if (!existing || existing.account_id !== account.id || existing.revoked_at) {
+      return reply.code(404).send({ error: 'API key not found' });
+    }
+    const renamed = sqlite.renameApiKey(keyId, account.id, next);
+    if (!renamed) {
+      return reply.code(400).send({ error: 'Enter a name (1–40 characters) for this dock key.' });
+    }
+    return {
+      ok: true,
+      id: renamed.id,
+      label: renamed.label,
+      api_keys: sqlite.getApiKeysForAccount(account.id),
+      rooms: sqlite.getRoomsWithLiveState(account.id).map(enrichRoom),
+    };
+  });
+
   /** Rotate secret; keep seat label. Kicks docks still using the old secret. */
   app.post('/api/api-keys/:keyId/regenerate', async (request, reply) => {
     const account = await resolveAccountFromRequest(request);

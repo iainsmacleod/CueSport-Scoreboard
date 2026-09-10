@@ -326,6 +326,23 @@ export async function fetchApiKey(serverUrl, token, keyId) {
   return res.json();
 }
 
+export async function renameApiKey(serverUrl, token, keyId, label) {
+  const base = serverUrl.replace(/\/$/, '');
+  const res = await fetch(`${base}/api/api-keys/${encodeURIComponent(keyId)}`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ label }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || err.message || 'Failed to rename API key');
+  }
+  return res.json();
+}
+
 export async function createGuestLink(serverUrl, token, roomId, label) {
   const base = serverUrl.replace(/\/$/, '');
   const res = await fetch(`${base}/api/rooms/${roomId}/guest-link`, {

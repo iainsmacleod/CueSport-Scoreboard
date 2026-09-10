@@ -21,7 +21,7 @@ for more information about Salotto please visit https://salotto.app
     <link rel="stylesheet" href="./common/css/control_panel/grey.css?v=8.0.0" />
     <link rel="stylesheet" href="./common/css/control_panel/light.css?v=8.0.0" />
     <link rel="stylesheet" href="./common/css/control_panel/rachni.css?v=8.0.0" />
-    <link rel="stylesheet" href="./common/css/control_panel/required.css?v=8.0.0.24" />
+    <link rel="stylesheet" href="./common/css/control_panel/required.css?v=8.0.0.25" />
     <script>
         //---------------------------------------------------------------------------------------------
         var versionNum = "8.0.0";
@@ -33,7 +33,7 @@ for more information about Salotto please visit https://salotto.app
     <script src="./common/js/match_racks.js?v=8.0.0"></script>
     <script src="./common/js/cloud_relay.js?v=8.0.0.12"></script>
     <script src="./common/js/stream_sharing.js?v=8.0.0"></script>
-    <script src="./common/js/player_stats.js?v=8.0.0.33"></script>
+    <script src="./common/js/player_stats.js?v=8.0.0.34"></script>
     <script src="./common/js/control_panel.js?v=8.0.0.34"></script>
     <script src="./common/js/cloud_commands.js?v=8.0.0.7"></script>
     <script src="./common/js/cloud_auth.js?v=8.0.0.1"></script>
@@ -1050,6 +1050,10 @@ for more information about Salotto please visit https://salotto.app
                             onclick="addMatchRackRow()">Add Rack</button>
                     </div>
                     <div id="statsMatchRacksEditor" class="stats-match-racks-editor"></div>
+                    <div class="stats-match-racks-editor-footer">
+                        <button type="button" class="stats-delete-btn hover obs28 button" id="statsMatchRemoveRackBtn"
+                            onclick="removeLastMatchRackRow()" disabled>Remove Last Rack</button>
+                    </div>
                 </div>
                 </div>
                 <div id="statsMatchExtrasHb" class="form-row stats-match-form-row noShow">

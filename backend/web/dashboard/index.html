@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>CueSport Scoreboard Cloud — Dashboard</title>
-  <link rel="stylesheet" href="/web/shared/styles.css?v=8.0.0.45" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.0.0.47" />
 </head>
 <body>
   <header class="site-header">
@@ -162,7 +162,7 @@
         </div>
         <div class="panel">
           <h2>OBS Dock Keys</h2>
-          <p class="hint">One key per dock seat. Create a key for each table, paste it into that dock’s CueSport Cloud settings. A second dock using the same key is rejected. <strong>Regenerate</strong> rotates the secret and keeps the same seat name (OBS Dock Key 1, 2, …). <strong>Remove</strong> frees the seat. Connections are listed by that same key name.</p>
+          <p class="hint">One key per dock seat. Create a key for each table, paste it into that dock’s CueSport Cloud settings. A second dock using the same key is rejected. <strong>Share</strong> sends the key by email, text, or your device share sheet. <strong>Regenerate</strong> rotates the secret and keeps the same seat name. <strong>Remove</strong> frees the seat and disconnects any dock using it. Rename a connection below so you remember who received each key.</p>
           <button id="createKeyBtn" class="btn">Create Dock Key</button>
           <p id="apiKeyLimitHint" class="hint hidden"></p>
           <p id="keyCopyNotice" class="copy-notice hidden" aria-live="polite"></p>
@@ -171,7 +171,7 @@
         </div>
         <div class="panel">
           <h2>OBS Connections</h2>
-          <p class="hint">Persisted dock connections for this account (including offline). Named after the OBS Dock Key in use. Live tables still appear on the Tables tab. <strong>Kick</strong> disconnects clients and removes the connection mapping; match history is kept.</p>
+          <p class="hint">Persisted dock connections for this account (including offline). Named after the OBS Dock Key in use — rename with the pencil so you know who you shared each key with. Live tables still appear on the Tables tab. <strong>Kick</strong> disconnects clients and removes the connection mapping; match history is kept.</p>
           <p id="debugRoomsEmpty" class="hint">No connections yet — connect an OBS dock with a Dock Key to create one.</p>
           <p id="debugRoomsNotice" class="hint hidden" aria-live="polite"></p>
           <ul id="debugRoomList"></ul>
@@ -236,6 +236,9 @@
             <button type="button" class="btn" id="statsMatchAddRackBtn">Add Rack</button>
           </div>
           <div id="statsMatchRacksEditor" class="stats-match-racks-editor"></div>
+          <div class="stats-match-racks-editor-footer">
+            <button type="button" class="btn danger" id="statsMatchRemoveRackBtn" disabled>Remove Last Rack</button>
+          </div>
         </div>
         <div id="statsMatchExtrasBalls" class="stats-toolbar hidden">
           <label class="stats-filter">
@@ -270,6 +273,19 @@
       </div>
     </div>
   </div>
-  <script type="module" src="/web/dashboard/app.js?v=8.0.0.64"></script>
+  <div id="dashShareKeyModal" class="dash-modal hidden" role="dialog" aria-modal="true" aria-labelledby="dashShareKeyTitle">
+    <div class="dash-modal-card panel dash-confirm-card">
+      <h2 id="dashShareKeyTitle">Share Dock Key</h2>
+      <p id="dashShareKeyMessage" class="dash-confirm-message">Send this OBS Dock Key by email, text, or your device share sheet.</p>
+      <div class="stats-toolbar dash-share-key-actions">
+        <button type="button" id="dashShareKeyNativeBtn" class="btn primary hidden">Share…</button>
+        <button type="button" id="dashShareKeyEmailBtn" class="btn">Email</button>
+        <button type="button" id="dashShareKeySmsBtn" class="btn">Text</button>
+        <button type="button" id="dashShareKeyCopyBtn" class="btn secondary">Copy</button>
+        <button type="button" id="dashShareKeyCloseBtn" class="btn">Close</button>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/web/dashboard/app.js?v=8.0.0.66"></script>
 </body>
 </html>

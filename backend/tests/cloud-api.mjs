@@ -382,6 +382,29 @@ async function run() {
       }
     }
 
+    if (apiKeyId) {
+      try {
+        const renamed = await fetchJson(`/api/api-keys/${apiKeyId}`, {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ label: 'browser-test-shared' }),
+        });
+        assert(
+          'PATCH /api/api-keys/:id rename',
+          renamed.ok && renamed.body.label === 'browser-test-shared',
+          `status=${renamed.status} body=${JSON.stringify(renamed.body)}`,
+        );
+        const meAfterRename = await fetchJson('/api/me', { headers: { Authorization: `Bearer ${token}` } });
+        const keyRow = (meAfterRename.body.api_keys || []).find((k) => k.id === apiKeyId);
+        assert('Renamed key appears in /api/me', keyRow?.label === 'browser-test-shared');
+      } catch (e) {
+        assert('PATCH /api/api-keys/:id rename', false, e.message);
+      }
+    }
+
     if (apiKey && smokeInstance && roomId) {
       try {
         const dockReuse = await wsJoin({ client: 'dock', apiKey, instanceId: smokeInstance });

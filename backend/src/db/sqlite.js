@@ -397,6 +397,32 @@ export function getApiKeysForAccount(accountId) {
   }));
 }
 
+/** Rename an active seat; syncs room / dock labels that use this key. */
+export function renameApiKey(keyId, accountId, label) {
+  const next = String(label || '').trim().slice(0, 40);
+  if (!next) return null;
+  const database = getDb();
+  const existing = database.prepare(
+    `SELECT id, label FROM api_keys
+     WHERE id = ? AND account_id = ? AND revoked_at IS NULL`
+  ).get(keyId, accountId);
+  if (!existing) return null;
+  database.prepare(
+    `UPDATE api_keys SET label = ? WHERE id = ? AND account_id = ? AND revoked_at IS NULL`
+  ).run(next, keyId, accountId);
+  const docks = database.prepare(
+    `SELECT room_id FROM room_docks WHERE api_key_id = ? AND account_id = ?`
+  ).all(keyId, accountId);
+  for (const dock of docks) {
+    database.prepare(
+      `UPDATE room_docks SET label = ? WHERE room_id = ? AND account_id = ?`
+    ).run(next, dock.room_id, accountId);
+    database.prepare('UPDATE rooms SET label = ? WHERE id = ? AND account_id = ?')
+      .run(next, dock.room_id, accountId);
+  }
+  return { id: keyId, label: next, previous_label: existing.label };
+}
+
 /** Returns plaintext key for the account owner, or null if missing/revoked/legacy. */
 export function getApiKeyPlaintext(keyId, accountId) {
   const row = getDb().prepare(

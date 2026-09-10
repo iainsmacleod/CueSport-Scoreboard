@@ -1086,8 +1086,38 @@ body.controls-locked #reconnectBanner {
   min-width: 0;
   font-size: 0.82rem;
 }
-.debug-room-meta strong {
-  font-size: 0.9rem;
+.debug-room-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+.debug-room-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #c0caf5;
+  overflow-wrap: anywhere;
+}
+.debug-room-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.debug-room-rename-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+}
+.debug-room-rename-inline input {
+  flex: 1 1 10rem;
+  min-width: 8rem;
+  max-width: 20rem;
+}
+.dash-share-key-actions {
+  flex-wrap: wrap;
 }
 .stats-summary {
   display: grid;
@@ -1797,6 +1827,14 @@ body.controls-locked #reconnectBanner {
   gap: 0.75rem;
   margin-bottom: 0.4rem;
   font-weight: 600;
+}
+.stats-match-racks-editor-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.5rem;
+}
+.stats-match-racks-editor-footer .btn {
+  margin: 0;
 }
 .stats-rack-edit-table {
   width: 100%;

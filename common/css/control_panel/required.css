@@ -2198,6 +2198,12 @@ label.switch.toggle-disabled {
 	width: 100%;
 }
 
+.stats-match-racks-editor-footer {
+	display: flex;
+	justify-content: flex-end;
+	margin-top: 6px;
+}
+
 .stats-rack-edit-table {
 	width: 100%;
 	font-size: 0.85em;

@@ -12,11 +12,12 @@ import {
   fetchApiKey,
   revokeApiKey,
   regenerateApiKey,
+  renameApiKey,
   deleteRoom,
   invalidateAllSessions,
   revokeAllGuestLinks,
   GAME_TYPES,
-} from '../shared/cloud-client.js?v=8.0.0.4';
+} from '../shared/cloud-client.js?v=8.0.0.5';
 import {
   computeDurationSeconds,
   formatDurationSeconds,
@@ -331,8 +332,33 @@ function renderDebugRooms(rooms) {
     const gameInfo = String(st.gameInfo || '').trim();
     const meta = document.createElement('div');
     meta.className = 'debug-room-meta';
-    meta.innerHTML =
-      `<strong>${escapeHtml(title)}</strong>` +
+
+    const titleRow = document.createElement('div');
+    titleRow.className = 'debug-room-title-row';
+    const titleEl = document.createElement('strong');
+    titleEl.className = 'debug-room-title';
+    titleEl.textContent = title;
+    titleRow.appendChild(titleEl);
+
+    const canRename = !!room.api_key_id;
+    if (canRename) {
+      const editBtn = document.createElement('button');
+      editBtn.type = 'button';
+      editBtn.className = 'stats-player-edit-btn debug-room-rename-btn';
+      editBtn.title = 'Rename dock (who you shared this key with)';
+      editBtn.setAttribute('aria-label', 'Rename dock');
+      editBtn.innerHTML =
+        '<svg class="stats-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>';
+      editBtn.addEventListener('click', () => {
+        startDebugRoomRename(room, titleRow, title);
+      });
+      titleRow.appendChild(editBtn);
+    }
+    meta.appendChild(titleRow);
+
+    const details = document.createElement('div');
+    details.className = 'debug-room-details';
+    details.innerHTML =
       `<span class="hint">OBS Dock UUID: ${escapeHtml(room.id)}</span>` +
       (gameInfo ? `<span>event: ${escapeHtml(gameInfo)}</span>` : '') +
       `<span>instance: ${escapeHtml(room.instance_key || '—')}</span>` +
@@ -341,6 +367,8 @@ function renderDebugRooms(rooms) {
       `<span>last seen: ${escapeHtml(formatLocalDateTime(room.last_seen_at) || '—')}</span>` +
       (room.cleanup_after ? `<span>cleanup after: ${escapeHtml(formatLocalDateTime(room.cleanup_after))}</span>` : '') +
       `<span>guest links: ${Number(room.guest_link_count) || 0}</span>`;
+    meta.appendChild(details);
+
     const actions = document.createElement('div');
     actions.className = 'token-list-actions';
     const kickBtn = createDashActionButton({
@@ -378,6 +406,93 @@ function renderDebugRooms(rooms) {
     li.appendChild(meta);
     li.appendChild(actions);
     list.appendChild(li);
+  });
+}
+
+function startDebugRoomRename(room, titleRow, currentTitle) {
+  if (!room?.api_key_id || !titleRow) return;
+  const form = document.createElement('form');
+  form.className = 'debug-room-rename-inline';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.maxLength = 40;
+  input.autocomplete = 'off';
+  input.setAttribute('aria-label', 'Dock name');
+  input.value = currentTitle;
+  const saveBtn = document.createElement('button');
+  saveBtn.type = 'submit';
+  saveBtn.className = 'btn';
+  saveBtn.textContent = 'Save';
+  const cancelBtn = document.createElement('button');
+  cancelBtn.type = 'button';
+  cancelBtn.className = 'btn debug-room-rename-cancel';
+  cancelBtn.textContent = 'Cancel';
+  form.appendChild(input);
+  form.appendChild(saveBtn);
+  form.appendChild(cancelBtn);
+  titleRow.replaceWith(form);
+  input.focus();
+  input.select();
+
+  const restoreTitle = () => {
+    const nextRow = document.createElement('div');
+    nextRow.className = 'debug-room-title-row';
+    const titleEl = document.createElement('strong');
+    titleEl.className = 'debug-room-title';
+    titleEl.textContent = currentTitle;
+    const editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.className = 'stats-player-edit-btn debug-room-rename-btn';
+    editBtn.title = 'Rename dock (who you shared this key with)';
+    editBtn.setAttribute('aria-label', 'Rename dock');
+    editBtn.innerHTML =
+      '<svg class="stats-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>';
+    editBtn.addEventListener('click', () => {
+      startDebugRoomRename(room, nextRow, currentTitle);
+    });
+    nextRow.appendChild(titleEl);
+    nextRow.appendChild(editBtn);
+    form.replaceWith(nextRow);
+  };
+
+  cancelBtn.addEventListener('click', (event) => {
+    event.preventDefault();
+    restoreTitle();
+  });
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const next = String(input.value || '').trim();
+    if (!next) {
+      setError('Enter a name for this dock.');
+      return;
+    }
+    if (next === currentTitle) {
+      restoreTitle();
+      return;
+    }
+    try {
+      setError('');
+      saveBtn.disabled = true;
+      cancelBtn.disabled = true;
+      const result = await renameApiKey(getServerUrl(), getToken(), room.api_key_id, next);
+      if (result.api_keys) renderApiKeys(result.api_keys);
+      if (result.rooms) {
+        renderDebugRooms(result.rooms);
+        renderTableCards(result.rooms);
+      } else {
+        await renderDashboard();
+      }
+      const notice = document.getElementById('debugRoomsNotice');
+      if (notice) {
+        notice.textContent = `Renamed to “${result.label || next}”.`;
+        notice.classList.remove('hidden');
+      }
+    } catch (err) {
+      setError(err.message);
+      saveBtn.disabled = false;
+      cancelBtn.disabled = false;
+    }
   });
 }
 
@@ -421,6 +536,9 @@ function dashActionIcon(kind) {
   }
   if (kind === 'kick') {
     return `<svg ${common}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="17" y1="8" x2="22" y2="13"/><line x1="22" y1="8" x2="17" y2="13"/></svg>`;
+  }
+  if (kind === 'share') {
+    return `<svg ${common}><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>`;
   }
   return '';
 }
@@ -493,6 +611,104 @@ async function copyRevealedApiKey(labelEl) {
   }, 1200);
 }
 
+function buildApiKeySharePayload(label, key) {
+  const server = getServerUrl().replace(/\/$/, '');
+  const seat = String(label || 'OBS Dock Key').trim() || 'OBS Dock Key';
+  const subject = `CueSport OBS Dock Key — ${seat}`;
+  const text =
+    `CueSport OBS Dock Key — ${seat}\n\n` +
+    `Key: ${key}\n` +
+    `Server: ${server}\n\n` +
+    'Paste the key into CueSport Cloud settings on the OBS dock (Connection). ' +
+    'Each dock needs its own key.';
+  return { subject, text, seat };
+}
+
+let pendingShareKey = null;
+
+function closeDashShareKeyModal() {
+  const modal = document.getElementById('dashShareKeyModal');
+  if (modal) modal.classList.add('hidden');
+  pendingShareKey = null;
+}
+
+function openDashShareKeyModal({ label, key }) {
+  const modal = document.getElementById('dashShareKeyModal');
+  const titleEl = document.getElementById('dashShareKeyTitle');
+  const msgEl = document.getElementById('dashShareKeyMessage');
+  const nativeBtn = document.getElementById('dashShareKeyNativeBtn');
+  if (!modal || !key) return;
+  pendingShareKey = buildApiKeySharePayload(label, key);
+  if (titleEl) titleEl.textContent = `Share “${pendingShareKey.seat}”`;
+  if (msgEl) {
+    msgEl.textContent =
+      'Send this OBS Dock Key by email, text, or your device share sheet. ' +
+      'Rename the connection afterward so you remember who received it.';
+  }
+  if (nativeBtn) {
+    nativeBtn.classList.toggle('hidden', typeof navigator.share !== 'function');
+  }
+  modal.classList.remove('hidden');
+}
+
+async function shareApiKeyViaChannel(channel) {
+  if (!pendingShareKey) return;
+  const { subject, text } = pendingShareKey;
+  if (channel === 'native') {
+    if (typeof navigator.share !== 'function') return;
+    try {
+      await navigator.share({ title: subject, text });
+      closeDashShareKeyModal();
+    } catch (err) {
+      if (err && err.name !== 'AbortError') setError(err.message || 'Share failed');
+    }
+    return;
+  }
+  if (channel === 'email') {
+    window.location.href =
+      `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`;
+    return;
+  }
+  if (channel === 'sms') {
+    // iOS uses &body=, Android commonly accepts ?body=
+    window.location.href = `sms:?&body=${encodeURIComponent(text)}`;
+    return;
+  }
+  if (channel === 'copy') {
+    const ok = await copyTextToClipboard(text);
+    if (!ok) {
+      setError('Unable to copy automatically — select and copy the key manually.');
+      return;
+    }
+    setError('');
+    showKeyCopyNotice('Share message copied to clipboard.');
+    closeDashShareKeyModal();
+  }
+}
+
+async function shareApiKey(k) {
+  try {
+    setError('');
+    const data = await fetchApiKey(getServerUrl(), getToken(), k.id);
+    const key = String(data.key || '').trim();
+    if (!key) throw new Error('Key not available');
+    // Prefer the native share sheet when available (same idea as guest links).
+    if (typeof navigator.share === 'function') {
+      const payload = buildApiKeySharePayload(k.label, key);
+      try {
+        await navigator.share({ title: payload.subject, text: payload.text });
+        return;
+      } catch (err) {
+        if (err && err.name === 'AbortError') return;
+        // Fall through to email/text modal if the sheet fails.
+      }
+    }
+    openDashShareKeyModal({ label: k.label, key });
+  } catch (err) {
+    setError(err.message);
+  }
+}
+
 function renderApiKeys(keys) {
   const keyList = document.getElementById('keyList');
   keyList.innerHTML = '';
@@ -542,6 +758,19 @@ function renderApiKeys(keys) {
       }
     });
 
+    const shareBtn = createDashActionButton({
+      className: 'secondary',
+      icon: 'share',
+      label: 'Share',
+      title: k.viewable === false
+        ? 'This key was created before viewable storage. Create a new key to share it.'
+        : 'Share this dock key via email, text, or your device share sheet',
+    });
+    shareBtn.disabled = k.viewable === false;
+    shareBtn.addEventListener('click', () => {
+      shareApiKey(k);
+    });
+
     const regenBtn = createDashActionButton({
       className: 'secondary',
       icon: 'refresh',
@@ -584,7 +813,7 @@ function renderApiKeys(keys) {
       className: 'danger',
       icon: 'trash',
       label: 'Remove',
-      title: 'Free this dock seat',
+      title: 'Free this dock seat and disconnect any dock using it',
     });
     removeBtn.addEventListener('click', async () => {
       const ok = await confirmDashAction({
@@ -615,6 +844,7 @@ function renderApiKeys(keys) {
     });
 
     actions.appendChild(viewBtn);
+    actions.appendChild(shareBtn);
     actions.appendChild(regenBtn);
     actions.appendChild(removeBtn);
     li.appendChild(label);
@@ -1649,8 +1879,27 @@ function syncMatchExtrasVisibility(gameType) {
   const words = gt === 'game8' ? 'Frames' : 'Racks';
   const label = document.getElementById('statsMatchRacksEditorLabel');
   const addBtn = document.getElementById('statsMatchAddRackBtn');
+  const removeBtn = document.getElementById('statsMatchRemoveRackBtn');
   if (label) label.textContent = words;
   if (addBtn) addBtn.textContent = `Add ${word}`;
+  if (removeBtn) removeBtn.textContent = `Remove Last ${word}`;
+  syncDashMatchRackRemoveBtn();
+}
+
+function syncDashMatchRackRemoveBtn() {
+  const removeBtn = document.getElementById('statsMatchRemoveRackBtn');
+  if (!removeBtn) return;
+  const editor = document.getElementById('statsMatchRacksEditor');
+  const count = editor ? editor.querySelectorAll('tr.stats-rack-edit-row').length : 0;
+  removeBtn.disabled = count < 1;
+}
+
+function removeLastDashMatchRackRow() {
+  const preserved = preserveDashRackEditorRows();
+  if (!preserved.length) return;
+  preserved.pop();
+  renderDashMatchRacksEditor(preserved);
+  syncMatchModalSaveEnabled();
 }
 
 function fillMatchGameTypes() {
@@ -1788,6 +2037,7 @@ function renderDashMatchRacksEditor(racks) {
   if (!list.length) {
     editor.innerHTML = `<p class="hint">No ${words} yet. Use Add ${word}.</p>`;
     updateDashMatchScoreSummary();
+    syncDashMatchRackRemoveBtn();
     return;
   }
   const p1 = escapeHtml(matchEditPlayerNames.p1 || 'Player 1');
@@ -1798,7 +2048,7 @@ function renderDashMatchRacksEditor(racks) {
   } else if (isStraight) {
     html += `<th>Run ${p1}</th><th>Run ${p2}</th>`;
   }
-  html += `<th>Fouls ${p1}</th><th>Fouls ${p2}</th><th></th></tr></thead><tbody>`;
+  html += `<th>Fouls ${p1}</th><th>Fouls ${p2}</th></tr></thead><tbody>`;
   list.forEach((r, index) => {
     let winnerSlot = '';
     const slot = r.winnerSlot != null ? String(r.winnerSlot) : '';
@@ -1822,8 +2072,7 @@ function renderDashMatchRacksEditor(racks) {
         <td><input type="number" class="stats-rack-hr-p2" min="0" max="999" value="${clampDashScore(r.highestRunP2 != null ? r.highestRunP2 : r.highestBreakP2)}" /></td>`;
     }
     html += `<td><input type="number" class="stats-rack-fouls-p1" min="0" max="999" value="${clampDashScore(r.foulsP1)}" /></td>
-      <td><input type="number" class="stats-rack-fouls-p2" min="0" max="999" value="${clampDashScore(r.foulsP2)}" /></td>
-      <td><button type="button" class="btn danger stats-rack-del-btn">Del</button></td></tr>`;
+      <td><input type="number" class="stats-rack-fouls-p2" min="0" max="999" value="${clampDashScore(r.foulsP2)}" /></td></tr>`;
   });
   html += '</tbody></table>';
   editor.innerHTML = html;
@@ -1836,14 +2085,8 @@ function renderDashMatchRacksEditor(racks) {
   editor.querySelectorAll('input').forEach((el) => {
     el.addEventListener('input', syncMatchModalSaveEnabled);
   });
-  editor.querySelectorAll('.stats-rack-del-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      btn.closest('tr')?.remove();
-      renderDashMatchRacksEditor(preserveDashRackEditorRows());
-      syncMatchModalSaveEnabled();
-    });
-  });
   updateDashMatchScoreSummary();
+  syncDashMatchRackRemoveBtn();
 }
 
 function serializeDashEditorRacksForCloud(editorRacks) {
@@ -2434,6 +2677,9 @@ document.getElementById('statsMatchAddRackBtn')?.addEventListener('click', () =>
   renderDashMatchRacksEditor(preserved);
   syncMatchModalSaveEnabled();
 });
+document.getElementById('statsMatchRemoveRackBtn')?.addEventListener('click', () => {
+  removeLastDashMatchRackRow();
+});
 document.getElementById('statsMatchModal')?.addEventListener('click', (event) => {
   if (event.target.id === 'statsMatchModal') closeMatchModal();
 });
@@ -2574,7 +2820,21 @@ document.getElementById('dashConfirmCancelBtn')?.addEventListener('click', () =>
 document.getElementById('dashConfirmModal')?.addEventListener('click', (event) => {
   if (event.target && event.target.id === 'dashConfirmModal') closeDashConfirm(false);
 });
+document.getElementById('dashShareKeyNativeBtn')?.addEventListener('click', () => shareApiKeyViaChannel('native'));
+document.getElementById('dashShareKeyEmailBtn')?.addEventListener('click', () => shareApiKeyViaChannel('email'));
+document.getElementById('dashShareKeySmsBtn')?.addEventListener('click', () => shareApiKeyViaChannel('sms'));
+document.getElementById('dashShareKeyCopyBtn')?.addEventListener('click', () => shareApiKeyViaChannel('copy'));
+document.getElementById('dashShareKeyCloseBtn')?.addEventListener('click', () => closeDashShareKeyModal());
+document.getElementById('dashShareKeyModal')?.addEventListener('click', (event) => {
+  if (event.target && event.target.id === 'dashShareKeyModal') closeDashShareKeyModal();
+});
 document.addEventListener('keydown', (event) => {
+  const shareModal = document.getElementById('dashShareKeyModal');
+  if (shareModal && !shareModal.classList.contains('hidden') && event.key === 'Escape') {
+    event.preventDefault();
+    closeDashShareKeyModal();
+    return;
+  }
   const modal = document.getElementById('dashConfirmModal');
   if (!modal || modal.classList.contains('hidden')) return;
   if (event.key === 'Escape') {
