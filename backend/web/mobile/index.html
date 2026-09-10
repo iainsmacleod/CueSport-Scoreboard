@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
   <title>CueSport Scoreboard Cloud Control</title>
-  <link rel="stylesheet" href="/web/shared/styles.css?v=8.0.0.49" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.0.0.53" />
 </head>
 <body class="mobile">
   <header>
@@ -238,17 +238,18 @@
 
       <div id="viewShare" class="mobile-view hidden">
         <div class="panel share-panel">
-          <h2>Public Control Link</h2>
+          <h2>Guest Control Link</h2>
           <p class="hint share-limitations">
-            Guests can score, pot balls, apply fouls, pick the breaker, and edit game type plus its options
-            (ball variant, win on break, golden ball, point based), race, and event info.
-            They can score with the same action balls as the dock for that game
-            (foul, undo, free ball on Snooker, respot on Bank/One Pocket), change game setup, and Restart/End/Call Match.
-            They cannot change player names or use replay.
+            Guests can control breaker, active player, score, apply fouls, and edit game type —
+            including any game-specific modifiers and details — as well as managing the overall
+            state of the game using Restart/End/Call Match. They cannot change player names or use
+            replay functionality.
+          </p>
+          <p class="hint share-limitations">
             Each guest link allows only one active device at a time.
           </p>
           <div id="shareQrWrap" class="share-qr-wrap">
-            <img id="shareQrImg" class="share-qr hidden" alt="QR code for public control link" />
+            <img id="shareQrImg" class="share-qr hidden" alt="QR code for guest control link" />
             <p id="shareStatus" class="hint">Preparing link…</p>
           </div>
           <p id="shareUrl" class="share-url hidden"></p>
@@ -337,6 +338,6 @@
       <div id="poolRespotTargets" class="snooker-foul-targets"></div>
     </div>
   </div>
-  <script type="module" src="/web/mobile/app.js?v=8.0.0.25"></script>
+  <script type="module" src="/web/mobile/app.js?v=8.0.0.26"></script>
 </body>
 </html>

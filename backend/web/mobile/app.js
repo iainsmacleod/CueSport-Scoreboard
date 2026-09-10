@@ -192,7 +192,7 @@ async function ensureGuestShareLink({ refreshList = false } = {}) {
   if (guestSharePromise) return guestSharePromise;
   const token = localStorage.getItem(TOKEN_KEY);
   if (!roomId || !token) {
-    throw new Error('Sign in required to create a public control link');
+    throw new Error('Sign in required to create a guest control link');
   }
   const status = document.getElementById('shareStatus');
   if (!cachedGuestShareUrl && status) {
@@ -321,7 +321,7 @@ function wireMobileNav() {
       if (!window.confirm('Create a new guest link? Existing links stay valid until you revoke them.')) return;
       try {
         const token = localStorage.getItem(TOKEN_KEY);
-        if (!roomId || !token) throw new Error('Sign in required to create a public control link');
+        if (!roomId || !token) throw new Error('Sign in required to create a guest control link');
         const created = await createGuestLink(window.location.origin, token, roomId);
         cachedGuestShareToken = created.token;
         cachedGuestShareUrl = guestUrlFromLink(created);
@@ -351,7 +351,7 @@ function wireMobileNav() {
       try {
         // URL only — share-sheet "Copy" concatenates `text` with the link on many phones.
         await navigator.share({
-          title: 'CueSport public control link',
+          title: 'CueSport guest control link',
           url: cachedGuestShareUrl,
         });
       } catch (err) {

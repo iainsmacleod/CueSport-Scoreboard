@@ -6519,6 +6519,10 @@
         return ts.highestBreak || 0;
     }
 
+    function wrapStatsTableHtml(tableHtml) {
+        return '<div class="stats-table-wrap">' + tableHtml + '</div>';
+    }
+
     function buildPlayerStatsDataTable(headers, cells, rowClass) {
         let html = '<table class="stats-table stats-player-stats-table"><thead><tr>';
         headers.forEach(function (header) {
@@ -6533,7 +6537,7 @@
             html += '<td>' + cell + '</td>';
         });
         html += '</tr></tbody></table>';
-        return html;
+        return wrapStatsTableHtml(html);
     }
 
     function renderPlayerSummaryCards(player, winStreak) {
@@ -6716,6 +6720,7 @@
                 '</tr>';
         });
         html += '</tbody></table>';
+        html = wrapStatsTableHtml(html);
 
         if (h2h.lastPlayedAt) {
             html += '<p class="stats-h2h-last">Last played: ' + formatDate(h2h.lastPlayedAt) + '</p>';
@@ -6813,8 +6818,10 @@
             '<div class="stats-section">' +
             '<h4 class="stats-section-title">Match History</h4>' +
             '<div class="stats-scroll-panel">' +
-            '<table class="stats-table"><thead><tr><th>Date</th><th>Match</th><th>Game</th><th>Score</th><th>Actions</th></tr></thead><tbody>' +
-            matchRows + '</tbody></table></div></div>';
+            wrapStatsTableHtml(
+                '<table class="stats-table"><thead><tr><th>Date</th><th>Match</th><th>Game</th><th>Score</th><th>Actions</th></tr></thead><tbody>' +
+                matchRows + '</tbody></table>'
+            ) + '</div></div>';
 
         bindStatsMatchInteractions(detailPanel);
         const opponentSelect = document.getElementById('statsPlayerOpponentSelect');
@@ -6886,8 +6893,10 @@
             '<div class="stats-section">' +
             '<h4 class="stats-section-title">Match History</h4>' +
             '<div class="stats-scroll-panel">' +
-            '<table class="stats-table"><thead><tr><th>Date</th><th>Match</th><th>Game</th><th>Score</th><th>Actions</th></tr></thead><tbody>' +
-            matchRows + '</tbody></table></div></div>';
+            wrapStatsTableHtml(
+                '<table class="stats-table"><thead><tr><th>Date</th><th>Match</th><th>Game</th><th>Score</th><th>Actions</th></tr></thead><tbody>' +
+                matchRows + '</tbody></table>'
+            ) + '</div></div>';
 
         bindStatsMatchInteractions(detailPanel);
         const opponentSelect = document.getElementById('statsPlayerOpponentSelect');
@@ -6986,7 +6995,8 @@
             return;
         }
 
-        container.innerHTML = '<table class="stats-table"><thead><tr><th>Date</th><th>Match</th><th>Game</th><th>Score</th><th>Actions</th></tr></thead><tbody>' +
+        container.innerHTML = wrapStatsTableHtml(
+            '<table class="stats-table"><thead><tr><th>Date</th><th>Match</th><th>Game</th><th>Score</th><th>Actions</th></tr></thead><tbody>' +
             renderMatchHistoryRows(h2h.matches, {
                 colspan: 5,
                 linkPlayers: true,
@@ -6995,7 +7005,8 @@
                     name1: h2h.player1.name,
                     name2: h2h.player2.name
                 }
-            }) + '</tbody></table>';
+            }) + '</tbody></table>'
+        );
         bindStatsMatchInteractions(container);
     }
 

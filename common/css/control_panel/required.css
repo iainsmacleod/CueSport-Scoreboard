@@ -2031,6 +2031,17 @@ label.switch.toggle-disabled {
 	font-size: 0.82em;
 }
 
+/* Contain wide tables so the modal/page does not grow horizontally. */
+.stats-table-wrap {
+	display: block;
+	width: 100%;
+	max-width: 100%;
+	min-width: 0;
+	overflow-x: auto;
+	-webkit-overflow-scrolling: touch;
+	overscroll-behavior-x: contain;
+}
+
 .stats-table th,
 .stats-table td {
 	border: 1px solid rgba(255, 255, 255, 0.2);
@@ -2194,7 +2205,11 @@ label.switch.toggle-disabled {
 
 .stats-match-racks-editor {
 	max-height: 220px;
+	max-width: 100%;
+	min-width: 0;
 	overflow: auto;
+	-webkit-overflow-scrolling: touch;
+	overscroll-behavior-x: contain;
 	width: 100%;
 }
 
@@ -2665,8 +2680,14 @@ label.switch.toggle-disabled {
 .stats-scroll-panel {
 	max-height: 180px;
 	overflow-y: auto;
-	overflow-x: auto;
+	overflow-x: hidden;
 	margin-top: 4px;
+	max-width: 100%;
+	min-width: 0;
+}
+
+.stats-scroll-panel > .stats-table-wrap {
+	max-height: none;
 }
 
 .stats-section-actions {

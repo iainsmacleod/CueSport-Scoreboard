@@ -64,6 +64,11 @@ function show(id, visible) {
   document.getElementById(id).classList.toggle('hidden', !visible);
   if (id === 'dashboardSection') {
     document.body.classList.toggle('has-dash-nav', !!visible);
+    const tabs = document.querySelector('.dash-tabs');
+    if (tabs) {
+      if (visible) tabs.removeAttribute('hidden');
+      else tabs.setAttribute('hidden', '');
+    }
   }
 }
 
