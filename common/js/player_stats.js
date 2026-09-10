@@ -66,6 +66,7 @@
         const p1Id = match.player1Id;
         const p2Id = match.player2Id;
         const straight = isStraightPoolGameType(match.gameType);
+        const allowRunOuts = isTrackerRackWinGameType(match.gameType);
         (match.racks || []).forEach(function (r) {
             if (straight) {
                 extras.highestRunP1 = Math.max(
@@ -80,12 +81,12 @@
                 extras.highestBreakP1 = Math.max(extras.highestBreakP1, clampScore(r.highestBreakP1));
                 extras.highestBreakP2 = Math.max(extras.highestBreakP2, clampScore(r.highestBreakP2));
             }
-            if (r.breakAndRun) {
+            if (allowRunOuts && r.breakAndRun) {
                 const slot = resolveWinnerSlot(r.winnerId, p1Id, p2Id);
                 if (slot === '1') extras.breakAndRunsP1 += 1;
                 else if (slot === '2') extras.breakAndRunsP2 += 1;
             }
-            if (r.tableRun) {
+            if (allowRunOuts && r.tableRun) {
                 const slot = resolveWinnerSlot(r.winnerId, p1Id, p2Id);
                 if (slot === '1') extras.tableRunsP1 += 1;
                 else if (slot === '2') extras.tableRunsP2 += 1;
@@ -166,11 +167,13 @@
             if (r.highestRunP2 != null) {
                 out.highestRunP2 = clampScore(r.highestRunP2);
             }
-            if (r.breakAndRun) {
-                out.breakAndRun = true;
-            }
-            if (r.tableRun) {
-                out.tableRun = true;
+            if (isTrackerRackWinGameType(match.gameType)) {
+                if (r.breakAndRun) {
+                    out.breakAndRun = true;
+                }
+                if (r.tableRun) {
+                    out.tableRun = true;
+                }
             }
             if (r.breakerSlot === '1' || r.breakerSlot === '2') {
                 out.breakerSlot = String(r.breakerSlot);
@@ -757,7 +760,8 @@
     }
 
     /** Map editor racks (winnerId 1/2) to cloud session:end rack shape. */
-    function serializeEditorRacksForCloud(editorRacks) {
+    function serializeEditorRacksForCloud(editorRacks, gameType) {
+        const allowRunOuts = isTrackerRackWinGameType(gameType);
         return (editorRacks || []).map(function (r, index) {
             const slot = resolveWinnerSlot(r.winnerId, null, null);
             if (!slot) {
@@ -783,11 +787,13 @@
                 out.highestRunP1 = clampScore(r.highestRunP1);
                 out.highestRunP2 = clampScore(r.highestRunP2);
             }
-            if (r.breakAndRun) {
-                out.breakAndRun = true;
-            }
-            if (r.tableRun) {
-                out.tableRun = true;
+            if (allowRunOuts) {
+                if (r.breakAndRun) {
+                    out.breakAndRun = true;
+                }
+                if (r.tableRun) {
+                    out.tableRun = true;
+                }
             }
             if (r.breakerSlot === '1' || r.breakerSlot === '2') {
                 out.breakerSlot = String(r.breakerSlot);
@@ -862,7 +868,8 @@
             return;
         }
         const scores = scoresFromEditorRacks(editorRacks);
-        const racks = serializeEditorRacksForCloud(editorRacks);
+        const gameType = document.getElementById('statsMatchGameType').value;
+        const racks = serializeEditorRacksForCloud(editorRacks, gameType);
         const dateVal = document.getElementById('statsMatchDate').value;
         try {
             await cloudApiFetch('/api/stats/matches/' + encodeURIComponent(startEventId), {
@@ -870,7 +877,7 @@
                 body: {
                     player1Name: modal.dataset.player1Name || matchEditPlayerNames.p1,
                     player2Name: modal.dataset.player2Name || matchEditPlayerNames.p2,
-                    gameType: document.getElementById('statsMatchGameType').value,
+                    gameType: gameType,
                     gameInfo: (document.getElementById('statsMatchGameInfo') || {}).value || '',
                     scores: scores,
                     racks: racks,

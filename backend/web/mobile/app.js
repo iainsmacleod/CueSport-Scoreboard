@@ -464,6 +464,9 @@ function controlsEnabled() {
 function updateControlsLock() {
   const locked = !controlsEnabled();
   document.body.classList.toggle('controls-locked', locked);
+  if (locked) {
+    closeScoringPickers();
+  }
   const live = document.getElementById('liveBoard');
   if (live) {
     live.setAttribute('aria-disabled', locked ? 'true' : 'false');
@@ -1167,6 +1170,9 @@ function renderBallGrid(state) {
   updateMobileRackFoulDisplay(state);
   const awaiting = inferAwaitingBreaker(state);
   const locked = !!(state.gameScoringLocked || (snapshot && snapshot.locked));
+  if (locked) {
+    closeScoringPickers();
+  }
   const snooker = isSnookerGameState(state, snapshot);
   const canUndo = state.canUndo === true || (snapshot && snapshot.canUndo === true);
   const undoTitle = snooker
@@ -1296,6 +1302,7 @@ function defaultSnookerFoulTargets() {
 }
 
 function openSnookerFoulPicker() {
+  if (!controlsEnabled() || (lastState && lastState.gameScoringLocked)) return;
   const modal = document.getElementById('snookerFoulModal');
   const container = document.getElementById('snookerFoulTargets');
   const hint = document.getElementById('snookerFoulHint');
@@ -1350,6 +1357,26 @@ function closeSnookerFoulPicker() {
   if (hint) hint.textContent = '';
 }
 
+function closePoolRespotPicker() {
+  const modal = document.getElementById('poolRespotModal');
+  const hint = document.getElementById('poolRespotHint');
+  if (modal) modal.classList.add('hidden');
+  if (hint) hint.textContent = '';
+}
+
+/** Close foul / respot pickers without sending a command (safe cancel). */
+function closeScoringPickers() {
+  closeSnookerFoulPicker();
+  closePoolRespotPicker();
+}
+
+function isScoringPickerOpen() {
+  const foul = document.getElementById('snookerFoulModal');
+  const respot = document.getElementById('poolRespotModal');
+  return !!(foul && !foul.classList.contains('hidden'))
+    || !!(respot && !respot.classList.contains('hidden'));
+}
+
 function selectSnookerFoul(foulKey) {
   closeSnookerFoulPicker();
   sendCmd('snooker_foul', { foulKey });
@@ -1361,6 +1388,7 @@ function wireSnookerFoulModal() {
 }
 
 function openPoolRespotPicker() {
+  if (!controlsEnabled() || (lastState && lastState.gameScoringLocked)) return;
   const modal = document.getElementById('poolRespotModal');
   const container = document.getElementById('poolRespotTargets');
   const hint = document.getElementById('poolRespotHint');
@@ -1401,11 +1429,6 @@ function openPoolRespotPicker() {
   modal.classList.remove('hidden');
 }
 
-function closePoolRespotPicker() {
-  const modal = document.getElementById('poolRespotModal');
-  if (modal) modal.classList.add('hidden');
-}
-
 function selectPoolRespot(ballId) {
   closePoolRespotPicker();
   if (ballId) sendCmd('respot_ball', { ballId });
@@ -1415,6 +1438,13 @@ function wirePoolRespotModal() {
   document.getElementById('poolRespotCancel')?.addEventListener('click', closePoolRespotPicker);
   document.getElementById('poolRespotBackdrop')?.addEventListener('click', closePoolRespotPicker);
 }
+
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape' && event.key !== 'Esc') return;
+  if (!isScoringPickerOpen()) return;
+  event.preventDefault();
+  closeScoringPickers();
+});
 
 function getResetActionLabel(state = lastState) {
   return 'Restart Match';

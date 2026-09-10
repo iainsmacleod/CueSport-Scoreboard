@@ -709,6 +709,53 @@ async function run() {
             snookerMatch.foulsP2 === 1 &&
             snookerMatch.highestBreakP1 === 42
         );
+        assert(
+          'Snooker edit clears prior B&R/TR',
+          !!snookerMatch &&
+            Number(snookerMatch.breakAndRunsP1 || 0) === 0 &&
+            Number(snookerMatch.breakAndRunsP2 || 0) === 0 &&
+            Number(snookerMatch.tableRunsP1 || 0) === 0 &&
+            Number(snookerMatch.tableRunsP2 || 0) === 0
+        );
+
+        const snookerRejectRunOuts = await fetchJson(`/api/stats/matches/${editable.startEventId}`, {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${tokenFresh}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            player1Name: 'Alice',
+            player2Name: 'Bob',
+            gameType: 'game8',
+            racks: [
+              { winnerSlot: '1', breakAndRun: true, highestBreakP1: 50, highestBreakP2: 0 },
+              { winnerSlot: '2', tableRun: true, highestBreakP1: 0, highestBreakP2: 40 },
+            ],
+            breakAndRunsP1: 9,
+            tableRunsP2: 9,
+          }),
+        });
+        assert('PATCH snooker ignores B&R/TR', snookerRejectRunOuts.ok && snookerRejectRunOuts.body.ok === true);
+        const statsAfterSnookerRunOuts = await fetchJson('/api/stats', {
+          headers: { Authorization: `Bearer ${tokenFresh}` },
+        });
+        const snookerNoRunOut = (statsAfterSnookerRunOuts.body.matches || [])
+          .find((m) => m.startEventId === editable.startEventId);
+        assert(
+          'Snooker match stores no B&R/TR',
+          !!snookerNoRunOut &&
+            Number(snookerNoRunOut.breakAndRunsP1 || 0) === 0 &&
+            Number(snookerNoRunOut.breakAndRunsP2 || 0) === 0 &&
+            Number(snookerNoRunOut.tableRunsP1 || 0) === 0 &&
+            Number(snookerNoRunOut.tableRunsP2 || 0) === 0 &&
+            !(snookerNoRunOut.racks || []).some((r) => r.breakAndRun || r.tableRun),
+          JSON.stringify({
+            br: snookerNoRunOut?.breakAndRunsP1,
+            tr: snookerNoRunOut?.tableRunsP2,
+            racks: snookerNoRunOut?.racks,
+          }),
+        );
         const alicePlayer = (statsAfterSnooker.body.players || []).find((p) => p.name === 'Alice');
         assert(
           'Player rollup includes fouls',

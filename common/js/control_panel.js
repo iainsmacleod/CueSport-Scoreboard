@@ -121,6 +121,17 @@ document.addEventListener("DOMContentLoaded", function () {
     initControlPanelTooltips();
 });
 
+document.addEventListener("keydown", function (event) {
+    if (event.key !== "Escape" && event.key !== "Esc") {
+        return;
+    }
+    if (!isScoringPickerOpen()) {
+        return;
+    }
+    event.preventDefault();
+    closeScoringPickers();
+});
+
 /**
  * Position a fixed tooltip inside the viewport: prefer above the anchor,
  * flip below if needed, and clamp horizontally so it never widens the tab.
@@ -1497,6 +1508,19 @@ function cancelPoolRespot() {
     clearPoolRespotHoverLabel();
 }
 
+/** Close foul / respot pickers (cancel without choosing is always safe). */
+function closeScoringPickers() {
+    cancelSnookerFoul();
+    cancelPoolRespot();
+}
+
+function isScoringPickerOpen() {
+    const foul = document.getElementById("snookerFoulModal");
+    const respot = document.getElementById("poolRespotModal");
+    return !!(foul && foul.style.display === "block")
+        || !!(respot && respot.style.display === "block");
+}
+
 function poolRespotModalBackdrop(event) {
     if (event && event.target && event.target.id === "poolRespotModal") {
         cancelPoolRespot();
@@ -1514,6 +1538,7 @@ function selectPoolRespot(element) {
 window.applyRespotBall = applyRespotBall;
 window.openPoolRespotPicker = openPoolRespotPicker;
 window.cancelPoolRespot = cancelPoolRespot;
+window.closeScoringPickers = closeScoringPickers;
 window.selectPoolRespot = selectPoolRespot;
 window.poolRespotModalBackdrop = poolRespotModalBackdrop;
 window.updatePoolRespotHoverLabel = updatePoolRespotHoverLabel;
@@ -2466,7 +2491,7 @@ function updateBallTrackerLockState() {
         }
     });
     if (locked) {
-        cancelSnookerFoul();
+        closeScoringPickers();
     }
     // Keep awaiting-breaker styling in sync when race lock flips (End Match).
     updateRackBreakerBallLock();
@@ -4226,6 +4251,7 @@ function useBallTracker() {
             displayCheckbox.checked = false;
         }
         cancelSnookerFoul();
+        cancelPoolRespot();
     }
 
     // Ball Tracker scoring needs an Active Player — force/lock that setting while tracker is on

@@ -993,8 +993,7 @@ a.mobile-nav-btn {
 /* Pause scoring/setup/replay while waiting for dock or disconnected; Share stays usable. */
 body.controls-locked #viewControl,
 body.controls-locked #viewSetup,
-body.controls-locked #viewReplay,
-body.controls-locked #snookerFoulModal {
+body.controls-locked #viewReplay {
   opacity: 0.55;
   pointer-events: none;
   user-select: none;

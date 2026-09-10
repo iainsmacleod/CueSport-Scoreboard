@@ -9,6 +9,15 @@ import { broadcastRoomCommand, notifyAccountTables } from '../ws/room-hub.js';
 
 const GAME_TYPE_IDS = new Set(['game1', 'game2', 'game3', 'game4', 'game5', 'game6', 'game7', 'game8']);
 
+/** B&R / TR apply to 8/9/10-Ball, Bank, and One Pocket only (not Straight or Snooker). */
+function supportsBreakAndTableRun(gameType) {
+  return gameType === 'game1'
+    || gameType === 'game2'
+    || gameType === 'game3'
+    || gameType === 'game5'
+    || gameType === 'game6';
+}
+
 function normalizePlayerName(name) {
   return normalizePlayerDisplayName(name);
 }
@@ -31,8 +40,9 @@ function deriveWinnerSlot(p1, p2) {
 }
 
 /** Normalize editable rack/frame rows from the dock/dashboard editor. */
-function normalizeCloudRacks(rawRacks) {
+function normalizeCloudRacks(rawRacks, gameType) {
   if (!Array.isArray(rawRacks)) return null;
+  const allowRunOuts = supportsBreakAndTableRun(gameType);
   const racks = [];
   rawRacks.forEach((raw, index) => {
     if (!raw || typeof raw !== 'object') return;
@@ -65,8 +75,8 @@ function normalizeCloudRacks(rawRacks) {
       entry.highestRunP1 = clampScore(raw.highestRunP1);
       entry.highestRunP2 = clampScore(raw.highestRunP2);
     }
-    if (raw.breakAndRun) entry.breakAndRun = true;
-    if (raw.tableRun) entry.tableRun = true;
+    if (allowRunOuts && raw.breakAndRun) entry.breakAndRun = true;
+    if (allowRunOuts && raw.tableRun) entry.tableRun = true;
     if (raw.breakerSlot === '1' || raw.breakerSlot === '2') {
       entry.breakerSlot = String(raw.breakerSlot);
     }
@@ -97,6 +107,7 @@ function aggregateExtrasFromRacks(racks, gameType) {
   };
   const isStraight = gameType === 'game4';
   const isSnooker = gameType === 'game8';
+  const allowRunOuts = supportsBreakAndTableRun(gameType);
   (racks || []).forEach((r) => {
     if (r.winnerSlot === '1') extras.scores.p1 += 1;
     else if (r.winnerSlot === '2') extras.scores.p2 += 1;
@@ -116,11 +127,11 @@ function aggregateExtrasFromRacks(racks, gameType) {
         clampScore(r.highestRunP2 != null ? r.highestRunP2 : r.highestBreakP2)
       );
     }
-    if (r.breakAndRun) {
+    if (allowRunOuts && r.breakAndRun) {
       if (r.winnerSlot === '1') extras.breakAndRunsP1 += 1;
       else if (r.winnerSlot === '2') extras.breakAndRunsP2 += 1;
     }
-    if (r.tableRun) {
+    if (allowRunOuts && r.tableRun) {
       if (r.winnerSlot === '1') extras.tableRunsP1 += 1;
       else if (r.winnerSlot === '2') extras.tableRunsP2 += 1;
     }
@@ -180,7 +191,7 @@ export async function registerEventRoutes(app) {
     }
 
     const normalizedRacks = Object.prototype.hasOwnProperty.call(body, 'racks')
-      ? normalizeCloudRacks(body.racks)
+      ? normalizeCloudRacks(body.racks, gameType)
       : null;
     if (normalizedRacks && normalizedRacks.length === 0) {
       return reply.code(400).send({ error: 'Add at least one rack/frame with a winner' });
@@ -211,6 +222,7 @@ export async function registerEventRoutes(app) {
       gameInfo,
     };
     const prevEnd = pair.end.payload || {};
+    const allowRunOuts = supportsBreakAndTableRun(gameType);
     const endPayload = {
       ...prevEnd,
       winnerSlot,
@@ -229,18 +241,18 @@ export async function registerEventRoutes(app) {
       highestRunP2: gameType === 'game4'
         ? clampScore(rackExtras ? rackExtras.highestRunP2 : (body.highestRunP2 ?? prevEnd.highestRunP2 ?? 0))
         : 0,
-      breakAndRunsP1: clampScore(
-        rackExtras ? rackExtras.breakAndRunsP1 : (body.breakAndRunsP1 ?? prevEnd.breakAndRunsP1 ?? 0)
-      ),
-      breakAndRunsP2: clampScore(
-        rackExtras ? rackExtras.breakAndRunsP2 : (body.breakAndRunsP2 ?? prevEnd.breakAndRunsP2 ?? 0)
-      ),
-      tableRunsP1: clampScore(
-        rackExtras ? rackExtras.tableRunsP1 : (body.tableRunsP1 ?? prevEnd.tableRunsP1 ?? 0)
-      ),
-      tableRunsP2: clampScore(
-        rackExtras ? rackExtras.tableRunsP2 : (body.tableRunsP2 ?? prevEnd.tableRunsP2 ?? 0)
-      ),
+      breakAndRunsP1: allowRunOuts
+        ? clampScore(rackExtras ? rackExtras.breakAndRunsP1 : (body.breakAndRunsP1 ?? prevEnd.breakAndRunsP1 ?? 0))
+        : 0,
+      breakAndRunsP2: allowRunOuts
+        ? clampScore(rackExtras ? rackExtras.breakAndRunsP2 : (body.breakAndRunsP2 ?? prevEnd.breakAndRunsP2 ?? 0))
+        : 0,
+      tableRunsP1: allowRunOuts
+        ? clampScore(rackExtras ? rackExtras.tableRunsP1 : (body.tableRunsP1 ?? prevEnd.tableRunsP1 ?? 0))
+        : 0,
+      tableRunsP2: allowRunOuts
+        ? clampScore(rackExtras ? rackExtras.tableRunsP2 : (body.tableRunsP2 ?? prevEnd.tableRunsP2 ?? 0))
+        : 0,
       ballsP1: clampScore(body.ballsP1 ?? prevEnd.ballsP1 ?? 0),
       ballsP2: clampScore(body.ballsP2 ?? prevEnd.ballsP2 ?? 0),
       foulsP1: clampScore(rackExtras ? rackExtras.foulsP1 : (body.foulsP1 ?? prevEnd.foulsP1 ?? 0)),
