@@ -435,6 +435,7 @@ function startDebugRoomRename(room, titleRow, currentTitle) {
   input.select();
 
   const restoreTitle = () => {
+    setError('');
     const nextRow = document.createElement('div');
     nextRow.className = 'debug-room-title-row';
     const titleEl = document.createElement('strong');

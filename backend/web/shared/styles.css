@@ -1058,12 +1058,14 @@ body.controls-locked #reconnectBanner {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+  flex-wrap: wrap;
   padding: 0.55rem 0;
   border-top: 1px solid #292e42;
   font-size: 0.85rem;
 }
-.token-list-item span {
-  flex: 1;
+.token-list-item > .api-key-summary,
+.token-list-item > span {
+  flex: 1 1 auto;
   min-width: 0;
   word-break: break-word;
 }
@@ -1073,6 +1075,20 @@ body.controls-locked #reconnectBanner {
 .token-list-item .btn {
   flex-shrink: 0;
   margin: 0;
+}
+@media (max-width: 720px) {
+  .token-list-item {
+    align-items: flex-start;
+  }
+  .token-list-item > .api-key-summary,
+  .token-list-item > span:first-child,
+  .token-list-item > .debug-room-meta {
+    flex: 1 1 100%;
+  }
+  .token-list-actions {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+  }
 }
 .debug-room-item {
   align-items: flex-start;
