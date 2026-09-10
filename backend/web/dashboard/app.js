@@ -380,14 +380,14 @@ function renderDebugRooms(rooms) {
       className: 'danger',
       icon: 'kick',
       label: 'Kick',
-      title: 'Disconnect clients and remove this connection mapping',
+      title: 'Disconnect dock and remove from this list',
     });
     kickBtn.addEventListener('click', async () => {
       const ok = await confirmDashAction({
         title: 'Kick Connection',
         message:
           `Kick “${title}”?\n\n` +
-          'Clients disconnect and this connection mapping is removed. Match history is kept.',
+          'Clients disconnect and this connection is removed from the list. Completed match history is kept.',
         confirmLabel: 'Kick',
         danger: true,
       });
@@ -400,7 +400,7 @@ function renderDebugRooms(rooms) {
         renderTableCards(result.rooms || []);
         const notice = document.getElementById('debugRoomsNotice');
         if (notice) {
-          notice.textContent = 'Connection kicked. Match history was kept.';
+          notice.textContent = 'Connection kicked. Completed match history was kept.';
           notice.classList.remove('hidden');
         }
       } catch (err) {
@@ -1379,12 +1379,10 @@ function matchPairHtml(m) {
     }
     return `<button type="button" class="${classes} stats-match-player-link" data-open-player="${escapeHtml(display)}">${escapeHtml(display)}</button>`;
   };
-  const draw = result.isDraw ? '<span class="stats-match-draw stats-draw">(Draw)</span>' : '';
   return `<div class="stats-match-pair">
     ${playerSpan(m.player1Name, result.winnerSlot === '1')}
     <span class="stats-match-vs">vs</span>
     ${playerSpan(m.player2Name, result.winnerSlot === '2')}
-    ${draw}
   </div>`;
 }
 

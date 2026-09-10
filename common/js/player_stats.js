@@ -5270,14 +5270,10 @@
             }
             return '<span class="' + classes + '">' + escapeHtml(display) + '</span>';
         }
-        const draw = result.isDraw
-            ? '<span class="stats-match-draw stats-draw">(Draw)</span>'
-            : '';
         return '<div class="stats-match-pair">' +
             playerBtn(match.player1Name, match.player1Id, result.winnerSlot === '1') +
             '<span class="stats-match-vs">vs</span>' +
             playerBtn(match.player2Name, match.player2Id, result.winnerSlot === '2') +
-            draw +
             '</div>';
     }
 
