@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>CueSport Scoreboard Cloud — Dashboard</title>
-  <link rel="stylesheet" href="/web/shared/styles.css?v=8.1.0.4" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.1.0.6" />
 </head>
 <body>
   <header class="site-header">
@@ -56,8 +56,14 @@
           </div>
           <p id="statsStatus" class="hint"></p>
           <div class="stats-subtabs" role="tablist" aria-label="Stats views">
-            <button type="button" class="stats-subtab active" role="tab" aria-selected="true" data-stats-panel="leaderboard">Leaderboard</button>
-            <button type="button" class="stats-subtab" role="tab" aria-selected="false" data-stats-panel="matches">Recent matches</button>
+            <button type="button" class="stats-subtab active" role="tab" aria-selected="true" data-stats-panel="leaderboard">
+              <svg class="stats-subtab-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v4a5 5 0 0 1-10 0V4z"/><path d="M5 6H3a2 2 0 0 0 2 4h1"/><path d="M19 6h2a2 2 0 0 1-2 4h-1"/></svg>
+              Leaderboard
+            </button>
+            <button type="button" class="stats-subtab" role="tab" aria-selected="false" data-stats-panel="matches">
+              <svg class="stats-subtab-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg>
+              Recent matches
+            </button>
           </div>
           <div id="statsPanelLeaderboard" class="stats-subpanel" role="tabpanel">
             <div class="stats-table-wrap">

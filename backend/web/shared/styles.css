@@ -1449,6 +1449,16 @@ body.controls-locked #reconnectBanner {
   font-weight: 600;
   min-height: 2.25rem;
   line-height: 1.15;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+}
+.stats-subtab-icon {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex-shrink: 0;
+  display: block;
 }
 .stats-subtab.active {
   background: #7aa2f7;
