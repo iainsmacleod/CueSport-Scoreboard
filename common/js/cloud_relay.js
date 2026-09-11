@@ -516,7 +516,7 @@
                 state.playerSlotMode = 'off';
             }
             state.obsConnected = dockStorage('isConnected', 'false') === 'true';
-            // Enable Replay Function toggle (persists across reconnects).
+            // Stream tab / OBS socket available (Enable Replay Function or live socket).
             state.replayEnabled = dockStorage('websocketEnabled', 'false') === 'true' || state.obsConnected;
             // Prefer storage; also trust control_panel Monitor / Instant Replay button labels.
             const monitorBtn = document.getElementById('btnMonitorGame');
@@ -527,6 +527,10 @@
                 (instantBtn && !instantBtn.classList.contains('noShow'))
             );
             state.monitoringActive = monitoringFromStorage || monitoringFromUi;
+            // Mobile Stream tab: monitoring/clips stay hidden until account owner unlocks replay controls
+            // (or monitoring is already running on the dock).
+            const replayControlsStored = dockStorage('replayControlsEnabled', '');
+            state.replayControlsEnabled = replayControlsStored === 'true' || state.monitoringActive;
             state.replayPlaybackActive = typeof isReplayPlaybackActive === 'boolean'
                 ? !!isReplayPlaybackActive
                 : /replay\s*active/i.test((document.getElementById('btnMonitorGame') || {}).textContent || '');
@@ -637,6 +641,15 @@
                 state.streamPromotionListed = false;
                 state.obsStreaming = false;
                 state.streamUrl = '';
+            }
+            // Overlay career stats (same payload the browser source uses).
+            try {
+                state.overlayStatsMode = dockStorage('overlayStatsMode', '') || '';
+                const overlayRaw = dockStorage('overlayStatsPayload', '');
+                state.overlayStats = overlayRaw ? JSON.parse(overlayRaw) : null;
+            } catch (_) {
+                state.overlayStatsMode = '';
+                state.overlayStats = null;
             }
         } catch (err) {
             console.warn('cloudRelay: extended state collection error', err);

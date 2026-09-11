@@ -7678,6 +7678,80 @@ obs.on('ConnectionClosed', () => {
     // setButtonsEnabled(false);
 });
 
+/**
+ * Start/stop OBS stream output (Cloud mobile Stream tab — account owner).
+ * Uses obs-websocket v5 StartStream/StopStream with v4 name fallback.
+ */
+async function toggleObsStreaming() {
+    if (!isObsReady) {
+        const msg = 'OBS WebSocket is not connected. Connect it under Settings (Enable Replay Function) first.';
+        console.warn(msg);
+        alert(msg);
+        throw new Error(msg);
+    }
+    try {
+        const status = await obs.call('GetStreamStatus');
+        const active = !!(status && status.outputActive);
+        const primary = active ? 'StopStream' : 'StartStream';
+        const legacy = active ? 'StopStreaming' : 'StartStreaming';
+        try {
+            await obs.call(primary);
+        } catch (err) {
+            try {
+                await obs.call(legacy);
+            } catch (_) {
+                throw err;
+            }
+        }
+        // OBS can take a moment to flip outputActive.
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        if (window.streamSharing && typeof window.streamSharing.refreshStreamingStatus === 'function') {
+            await window.streamSharing.refreshStreamingStatus();
+        }
+        // Re-check once more if OBS was still settling after StartStream.
+        if (window.streamSharing && typeof window.streamSharing.refreshStreamingStatus === 'function') {
+            await new Promise((resolve) => setTimeout(resolve, 700));
+            await window.streamSharing.refreshStreamingStatus();
+        }
+        if (window.cloudRelay && typeof window.cloudRelay.pushDockStateSoon === 'function') {
+            window.cloudRelay.pushDockStateSoon(0);
+        }
+        const streamingNow = !!(window.streamSharing &&
+            typeof window.streamSharing.getPromotionListingState === 'function' &&
+            window.streamSharing.getPromotionListingState().obsStreaming);
+        return { streaming: streamingNow };
+    } catch (err) {
+        const msg = (err && err.message) ? err.message : String(err || 'Unknown OBS error');
+        console.error('toggleObsStreaming failed:', err);
+        alert('Failed to toggle OBS streaming:\n' + msg);
+        throw err;
+    }
+}
+window.toggleObsStreaming = toggleObsStreaming;
+
+/**
+ * Unlock/lock mobile monitoring + clip controls (account owner).
+ * Does not start the OBS replay buffer by itself — Monitor Game still does that.
+ */
+async function setReplayControlsEnabled(enabled) {
+    const on = !!enabled;
+    setStorageItem('replayControlsEnabled', on ? 'true' : 'false');
+    if (!on && getStorageItem('isMonitoringActive') === 'true') {
+        if (typeof toggleReplayMonitoring === 'function') {
+            await toggleReplayMonitoring();
+        }
+    }
+    if (window.cloudRelay && typeof window.cloudRelay.pushDockStateSoon === 'function') {
+        window.cloudRelay.pushDockStateSoon(0);
+    }
+    return { enabled: on };
+}
+window.setReplayControlsEnabled = setReplayControlsEnabled;
+
+function markReplayControlsEnabled() {
+    setStorageItem('replayControlsEnabled', 'true');
+}
+
 // UI helpers
 function setReplayPlaybackActive(active) {
     isReplayPlaybackActive = !!active;
@@ -8104,6 +8178,7 @@ async function toggleReplayMonitoring() {
                 console.log('Replay buffer is already running, syncing state...');
                 isMonitoringActive = true;
                 setStorageItem('isMonitoringActive', 'true');
+                markReplayControlsEnabled();
                 btnReplayClip.classList.remove('noShow');
                 setReplayButtonText();
                 setMonitorButtonText();
@@ -8115,6 +8190,7 @@ async function toggleReplayMonitoring() {
                 await obs.call('StartReplayBuffer');
                 isMonitoringActive = true;
                 setStorageItem('isMonitoringActive', 'true');
+                markReplayControlsEnabled();
                 btnReplayClip.classList.remove('noShow');
                 setReplayButtonText();
                 setMonitorButtonText();
@@ -8132,6 +8208,7 @@ async function toggleReplayMonitoring() {
                             console.log('Replay buffer was already running despite error, syncing state');
                             isMonitoringActive = true;
                             setStorageItem('isMonitoringActive', 'true');
+                            markReplayControlsEnabled();
                             btnReplayClip.classList.remove('noShow');
                             setReplayButtonText();
                             setMonitorButtonText();

@@ -1613,12 +1613,13 @@ function syncMatchActionButtons(state) {
 }
 
 /**
- * Stream tab: account-owner OBS start/stop, plus monitoring/clips when available.
+ * Stream tab: account-owner OBS start/stop, plus monitoring/clips when unlocked.
  */
 function syncReplayPanel(state) {
   const monitoring = !!state.monitoringActive;
   const replayPlaying = !!state.replayPlaybackActive;
   const streaming = state.obsStreaming === true;
+  const replayControlsEnabled = state.replayControlsEnabled === true || monitoring;
   // Monitoring implies OBS was usable; don't hide clips if obsConnected lagged false.
   const obsConnected = state.obsConnected === true || monitoring || replayPlaying || streaming;
   const clips = Array.isArray(state.replayClips)
@@ -1630,9 +1631,32 @@ function syncReplayPanel(state) {
 
   const streamBtn = document.getElementById('streamToggleBtn');
   if (streamBtn) {
-    streamBtn.textContent = streaming ? 'Stop Streaming' : 'Start Streaming';
-    streamBtn.classList.toggle('stream-active', streaming);
-    streamBtn.disabled = !obsConnected;
+    const pending = streamBtn.dataset.streamPending === '1';
+    if (!pending) {
+      streamBtn.textContent = streaming ? 'Stop Streaming' : 'Start Streaming';
+      streamBtn.disabled = !obsConnected;
+    } else if (streaming === (streamBtn.dataset.streamExpect === '1')) {
+      // Dock confirmed the expected streaming state.
+      streamBtn.dataset.streamPending = '0';
+      streamBtn.dataset.streamExpect = '';
+      streamBtn.textContent = streaming ? 'Stop Streaming' : 'Start Streaming';
+      streamBtn.disabled = !obsConnected;
+    }
+    streamBtn.classList.toggle('stream-active', streaming || streamBtn.dataset.streamExpect === '1');
+  }
+
+  const unlockSection = document.getElementById('streamReplayUnlockSection');
+  const replaySection = document.getElementById('streamReplaySection');
+  const enableBtn = document.getElementById('replayControlsEnableBtn');
+  if (unlockSection) {
+    // Account owner (non-guest mobile) can unlock when OBS socket is up but replay controls are off.
+    unlockSection.classList.toggle('hidden', isGuestMode || !obsConnected || replayControlsEnabled);
+  }
+  if (enableBtn) {
+    enableBtn.disabled = !obsConnected || isGuestMode;
+  }
+  if (replaySection) {
+    replaySection.classList.toggle('hidden', !replayControlsEnabled);
   }
 
   const monitorBtn = document.getElementById('monitorBtn');
@@ -1672,6 +1696,201 @@ function syncReplayPanel(state) {
   });
   if (clipsRow) {
     clipsRow.classList.toggle('hidden', !anyClip);
+  }
+
+  syncStreamStatsPanel(state);
+}
+
+function escapeStreamStatsText(value) {
+  return escapeHtml(value);
+}
+
+function buildStreamStatsH2HTable(stats) {
+  const racksWord = stats.racksLabel || ((stats.rackLabel || 'Rack') + 's');
+  const p1Name = stats.p1Name || 'Player 1';
+  const p2Name = stats.p2Name || 'Player 2';
+  const p1Break = stats.p1HighestBreak || 0;
+  const p2Break = stats.p2HighestBreak || 0;
+  const p1Balls = stats.p1Balls || 0;
+  const p2Balls = stats.p2Balls || 0;
+  const rows = [];
+  if (stats.showGamesWL !== false) {
+    rows.push({ label: 'Matches Won', left: stats.p1Games || 0, right: stats.p2Games || 0 });
+  }
+  if (stats.showRacksWL !== false) {
+    rows.push({ label: racksWord + ' Won', left: stats.p1Racks || 0, right: stats.p2Racks || 0 });
+  }
+  if (stats.showHighestBreak && (p1Break > 0 || p2Break > 0)) {
+    rows.push({
+      label: stats.highestBreakLabel || 'Highest Break',
+      left: p1Break,
+      right: p2Break,
+    });
+  }
+  if (stats.showBalls && (p1Balls > 0 || p2Balls > 0)) {
+    rows.push({ label: 'Balls Potted', left: p1Balls, right: p2Balls });
+  }
+  const p1Fouls = stats.p1Fouls || 0;
+  const p2Fouls = stats.p2Fouls || 0;
+  if (stats.showFouls && (p1Fouls > 0 || p2Fouls > 0)) {
+    rows.push({ label: 'Fouls', left: p1Fouls, right: p2Fouls });
+  }
+  const p1Br = stats.p1BreakAndRuns || 0;
+  const p2Br = stats.p2BreakAndRuns || 0;
+  const p1Tr = stats.p1TableRuns || 0;
+  const p2Tr = stats.p2TableRuns || 0;
+  if (stats.showBreakAndRun && (p1Br > 0 || p2Br > 0)) {
+    rows.push({ label: 'Break & Run', left: p1Br, right: p2Br });
+  }
+  if (stats.showTableRun && (p1Tr > 0 || p2Tr > 0)) {
+    rows.push({ label: 'Table Run', left: p1Tr, right: p2Tr });
+  }
+  if (!rows.length) {
+    return '<div class="stream-stats-empty">No stats enabled for this game type.</div>';
+  }
+  let html = '<table class="stream-stats-table stream-stats-h2h-table"><thead><tr>' +
+    '<th class="stream-stats-col-player">' + escapeStreamStatsText(p1Name) + '</th>' +
+    '<th class="stream-stats-col-label"></th>' +
+    '<th class="stream-stats-col-player">' + escapeStreamStatsText(p2Name) + '</th>' +
+    '</tr></thead><tbody>';
+  rows.forEach((row, index) => {
+    html += '<tr class="' + (index % 2 === 0 ? 'stream-stats-row-even' : 'stream-stats-row-odd') + '">' +
+      '<td class="stream-stats-col-value">' + escapeStreamStatsText(row.left) + '</td>' +
+      '<td class="stream-stats-col-label">' + escapeStreamStatsText(row.label) + '</td>' +
+      '<td class="stream-stats-col-value">' + escapeStreamStatsText(row.right) + '</td>' +
+      '</tr>';
+  });
+  html += '</tbody></table>';
+  return html;
+}
+
+function buildStreamStatsPlayerTable(stats) {
+  const rackLabel = stats.rackLabel || 'Rack';
+  const highestBreak = stats.highestBreak || 0;
+  const currentBreak = stats.currentBreak || 0;
+  const ballsPotted = stats.ballsPotted || 0;
+  const winStreak = stats.winStreak || 0;
+  const rows = [];
+  if (stats.showGamesWL !== false) {
+    rows.push({ label: 'Matches Won', value: stats.gamesWL + ' (' + stats.winRate + '%)' });
+  }
+  if (stats.showRacksWL !== false) {
+    rows.push({
+      label: rackLabel + ' W/L',
+      value: stats.racksWL + (stats.rackWinRate != null ? ' (' + stats.rackWinRate + '%)' : ''),
+    });
+  }
+  if (stats.showCurrentBreak && currentBreak > 0) {
+    rows.push({
+      label: stats.currentBreakLabel || 'Current Break',
+      value: currentBreak,
+    });
+  }
+  if (stats.showPossibleBreak && (stats.possibleBreak || 0) > 0) {
+    rows.push({
+      label: stats.possibleBreakLabel || 'Possible Break',
+      value: stats.possibleBreak,
+    });
+  }
+  if (stats.showScoreMargin) {
+    rows.push({
+      label: stats.scoreMarginLabel || 'Difference',
+      value: stats.scoreMargin || '0',
+    });
+  }
+  if (stats.showPointsRemaining) {
+    const tone = stats.pointsRemainingTone ||
+      (stats.scoreMarginCritical ? 'danger' : (stats.scoreMarginSafe ? 'safe' : ''));
+    rows.push({
+      label: stats.pointsRemainingLabel || 'Points Remaining',
+      value: stats.pointsRemaining != null ? stats.pointsRemaining : (stats.scoreMarginRemaining || 0),
+      valueClass: tone === 'danger' ? 'stream-stats-danger' :
+        (tone === 'safe' ? 'stream-stats-safe' : ''),
+    });
+  }
+  if (stats.showHighestBreak && highestBreak > 0) {
+    rows.push({
+      label: stats.highestBreakLabel || 'Highest Break',
+      value: highestBreak,
+    });
+  }
+  if (stats.showBalls && ballsPotted > 0) {
+    rows.push({ label: 'Balls Potted', value: ballsPotted });
+  }
+  if (stats.showFouls && (stats.fouls || 0) > 0) {
+    rows.push({ label: 'Fouls', value: stats.fouls });
+  }
+  if (stats.showBreakAndRun && (stats.breakAndRuns || 0) > 0) {
+    rows.push({ label: 'Break & Run', value: stats.breakAndRuns });
+  }
+  if (stats.showTableRun && (stats.tableRuns || 0) > 0) {
+    rows.push({ label: 'Table Run', value: stats.tableRuns });
+  }
+  if (stats.showWinStreak !== false && winStreak > 0) {
+    rows.push({ label: 'Win Streak', value: winStreak });
+  }
+  if (!rows.length) {
+    return '<div class="stream-stats-empty">No stats enabled for this game type.</div>';
+  }
+  let html = '<table class="stream-stats-table stream-stats-player-table">' +
+    '<thead><tr><th>Stat</th><th>Value</th></tr></thead><tbody>';
+  rows.forEach((row, index) => {
+    html += '<tr class="' + (index % 2 === 0 ? 'stream-stats-row-even' : 'stream-stats-row-odd') + '">' +
+      '<td class="stream-stats-col-label">' + escapeStreamStatsText(row.label) + '</td>' +
+      '<td class="stream-stats-col-value' + (row.valueClass ? ' ' + row.valueClass : '') + '">' +
+      escapeStreamStatsText(row.value) + '</td>' +
+      '</tr>';
+  });
+  html += '</tbody></table>';
+  return html;
+}
+
+/**
+ * Stream tab: overlay-matching career stats (P1 / P2 / H2H). Available to all levels.
+ */
+function syncStreamStatsPanel(state) {
+  const p1Btn = document.getElementById('streamStatsP1Btn');
+  const p2Btn = document.getElementById('streamStatsP2Btn');
+  const h2hBtn = document.getElementById('streamStatsH2hBtn');
+  const panel = document.getElementById('streamStatsPanel');
+  const titleEl = document.getElementById('streamStatsTitle');
+  const bodyEl = document.getElementById('streamStatsBody');
+  if (!p1Btn || !p2Btn || !h2hBtn || !panel || !titleEl || !bodyEl) return;
+
+  const p1Name = truncatePlayerName(state.player1Name || '') || 'Player 1';
+  const p2Name = truncatePlayerName(state.player2Name || '') || 'Player 2';
+  p1Btn.textContent = p1Name;
+  p2Btn.textContent = p2Name;
+
+  const mode = state.overlayStatsMode || '';
+  const stats = state.overlayStats && typeof state.overlayStats === 'object' ? state.overlayStats : null;
+  // Mode is exclusive: at most one of p1 / p2 / h2h is on.
+  const activeMode = (stats && stats.visible && stats.mode) || mode || '';
+  const visible = !!(stats && stats.visible && activeMode);
+
+  [p1Btn, p2Btn, h2hBtn].forEach((btn) => {
+    const on = btn.dataset.mode === activeMode && !!activeMode;
+    btn.classList.toggle('stats-active', on);
+    btn.classList.toggle('stats-inactive', !on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+
+  if (!visible) {
+    panel.classList.add('hidden');
+    titleEl.textContent = '';
+    bodyEl.innerHTML = '';
+    return;
+  }
+
+  panel.classList.remove('hidden');
+  titleEl.textContent = stats.title || 'Stats';
+  titleEl.classList.toggle('stream-stats-player-name', stats.mode === 'p1' || stats.mode === 'p2');
+  if (stats.emptyMessage) {
+    bodyEl.innerHTML = '<div class="stream-stats-empty">' + escapeStreamStatsText(stats.emptyMessage) + '</div>';
+  } else if (stats.mode === 'h2h') {
+    bodyEl.innerHTML = buildStreamStatsH2HTable(stats);
+  } else {
+    bodyEl.innerHTML = buildStreamStatsPlayerTable(stats);
   }
 }
 
@@ -2159,7 +2378,12 @@ function wireSetupPanel() {
 function wireCommands() {
   document.querySelectorAll('[data-cmd]').forEach((el) => {
     el.addEventListener('click', () => {
-      if (el.disabled || el.classList.contains('hidden')) return;
+      if (el.disabled || el.classList.contains('hidden')) {
+        if (el.id === 'streamToggleBtn') {
+          setError('OBS WebSocket is not connected on the dock — connect it in Settings first.');
+        }
+        return;
+      }
       if (!controlsEnabled()) {
         setError(controlLockMessage());
         return;
@@ -2170,6 +2394,7 @@ function wireCommands() {
       if (el.dataset.slot) payload.slot = el.dataset.slot;
       if (el.dataset.isp1 != null) payload.isP1 = el.dataset.isp1 === 'true';
       if (el.dataset.index != null) payload.index = parseInt(el.dataset.index, 10);
+      if (el.dataset.mode) payload.mode = el.dataset.mode;
       if (cmd === 'set_player_name') {
         payload.slot = el.dataset.slot;
         payload.name = document.getElementById(payload.slot === '1' ? 'p1Name' : 'p2Name').value;
@@ -2190,6 +2415,63 @@ function wireCommands() {
       }
       if (MATCH_CONFIRM_CMDS.has(cmd)) {
         openMatchConfirmModal(cmd, () => sendCmd(cmd, payload));
+        return;
+      }
+      if (cmd === 'toggle_streaming') {
+        setError('');
+        const streaming = lastState?.obsStreaming === true;
+        const expectOn = !streaming;
+        el.dataset.streamPending = '1';
+        el.dataset.streamExpect = expectOn ? '1' : '0';
+        el.textContent = streaming ? 'Stopping…' : 'Starting…';
+        el.disabled = true;
+        el.classList.toggle('stream-active', expectOn);
+        if (!sendCmd(cmd, payload)) {
+          el.dataset.streamPending = '0';
+          el.dataset.streamExpect = '';
+          el.textContent = streaming ? 'Stop Streaming' : 'Start Streaming';
+          el.classList.toggle('stream-active', streaming);
+          el.disabled = false;
+          return;
+        }
+        // Optimistic label while OBS settles; syncReplayPanel reconciles from dock state.
+        setTimeout(() => {
+          if (document.getElementById('streamToggleBtn') !== el) return;
+          if (el.dataset.streamPending === '1') {
+            el.dataset.streamPending = '0';
+            el.dataset.streamExpect = '';
+            syncReplayPanel(lastState || {});
+          }
+        }, 6000);
+        return;
+      }
+      if (cmd === 'toggle_overlay_stats') {
+        setError('');
+        const mode = payload.mode;
+        if (!mode) return;
+        const buttons = ['streamStatsP1Btn', 'streamStatsP2Btn', 'streamStatsH2hBtn']
+          .map((id) => document.getElementById(id))
+          .filter(Boolean);
+        const current = buttons.find((btn) => btn.classList.contains('stats-active'));
+        const turningOff = !!(current && current.dataset.mode === mode);
+        buttons.forEach((btn) => {
+          const nextOn = !turningOff && btn.dataset.mode === mode;
+          btn.classList.toggle('stats-active', nextOn);
+          btn.classList.toggle('stats-inactive', !nextOn);
+          btn.setAttribute('aria-pressed', nextOn ? 'true' : 'false');
+        });
+        sendCmd(cmd, payload);
+        return;
+      }
+      if (cmd === 'set_replay_controls' || cmd === 'set_replay_controls_off') {
+        setError('');
+        const enable = cmd === 'set_replay_controls';
+        el.disabled = true;
+        if (!sendCmd('set_replay_controls', { enabled: enable })) {
+          el.disabled = false;
+          return;
+        }
+        setTimeout(() => syncReplayPanel(lastState || {}), 4000);
         return;
       }
       sendCmd(cmd, payload);

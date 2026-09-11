@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
   <title>CueSport Scoreboard Cloud Control</title>
-  <link rel="stylesheet" href="/web/shared/styles.css?v=8.1.0.21" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.1.0.23" />
 </head>
 <body class="mobile">
   <header>
@@ -217,8 +217,31 @@
               <button type="button" class="btn stream-btn" id="streamToggleBtn" data-cmd="toggle_streaming">Start Streaming</button>
             </div>
           </div>
-          <div class="stream-section" id="streamReplaySection">
+          <div class="stream-section" id="streamStatsSection">
+            <h3 class="share-links-heading">Statistics</h3>
+            <p class="hint">Show the same career stats panel on the overlay. Tap again to hide.</p>
+            <div class="row clips stream-stats-mode-row" id="streamStatsModeRow">
+              <button type="button" class="btn stats-inactive" id="streamStatsP1Btn" data-cmd="toggle_overlay_stats" data-mode="p1" aria-pressed="false">Player 1</button>
+              <button type="button" class="btn stats-inactive" id="streamStatsP2Btn" data-cmd="toggle_overlay_stats" data-mode="p2" aria-pressed="false">Player 2</button>
+              <button type="button" class="btn stats-inactive" id="streamStatsH2hBtn" data-cmd="toggle_overlay_stats" data-mode="h2h" aria-pressed="false">H2H</button>
+            </div>
+            <div id="streamStatsPanel" class="stream-stats-panel hidden" aria-live="polite">
+              <h4 id="streamStatsTitle" class="stream-stats-title"></h4>
+              <div id="streamStatsBody" class="stream-stats-body"></div>
+            </div>
+          </div>
+          <div class="stream-section" id="streamReplayUnlockSection">
+            <h3 class="share-links-heading">Replay buffer</h3>
+            <p class="hint">Unlock monitoring and clip controls for this table. Account owner only.</p>
+            <div class="row clips">
+              <button type="button" class="btn" id="replayControlsEnableBtn" data-cmd="set_replay_controls">Enable Replay Buffer</button>
+            </div>
+          </div>
+          <div class="stream-section hidden" id="streamReplaySection">
             <h3 class="share-links-heading">Monitoring and clips</h3>
+            <div class="row clips" id="replayControlsDisableRow">
+              <button type="button" class="btn secondary" id="replayControlsDisableBtn" data-cmd="set_replay_controls_off">Disable Replay Buffer</button>
+            </div>
             <div class="row clips" id="replayMonitorRow">
               <button type="button" class="btn monitor-btn" id="monitorBtn" data-cmd="toggle_monitoring">Monitor Game</button>
               <button type="button" class="btn hidden" id="instantReplayBtn" data-cmd="instant_replay">Instant Replay</button>
@@ -365,6 +388,6 @@
       <div id="poolRespotTargets" class="snooker-foul-targets"></div>
     </div>
   </div>
-  <script type="module" src="/web/mobile/app.js?v=8.0.0.31"></script>
+  <script type="module" src="/web/mobile/app.js?v=8.0.0.35"></script>
 </body>
 </html>

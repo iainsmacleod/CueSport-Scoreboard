@@ -109,8 +109,104 @@ main { padding: 1rem 1.25rem; max-width: 720px; margin: 0 auto; }
 .btn.monitor-active { background: #f7768e; color: #1a1b26; font-weight: 600; }
 .btn.replay-active { background: #e0af68; color: #1a1b26; font-weight: 600; }
 .btn.stream-active { background: #f7768e; color: #1a1b26; font-weight: 600; }
+.btn.stats-active {
+  background: #7aa2f7;
+  color: #1a1b26;
+  font-weight: 600;
+  opacity: 1;
+  border-color: rgba(122, 162, 247, 0.85);
+}
+.btn.stats-inactive {
+  background: rgba(36, 40, 59, 0.72);
+  color: #565f89;
+  border-color: rgba(86, 95, 137, 0.35);
+  opacity: 0.72;
+  font-weight: 500;
+}
+.btn.stats-inactive:hover {
+  opacity: 0.95;
+  color: #a9b1d6;
+  border-color: rgba(169, 177, 214, 0.45);
+}
 .stream-section { margin-top: 0.35rem; }
 .stream-section .share-links-heading { margin-top: 0.75rem; }
+.stream-stats-mode-row {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+}
+.stream-stats-mode-row > .btn {
+  width: 100%;
+  box-sizing: border-box;
+}
+.stream-stats-panel {
+  margin: 0.65rem 0 0.25rem;
+  padding: 0.75rem 0.85rem;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+}
+.stream-stats-title {
+  margin: 0 0 0.55rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-align: center;
+  color: #c0caf5;
+}
+.stream-stats-title.stream-stats-player-name {
+  font-size: 1.2rem;
+  letter-spacing: 0.01em;
+}
+.stream-stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+.stream-stats-table th,
+.stream-stats-table td {
+  padding: 0.35rem 0.4rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.stream-stats-table thead th {
+  color: #a9b1d6;
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.stream-stats-row-even td { background: rgba(255, 255, 255, 0.02); }
+.stream-stats-row-odd td { background: transparent; }
+.stream-stats-h2h-table .stream-stats-col-player {
+  text-align: center;
+  width: 28%;
+}
+.stream-stats-h2h-table .stream-stats-col-label {
+  text-align: center;
+  color: #a9b1d6;
+  font-size: 0.82rem;
+}
+.stream-stats-h2h-table .stream-stats-col-value {
+  text-align: center;
+  font-weight: 700;
+  color: #c0caf5;
+}
+.stream-stats-player-table .stream-stats-col-label {
+  text-align: left;
+  color: #a9b1d6;
+}
+.stream-stats-player-table .stream-stats-col-value {
+  text-align: right;
+  font-weight: 700;
+  color: #c0caf5;
+}
+.stream-stats-col-value.stream-stats-danger { color: #f7768e; }
+.stream-stats-col-value.stream-stats-safe { color: #9ece6a; }
+.stream-stats-empty {
+  text-align: center;
+  color: #a9b1d6;
+  padding: 0.5rem 0.25rem;
+  font-size: 0.9rem;
+}
 .row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.5rem 0; }
 .row.clips {
   flex-direction: column;

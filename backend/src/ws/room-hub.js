@@ -657,6 +657,7 @@ function handleEvent(ws, meta, msg) {
 /** Commands only the Cloud account owner (JWT/dev) may send. */
 const ACCOUNT_OWNER_COMMANDS = new Set([
   'toggle_streaming',
+  'set_replay_controls',
 ]);
 
 function handleCommand(ws, meta, msg) {
@@ -666,12 +667,14 @@ function handleCommand(ws, meta, msg) {
     return;
   }
   if (ACCOUNT_OWNER_COMMANDS.has(msg.action)) {
-    const isOwner = meta.authMethod === 'jwt' || meta.authMethod === 'dev';
+    const isOwner = meta.authMethod === 'jwt'
+      || meta.authMethod === 'dev'
+      || (meta.client === 'mobile' && !!meta.accountId && !meta.guestToken);
     if (!isOwner) {
       send(ws, {
         type: 'error',
         code: 'owner_forbidden',
-        message: 'Only the account owner can start or stop OBS streaming',
+        message: 'Only the account owner can use this control',
       });
       return;
     }

@@ -314,9 +314,27 @@
                     typeof toggleReplayMonitoring === 'function' ? toggleReplayMonitoring() : undefined
                 ).then(publishAfterScoring);
             case 'toggle_streaming':
-                return Promise.resolve(
-                    typeof toggleObsStreaming === 'function' ? toggleObsStreaming() : undefined
-                ).then(publishAfterScoring);
+                if (typeof window.toggleObsStreaming !== 'function') {
+                    return Promise.reject(new Error('Streaming control is unavailable — reload the OBS dock'));
+                }
+                return Promise.resolve(window.toggleObsStreaming()).then(publishAfterScoring);
+            case 'set_replay_controls': {
+                const enabled = !!(payload && payload.enabled);
+                if (typeof window.setReplayControlsEnabled !== 'function') {
+                    return Promise.reject(new Error('Replay controls are unavailable — reload the OBS dock'));
+                }
+                return Promise.resolve(window.setReplayControlsEnabled(enabled)).then(publishAfterScoring);
+            }
+            case 'toggle_overlay_stats': {
+                const mode = payload && payload.mode ? String(payload.mode) : '';
+                if (!mode || (mode !== 'p1' && mode !== 'p2' && mode !== 'h2h')) {
+                    return Promise.resolve();
+                }
+                if (typeof window.toggleOverlayStats !== 'function') {
+                    return Promise.reject(new Error('Overlay stats are unavailable — reload the OBS dock'));
+                }
+                return Promise.resolve(window.toggleOverlayStats(mode)).then(publishAfterScoring);
+            }
             case 'play_clip':
                 if (payload && payload.index != null && typeof playPreviousReplay === 'function') {
                     return Promise.resolve(playPreviousReplay(parseInt(payload.index, 10))).then(publishAfterScoring);
@@ -346,6 +364,9 @@
         window.cloudRelay.onCommand(function (action, payload) {
             Promise.resolve(runCommand(action, payload)).catch(function (err) {
                 console.error('cloud_commands:', err);
+                if ((action === 'toggle_streaming' || action === 'set_replay_controls') && typeof alert === 'function') {
+                    alert(err && err.message ? err.message : 'Command failed');
+                }
             });
         });
     }

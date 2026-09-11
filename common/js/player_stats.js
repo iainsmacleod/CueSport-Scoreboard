@@ -5102,9 +5102,9 @@
 
     function broadcastOverlayStatsIfEnabled() {
         const gen = ++overlayBroadcastGeneration;
-        buildOverlayStatsPayload().then(function (payload) {
+        return buildOverlayStatsPayload().then(function (payload) {
             if (gen !== overlayBroadcastGeneration) {
-                return;
+                return payload;
             }
             payload = applyLiveOverlayFields(payload);
             persistOverlayStatsPayload(payload);
@@ -5112,8 +5112,13 @@
                 bc.postMessage({ overlayStats: payload });
             }
             maybeRefreshStatsModalH2H();
+            if (window.cloudRelay && typeof window.cloudRelay.pushDockStateSoon === 'function') {
+                window.cloudRelay.pushDockStateSoon(0);
+            }
+            return payload;
         }).catch(function (err) {
             console.error('Overlay stats broadcast error:', err);
+            throw err;
         });
     }
 
@@ -5125,7 +5130,7 @@
             setOverlayStatsMode(mode);
         }
         updateOverlayButtonStyles(getOverlayStatsMode());
-        broadcastOverlayStatsIfEnabled();
+        return broadcastOverlayStatsIfEnabled();
     }
 
     // --- Autocomplete ---

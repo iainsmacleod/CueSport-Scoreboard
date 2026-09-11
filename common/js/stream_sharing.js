@@ -406,6 +406,11 @@
 
                 updateStreamPromotionToggle();
                 updateStreamSharingVisibility();
+                if (wasStreaming !== isObsStreaming &&
+                    window.cloudRelay &&
+                    typeof window.cloudRelay.pushDockStateSoon === 'function') {
+                    window.cloudRelay.pushDockStateSoon(0);
+                }
             } catch (error) {
                 console.warn('Could not check OBS streaming status:', error);
                 const wasStreaming = isObsStreaming;
@@ -575,6 +580,10 @@
     }
 
     async function toggleObsStreaming() {
+        // Prefer control_panel implementation (same OBS client / alerts as Instant Replay).
+        if (typeof window.toggleObsStreaming === 'function' && window.toggleObsStreaming !== toggleObsStreaming) {
+            return window.toggleObsStreaming();
+        }
         if (typeof obs === 'undefined' || !obs || typeof isObsReady === 'undefined' || !isObsReady) {
             throw new Error('OBS WebSocket is not connected');
         }
@@ -596,7 +605,10 @@
     window.closeStreamPromotionSettingsModal = closeStreamPromotionSettingsModal;
     window.saveStreamPromotionSettings = saveStreamPromotionSettings;
     window.toggleStreamPromotion = toggleStreamPromotion;
-    window.toggleObsStreaming = toggleObsStreaming;
+    // control_panel.js owns the primary toggleObsStreaming; keep a fallback for load-order safety.
+    if (typeof window.toggleObsStreaming !== 'function') {
+        window.toggleObsStreaming = toggleObsStreaming;
+    }
 
     window.streamSharing = {
         sendUpdate: function() {
@@ -645,7 +657,7 @@
         },
 
         toggle: toggleStreamPromotion,
-        toggleObsStreaming: toggleObsStreaming,
+        refreshStreamingStatus: checkObsStreamingStatus,
     };
 
     if (document.readyState === 'loading') {
