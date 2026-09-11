@@ -2800,6 +2800,9 @@
                 const current = parseInt(getStorageItem('snookerCurrentBreak') || '0', 10) || 0;
                 highestBreak = Math.max(highestBreak, current);
             }
+        } else if (typeof window.getRackFouls === 'function') {
+            // Current unfinished rack/frame foul counts (not yet written into match.racks).
+            fouls += Math.max(0, window.getRackFouls(slotStr) || 0);
         }
         if (isStraightPoolGameType(gameType) &&
             activeMatchSession.straightPoolRunSlot === slotStr) {
@@ -4662,6 +4665,20 @@
         return localStorage.getItem(OVERLAY_STATS_PAYLOAD_KEY);
     }
 
+    /** Stats Overlay needs Ball Scoring (tracker) visibly enabled. */
+    function isOverlayStatsAllowed() {
+        if (typeof window.isBallTrackerControlsVisible === 'function') {
+            return !!window.isBallTrackerControlsVisible();
+        }
+        if (typeof getStorageItem !== 'function') {
+            return false;
+        }
+        return getStorageItem('enableBallTracker') === 'yes' &&
+            getStorageItem('scoreDisplay') === 'yes' &&
+            getStorageItem('usePlayer1') === 'yes' &&
+            getStorageItem('usePlayer2') === 'yes';
+    }
+
     function updateOverlayButtonStyles(activeMode) {
         const buttons = {
             p1: document.getElementById('overlayP1StatsBtn'),
@@ -4683,8 +4700,56 @@
         });
     }
 
+    /** Disable P1/P2/H2H when Ball Scoring is off; clear any live overlay panel. */
+    function syncOverlayStatsControlsAvailability() {
+        const allowed = isOverlayStatsAllowed();
+        const controls = document.getElementById('statsOverlayControls');
+        const header = document.getElementById('statsOverlayLabel');
+        const buttons = [
+            document.getElementById('overlayP1StatsBtn'),
+            document.getElementById('overlayP2StatsBtn'),
+            document.getElementById('overlayH2HBtn')
+        ];
+        const disabledTitle = 'Enable Ball Scoring to show overlay stats';
+
+        if (controls) {
+            controls.classList.toggle('stats-overlay-disabled', !allowed);
+            controls.setAttribute('aria-disabled', allowed ? 'false' : 'true');
+        }
+        if (header) {
+            header.classList.toggle('stats-overlay-disabled', !allowed);
+            header.title = allowed ? '' : disabledTitle;
+        }
+        buttons.forEach(function (btn) {
+            if (!btn) {
+                return;
+            }
+            btn.classList.toggle('stats-overlay-btn-disabled', !allowed);
+            btn.setAttribute('aria-disabled', allowed ? 'false' : 'true');
+            if (allowed) {
+                btn.removeAttribute('title');
+            } else {
+                btn.title = disabledTitle;
+            }
+        });
+
+        if (!allowed && getOverlayStatsMode()) {
+            setOverlayStatsMode('');
+            updateOverlayButtonStyles('');
+            const payload = { visible: false };
+            persistOverlayStatsPayload(payload);
+            if (typeof bc !== 'undefined') {
+                bc.postMessage({ overlayStats: payload });
+            }
+            if (window.cloudRelay && typeof window.cloudRelay.pushDockStateSoon === 'function') {
+                window.cloudRelay.pushDockStateSoon(0);
+            }
+        }
+    }
+
     function syncOverlayButtonsFromStorage() {
         migrateOverlayStorage();
+        syncOverlayStatsControlsAvailability();
         updateOverlayButtonStyles(getOverlayStatsMode());
     }
 
@@ -4883,6 +4948,118 @@
         return map[key] != null ? (map[key] || 0) : 0;
     }
 
+    /** True when the active unfinished match is between these two players for this game type. */
+    function hasLiveH2HMatch(playerId1, playerId2, gameType) {
+        const pending = getEditablePendingMatch();
+        if (!pending || !pendingMatchBelongsToPair(pending, playerId1, playerId2)) {
+            return false;
+        }
+        return !gameType || pending.gameType === gameType;
+    }
+
+    /**
+     * Career H2H totals from completed meetings only (excludes pending fold so live can be added once).
+     * Cloud summaries are already completed-only; local may include an in-progress match in maps.
+     */
+    function buildCompletedH2HOverlayBases(h2h, lookupId1, lookupId2, gameType) {
+        const straight = isStraightPoolGameType(gameType);
+        const empty = {
+            p1Games: 0,
+            p2Games: 0,
+            p1Racks: 0,
+            p2Racks: 0,
+            p1Balls: 0,
+            p2Balls: 0,
+            p1Fouls: 0,
+            p2Fouls: 0,
+            p1HighestBreak: 0,
+            p2HighestBreak: 0
+        };
+        if (!h2h || !lookupId1 || !lookupId2) {
+            return empty;
+        }
+        if (isCloudStatsMode()) {
+            return {
+                p1Games: h2hMapValue(h2h.gamesWon, lookupId1),
+                p2Games: h2hMapValue(h2h.gamesWon, lookupId2),
+                p1Racks: h2hMapValue(h2h.racksWon, lookupId1),
+                p2Racks: h2hMapValue(h2h.racksWon, lookupId2),
+                p1Balls: h2hMapValue(h2h.ballsWon, lookupId1),
+                p2Balls: h2hMapValue(h2h.ballsWon, lookupId2),
+                p1Fouls: h2hMapValue(h2h.fouls, lookupId1),
+                p2Fouls: h2hMapValue(h2h.fouls, lookupId2),
+                p1HighestBreak: straight
+                    ? h2hMapValue(h2h.highestRun, lookupId1)
+                    : h2hMapValue(h2h.highestBreak, lookupId1),
+                p2HighestBreak: straight
+                    ? h2hMapValue(h2h.highestRun, lookupId2)
+                    : h2hMapValue(h2h.highestBreak, lookupId2)
+            };
+        }
+        const temp = {
+            gamesWon: {},
+            racksWon: {},
+            ballsWon: {},
+            fouls: {},
+            highestBreak: {},
+            highestRun: {},
+            lastPlayedAt: null
+        };
+        temp.gamesWon[lookupId1] = 0;
+        temp.gamesWon[lookupId2] = 0;
+        temp.racksWon[lookupId1] = 0;
+        temp.racksWon[lookupId2] = 0;
+        temp.ballsWon[lookupId1] = 0;
+        temp.ballsWon[lookupId2] = 0;
+        temp.fouls[lookupId1] = 0;
+        temp.fouls[lookupId2] = 0;
+        temp.highestBreak[lookupId1] = 0;
+        temp.highestBreak[lookupId2] = 0;
+        temp.highestRun[lookupId1] = 0;
+        temp.highestRun[lookupId2] = 0;
+        (h2h.matches || []).forEach(function (m) {
+            if (!m || m.status !== 'completed') {
+                return;
+            }
+            accumulateMatchIntoH2HSummary(temp, m, lookupId1, lookupId2);
+        });
+        return {
+            p1Games: temp.gamesWon[lookupId1] || 0,
+            p2Games: temp.gamesWon[lookupId2] || 0,
+            p1Racks: temp.racksWon[lookupId1] || 0,
+            p2Racks: temp.racksWon[lookupId2] || 0,
+            p1Balls: temp.ballsWon[lookupId1] || 0,
+            p2Balls: temp.ballsWon[lookupId2] || 0,
+            p1Fouls: temp.fouls[lookupId1] || 0,
+            p2Fouls: temp.fouls[lookupId2] || 0,
+            p1HighestBreak: straight
+                ? (temp.highestRun[lookupId1] || 0)
+                : (temp.highestBreak[lookupId1] || 0),
+            p2HighestBreak: straight
+                ? (temp.highestRun[lookupId2] || 0)
+                : (temp.highestBreak[lookupId2] || 0)
+        };
+    }
+
+    function countPendingRacksForSlot(pending, slot) {
+        if (!pending || isStraightPoolGameType(pending.gameType || getActiveGameType())) {
+            return 0;
+        }
+        const playerId = String(slot) === '2'
+            ? activeMatchSession.player2Id
+            : activeMatchSession.player1Id;
+        if (!playerId) {
+            return 0;
+        }
+        let count = 0;
+        (pending.racks || []).forEach(function (r) {
+            if (r && r.winnerId === playerId) {
+                count += 1;
+            }
+        });
+        return count;
+    }
+
     async function buildH2HOverlayPayload() {
         const visible = getOverlayStatsMode() === 'h2h';
         const p1Name = truncateName(document.getElementById('p1Name')?.value || '');
@@ -4900,15 +5077,29 @@
             return { visible: visible, mode: 'h2h', title: 'Head to Head', emptyMessage: 'First match-up' };
         }
 
-        const h2h = isCloudStatsMode()
+        const hasLiveMatch = hasLiveH2HMatch(p1Id, p2Id, gameType);
+        let h2h = isCloudStatsMode()
             ? buildCloudHeadToHead(p1Id, p2Id, await fetchCloudStats(), { gameType: gameType })
             : await getHeadToHead(p1Id, p2Id, { gameType: gameType });
+        if (!h2h && hasLiveMatch) {
+            h2h = {
+                player1: { id: p1Id, name: p1Name, stats: createEmptyStats() },
+                player2: { id: p2Id, name: p2Name, stats: createEmptyStats() },
+                gamesWon: {},
+                racksWon: {},
+                ballsWon: {},
+                fouls: {},
+                highestBreak: {},
+                highestRun: {},
+                matches: []
+            };
+        }
         if (!h2h) {
             return { visible: visible, mode: 'h2h', title: 'Head to Head', emptyMessage: 'First match-up' };
         }
         const lookupId1 = h2h.player1 && h2h.player1.id ? h2h.player1.id : p1Id;
         const lookupId2 = h2h.player2 && h2h.player2.id ? h2h.player2.id : p2Id;
-        if (!h2hSummaryHasDisplayableActivity(h2h, lookupId1, lookupId2)) {
+        if (!h2hSummaryHasDisplayableActivity(h2h, lookupId1, lookupId2) && !hasLiveMatch) {
             return {
                 visible: visible,
                 mode: 'h2h',
@@ -4919,6 +5110,7 @@
 
         const p1TypeStats = readTypeStats(h2h.player1, gameType);
         const p2TypeStats = readTypeStats(h2h.player2, gameType);
+        const bases = buildCompletedH2HOverlayBases(h2h, lookupId1, lookupId2, gameType);
 
         return {
             visible: visible,
@@ -4936,22 +5128,27 @@
             showTableRun: overlayStatEnabled(gameType, 'tableRun'),
             rackLabel: rackOrFrameLabel(false, gameType),
             racksLabel: rackOrFrameLabel(true, gameType),
-            p1Name: h2h.player1.name,
-            p2Name: h2h.player2.name,
-            p1Games: h2hMapValue(h2h.gamesWon, lookupId1),
-            p2Games: h2hMapValue(h2h.gamesWon, lookupId2),
-            p1Racks: h2hMapValue(h2h.racksWon, lookupId1),
-            p2Racks: h2hMapValue(h2h.racksWon, lookupId2),
-            p1Balls: h2hMapValue(h2h.ballsWon, lookupId1),
-            p2Balls: h2hMapValue(h2h.ballsWon, lookupId2),
-            p1Fouls: h2hMapValue(h2h.fouls, lookupId1),
-            p2Fouls: h2hMapValue(h2h.fouls, lookupId2),
-            p1HighestBreak: isStraightPoolGameType(gameType)
-                ? h2hMapValue(h2h.highestRun, lookupId1)
-                : h2hMapValue(h2h.highestBreak, lookupId1),
-            p2HighestBreak: isStraightPoolGameType(gameType)
-                ? h2hMapValue(h2h.highestRun, lookupId2)
-                : h2hMapValue(h2h.highestBreak, lookupId2),
+            hasLiveMatch: hasLiveMatch,
+            p1Name: (h2h.player1 && h2h.player1.name) || p1Name,
+            p2Name: (h2h.player2 && h2h.player2.name) || p2Name,
+            p1Games: bases.p1Games,
+            p2Games: bases.p2Games,
+            p1RacksBase: bases.p1Racks,
+            p2RacksBase: bases.p2Racks,
+            p1BallsBase: bases.p1Balls,
+            p2BallsBase: bases.p2Balls,
+            p1FoulsBase: bases.p1Fouls,
+            p2FoulsBase: bases.p2Fouls,
+            p1HighestBreakBase: bases.p1HighestBreak,
+            p2HighestBreakBase: bases.p2HighestBreak,
+            p1Racks: bases.p1Racks,
+            p2Racks: bases.p2Racks,
+            p1Balls: bases.p1Balls,
+            p2Balls: bases.p2Balls,
+            p1Fouls: bases.p1Fouls,
+            p2Fouls: bases.p2Fouls,
+            p1HighestBreak: bases.p1HighestBreak,
+            p2HighestBreak: bases.p2HighestBreak,
             p1BreakAndRuns: p1TypeStats.breakAndRuns || 0,
             p2BreakAndRuns: p2TypeStats.breakAndRuns || 0,
             p1TableRuns: p1TypeStats.tableRuns || 0,
@@ -5129,6 +5326,10 @@
     }
 
     function toggleOverlayStats(mode) {
+        if (!isOverlayStatsAllowed()) {
+            syncOverlayStatsControlsAvailability();
+            return Promise.resolve({ visible: false });
+        }
         const current = getOverlayStatsMode();
         if (current === mode) {
             setOverlayStatsMode('');
@@ -7876,6 +8077,8 @@
         publishSnookerOverlayLiveStats: publishSnookerOverlayLiveStats,
         onScoreModeChanged: onScoreModeChanged,
         syncOverlayButtonsFromStorage: syncOverlayButtonsFromStorage,
+        syncOverlayStatsControlsAvailability: syncOverlayStatsControlsAvailability,
+        isOverlayStatsAllowed: isOverlayStatsAllowed,
         initPlayerAutocomplete: initPlayerAutocomplete,
         buildOverlayStatsPayload: buildOverlayStatsPayload,
         renderMatchRackBreakdown: renderMatchRackBreakdown,

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
   <title>CueSport Scoreboard Cloud Control</title>
-  <link rel="stylesheet" href="/web/shared/styles.css?v=8.1.0.25" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.1.0.26" />
 </head>
 <body class="mobile">
   <header>
@@ -225,7 +225,7 @@
           </div>
           <div class="stream-section" id="streamStatsSection">
             <h3 class="share-links-heading">Statistics</h3>
-            <p class="hint">Show the same career stats panel on the overlay. Tap again to hide.</p>
+            <p class="hint" id="streamStatsHint">Show the same career stats panel on the overlay. Requires Ball Scoring on the dock. Tap again to hide.</p>
             <div class="row clips stream-stats-mode-row" id="streamStatsModeRow">
               <button type="button" class="btn stats-inactive" id="streamStatsP1Btn" data-cmd="toggle_overlay_stats" data-mode="p1" aria-pressed="false">Player 1</button>
               <button type="button" class="btn stats-inactive" id="streamStatsP2Btn" data-cmd="toggle_overlay_stats" data-mode="p2" aria-pressed="false">Player 2</button>
@@ -398,6 +398,6 @@
       <div id="poolRespotTargets" class="snooker-foul-targets"></div>
     </div>
   </div>
-  <script type="module" src="/web/mobile/app.js?v=8.0.0.37"></script>
+  <script type="module" src="/web/mobile/app.js?v=8.0.0.38"></script>
 </body>
 </html>

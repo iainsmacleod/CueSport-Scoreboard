@@ -1415,6 +1415,7 @@ function updateRackFoulDisplay() {
 }
 
 window.getRackFouls = getRackFouls;
+window.isBallTrackerControlsVisible = isBallTrackerControlsVisible;
 window.updateRackFoulDisplay = updateRackFoulDisplay;
 
 function getSnookerFrameFouls(player) {
@@ -1823,6 +1824,8 @@ function captureScoringUndoSnapshot(options) {
         ballState: snapshotBallState,
         pocketOwners: getPocketBallOwners(),
         playerBallSet: getStorageItem("playerBallSet") || "p1Open",
+        ballSetOpenLastPotSlot: getStorageItem("ballSetOpenLastPotSlot") || "",
+        ballSetOpenSamePlayerPots: getStorageItem("ballSetOpenSamePlayerPots") || "0",
         rackBreakerSlot: getStorageItem("rackBreakerSlot") || "",
         rackOpponentVisited: getStorageItem("rackOpponentVisited") || "no",
         rackIncomingLostTurn: getStorageItem("rackIncomingLostTurn") || "no",
@@ -1937,6 +1940,8 @@ function restoreTrackerFromScoringSnapshot(before) {
     if (typeof bc !== "undefined") {
         bc.postMessage({ playerBallSet: ballSet });
     }
+    setStorageItem("ballSetOpenLastPotSlot", before.ballSetOpenLastPotSlot || "");
+    setStorageItem("ballSetOpenSamePlayerPots", before.ballSetOpenSamePlayerPots || "0");
 
     setStorageItem("rackBreakerSlot", before.rackBreakerSlot || "");
     setStorageItem("rackOpponentVisited", before.rackOpponentVisited === "yes" ? "yes" : "no");
@@ -3895,6 +3900,9 @@ function syncScoreDisplayDependentUI() {
         bc.postMessage({ scoreDisplay: scoresOn ? "yes" : "no" });
     }
     syncControlsTabLayout();
+    if (window.PlayerStats && typeof window.PlayerStats.syncOverlayStatsControlsAvailability === 'function') {
+        window.PlayerStats.syncOverlayStatsControlsAvailability();
+    }
 }
 
 function updateScoreModeUI() {
@@ -4397,6 +4405,9 @@ function useBallTracker() {
         }
         syncBallSetSettingsVisibility();
         syncControlsTabLayout();
+        if (window.PlayerStats && typeof window.PlayerStats.syncOverlayStatsControlsAvailability === 'function') {
+            window.PlayerStats.syncOverlayStatsControlsAvailability();
+        }
         return;
     }
     const player1Enabled = getStorageItem("usePlayer1") === "yes";
@@ -4433,6 +4444,9 @@ function useBallTracker() {
     syncRackBreakerPickerVisibility();
     syncPoolFoulButtonVisibility();
     updateScoringUndoButton();
+    if (window.PlayerStats && typeof window.PlayerStats.syncOverlayStatsControlsAvailability === 'function') {
+        window.PlayerStats.syncOverlayStatsControlsAvailability();
+    }
 }
 
 /**
@@ -4655,7 +4669,8 @@ function togglePot(element) {
         return;
     }
 
-    // 8-Ball / Custom: while Open, assign Chosen Ball from Active Player (8-Ball waits for 2nd object ball).
+    // 8-Ball / Custom: while Open, assign Chosen Ball from Active Player
+    // (8-Ball: 2nd pot same player, or 1st pot after player change).
     if (nowFaded) {
         maybeAssignBallSetFromPot(element.id);
     }
@@ -4774,10 +4789,17 @@ function countFadedObjectBalls() {
 /**
  * While Ball Set Toggle + Ball Scoring are on (8-Ball / Custom) and the table is Open,
  * assign Chosen Ball for the Active Player from a potted object ball.
- * 8-Ball waits until a second object ball is potted (first pot may be off the break / still open).
+ * 8-Ball open-table rule:
+ *   - same player continues → assign on their 2nd object pot (first may be off the break)
+ *   - active player changes → assign on that player's 1st object pot
  * Custom still assigns on the first object ball.
  * Stored P1-centric: if P2 pots a group, P1 is set to the opposite group.
  */
+function clearBallSetOpenPotTracking() {
+    setStorageItem("ballSetOpenLastPotSlot", "");
+    setStorageItem("ballSetOpenSamePlayerPots", "0");
+}
+
 function maybeAssignBallSetFromPot(ballId) {
     if (getStorageItem("useBallSet") !== "yes") {
         return;
@@ -4802,12 +4824,28 @@ function maybeAssignBallSetFromPot(ballId) {
         return;
     }
 
-    // 8-Ball: stay Open until two object balls are down (avoids assigning off a break pot).
-    if (gameType === "game1" && countFadedObjectBalls() < 2) {
-        return;
+    const active = getActivePlayerSlot();
+    if (gameType === "game1") {
+        const lastPotSlot = getStorageItem("ballSetOpenLastPotSlot") || "";
+        let samePlayerPots = parseInt(getStorageItem("ballSetOpenSamePlayerPots") || "0", 10);
+        if (!Number.isFinite(samePlayerPots) || samePlayerPots < 0) {
+            samePlayerPots = 0;
+        }
+        if (lastPotSlot === active) {
+            samePlayerPots += 1;
+        } else {
+            // First pot of the rack, or first pot after the active player changed.
+            samePlayerPots = 1;
+        }
+        setStorageItem("ballSetOpenLastPotSlot", active);
+        setStorageItem("ballSetOpenSamePlayerPots", String(samePlayerPots));
+        // Same shooter: wait for 2nd pot. After a player change: assign on 1st pot.
+        const playerChanged = lastPotSlot !== "" && lastPotSlot !== active;
+        if (!playerChanged && samePlayerPots < 2) {
+            return;
+        }
     }
 
-    const active = getActivePlayerSlot();
     const value = getBallSetValueForPottedBall(num, active);
 
     const radio = document.querySelector('input[name="p1BallSetSelect"][value="' + value + '"]');
@@ -4816,6 +4854,7 @@ function maybeAssignBallSetFromPot(ballId) {
     }
     setStorageItem("playerBallSet", value);
     bc.postMessage({ playerBallSet: value });
+    clearBallSetOpenPotTracking();
     console.log("Ball set auto-assigned from " + ballId + " (active P" + active + "): " + value);
 }
 
@@ -6897,6 +6936,7 @@ function resetBallSet() {
     setStorageItem("playerBallSet", "p1Open");
     document.getElementById('p1colorOpen').checked = true;
     bc.postMessage({ playerBallSet: "p1Open" });
+    clearBallSetOpenPotTracking();
 }
 
 function resetBallTracker() {

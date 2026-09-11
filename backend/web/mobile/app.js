@@ -1939,6 +1939,8 @@ function syncStreamStatsPanel(state) {
   const panel = document.getElementById('streamStatsPanel');
   const titleEl = document.getElementById('streamStatsTitle');
   const bodyEl = document.getElementById('streamStatsBody');
+  const section = document.getElementById('streamStatsSection');
+  const modeRow = document.getElementById('streamStatsModeRow');
   if (!p1Btn || !p2Btn || !h2hBtn || !panel || !titleEl || !bodyEl) return;
 
   const p1Name = truncatePlayerName(state.player1Name || '') || 'Player 1';
@@ -1946,11 +1948,24 @@ function syncStreamStatsPanel(state) {
   p1Btn.textContent = p1Name;
   p2Btn.textContent = p2Name;
 
+  const scoringOn = isBallScoringOn(state);
+  const disabledTitle = 'Enable Ball Scoring on the dock to show overlay stats';
+  [p1Btn, p2Btn, h2hBtn].forEach((btn) => {
+    btn.disabled = !scoringOn;
+    if (scoringOn) {
+      btn.removeAttribute('title');
+    } else {
+      btn.title = disabledTitle;
+    }
+  });
+  if (section) section.classList.toggle('stream-stats-disabled', !scoringOn);
+  if (modeRow) modeRow.classList.toggle('stream-stats-disabled', !scoringOn);
+
   const mode = state.overlayStatsMode || '';
   const stats = state.overlayStats && typeof state.overlayStats === 'object' ? state.overlayStats : null;
   // Mode is exclusive: at most one of p1 / p2 / h2h is on.
-  const activeMode = (stats && stats.visible && stats.mode) || mode || '';
-  const visible = !!(stats && stats.visible && activeMode);
+  const activeMode = scoringOn && ((stats && stats.visible && stats.mode) || mode || '');
+  const visible = !!(scoringOn && stats && stats.visible && activeMode);
 
   [p1Btn, p2Btn, h2hBtn].forEach((btn) => {
     const on = btn.dataset.mode === activeMode && !!activeMode;
@@ -2531,6 +2546,7 @@ function wireCommands() {
       }
       if (cmd === 'toggle_overlay_stats') {
         setError('');
+        if (!isBallScoringOn(lastState || {})) return;
         const mode = payload.mode;
         if (!mode) return;
         const buttons = ['streamStatsP1Btn', 'streamStatsP2Btn', 'streamStatsH2hBtn']
