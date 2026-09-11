@@ -4,17 +4,20 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>CueSport Scoreboard Cloud — Dashboard</title>
-  <link rel="stylesheet" href="/web/shared/styles.css?v=8.0.0.57" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.1.0.4" />
 </head>
 <body>
   <header class="site-header">
     <div class="site-header-inner">
       <div>
-        <h1>CueSport Scoreboard Cloud <span class="site-version">v8.0.0</span></h1>
+        <h1>CueSport Scoreboard Cloud <span class="site-version">v8.1.0</span></h1>
       </div>
       <div class="site-header-actions">
         <nav class="site-nav">
-          <a class="btn" href="/streams">Live Streams</a>
+          <a class="btn" href="/streams">
+            <svg class="site-nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="14" height="12" rx="2"/><polygon points="22 8 16 12 22 16 22 8"/></svg>
+            Live Streams
+          </a>
         </nav>
       </div>
     </div>
@@ -93,7 +96,7 @@
         </div>
 
         <div id="statsPlayerDetail" class="panel hidden">
-          <button type="button" id="statsPlayerBackBtn" class="btn">Back</button>
+          <button type="button" id="statsPlayerBackBtn" class="btn dash-action-btn" title="Back to stats" aria-label="Back to stats">Back</button>
           <div class="stats-player-heading">
             <div id="statsPlayerTitleView" class="stats-player-title-view">
               <h2 id="statsPlayerTitle">Player</h2>
@@ -106,8 +109,8 @@
             </div>
             <form id="statsPlayerRenameForm" class="stats-player-rename-inline hidden">
               <input id="statsPlayerRenameInput" type="text" maxlength="20" autocomplete="off" aria-label="Player display name" />
-              <button type="submit" class="btn">Save</button>
-              <button type="button" id="statsPlayerRenameCancelBtn" class="btn">Cancel</button>
+              <button type="submit" class="btn save">Save</button>
+              <button type="button" id="statsPlayerRenameCancelBtn" class="btn cancel">Cancel</button>
             </form>
           </div>
           <div id="statsPlayerSummary" class="stats-summary"></div>
@@ -173,7 +176,7 @@
             <strong>Remove</strong> — frees the seat and disconnects any dock using it.<br />
             <strong>Rename</strong> — allows you to rename a key to be more user-friendly.
           </p>
-          <button id="createKeyBtn" class="btn">Create Dock Key</button>
+          <button id="createKeyBtn" class="btn dash-action-btn" type="button" title="Create Dock Key" aria-label="Create Dock Key">Create Dock Key</button>
           <p id="apiKeyLimitHint" class="hint hidden"></p>
           <p id="keyCopyNotice" class="copy-notice hidden" aria-live="polite"></p>
           <p id="keyRevokeNotice" class="hint hidden" aria-live="polite"></p>
@@ -264,12 +267,9 @@
         <div id="statsMatchRacksEditorWrap" class="stats-match-racks-editor-wrap">
           <div class="stats-match-racks-editor-header">
             <span id="statsMatchRacksEditorLabel">Racks</span>
-            <button type="button" class="btn" id="statsMatchAddRackBtn">Add Rack</button>
+            <button type="button" class="btn dash-action-btn" id="statsMatchAddRackBtn">Add Rack</button>
           </div>
           <div id="statsMatchRacksEditor" class="stats-match-racks-editor"></div>
-          <div class="stats-match-racks-editor-footer">
-            <button type="button" class="btn danger" id="statsMatchRemoveRackBtn" disabled>Remove Last Rack</button>
-          </div>
         </div>
         <div id="statsMatchExtrasBalls" class="stats-toolbar hidden">
           <label class="stats-filter">
@@ -286,10 +286,10 @@
           <input id="statsMatchDate" type="date" />
         </label>
         <p id="statsMatchError" class="error hidden"></p>
-        <div class="stats-toolbar">
-              <button type="submit" id="statsMatchSaveBtn" class="btn primary" disabled>Save</button>
-          <button type="button" id="statsMatchCancelBtn" class="btn">Cancel</button>
-          <button type="button" id="statsMatchDeleteBtn" class="btn danger">Delete</button>
+        <div class="stats-toolbar stats-match-form-actions">
+          <button type="submit" id="statsMatchSaveBtn" class="btn save dash-action-btn" disabled>Save</button>
+          <button type="button" id="statsMatchCancelBtn" class="btn cancel dash-action-btn">Cancel</button>
+          <button type="button" id="statsMatchDeleteBtn" class="btn danger dash-action-btn">Delete</button>
         </div>
       </form>
     </div>
@@ -300,7 +300,7 @@
       <p id="dashConfirmMessage" class="dash-confirm-message"></p>
       <div class="stats-toolbar dash-confirm-actions">
         <button type="button" id="dashConfirmOkBtn" class="btn primary">Confirm</button>
-        <button type="button" id="dashConfirmCancelBtn" class="btn">Cancel</button>
+        <button type="button" id="dashConfirmCancelBtn" class="btn cancel">Cancel</button>
       </div>
     </div>
   </div>
@@ -317,6 +317,6 @@
       </div>
     </div>
   </div>
-  <script type="module" src="/web/dashboard/app.js?v=8.0.0.72"></script>
+  <script type="module" src="/web/dashboard/app.js?v=8.1.0.5"></script>
 </body>
 </html>

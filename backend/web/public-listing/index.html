@@ -4,17 +4,20 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>CueSport Scoreboard Cloud</title>
-  <link rel="stylesheet" href="/web/shared/styles.css" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.1.0.5" />
 </head>
 <body>
   <header class="site-header">
     <div class="site-header-inner">
       <div>
-        <h1>CueSport Scoreboard Cloud <span class="site-version">v8.0.0</span></h1>
+        <h1>CueSport Scoreboard Cloud <span class="site-version">v8.1.0</span></h1>
         <p class="subtitle">Remote scoring, multi-table control, and live stream discovery</p>
       </div>
       <nav class="site-nav">
-        <a class="btn" href="/streams">Live Streams</a>
+        <a class="btn" href="/streams">
+          <svg class="site-nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="14" height="12" rx="2"/><polygon points="22 8 16 12 22 16 22 8"/></svg>
+          Live Streams
+        </a>
         <a id="authNavBtn" class="btn primary" href="/dashboard">Sign In</a>
       </nav>
     </div>
@@ -65,7 +68,13 @@
       const btn = document.getElementById('authNavBtn');
       if (!btn) return;
       const signedIn = !!localStorage.getItem('cuesport_token');
-      btn.textContent = signedIn ? 'Dashboard' : 'Sign In';
+      const icon = signedIn
+        ? '<svg class="site-nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>'
+        : '<svg class="site-nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>';
+      const label = signedIn ? 'Dashboard' : 'Sign In';
+      btn.innerHTML = `${icon}${label}`;
+      btn.setAttribute('aria-label', label);
+      btn.title = label;
     }
 
     function escapeHtml(text) {

@@ -427,11 +427,11 @@ function startDebugRoomRename(room, titleRow, currentTitle) {
   input.value = currentTitle;
   const saveBtn = document.createElement('button');
   saveBtn.type = 'submit';
-  saveBtn.className = 'btn';
+  saveBtn.className = 'btn save';
   saveBtn.textContent = 'Save';
   const cancelBtn = document.createElement('button');
   cancelBtn.type = 'button';
-  cancelBtn.className = 'btn debug-room-rename-cancel';
+  cancelBtn.className = 'btn cancel debug-room-rename-cancel';
   cancelBtn.textContent = 'Cancel';
   form.appendChild(input);
   form.appendChild(saveBtn);
@@ -547,7 +547,22 @@ function dashActionIcon(kind) {
     return `<svg ${common}><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`;
   }
   if (kind === 'trash') {
-    return `<svg ${common}><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`;
+    return `<svg ${common}><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>`;
+  }
+  if (kind === 'save') {
+    return `<svg ${common}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>`;
+  }
+  if (kind === 'cancel') {
+    return `<svg ${common}><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`;
+  }
+  if (kind === 'plus') {
+    return `<svg ${common}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
+  }
+  if (kind === 'back') {
+    return `<svg ${common}><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>`;
+  }
+  if (kind === 'key') {
+    return `<svg ${common}><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>`;
   }
   if (kind === 'kick') {
     return `<svg ${common}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="17" y1="8" x2="22" y2="13"/><line x1="22" y1="8" x2="17" y2="13"/></svg>`;
@@ -1703,6 +1718,7 @@ function matchRacksToggleButton(m) {
 
 function matchEditButton(startEventId) {
   return statsActionButton({
+    className: 'edit',
     attrs: `data-edit-match="${escapeHtml(startEventId)}"`,
     icon: 'edit',
     label: 'Edit',
@@ -1994,26 +2010,22 @@ function syncMatchExtrasVisibility(gameType) {
   const words = gt === 'game8' ? 'Frames' : 'Racks';
   const label = document.getElementById('statsMatchRacksEditorLabel');
   const addBtn = document.getElementById('statsMatchAddRackBtn');
-  const removeBtn = document.getElementById('statsMatchRemoveRackBtn');
   if (label) label.textContent = words;
-  if (addBtn) addBtn.textContent = `Add ${word}`;
-  if (removeBtn) removeBtn.textContent = `Remove Last ${word}`;
-  syncDashMatchRackRemoveBtn();
+  if (addBtn) {
+    addBtn.classList.add('dash-action-btn');
+    setDashActionButtonContent(addBtn, {
+      icon: 'plus',
+      label: `Add ${word}`,
+      title: `Add ${word.toLowerCase()}`,
+    });
+  }
   updateDashMatchScoreSummary();
 }
 
-function syncDashMatchRackRemoveBtn() {
-  const removeBtn = document.getElementById('statsMatchRemoveRackBtn');
-  if (!removeBtn) return;
-  const editor = document.getElementById('statsMatchRacksEditor');
-  const count = editor ? editor.querySelectorAll('tr.stats-rack-edit-row').length : 0;
-  removeBtn.disabled = count < 1;
-}
-
-function removeLastDashMatchRackRow() {
+function removeDashMatchRackAt(index) {
   const preserved = preserveDashRackEditorRows();
-  if (!preserved.length) return;
-  preserved.pop();
+  if (index < 0 || index >= preserved.length) return;
+  preserved.splice(index, 1);
   renderDashMatchRacksEditor(preserved);
   syncMatchModalSaveEnabled();
 }
@@ -2047,6 +2059,43 @@ function closeMatchModal() {
 
 let matchModalBusy = false;
 
+function setMatchModalActionButtons({ saving = false, deleting = false } = {}) {
+  const saveBtn = document.getElementById('statsMatchSaveBtn');
+  const cancelBtn = document.getElementById('statsMatchCancelBtn');
+  const deleteBtn = document.getElementById('statsMatchDeleteBtn');
+  const addBtn = document.getElementById('statsMatchAddRackBtn');
+  if (saveBtn) {
+    setDashActionButtonContent(saveBtn, {
+      icon: 'save',
+      label: saving ? 'Saving…' : 'Save',
+      title: saving ? 'Saving match' : 'Save match',
+    });
+  }
+  if (cancelBtn) {
+    setDashActionButtonContent(cancelBtn, {
+      icon: 'cancel',
+      label: 'Cancel',
+      title: 'Cancel editing',
+    });
+  }
+  if (deleteBtn) {
+    setDashActionButtonContent(deleteBtn, {
+      icon: 'trash',
+      label: deleting ? 'Deleting…' : 'Delete',
+      title: deleting ? 'Deleting match' : 'Delete match',
+    });
+  }
+  if (addBtn) {
+    const gameType = document.getElementById('statsMatchGameType')?.value || 'game1';
+    const word = gameType === 'game8' ? 'Frame' : 'Rack';
+    setDashActionButtonContent(addBtn, {
+      icon: 'plus',
+      label: `Add ${word}`,
+      title: `Add ${word.toLowerCase()}`,
+    });
+  }
+}
+
 function setDashMatchModalBusy(busy, action = 'save') {
   matchModalBusy = !!busy;
   const modal = document.getElementById('statsMatchModal');
@@ -2062,13 +2111,13 @@ function setDashMatchModalBusy(busy, action = 'save') {
   });
   if (saveBtn) {
     saveBtn.disabled = matchModalBusy ? true : !matchModalHasChanges();
-    saveBtn.textContent = matchModalBusy && action === 'save' ? 'Saving…' : 'Save';
   }
   if (cancelBtn) cancelBtn.disabled = matchModalBusy;
-  if (deleteBtn) {
-    deleteBtn.disabled = matchModalBusy;
-    deleteBtn.textContent = matchModalBusy && action === 'delete' ? 'Deleting…' : 'Delete';
-  }
+  if (deleteBtn) deleteBtn.disabled = matchModalBusy;
+  setMatchModalActionButtons({
+    saving: matchModalBusy && action === 'save',
+    deleting: matchModalBusy && action === 'delete',
+  });
 }
 
 function syncMatchModalSaveEnabled() {
@@ -2197,7 +2246,6 @@ function renderDashMatchRacksEditor(racks) {
   if (!list.length) {
     editor.innerHTML = `<p class="hint">No ${words} yet. Use Add ${word}.</p>`;
     updateDashMatchScoreSummary();
-    syncDashMatchRackRemoveBtn();
     return;
   }
   const p1 = escapeHtml(matchEditPlayerNames.p1 || 'Player 1');
@@ -2208,7 +2256,7 @@ function renderDashMatchRacksEditor(racks) {
   } else if (isStraight) {
     html += `<th>Run ${p1}</th><th>Run ${p2}</th>`;
   }
-  html += `<th>Fouls ${p1}</th><th>Fouls ${p2}</th></tr></thead><tbody>`;
+  html += `<th>Fouls ${p1}</th><th>Fouls ${p2}</th><th class="stats-rack-edit-actions-col"></th></tr></thead><tbody>`;
   list.forEach((r, index) => {
     let winnerSlot = '';
     const slot = r.winnerSlot != null ? String(r.winnerSlot) : '';
@@ -2232,7 +2280,12 @@ function renderDashMatchRacksEditor(racks) {
         <td><input type="number" class="stats-rack-hr-p2" min="0" max="999" value="${clampDashScore(r.highestRunP2 != null ? r.highestRunP2 : r.highestBreakP2)}" /></td>`;
     }
     html += `<td><input type="number" class="stats-rack-fouls-p1" min="0" max="999" value="${clampDashScore(r.foulsP1)}" /></td>
-      <td><input type="number" class="stats-rack-fouls-p2" min="0" max="999" value="${clampDashScore(r.foulsP2)}" /></td></tr>`;
+      <td><input type="number" class="stats-rack-fouls-p2" min="0" max="999" value="${clampDashScore(r.foulsP2)}" /></td>
+      <td class="stats-rack-edit-actions">
+        <button type="button" class="stats-player-edit-btn stats-player-delete-btn stats-rack-delete-btn" data-rack-index="${index}" title="Delete ${word.toLowerCase()} ${index + 1}" aria-label="Delete ${word.toLowerCase()} ${index + 1}">
+          ${dashActionIcon('trash')}
+        </button>
+      </td></tr>`;
   });
   html += '</tbody></table>';
   editor.innerHTML = html;
@@ -2245,8 +2298,13 @@ function renderDashMatchRacksEditor(racks) {
   editor.querySelectorAll('input').forEach((el) => {
     el.addEventListener('input', syncMatchModalSaveEnabled);
   });
+  editor.querySelectorAll('.stats-rack-delete-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const idx = Number(btn.getAttribute('data-rack-index'));
+      if (Number.isFinite(idx)) removeDashMatchRackAt(idx);
+    });
+  });
   updateDashMatchScoreSummary();
-  syncDashMatchRackRemoveBtn();
 }
 
 function serializeDashEditorRacksForCloud(editorRacks) {
@@ -2863,23 +2921,34 @@ document.getElementById('statsPlayerDeleteBtn')?.addEventListener('click', async
   if (!selectedPlayerKey) return;
   const playerName = statsPlayerDisplayName(selectedPlayerKey);
   const matchCount = playerMatches(selectedPlayerKey).length;
-  if (!window.confirm(`Delete "${playerName}" and ${matchCount} match(es)? This cannot be undone.`)) {
-    return;
-  }
-  if (!window.confirm('Are you absolutely sure?')) {
-    return;
-  }
+  const matchLabel = matchCount === 1 ? '1 match' : `${matchCount} matches`;
+  const ok = await confirmDashAction({
+    title: 'Delete Player',
+    message:
+      `Delete “${playerName}” and ${matchLabel} from cloud stats?\n\n` +
+      'This cannot be undone. The player is removed from the account roster and every match involving them is deleted.',
+    confirmLabel: 'Delete Player',
+    danger: true,
+  });
+  if (!ok) return;
+  const ok2 = await confirmDashAction({
+    title: 'Confirm Delete',
+    message: `Are you absolutely sure you want to permanently delete “${playerName}”?`,
+    confirmLabel: 'Delete Permanently',
+    danger: true,
+  });
+  if (!ok2) return;
   try {
     const result = await deleteAccountPlayer(getServerUrl(), getToken(), selectedPlayerKey);
     selectedPlayerKey = '';
     playerRenameEditing = false;
     await loadAccountStats(true);
+    const deleted = Number(result?.deletedMatches) || 0;
     const statusEl = document.getElementById('statsStatus');
     if (statusEl) {
-      const deleted = Number(result?.deletedMatches) || 0;
       statusEl.textContent = deleted === 1
-        ? `Deleted ${playerName} and 1 match.`
-        : `Deleted ${playerName} and ${deleted} matches.`;
+        ? `Deleted ${playerName} and 1 match from cloud stats.`
+        : `Deleted ${playerName} and ${deleted} matches from cloud stats.`;
     }
   } catch (err) {
     setError(err.message);
@@ -2947,9 +3016,6 @@ document.getElementById('statsMatchAddRackBtn')?.addEventListener('click', () =>
   preserved.push({ winnerId: '' });
   renderDashMatchRacksEditor(preserved);
   syncMatchModalSaveEnabled();
-});
-document.getElementById('statsMatchRemoveRackBtn')?.addEventListener('click', () => {
-  removeLastDashMatchRackRow();
 });
 document.getElementById('statsMatchModal')?.addEventListener('click', (event) => {
   if (event.target.id === 'statsMatchModal') closeMatchModal();
@@ -3339,4 +3405,23 @@ function initMatchPlayerAutocompleteForSlot(slot, inputId, listId) {
 
 initStatsPlayerSearch();
 initMatchPlayerAutocomplete();
+setMatchModalActionButtons();
+{
+  const backBtn = document.getElementById('statsPlayerBackBtn');
+  if (backBtn) {
+    setDashActionButtonContent(backBtn, {
+      icon: 'back',
+      label: 'Back',
+      title: 'Back to stats',
+    });
+  }
+  const createKeyBtn = document.getElementById('createKeyBtn');
+  if (createKeyBtn) {
+    setDashActionButtonContent(createKeyBtn, {
+      icon: 'key',
+      label: 'Create Dock Key',
+      title: 'Create a new OBS Dock Key',
+    });
+  }
+}
 renderDashboard();

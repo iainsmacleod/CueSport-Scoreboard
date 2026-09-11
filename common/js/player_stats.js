@@ -6782,6 +6782,11 @@
                 '<p class="stats-empty">Select a player from the leaderboard.</p>';
             statsModalSelectedPlayerId = null;
             await refreshStatsUI();
+            alert(
+                matchCount === 1
+                    ? 'Deleted "' + playerName + '" and 1 match.'
+                    : 'Deleted "' + playerName + '" and ' + matchCount + ' match(es).'
+            );
         } catch (err) {
             alert('Delete failed: ' + err.message);
         }

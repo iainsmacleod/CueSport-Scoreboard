@@ -10,7 +10,7 @@ Display player names, race and game info, racks (and balls where needed), logos,
 
 *Best viewed as a **1920×1080** browser source*
 
-**Current version: 8.0.0**
+**Current version: 8.1.0**
 
 </div>
 
