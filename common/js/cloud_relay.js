@@ -687,6 +687,14 @@
         return {
             player1Name: dockStorage('p1NameCtrlPanel', '') || '',
             player2Name: dockStorage('p2NameCtrlPanel', '') || '',
+            player1Id: (function () {
+                const el = document.getElementById('p1Name');
+                return el ? (el.getAttribute('data-player-id') || '') : '';
+            }()),
+            player2Id: (function () {
+                const el = document.getElementById('p2Name');
+                return el ? (el.getAttribute('data-player-id') || '') : '';
+            }()),
             p1Score: scoreInt('p1ScoreCtrlPanel'),
             p2Score: scoreInt('p2ScoreCtrlPanel'),
             p1Balls: scoreInt('p1BallsCtrlPanel'),

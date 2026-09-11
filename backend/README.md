@@ -98,7 +98,7 @@ Built-in defaults (all overridable via the env vars above).
 ## Supabase setup (production)
 
 1. Create a Supabase project.
-2. Run [`supabase/migrations/001_initial.sql`](supabase/migrations/001_initial.sql) then [`002_session_epoch_quotas.sql`](supabase/migrations/002_session_epoch_quotas.sql) in the SQL editor.
+2. Run [`supabase/migrations/001_initial.sql`](supabase/migrations/001_initial.sql), [`002_session_epoch_quotas.sql`](supabase/migrations/002_session_epoch_quotas.sql), then [`003_account_players_uuid.sql`](supabase/migrations/003_account_players_uuid.sql) in the SQL editor.
 3. Enable **Google** provider under Authentication → Providers.
 4. Add redirect URLs: `{PUBLIC_URL}/web/dashboard/`, `{PUBLIC_URL}/auth/callback`.
 5. Set env vars in `.env` and deploy.

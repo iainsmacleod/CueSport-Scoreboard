@@ -5,7 +5,7 @@
     'use strict';
 
     const DB_NAME = 'cuesport_stats';
-    const DB_VERSION = 1;
+    const DB_VERSION = 2;
     const SCHEMA_VERSION = 1;
 
     const GAME_TYPE_LABELS = {
@@ -564,8 +564,8 @@
     }
 
     function adaptCloudRacks(m) {
-        const p1 = cloudPlayerKey(m.player1Name);
-        const p2 = cloudPlayerKey(m.player2Name);
+        const p1 = String(m.player1Id || '').trim() || cloudPlayerKey(m.player1Name);
+        const p2 = String(m.player2Id || '').trim() || cloudPlayerKey(m.player2Name);
         return (Array.isArray(m.racks) ? m.racks : []).map(function (r, index) {
             if (!r || typeof r !== 'object') {
                 return null;
@@ -607,11 +607,13 @@
         if (!m) return null;
         const p1Name = m.player1Name || '';
         const p2Name = m.player2Name || '';
+        const p1Id = String(m.player1Id || '').trim() || cloudPlayerKey(p1Name);
+        const p2Id = String(m.player2Id || '').trim() || cloudPlayerKey(p2Name);
         return {
             id: m.startEventId || m.id,
             startEventId: m.startEventId || m.id,
-            player1Id: cloudPlayerKey(p1Name),
-            player2Id: cloudPlayerKey(p2Name),
+            player1Id: p1Id,
+            player2Id: p2Id,
             player1Name: p1Name,
             player2Name: p2Name,
             gameType: m.gameType || 'game1',
@@ -636,21 +638,23 @@
             foulsP2: Number(m.foulsP2) || 0,
             winnerSlot: m.winnerSlot || null,
             winnerId: m.winnerSlot === '1'
-                ? cloudPlayerKey(p1Name)
-                : (m.winnerSlot === '2' ? cloudPlayerKey(p2Name) : null),
+                ? p1Id
+                : (m.winnerSlot === '2' ? p2Id : null),
             _cloud: true
         };
     }
 
     function cloudMatchesForPlayer(matches, playerKey) {
-        const key = cloudPlayerKey(playerKey);
+        const key = String(playerKey || '').trim();
+        const keyLower = cloudPlayerKey(playerKey);
         return (matches || []).filter(function (m) {
-            return cloudPlayerKey(m.player1Name) === key || cloudPlayerKey(m.player2Name) === key;
+            if (m.player1Id === key || m.player2Id === key) return true;
+            return cloudPlayerKey(m.player1Name) === keyLower || cloudPlayerKey(m.player2Name) === keyLower;
         }).map(adaptCloudMatchForUi);
     }
 
     function buildCloudPlayerDetailShape(cloudPlayer, matches) {
-        const key = cloudPlayerKey(cloudPlayer.id || cloudPlayer.name);
+        const key = String(cloudPlayer.id || '').trim() || cloudPlayerKey(cloudPlayer.name);
         const byGameType = {};
         Object.keys(GAME_TYPE_LABELS).forEach(function (gt) {
             byGameType[gt] = createEmptyTypeStats();
@@ -1555,9 +1559,19 @@
             };
             request.onupgradeneeded = function (event) {
                 const database = event.target.result;
+                const oldVersion = event.oldVersion || 0;
+                // Dev wipe: unique name index → non-unique (duplicate display names).
+                if (oldVersion > 0 && oldVersion < 2) {
+                    if (database.objectStoreNames.contains('players')) {
+                        database.deleteObjectStore('players');
+                    }
+                    if (database.objectStoreNames.contains('matches')) {
+                        database.deleteObjectStore('matches');
+                    }
+                }
                 if (!database.objectStoreNames.contains('players')) {
                     const playerStore = database.createObjectStore('players', { keyPath: 'id' });
-                    playerStore.createIndex('nameNormalized', 'nameNormalized', { unique: true });
+                    playerStore.createIndex('nameNormalized', 'nameNormalized', { unique: false });
                 }
                 if (!database.objectStoreNames.contains('matches')) {
                     const matchStore = database.createObjectStore('matches', { keyPath: 'id' });
@@ -1781,15 +1795,44 @@
         if (!normalized) {
             return null;
         }
+        const matches = await findPlayersByNormalizedName(normalized);
+        return matches[0] || null;
+    }
+
+    async function findPlayersByNormalizedName(normalized) {
+        if (!normalized) {
+            return [];
+        }
         await openDatabase();
         const store = tx(['players'], 'readonly').objectStore('players');
-        return promisifyRequest(store.index('nameNormalized').get(normalized));
+        return promisifyRequest(store.index('nameNormalized').getAll(normalized));
     }
 
     async function getAllPlayers() {
         await openDatabase();
         const store = tx(['players'], 'readonly').objectStore('players');
         return promisifyRequest(store.getAll());
+    }
+
+    /** Always create a new player row (allows duplicate display names). */
+    async function createPlayer(name) {
+        const displayName = truncateName(name);
+        const normalized = normalizeName(displayName);
+        if (!normalized) {
+            return null;
+        }
+        const now = new Date().toISOString();
+        const player = {
+            id: generateId(),
+            name: displayName,
+            nameNormalized: normalized,
+            stats: createEmptyStats(),
+            createdAt: now,
+            updatedAt: now,
+            lastPlayedAt: null
+        };
+        await putPlayer(player);
+        return player;
     }
 
     async function ensurePlayer(name) {
@@ -1802,18 +1845,7 @@
         if (player) {
             return player;
         }
-        const now = new Date().toISOString();
-        player = {
-            id: generateId(),
-            name: displayName,
-            nameNormalized: normalized,
-            stats: createEmptyStats(),
-            createdAt: now,
-            updatedAt: now,
-            lastPlayedAt: null
-        };
-        await putPlayer(player);
-        return player;
+        return createPlayer(displayName);
     }
 
     async function searchPlayers(query, limit) {
@@ -1955,7 +1987,7 @@
         setPlayerIdOnInput('1', p1.id);
         setPlayerIdOnInput('2', p2.id);
 
-        const duplicateNames = p1.id === p2.id || normalizeName(p1Name) === normalizeName(p2Name);
+        const duplicateNames = p1.id === p2.id;
         const now = new Date().toISOString();
         const match = {
             id: generateId(),
@@ -2019,6 +2051,8 @@
             gameInfo: match.gameInfo || activeMatchSession.gameInfo || '',
             player1: match.player1Name,
             player2: match.player2Name,
+            player1Id: match.player1Id || activeMatchSession.player1Id || null,
+            player2Id: match.player2Id || activeMatchSession.player2Id || null,
             reason: reason || 'activity'
         });
         queuePersistPendingSession();
@@ -4153,11 +4187,6 @@
             throw new Error('Name cannot be empty.');
         }
 
-        const existing = await findPlayerByNormalizedName(normalized);
-        if (existing && existing.id !== playerId) {
-            throw new Error('A player with that name already exists.');
-        }
-
         const player = await getPlayer(playerId);
         if (!player) {
             throw new Error('Player not found.');
@@ -4268,22 +4297,12 @@
 
         let playersImported = 0;
         let matchesImported = 0;
-        const usedNormalized = {};
 
         for (let i = 0; i < data.players.length; i++) {
             const shaped = ensurePlayerRecordShape(data.players[i]);
             if (!shaped) {
                 continue;
             }
-            // Keep unique nameNormalized index happy if file has duplicates.
-            let uniqueNorm = shaped.nameNormalized;
-            let suffix = 2;
-            while (usedNormalized[uniqueNorm]) {
-                uniqueNorm = shaped.nameNormalized + '-' + suffix;
-                suffix++;
-            }
-            shaped.nameNormalized = uniqueNorm;
-            usedNormalized[uniqueNorm] = true;
             await putPlayer(shaped);
             playersImported++;
         }
@@ -4868,7 +4887,7 @@
 
     async function createAndSelectAutocompletePlayer(slot, name, input, list) {
         try {
-            const player = await ensurePlayer(name);
+            const player = await createPlayer(name);
             if (!player) {
                 return;
             }
@@ -4899,9 +4918,9 @@
             const exactExists = !!(queryNorm && results.some(function (p) {
                 return (p.nameNormalized || normalizeName(p.name)) === queryNorm;
             }));
-            // Offer create whenever the typed name is not an exact existing player
-            // (e.g. "Billy" while "Billy Strings" exists)
-            const createName = (!browseAll && query && !exactExists) ? truncateName(query) : null;
+            // Offer create whenever there is a typed name (including browse-all with a query),
+            // so a second player can share a display name.
+            const createName = query ? truncateName(query) : null;
 
             autocompleteState[slot].results = results;
             autocompleteState[slot].createNewName = createName;
@@ -4909,7 +4928,7 @@
             list.innerHTML = '';
             list.classList.toggle('autocomplete-browse', !!browseAll);
 
-            if (browseAll && results.length === 0) {
+            if (browseAll && results.length === 0 && !createName) {
                 const empty = document.createElement('div');
                 empty.className = 'autocomplete-item autocomplete-new';
                 empty.textContent = 'No saved players yet.';
@@ -4922,7 +4941,9 @@
                 const createItem = document.createElement('div');
                 createItem.className = 'autocomplete-item autocomplete-new';
                 createItem.dataset.index = '0';
-                createItem.textContent = 'Create new player: "' + createName + '"';
+                createItem.textContent = exactExists
+                    ? 'Create another player: "' + createName + '"'
+                    : 'Create new player: "' + createName + '"';
                 createItem.addEventListener('mousedown', function (e) {
                     e.preventDefault();
                     createAndSelectAutocompletePlayer(slot, createName, input, list);
@@ -4934,7 +4955,15 @@
                 const item = document.createElement('div');
                 item.className = 'autocomplete-item';
                 item.dataset.index = String(createName ? index + 1 : index);
-                item.innerHTML = '<span class="autocomplete-name">' + escapeHtml(player.name) + '</span>' +
+                const shortId = String(player.id || '').slice(0, 8);
+                const lastPlayed = player.lastPlayedAt
+                    ? new Date(player.lastPlayedAt).toLocaleDateString()
+                    : '';
+                const disambig = exactExists
+                    ? (' · ' + (lastPlayed || shortId))
+                    : '';
+                item.innerHTML = '<span class="autocomplete-name">' + escapeHtml(player.name) +
+                    escapeHtml(disambig) + '</span>' +
                     '<span class="autocomplete-preview">' + formatPlayerPreview(player.stats) + '</span>';
                 item.addEventListener('mousedown', function (e) {
                     e.preventDefault();
@@ -7237,6 +7266,7 @@
     window.PlayerStats = {
         init: initPlayerStats,
         ensurePlayer: ensurePlayer,
+        createPlayer: createPlayer,
         findPlayerByNormalizedName: findPlayerByNormalizedName,
         searchPlayers: searchPlayers,
         getPlayer: getPlayer,

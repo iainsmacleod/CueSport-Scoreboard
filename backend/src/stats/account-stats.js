@@ -66,14 +66,15 @@ export function summarizeAccountStats(events) {
   const playerMap = new Map();
   const tables = new Map();
 
-  function getPlayer(name) {
+  function getPlayer(id, name) {
+    const playerId = String(id || '').trim();
     const display = String(name || '').trim();
-    const key = display.toLowerCase();
-    if (!key) return null;
+    if (!playerId && !display) return null;
+    const key = playerId || display.toLowerCase();
     if (!playerMap.has(key)) {
       playerMap.set(key, {
         id: key,
-        name: display,
+        name: display || key,
         gamesWon: 0,
         gamesDrawn: 0,
         gamesLost: 0,
@@ -87,6 +88,8 @@ export function summarizeAccountStats(events) {
         fouls: 0,
         lastPlayedAt: null,
       });
+    } else if (display) {
+      playerMap.get(key).name = display;
     }
     return playerMap.get(key);
   }
@@ -129,6 +132,8 @@ export function summarizeAccountStats(events) {
     const ep = end ? (end.payload || {}) : {};
     const p1Name = sp.player1 || '';
     const p2Name = sp.player2 || '';
+    const p1Id = String(sp.player1Id || '').trim() || null;
+    const p2Id = String(sp.player2Id || '').trim() || null;
     if (!p1Name || !p2Name) continue;
 
     const label = tableLabel(start);
@@ -179,6 +184,8 @@ export function summarizeAccountStats(events) {
       endEventId: end ? end.id : null,
       roomId: start.room_id,
       tableLabel: label,
+      player1Id: p1Id,
+      player2Id: p2Id,
       player1Name: p1Name,
       player2Name: p2Name,
       gameType,
@@ -196,8 +203,8 @@ export function summarizeAccountStats(events) {
     matches.push(match);
 
     if (!end) continue;
-    const p1 = getPlayer(p1Name);
-    const p2 = getPlayer(p2Name);
+    const p1 = getPlayer(p1Id, p1Name);
+    const p2 = getPlayer(p2Id, p2Name);
     if (!p1 || !p2) continue;
 
     // Racks/frames always come from the final scoreline (including draws).
@@ -252,6 +259,7 @@ export function summarizeAccountStats(events) {
 
 /** Account stats for HTTP and WebSocket dock clients. */
 export function getAccountStats(accountId, limit = 5000) {
+  sqlite.syncAccountPlayersFromMatchEvents(accountId);
   const events = sqlite.getAccountSessionEvents(accountId, limit);
   const stats = summarizeAccountStats(events);
   for (const match of stats.matches || []) {

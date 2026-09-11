@@ -267,7 +267,7 @@ export async function deleteAccountMatch(serverUrl, token, startEventId) {
   return res.json();
 }
 
-export async function renameAccountPlayer(serverUrl, token, from, to) {
+export async function renameAccountPlayer(serverUrl, token, playerId, to) {
   const base = serverUrl.replace(/\/$/, '');
   const res = await fetch(`${base}/api/stats/players`, {
     method: 'PATCH',
@@ -275,7 +275,7 @@ export async function renameAccountPlayer(serverUrl, token, from, to) {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ from, to }),
+    body: JSON.stringify({ id: playerId, to }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));

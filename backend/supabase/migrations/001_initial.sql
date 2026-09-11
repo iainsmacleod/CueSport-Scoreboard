@@ -90,12 +90,15 @@ create table if not exists room_guest_tokens (
 create index if not exists idx_room_guest_tokens_account on room_guest_tokens(account_id);
 
 create table if not exists account_players (
+  id uuid primary key default gen_random_uuid(),
   account_id uuid not null references accounts(id) on delete cascade,
   name text not null,
   name_normalized text not null,
-  last_seen_at timestamptz not null default now(),
-  primary key (account_id, name_normalized)
+  last_seen_at timestamptz not null default now()
 );
+
+create index if not exists idx_account_players_account on account_players(account_id);
+create index if not exists idx_account_players_name on account_players(account_id, name_normalized);
 
 -- Trigger: create account profile on Supabase auth signup (run in Supabase SQL editor)
 -- create or replace function public.handle_new_user()

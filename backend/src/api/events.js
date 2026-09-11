@@ -186,7 +186,15 @@ export async function registerEventRoutes(app) {
     if (!player1Name || !player2Name) {
       return reply.code(400).send({ error: 'Both player names are required' });
     }
-    if (namesEqual(player1Name, player2Name)) {
+    const prevStart = pair.start.payload || {};
+    let player1Id = String(body.player1Id || prevStart.player1Id || '').trim() || null;
+    let player2Id = String(body.player2Id || prevStart.player2Id || '').trim() || null;
+    player1Id = sqlite.upsertAccountPlayer(account.id, player1Name, player1Id);
+    player2Id = sqlite.upsertAccountPlayer(account.id, player2Name, player2Id);
+    if (!player1Id || !player2Id) {
+      return reply.code(400).send({ error: 'Could not resolve players' });
+    }
+    if (player1Id === player2Id) {
       return reply.code(400).send({ error: 'Players must be different' });
     }
 
@@ -213,11 +221,13 @@ export async function registerEventRoutes(app) {
     }
     const completedAt = toSqliteDateTime(body.completedAt);
 
-    const gameInfo = String(body.gameInfo != null ? body.gameInfo : (pair.start.payload?.gameInfo || '')).trim().slice(0, 60);
+    const gameInfo = String(body.gameInfo != null ? body.gameInfo : (prevStart.gameInfo || '')).trim().slice(0, 60);
     const startPayload = {
-      ...(pair.start.payload || {}),
+      ...prevStart,
       player1: player1Name,
       player2: player2Name,
+      player1Id,
+      player2Id,
       gameType,
       gameInfo,
     };
@@ -266,8 +276,6 @@ export async function registerEventRoutes(app) {
 
     sqlite.updateMatchEvent(pair.start.id, { payload: startPayload });
     sqlite.updateMatchEvent(pair.end.id, { payload: endPayload, createdAt: completedAt || undefined });
-    sqlite.upsertAccountPlayer(account.id, player1Name);
-    sqlite.upsertAccountPlayer(account.id, player2Name);
     return { ok: true };
   });
 
@@ -311,16 +319,17 @@ export async function registerEventRoutes(app) {
   app.patch('/api/stats/players', async (request, reply) => {
     const account = await resolveAccountFromRequest(request);
     if (!account) return reply.code(401).send({ error: 'Unauthorized' });
-    // Display form for event payloads + roster label (trim, max 20, preserve case).
-    // Matching is case-insensitive via namesEqual / sqlite name_normalized keys.
-    const fromName = normalizePlayerDisplayName(request.body?.from);
-    const toName = normalizePlayerDisplayName(request.body?.to);
-    if (!fromName || !toName) {
-      return reply.code(400).send({ error: 'from and to names are required' });
+    const playerId = String(request.body?.id || request.body?.playerId || '').trim();
+    const toName = normalizePlayerDisplayName(request.body?.to || request.body?.name);
+    if (!playerId || !toName) {
+      return reply.code(400).send({ error: 'player id and to name are required' });
     }
-    // Identical display → no-op. Case-only changes still update payloads + roster label.
-    if (fromName === toName) {
-      return { ok: true, updated: 0 };
+    const existing = sqlite.getAccountPlayer(account.id, playerId);
+    if (!existing) {
+      return reply.code(404).send({ error: 'Player not found' });
+    }
+    if (existing.name === toName) {
+      return { ok: true, updated: 0, id: playerId, name: toName };
     }
     const events = sqlite.getAccountSessionEvents(account.id, 10000);
     let updated = 0;
@@ -329,11 +338,13 @@ export async function registerEventRoutes(app) {
       if (ev.account_id !== account.id) continue;
       const payload = { ...(ev.payload || {}) };
       let changed = false;
-      if (namesEqual(payload.player1, fromName)) {
+      if (payload.player1Id === playerId || (!payload.player1Id && namesEqual(payload.player1, existing.name))) {
+        payload.player1Id = playerId;
         payload.player1 = toName;
         changed = true;
       }
-      if (namesEqual(payload.player2, fromName)) {
+      if (payload.player2Id === playerId || (!payload.player2Id && namesEqual(payload.player2, existing.name))) {
+        payload.player2Id = playerId;
         payload.player2 = toName;
         changed = true;
       }
@@ -342,9 +353,8 @@ export async function registerEventRoutes(app) {
         updated += 1;
       }
     }
-    // Roster keys are lowercased inside sqlite; pass display names, not pre-lowercased keys.
-    sqlite.renameAccountPlayerRoster(account.id, fromName, toName);
-    return { ok: true, updated };
+    sqlite.renameAccountPlayerRoster(account.id, playerId, toName);
+    return { ok: true, updated, id: playerId, name: toName };
   });
 
   app.get('/api/streams', async () => {

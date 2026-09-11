@@ -17,7 +17,7 @@ import {
   invalidateAllSessions,
   revokeAllGuestLinks,
   GAME_TYPES,
-} from '../shared/cloud-client.js?v=8.0.0.5';
+} from '../shared/cloud-client.js?v=8.0.0.6';
 import {
   computeDurationSeconds,
   formatDurationSeconds,
@@ -1159,14 +1159,26 @@ function scoreCellHtml(match, options = {}) {
     return '<span class="stats-match-live-label">Live</span>';
   }
   if (options.viewerRelative && options.playerKey) {
-    const key = String(options.playerKey || '').toLowerCase();
-    const isP1 = String(match.player1Name || '').toLowerCase() === key;
+    const slot = matchPlayerSlot(match, options.playerKey);
+    const isP1 = slot === '1';
     const own = isP1 ? (match.scores?.p1 ?? 0) : (match.scores?.p2 ?? 0);
     const opp = isP1 ? (match.scores?.p2 ?? 0) : (match.scores?.p1 ?? 0);
     return scoreStackHtml(own, opp);
   }
   if (!match.scores) return escapeHtml('—');
   return scoreStackHtml(match.scores.p1 ?? 0, match.scores.p2 ?? 0);
+}
+
+/** Prefer UUID identity; fall back to case-insensitive display name. */
+function matchPlayerSlot(match, playerKey) {
+  const key = String(playerKey || '').trim();
+  if (!key || !match) return null;
+  if (match.player1Id && match.player1Id === key) return '1';
+  if (match.player2Id && match.player2Id === key) return '2';
+  const lower = key.toLowerCase();
+  if (String(match.player1Name || '').toLowerCase() === lower) return '1';
+  if (String(match.player2Name || '').toLowerCase() === lower) return '2';
+  return null;
 }
 
 /** Normalize stored winner / scores into a decisive result or draw. */
@@ -1218,14 +1230,14 @@ function isMatchInProgress(match) {
 
 function statsFromMatches(matches) {
   const playerMap = new Map();
-  function touch(name) {
+  function touch(id, name) {
     const display = String(name || '').trim();
-    const key = display.toLowerCase();
+    const key = String(id || '').trim() || display.toLowerCase();
     if (!key) return null;
     if (!playerMap.has(key)) {
       playerMap.set(key, {
         id: key,
-        name: display,
+        name: display || key,
         gamesWon: 0,
         gamesDrawn: 0,
         gamesLost: 0,
@@ -1239,12 +1251,14 @@ function statsFromMatches(matches) {
         fouls: 0,
         lastPlayedAt: null,
       });
+    } else if (display) {
+      playerMap.get(key).name = display;
     }
     return playerMap.get(key);
   }
   for (const match of matches) {
-    const p1 = touch(match.player1Name);
-    const p2 = touch(match.player2Name);
+    const p1 = touch(match.player1Id, match.player1Name);
+    const p2 = touch(match.player2Id, match.player2Name);
     if (!p1 || !p2) continue;
 
     if (match.scores) {
@@ -1450,12 +1464,9 @@ function rackBallCounts(m, rack, rackIndex, timedRacks) {
 function renderMatchRackBreakdown(m, options = {}) {
   const timedRacks = enrichRacksWithDuration(m);
   if (!timedRacks.length) return '';
-  const viewerKey = options.viewerPlayerKey
-    ? String(options.viewerPlayerKey).toLowerCase()
-    : '';
-  const p1Key = String(m.player1Name || '').toLowerCase();
-  const p2Key = String(m.player2Name || '').toLowerCase();
-  const viewerIsP2 = viewerKey && viewerKey === p2Key;
+  const viewerKey = options.viewerPlayerKey || '';
+  const viewerSlot = viewerKey ? matchPlayerSlot(m, viewerKey) : null;
+  const viewerIsP2 = viewerSlot === '2';
   const isSnooker = m.gameType === 'game8';
   const isStraight = m.gameType === 'game4';
   const isPoolRunGame = m.gameType === 'game1' || m.gameType === 'game2' || m.gameType === 'game3' ||
@@ -1670,17 +1681,18 @@ function matchOverviewRow(m) {
 }
 
 function playerMatches(playerKey, options = {}) {
-  const key = String(playerKey || '').toLowerCase();
-  const opponentKey = String(options.opponent || '').toLowerCase();
+  const opponentKey = String(options.opponent || '').trim();
   const gameType = options.gameType || '';
   return recentMatches(statsData || {}).filter((m) => {
-    const isP1 = String(m.player1Name || '').toLowerCase() === key;
-    const isP2 = String(m.player2Name || '').toLowerCase() === key;
-    if (!isP1 && !isP2) return false;
+    const slot = matchPlayerSlot(m, playerKey);
+    if (!slot) return false;
     if (gameType && m.gameType !== gameType) return false;
     if (opponentKey) {
-      const opponent = String(isP1 ? m.player2Name : m.player1Name || '').toLowerCase();
-      if (opponent !== opponentKey) return false;
+      const opponentId = slot === '1' ? m.player2Id : m.player1Id;
+      const opponentName = slot === '1' ? m.player2Name : m.player1Name;
+      if (opponentId && opponentId === opponentKey) return true;
+      if (String(opponentName || '').toLowerCase() === opponentKey.toLowerCase()) return true;
+      return false;
     }
     return true;
   });
@@ -1694,10 +1706,11 @@ function populatePlayerDetailFilters(matches) {
   const opponents = new Map();
   const games = new Set();
   matches.forEach((m) => {
-    const isP1 = String(m.player1Name || '').toLowerCase() === selectedPlayerKey;
-    const opponentName = isP1 ? m.player2Name : m.player1Name;
-    const opponentKey = String(opponentName || '').trim().toLowerCase();
-    if (opponentKey) opponents.set(opponentKey, String(opponentName || '').trim());
+    const slot = matchPlayerSlot(m, selectedPlayerKey);
+    const opponentId = slot === '1' ? m.player2Id : (slot === '2' ? m.player1Id : null);
+    const opponentName = slot === '1' ? m.player2Name : (slot === '2' ? m.player1Name : null);
+    const opponentKey = String(opponentId || opponentName || '').trim();
+    if (opponentKey) opponents.set(opponentKey, String(opponentName || opponentKey).trim());
     if (m.gameType) games.add(m.gameType);
   });
 
@@ -2192,6 +2205,11 @@ function openMatchModal(startEventId) {
   const match = findMatchByStartId(startEventId);
   if (!match || isMatchInProgress(match)) return;
   fillMatchGameTypes();
+  const form = document.getElementById('statsMatchForm');
+  if (form) {
+    form.dataset.player1Id = match.player1Id || '';
+    form.dataset.player2Id = match.player2Id || '';
+  }
   document.getElementById('statsMatchEventId').value = match.startEventId;
   document.getElementById('statsMatchP1').value = match.player1Name || '';
   document.getElementById('statsMatchP2').value = match.player2Name || '';
@@ -2219,6 +2237,7 @@ async function saveMatchModal(event) {
   if (!matchModalHasChanges()) return;
   const startEventId = document.getElementById('statsMatchEventId')?.value;
   if (!startEventId) return;
+  const form = document.getElementById('statsMatchForm');
   const p1 = document.getElementById('statsMatchP1').value.trim();
   const p2 = document.getElementById('statsMatchP2').value.trim();
   const dateVal = document.getElementById('statsMatchDate').value;
@@ -2238,6 +2257,8 @@ async function saveMatchModal(event) {
     await updateAccountMatch(getServerUrl(), getToken(), startEventId, {
       player1Name: p1,
       player2Name: p2,
+      player1Id: form?.dataset.player1Id || undefined,
+      player2Id: form?.dataset.player2Id || undefined,
       gameType,
       gameInfo: document.getElementById('statsMatchGameInfo').value.trim(),
       scores,
@@ -2463,11 +2484,22 @@ function formatPlayerPreview(lastSeenAt) {
   return `Last seen ${local}`;
 }
 
-function openPlayerFromSearch(name) {
-  const trimmed = String(name || '').trim().slice(0, 20);
+function openPlayerFromSearch(playerOrName) {
   const input = document.getElementById('statsPlayerSearch');
-  if (input) input.value = trimmed;
-  selectedPlayerKey = trimmed.toLowerCase();
+  let key = '';
+  let label = '';
+  if (playerOrName && typeof playerOrName === 'object') {
+    key = String(playerOrName.id || '').trim();
+    label = String(playerOrName.name || '').trim().slice(0, 20);
+    if (!key) key = label.toLowerCase();
+  } else {
+    label = String(playerOrName || '').trim().slice(0, 20);
+    const players = statsFromMatches(completedMatches(statsData || {})).players
+      .filter((p) => String(p.name || '').toLowerCase() === label.toLowerCase());
+    key = players.length === 1 ? players[0].id : label.toLowerCase();
+  }
+  if (input) input.value = label;
+  selectedPlayerKey = key;
   playerDetailOpponentFilter = '';
   playerDetailGameFilter = '';
   playerRenameEditing = false;
@@ -2536,7 +2568,7 @@ function initStatsPlayerSearch() {
           + `<span class="autocomplete-preview">${escapeHtml(formatPlayerPreview(player.last_seen_at))}</span>`;
         item.addEventListener('mousedown', (e) => {
           e.preventDefault();
-          openPlayerFromSearch(player.name);
+          openPlayerFromSearch(player);
           hideList();
         });
         list.appendChild(item);
@@ -2580,7 +2612,7 @@ function initStatsPlayerSearch() {
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (activeIndex >= 0 && results[activeIndex]) {
-        openPlayerFromSearch(results[activeIndex].name);
+        openPlayerFromSearch(results[activeIndex]);
         hideList();
       } else if (input.value.trim()) {
         openPlayerFromSearch(input.value.trim());
@@ -2680,8 +2712,8 @@ document.getElementById('statsPlayerRenameForm')?.addEventListener('submit', asy
   };
   try {
     setBusy(true);
-    const result = await renameAccountPlayer(getServerUrl(), getToken(), fromName, toName);
-    selectedPlayerKey = toName.toLowerCase();
+    const result = await renameAccountPlayer(getServerUrl(), getToken(), selectedPlayerKey, toName);
+    selectedPlayerKey = result?.id || selectedPlayerKey;
     playerRenameEditing = false;
     await loadAccountStats(true);
     const updated = Number(result?.updated) || 0;
@@ -2964,9 +2996,6 @@ if (window.location.search.includes('auth=callback') || window.location.hash.inc
   }
 }
 
-initStatsPlayerSearch();
-initMatchPlayerAutocomplete();
-
 function initMatchPlayerAutocomplete() {
   initMatchPlayerAutocompleteForSlot('1', 'statsMatchP1', 'statsMatchP1Autocomplete');
   initMatchPlayerAutocompleteForSlot('2', 'statsMatchP2', 'statsMatchP2Autocomplete');
@@ -2983,10 +3012,19 @@ function truncateMatchPlayerName(name) {
   return String(name || '').trim().slice(0, 20);
 }
 
-function pickMatchPlayerName(slot, name) {
+function pickMatchPlayerName(slot, playerOrName) {
   const input = document.getElementById(slot === '2' ? 'statsMatchP2' : 'statsMatchP1');
+  const form = document.getElementById('statsMatchForm');
   if (!input) return;
+  const name = typeof playerOrName === 'object'
+    ? playerOrName?.name
+    : playerOrName;
+  const id = typeof playerOrName === 'object' ? (playerOrName?.id || '') : '';
   input.value = truncateMatchPlayerName(name);
+  if (form) {
+    if (slot === '2') form.dataset.player2Id = id;
+    else form.dataset.player1Id = id;
+  }
   syncMatchModalPlayerLabels();
   syncMatchModalSaveEnabled();
 }
@@ -3032,7 +3070,7 @@ function initMatchPlayerAutocompleteForSlot(slot, inputId, listId) {
       const exactExists = !!(queryNorm && results.some(
         (p) => normalizeMatchPlayerName(p.name) === queryNorm
       ));
-      createNewName = (!browseAll && query && !exactExists) ? truncateMatchPlayerName(query) : null;
+      createNewName = (!browseAll && query) ? truncateMatchPlayerName(query) : null;
       activeIndex = -1;
       list.innerHTML = '';
       list.classList.toggle('autocomplete-browse', browseAll);
@@ -3049,10 +3087,13 @@ function initMatchPlayerAutocompleteForSlot(slot, inputId, listId) {
       if (createNewName) {
         const createItem = document.createElement('div');
         createItem.className = 'autocomplete-item autocomplete-new';
-        createItem.textContent = `Create new player: "${createNewName}"`;
+        createItem.textContent = exactExists
+          ? `Create another player: "${createNewName}"`
+          : `Create new player: "${createNewName}"`;
         createItem.addEventListener('mousedown', (e) => {
           e.preventDefault();
-          pickMatchPlayerName(slot, createNewName);
+          // Clear id so server creates/binds a new roster row for this name.
+          pickMatchPlayerName(slot, { name: createNewName, id: '' });
           hideList();
         });
         list.appendChild(createItem);
@@ -3062,11 +3103,14 @@ function initMatchPlayerAutocompleteForSlot(slot, inputId, listId) {
         const item = document.createElement('div');
         item.className = 'autocomplete-item';
         item.dataset.index = String(createNewName ? index + 1 : index);
-        item.innerHTML = `<span class="autocomplete-name">${escapeHtml(player.name)}</span>`
+        const disambig = exactExists
+          ? ` · ${String(player.id || '').slice(0, 8)}`
+          : '';
+        item.innerHTML = `<span class="autocomplete-name">${escapeHtml(player.name)}${escapeHtml(disambig)}</span>`
           + `<span class="autocomplete-preview">${escapeHtml(formatPlayerPreview(player.last_seen_at))}</span>`;
         item.addEventListener('mousedown', (e) => {
           e.preventDefault();
-          pickMatchPlayerName(slot, player.name);
+          pickMatchPlayerName(slot, player);
           hideList();
         });
         list.appendChild(item);
@@ -3081,6 +3125,12 @@ function initMatchPlayerAutocompleteForSlot(slot, inputId, listId) {
   };
 
   input.addEventListener('input', () => {
+    // Typing without picking clears bound id until a roster row is selected.
+    const form = document.getElementById('statsMatchForm');
+    if (form) {
+      if (slot === '2') form.dataset.player2Id = '';
+      else form.dataset.player1Id = '';
+    }
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => refresh(), 150);
   });
@@ -3110,10 +3160,10 @@ function initMatchPlayerAutocompleteForSlot(slot, inputId, listId) {
         return;
       }
       if (createNewName && activeIndex === 0) {
-        pickMatchPlayerName(slot, createNewName);
+        pickMatchPlayerName(slot, { name: createNewName, id: '' });
       } else {
         const resultIndex = createNewName ? activeIndex - 1 : activeIndex;
-        if (results[resultIndex]) pickMatchPlayerName(slot, results[resultIndex].name);
+        if (results[resultIndex]) pickMatchPlayerName(slot, results[resultIndex]);
       }
       hideList();
     } else if (e.key === 'Escape') {
@@ -3124,4 +3174,7 @@ function initMatchPlayerAutocompleteForSlot(slot, inputId, listId) {
     if (!input.contains(e.target) && !list.contains(e.target)) hideList();
   });
 }
+
+initStatsPlayerSearch();
+initMatchPlayerAutocomplete();
 renderDashboard();

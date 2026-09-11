@@ -762,13 +762,14 @@ async function run() {
           !!alicePlayer && alicePlayer.fouls === 4,
           alicePlayer ? String(alicePlayer.fouls) : 'missing'
         );
+        assert('Player has stable id', !!alicePlayer?.id && alicePlayer.id !== 'alice');
         const renamed = await fetchJson('/api/stats/players', {
           method: 'PATCH',
           headers: {
             Authorization: `Bearer ${tokenFresh}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ from: 'Alice', to: 'Alicia' }),
+          body: JSON.stringify({ id: alicePlayer.id, to: 'Alicia' }),
         });
         assert('PATCH /api/stats/players', renamed.ok && renamed.body.updated >= 1);
         const caseOnlyRename = await fetchJson('/api/stats/players', {
@@ -777,7 +778,7 @@ async function run() {
             Authorization: `Bearer ${tokenFresh}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ from: 'Alicia', to: 'ALICIA' }),
+          body: JSON.stringify({ id: alicePlayer.id, to: 'ALICIA' }),
         });
         assert(
           'PATCH /api/stats/players case-only',
@@ -788,12 +789,35 @@ async function run() {
           headers: { Authorization: `Bearer ${tokenFresh}` },
         });
         const aliciaPlayer = (statsAfterCase.body.players || []).find(
-          (p) => String(p.name || '').toLowerCase() === 'alicia',
+          (p) => p.id === alicePlayer.id,
         );
         assert(
           'Case-only rename updates roster display',
           !!aliciaPlayer && aliciaPlayer.name === 'ALICIA',
           aliciaPlayer ? aliciaPlayer.name : 'missing',
+        );
+        const dupA = crypto.randomUUID();
+        const dupB = crypto.randomUUID();
+        // Same display name, two ids — allowed in match edit
+        const sameNameEdit = await fetchJson(`/api/stats/matches/${editable.startEventId}`, {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${tokenFresh}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            player1Name: 'John',
+            player2Name: 'John',
+            player1Id: dupA,
+            player2Id: dupB,
+            gameType: 'game1',
+            scores: { p1: 1, p2: 0 },
+          }),
+        });
+        assert(
+          'PATCH allows duplicate display names with distinct ids',
+          sameNameEdit.ok && sameNameEdit.body.ok === true,
+          JSON.stringify(sameNameEdit.body),
         );
         const deleted = await fetchJson(`/api/stats/matches/${editable.startEventId}`, {
           method: 'DELETE',

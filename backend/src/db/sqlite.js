@@ -88,15 +88,17 @@ CREATE TABLE IF NOT EXISTS room_guest_tokens (
 );
 
 CREATE TABLE IF NOT EXISTS account_players (
+  id TEXT PRIMARY KEY,
   account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   name_normalized TEXT NOT NULL,
-  last_seen_at TEXT NOT NULL DEFAULT (datetime('now')),
-  PRIMARY KEY (account_id, name_normalized)
+  last_seen_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_api_keys_account ON api_keys(account_id);
 CREATE INDEX IF NOT EXISTS idx_rooms_account ON rooms(account_id);
+CREATE INDEX IF NOT EXISTS idx_account_players_account ON account_players(account_id);
+CREATE INDEX IF NOT EXISTS idx_account_players_name ON account_players(account_id, name_normalized);
 `;
 
 const MATCH_EVENTS_INDEXES = `
@@ -169,6 +171,33 @@ function ensureMatchEventsAccountScoped(database) {
   `);
 }
 
+/** Dev wipe: name-keyed roster → UUID player rows (duplicate display names allowed). */
+function ensureAccountPlayersUuid(database) {
+  const exists = database.prepare(
+    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='account_players'"
+  ).get();
+  if (!exists) return;
+  const cols = new Set(tableColumns(database, 'account_players'));
+  if (cols.has('id')) return;
+
+  console.warn(
+    '[sqlite] Legacy account_players (name key) — dropping and recreating UUID-keyed table. ' +
+      'Roster cleared; match_events kept (re-sync on next stats load).'
+  );
+  database.exec('DROP TABLE IF EXISTS account_players');
+  database.exec(`
+    CREATE TABLE account_players (
+      id TEXT PRIMARY KEY,
+      account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      name_normalized TEXT NOT NULL,
+      last_seen_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_account_players_account ON account_players(account_id);
+    CREATE INDEX IF NOT EXISTS idx_account_players_name ON account_players(account_id, name_normalized);
+  `);
+}
+
 export function getDb() {
   if (!db) {
     const dir = path.dirname(config.sqlitePath);
@@ -183,6 +212,7 @@ export function getDb() {
     ensureApiKeyColumns(db);
     ensureRoomDockColumns(db);
     ensureMatchEventsAccountScoped(db);
+    ensureAccountPlayersUuid(db);
     db.exec(MATCH_EVENTS_INDEXES);
   }
   return db;
@@ -806,25 +836,73 @@ export function revokeAllGuestTokens(accountId) {
   return result.changes;
 }
 
-/** Remember a player name for account roster / mobile autocomplete. */
-export function upsertAccountPlayer(accountId, name) {
-  if (!accountId) return;
+/**
+ * Upsert a roster player by UUID (preferred) or find/create by display name.
+ * Returns the player id, or null if skipped.
+ */
+export function upsertAccountPlayer(accountId, name, playerId = null) {
+  if (!accountId) return null;
   const display = truncatePlayerName(name);
   const normalized = normalizePlayerName(display);
-  if (!normalized) return;
-  getDb().prepare(
-    `INSERT INTO account_players (account_id, name, name_normalized, last_seen_at)
-     VALUES (?, ?, ?, datetime('now'))
-     ON CONFLICT(account_id, name_normalized) DO UPDATE SET
-       name = excluded.name,
-       last_seen_at = datetime('now')`
-  ).run(accountId, display, normalized);
+  if (!normalized) return null;
+  const database = getDb();
+
+  if (playerId) {
+    const existing = database.prepare(
+      'SELECT id, account_id FROM account_players WHERE id = ?'
+    ).get(playerId);
+    if (existing && existing.account_id !== accountId) {
+      return null;
+    }
+    database.prepare(
+      `INSERT INTO account_players (id, account_id, name, name_normalized, last_seen_at)
+       VALUES (?, ?, ?, ?, datetime('now'))
+       ON CONFLICT(id) DO UPDATE SET
+         name = excluded.name,
+         name_normalized = excluded.name_normalized,
+         last_seen_at = datetime('now')`
+    ).run(playerId, accountId, display, normalized);
+    return playerId;
+  }
+
+  const byName = database.prepare(
+    `SELECT id FROM account_players
+     WHERE account_id = ? AND name_normalized = ?
+     ORDER BY last_seen_at DESC
+     LIMIT 1`
+  ).get(accountId, normalized);
+  if (byName?.id) {
+    database.prepare(
+      `UPDATE account_players
+       SET name = ?, last_seen_at = datetime('now')
+       WHERE id = ?`
+    ).run(display, byName.id);
+    return byName.id;
+  }
+
+  const id = uuidv4();
+  database.prepare(
+    `INSERT INTO account_players (id, account_id, name, name_normalized, last_seen_at)
+     VALUES (?, ?, ?, ?, datetime('now'))`
+  ).run(id, accountId, display, normalized);
+  return id;
+}
+
+export function getAccountPlayer(accountId, playerId) {
+  if (!accountId || !playerId) return null;
+  return getDb().prepare(
+    'SELECT id, account_id, name, name_normalized, last_seen_at FROM account_players WHERE id = ? AND account_id = ?'
+  ).get(playerId, accountId) || null;
 }
 
 export function upsertAccountPlayersFromState(accountId, state) {
   if (!accountId || !state || typeof state !== 'object') return;
-  if (state.player1Name) upsertAccountPlayer(accountId, state.player1Name);
-  if (state.player2Name) upsertAccountPlayer(accountId, state.player2Name);
+  if (state.player1Name) {
+    upsertAccountPlayer(accountId, state.player1Name, state.player1Id || null);
+  }
+  if (state.player2Name) {
+    upsertAccountPlayer(accountId, state.player2Name, state.player2Id || null);
+  }
 }
 
 /** Seed roster from saved room session state when table is still empty. */
@@ -846,7 +924,7 @@ export function searchAccountPlayers(accountId, query, limit = 8) {
   const normalized = normalizePlayerName(query);
   if (!normalized) {
     return getDb().prepare(
-      `SELECT name, last_seen_at FROM account_players
+      `SELECT id, name, last_seen_at FROM account_players
        WHERE account_id = ?
        ORDER BY last_seen_at DESC, name COLLATE NOCASE ASC
        LIMIT ?`
@@ -854,7 +932,7 @@ export function searchAccountPlayers(accountId, query, limit = 8) {
   }
   const like = `%${normalized}%`;
   return getDb().prepare(
-    `SELECT name, last_seen_at FROM account_players
+    `SELECT id, name, last_seen_at FROM account_players
      WHERE account_id = ? AND (name_normalized LIKE ? OR LOWER(name) LIKE ?)
      ORDER BY
        CASE WHEN name_normalized = ? THEN 0 WHEN name_normalized LIKE ? THEN 1 ELSE 2 END,
@@ -864,11 +942,12 @@ export function searchAccountPlayers(accountId, query, limit = 8) {
   ).all(accountId, like, like, normalized, `${normalized}%`, max);
 }
 
-/** Pull player names from recorded session:start events into the roster. */
+/** Pull player ids/names from recorded session:start events into the roster.
+ *  Assigns UUIDs to name-only payloads (dev greenfield / older fixtures). */
 export function syncAccountPlayersFromMatchEvents(accountId) {
   if (!accountId) return;
   const rows = getDb().prepare(
-    `SELECT e.payload
+    `SELECT e.id, e.payload
      FROM match_events e
      WHERE e.account_id = ?
        AND e.event_type = 'session:start'`
@@ -880,20 +959,39 @@ export function syncAccountPlayersFromMatchEvents(accountId) {
     } catch {
       payload = {};
     }
-    if (payload.player1) upsertAccountPlayer(accountId, payload.player1);
-    if (payload.player2) upsertAccountPlayer(accountId, payload.player2);
+    let changed = false;
+    if (payload.player1) {
+      const id = upsertAccountPlayer(accountId, payload.player1, payload.player1Id || null);
+      if (id && payload.player1Id !== id) {
+        payload.player1Id = id;
+        changed = true;
+      }
+    }
+    if (payload.player2) {
+      const id = upsertAccountPlayer(accountId, payload.player2, payload.player2Id || null);
+      if (id && payload.player2Id !== id) {
+        payload.player2Id = id;
+        changed = true;
+      }
+    }
+    if (changed) {
+      getDb().prepare(
+        `UPDATE match_events SET payload = ? WHERE id = ? AND account_id = ?`
+      ).run(JSON.stringify(payload), row.id, accountId);
+    }
   }
 }
 
-/** Rename a roster entry (and drop the old key). Match event payloads are updated separately. */
-export function renameAccountPlayerRoster(accountId, fromName, toName) {
-  if (!accountId) return;
-  const fromNorm = normalizePlayerName(fromName);
+/** Update roster display name for a player UUID. Match payloads are updated separately. */
+export function renameAccountPlayerRoster(accountId, playerId, toName) {
+  if (!accountId || !playerId) return false;
   const toDisplay = truncatePlayerName(toName);
   const toNorm = normalizePlayerName(toDisplay);
-  if (!fromNorm || !toNorm) return;
-  getDb().prepare(
-    'DELETE FROM account_players WHERE account_id = ? AND name_normalized = ?'
-  ).run(accountId, fromNorm);
-  upsertAccountPlayer(accountId, toDisplay);
+  if (!toNorm) return false;
+  const result = getDb().prepare(
+    `UPDATE account_players
+     SET name = ?, name_normalized = ?, last_seen_at = datetime('now')
+     WHERE id = ? AND account_id = ?`
+  ).run(toDisplay, toNorm, playerId, accountId);
+  return result.changes > 0;
 }
