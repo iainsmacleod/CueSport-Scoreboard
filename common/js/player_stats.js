@@ -262,6 +262,42 @@
             window.cloudRelay.isEnabled());
     }
 
+    /** While Cloud is connected, do not dual-write career stats into IndexedDB. */
+    function skipLocalCareerWrites() {
+        return isCloudStatsMode();
+    }
+
+    function cloudPermissions() {
+        return (window.cloudRelay && typeof window.cloudRelay.getPermissions === 'function')
+            ? window.cloudRelay.getPermissions()
+            : null;
+    }
+
+    function cloudCanManagePlayers() {
+        if (!isCloudStatsMode()) {
+            return true;
+        }
+        const perms = cloudPermissions();
+        return !!(perms && perms.canManagePlayers);
+    }
+
+    function cloudCanMutateMatch(match) {
+        if (!isCloudStatsMode() || !match || !match._cloud) {
+            return true;
+        }
+        const perms = cloudPermissions();
+        if (!perms) {
+            return false;
+        }
+        if (perms.canEditAnyMatch) {
+            return true;
+        }
+        if (!perms.canEditOwnMatch) {
+            return false;
+        }
+        return String(match.api_key_id || '') === String(perms.keyId || '');
+    }
+
     let cloudStatsCache = null;
     let cloudStatsCacheTs = 0;
     const CLOUD_STATS_CACHE_TTL = 30000;
@@ -619,6 +655,41 @@
             cloudPlayerKey(match.player2Name) === keyLower;
     }
 
+    function shapeCloudRosterPlayer(p) {
+        if (!p) return null;
+        const name = p.name || '';
+        const id = String(p.id || '').trim() || cloudPlayerKey(name);
+        return {
+            id: id,
+            name: name,
+            nameNormalized: normalizeName(name),
+            lastPlayedAt: p.lastPlayedAt || null,
+            stats: typeof createEmptyStats === 'function' ? createEmptyStats() : { byGameType: {} },
+            _cloud: true
+        };
+    }
+
+    async function getCloudRosterPlayers() {
+        const data = await fetchCloudStats();
+        return (data.players || []).map(shapeCloudRosterPlayer).filter(Boolean);
+    }
+
+    async function findCloudRosterPlayer(nameOrId) {
+        const raw = String(nameOrId || '').trim();
+        if (!raw) return null;
+        const all = await getCloudRosterPlayers();
+        const key = cloudPlayerKey(raw);
+        const byId = all.find(function (p) {
+            return String(p.id) === raw || cloudPlayerKey(p.id) === key;
+        });
+        if (byId) return byId;
+        const byName = all.find(function (p) {
+            return (p.nameNormalized || normalizeName(p.name)) === normalizeName(raw) ||
+                cloudPlayerKey(p.name) === key;
+        });
+        return byName || null;
+    }
+
     function adaptCloudRacks(m) {
         const p1 = String(m.player1Id || '').trim() || cloudPlayerKey(m.player1Name);
         const p2 = String(m.player2Id || '').trim() || cloudPlayerKey(m.player2Name);
@@ -704,6 +775,7 @@
             winnerId: m.winnerSlot === '1'
                 ? p1Id
                 : (m.winnerSlot === '2' ? p2Id : null),
+            api_key_id: m.api_key_id || m.apiKeyId || null,
             _cloud: true
         };
     }
@@ -770,17 +842,25 @@
         };
     }
 
-    function buildCloudHeadToHead(playerId1, playerId2, cloudData) {
+    function buildCloudHeadToHead(playerId1, playerId2, cloudData, options) {
         const id1 = cloudPlayerKey(playerId1);
         const id2 = cloudPlayerKey(playerId2);
         if (!id1 || !id2 || id1 === id2) return null;
+        const opts = options || {};
+        const gameTypeFilter = opts.gameType || null;
         const players = cloudData.players || [];
         const p1 = players.find(function (p) { return cloudPlayerKey(p.id || p.name) === id1; });
         const p2 = players.find(function (p) { return cloudPlayerKey(p.id || p.name) === id2; });
         if (!p1 || !p2) return null;
+        const p1Matches = (cloudData.matches || []).filter(function (m) {
+            return m && m.status === 'completed' && cloudMatchInvolvesPlayer(m, playerId1);
+        });
+        const p2Matches = (cloudData.matches || []).filter(function (m) {
+            return m && m.status === 'completed' && cloudMatchInvolvesPlayer(m, playerId2);
+        });
         const summary = {
-            player1: { id: id1, name: p1.name },
-            player2: { id: id2, name: p2.name },
+            player1: buildCloudPlayerDetailShape(p1, p1Matches),
+            player2: buildCloudPlayerDetailShape(p2, p2Matches),
             gamesWon: { [id1]: 0, [id2]: 0 },
             racksWon: { [id1]: 0, [id2]: 0 },
             ballsWon: { [id1]: 0, [id2]: 0 },
@@ -789,7 +869,7 @@
             fouls: { [id1]: 0, [id2]: 0 },
             matches: [],
             lastPlayedAt: null,
-            gameType: null
+            gameType: gameTypeFilter
         };
         (cloudData.matches || []).forEach(function (raw) {
             if (!raw || raw.status !== 'completed') return;
@@ -797,24 +877,29 @@
                 return;
             }
             const m = adaptCloudMatchForUi(raw);
+            if (gameTypeFilter && m.gameType !== gameTypeFilter) {
+                return;
+            }
             summary.matches.push(m);
+            const m1Key = (cloudPlayerKey(m.player1Id) === id1 || cloudPlayerKey(m.player1Name) === id1) ? id1 : id2;
+            const m2Key = m1Key === id1 ? id2 : id1;
             if (m.winnerSlot === '1') {
-                summary.gamesWon[m.player1Id] = (summary.gamesWon[m.player1Id] || 0) + 1;
+                summary.gamesWon[m1Key] = (summary.gamesWon[m1Key] || 0) + 1;
             } else if (m.winnerSlot === '2') {
-                summary.gamesWon[m.player2Id] = (summary.gamesWon[m.player2Id] || 0) + 1;
+                summary.gamesWon[m2Key] = (summary.gamesWon[m2Key] || 0) + 1;
             }
             if (m.gameType !== 'game4') {
-                summary.racksWon[m.player1Id] = (summary.racksWon[m.player1Id] || 0) + (m.finalScore.p1 || 0);
-                summary.racksWon[m.player2Id] = (summary.racksWon[m.player2Id] || 0) + (m.finalScore.p2 || 0);
+                summary.racksWon[m1Key] = (summary.racksWon[m1Key] || 0) + (m.finalScore.p1 || 0);
+                summary.racksWon[m2Key] = (summary.racksWon[m2Key] || 0) + (m.finalScore.p2 || 0);
             }
-            summary.ballsWon[m.player1Id] = (summary.ballsWon[m.player1Id] || 0) + m.ballsP1;
-            summary.ballsWon[m.player2Id] = (summary.ballsWon[m.player2Id] || 0) + m.ballsP2;
-            summary.fouls[m.player1Id] = (summary.fouls[m.player1Id] || 0) + m.foulsP1;
-            summary.fouls[m.player2Id] = (summary.fouls[m.player2Id] || 0) + m.foulsP2;
-            summary.highestBreak[m.player1Id] = Math.max(summary.highestBreak[m.player1Id] || 0, m.highestBreakP1);
-            summary.highestBreak[m.player2Id] = Math.max(summary.highestBreak[m.player2Id] || 0, m.highestBreakP2);
-            summary.highestRun[m.player1Id] = Math.max(summary.highestRun[m.player1Id] || 0, m.highestRunP1);
-            summary.highestRun[m.player2Id] = Math.max(summary.highestRun[m.player2Id] || 0, m.highestRunP2);
+            summary.ballsWon[m1Key] = (summary.ballsWon[m1Key] || 0) + m.ballsP1;
+            summary.ballsWon[m2Key] = (summary.ballsWon[m2Key] || 0) + m.ballsP2;
+            summary.fouls[m1Key] = (summary.fouls[m1Key] || 0) + m.foulsP1;
+            summary.fouls[m2Key] = (summary.fouls[m2Key] || 0) + m.foulsP2;
+            summary.highestBreak[m1Key] = Math.max(summary.highestBreak[m1Key] || 0, m.highestBreakP1);
+            summary.highestBreak[m2Key] = Math.max(summary.highestBreak[m2Key] || 0, m.highestBreakP2);
+            summary.highestRun[m1Key] = Math.max(summary.highestRun[m1Key] || 0, m.highestRunP1);
+            summary.highestRun[m2Key] = Math.max(summary.highestRun[m2Key] || 0, m.highestRunP2);
             const played = m.completedAt || m.startedAt;
             if (played && (!summary.lastPlayedAt || played > summary.lastPlayedAt)) {
                 summary.lastPlayedAt = played;
@@ -1901,6 +1986,9 @@
     }
 
     async function putPlayer(player) {
+        if (skipLocalCareerWrites()) {
+            return player;
+        }
         await openDatabase();
         const store = tx(['players'], 'readwrite').objectStore('players');
         return promisifyRequest(store.put(player));
@@ -1913,6 +2001,9 @@
     }
 
     async function putMatch(match) {
+        if (skipLocalCareerWrites()) {
+            return match;
+        }
         await openDatabase();
         const store = tx(['matches'], 'readwrite').objectStore('matches');
         return promisifyRequest(store.put(match));
@@ -1968,6 +2059,13 @@
         if (!normalized) {
             return null;
         }
+        if (skipLocalCareerWrites()) {
+            const cloud = await findCloudRosterPlayer(displayName);
+            if (cloud) {
+                return cloud;
+            }
+            return createPlayer(displayName);
+        }
         let player = await findPlayerByNormalizedName(normalized);
         if (player) {
             return player;
@@ -1976,8 +2074,10 @@
     }
 
     async function searchPlayers(query, limit) {
+        const all = skipLocalCareerWrites()
+            ? await getCloudRosterPlayers()
+            : await getAllPlayers();
         const normalizedQuery = normalizeName(query);
-        const all = await getAllPlayers();
         const maxResults = typeof limit === 'number' ? limit : 8;
         if (!normalizedQuery) {
             return all
@@ -2055,16 +2155,38 @@
         if (!normalized) {
             return null;
         }
+        if (skipLocalCareerWrites()) {
+            return findCloudRosterPlayer(name);
+        }
         return findPlayerByNormalizedName(normalized);
     }
 
     async function resolvePlayerForSlot(slot, name, createIfMissing) {
         const existingId = getPlayerIdFromInput(slot);
         if (existingId) {
-            const player = await getPlayer(existingId);
-            // Bound id is only valid while the typed name still matches that player
-            if (player && normalizeName(player.name) === normalizeName(truncateName(name))) {
-                return player;
+            if (skipLocalCareerWrites()) {
+                const cloud = await findCloudRosterPlayer(existingId);
+                if (cloud && normalizeName(cloud.name) === normalizeName(truncateName(name))) {
+                    return cloud;
+                }
+                const sessionId = slot === '1' ? activeMatchSession.player1Id : activeMatchSession.player2Id;
+                const sessionName = slot === '1' ? activeMatchSession.player1Name : activeMatchSession.player2Name;
+                if (sessionId === existingId && sessionName &&
+                    normalizeName(sessionName) === normalizeName(truncateName(name))) {
+                    return {
+                        id: existingId,
+                        name: truncateName(name),
+                        nameNormalized: normalizeName(name),
+                        stats: createEmptyStats(),
+                        _cloud: true
+                    };
+                }
+            } else {
+                const player = await getPlayer(existingId);
+                // Bound id is only valid while the typed name still matches that player
+                if (player && normalizeName(player.name) === normalizeName(truncateName(name))) {
+                    return player;
+                }
             }
         }
         const found = await lookupPlayer(name);
@@ -4568,9 +4690,16 @@
         }
         let id = getPlayerIdFromInput(slot);
         if (id) {
-            const player = await getPlayer(id);
-            if (player && normalizeName(player.name) === normalizeName(name)) {
-                return player.id;
+            if (skipLocalCareerWrites()) {
+                const cloud = await findCloudRosterPlayer(id);
+                if (cloud && normalizeName(cloud.name) === normalizeName(name)) {
+                    return cloud.id;
+                }
+            } else {
+                const player = await getPlayer(id);
+                if (player && normalizeName(player.name) === normalizeName(name)) {
+                    return player.id;
+                }
             }
         }
         const sessionId = slot === '1' ? activeMatchSession.player1Id : activeMatchSession.player2Id;
@@ -4583,6 +4712,9 @@
     }
 
     async function buildPlayerOverlayPayload(slot) {
+        if (isCloudStatsMode()) {
+            return buildCloudPlayerOverlayPayload(slot);
+        }
         const mode = slot === '1' ? 'p1' : 'p2';
         const inputId = slot === '1' ? 'p1Name' : 'p2Name';
         const name = truncateName(document.getElementById(inputId)?.value || '');
@@ -4618,6 +4750,71 @@
         const matches = (await getMatchesForPlayer(playerId)).filter(function (m) {
             return m.gameType === gameType;
         });
+        return finishPlayerOverlayPayload(slot, mode, visible, gameType, player.name, playerId, typeStats, matches);
+    }
+
+    async function buildCloudPlayerOverlayPayload(slot) {
+        const mode = slot === '1' ? 'p1' : 'p2';
+        const inputId = slot === '1' ? 'p1Name' : 'p2Name';
+        const name = truncateName(document.getElementById(inputId)?.value || '');
+        const visible = getOverlayStatsMode() === mode;
+        const gameType = getActiveGameType();
+        if (!name) {
+            return { visible: visible, mode: mode, title: 'Player ' + slot, emptyMessage: 'First tracked game' };
+        }
+        const data = await fetchCloudStats();
+        const boundId = getPlayerIdFromInput(slot);
+        const cloudPlayer = (data.players || []).find(function (p) {
+            return cloudPlayerKey(p.name) === cloudPlayerKey(name) ||
+                String(p.id || '') === String(boundId || '') ||
+                cloudPlayerKey(p.id) === cloudPlayerKey(name);
+        });
+        const playerId = cloudPlayer
+            ? (String(cloudPlayer.id || '').trim() || cloudPlayerKey(cloudPlayer.name))
+            : (boundId || null);
+        if (!cloudPlayer) {
+            const liveEmpty = readLiveCurrentBreakForSlot(slot) <= 0 &&
+                readLivePossibleBreakForSlot(slot) <= 0 &&
+                readMatchScopedStatsForSlot(slot).ballsPotted <= 0 &&
+                readMatchScopedStatsForSlot(slot).highestBreak <= 0 &&
+                readMatchScopedStatsForSlot(slot).highestRun <= 0 &&
+                readMatchScopedStatsForSlot(slot).fouls <= 0;
+            if (liveEmpty) {
+                return {
+                    visible: visible,
+                    mode: mode,
+                    title: name,
+                    emptyMessage: 'First tracked ' + (GAME_TYPE_LABELS[gameType] || 'game')
+                };
+            }
+            return finishPlayerOverlayPayload(slot, mode, visible, gameType, name, playerId || name, createEmptyTypeStats(), []);
+        }
+        const rawMatches = (data.matches || []).filter(function (m) {
+            return m && m.status === 'completed' && cloudMatchInvolvesPlayer(m, playerId);
+        });
+        const player = buildCloudPlayerDetailShape(cloudPlayer, rawMatches);
+        const typeStats = readTypeStats(player, gameType);
+        if (!typeStatsHaveActivity(typeStats) &&
+            readLiveCurrentBreakForSlot(slot) <= 0 &&
+            readLivePossibleBreakForSlot(slot) <= 0 &&
+            readMatchScopedStatsForSlot(slot).ballsPotted <= 0 &&
+            readMatchScopedStatsForSlot(slot).highestBreak <= 0 &&
+            readMatchScopedStatsForSlot(slot).highestRun <= 0 &&
+            readMatchScopedStatsForSlot(slot).fouls <= 0) {
+            return {
+                visible: visible,
+                mode: mode,
+                title: player.name,
+                emptyMessage: 'First tracked ' + (GAME_TYPE_LABELS[gameType] || 'game')
+            };
+        }
+        const matches = rawMatches.map(adaptCloudMatchForUi).filter(function (m) {
+            return m && m.gameType === gameType;
+        });
+        return finishPlayerOverlayPayload(slot, mode, visible, gameType, player.name, player.id, typeStats, matches);
+    }
+
+    function finishPlayerOverlayPayload(slot, mode, visible, gameType, title, playerId, typeStats, matches) {
         const matchStats = readMatchScopedStatsForSlot(slot);
         const currentBreak = readLiveCurrentBreakForSlot(slot);
         const possibleBreak = readLivePossibleBreakForSlot(slot);
@@ -4625,7 +4822,7 @@
         return {
             visible: visible,
             mode: mode,
-            title: player.name,
+            title: title,
             gameType: gameType,
             gameTypeLabel: GAME_TYPE_LABELS[gameType] || gameType,
             // Matches / racks won are H2H-only on the browser overlay.
@@ -4673,6 +4870,13 @@
         };
     }
 
+    function h2hMapValue(map, playerId) {
+        if (!map || !playerId) return 0;
+        if (map[playerId] != null) return map[playerId] || 0;
+        const key = cloudPlayerKey(playerId);
+        return map[key] != null ? (map[key] || 0) : 0;
+    }
+
     async function buildH2HOverlayPayload() {
         const visible = getOverlayStatsMode() === 'h2h';
         const p1Name = truncateName(document.getElementById('p1Name')?.value || '');
@@ -4690,11 +4894,15 @@
             return { visible: visible, mode: 'h2h', title: 'Head to Head', emptyMessage: 'First match-up' };
         }
 
-        const h2h = await getHeadToHead(p1Id, p2Id, { gameType: gameType });
+        const h2h = isCloudStatsMode()
+            ? buildCloudHeadToHead(p1Id, p2Id, await fetchCloudStats(), { gameType: gameType })
+            : await getHeadToHead(p1Id, p2Id, { gameType: gameType });
         if (!h2h) {
             return { visible: visible, mode: 'h2h', title: 'Head to Head', emptyMessage: 'First match-up' };
         }
-        if (!h2hSummaryHasDisplayableActivity(h2h, p1Id, p2Id)) {
+        const lookupId1 = h2h.player1 && h2h.player1.id ? h2h.player1.id : p1Id;
+        const lookupId2 = h2h.player2 && h2h.player2.id ? h2h.player2.id : p2Id;
+        if (!h2hSummaryHasDisplayableActivity(h2h, lookupId1, lookupId2)) {
             return {
                 visible: visible,
                 mode: 'h2h',
@@ -4724,20 +4932,20 @@
             racksLabel: rackOrFrameLabel(true, gameType),
             p1Name: h2h.player1.name,
             p2Name: h2h.player2.name,
-            p1Games: h2h.gamesWon[p1Id] || 0,
-            p2Games: h2h.gamesWon[p2Id] || 0,
-            p1Racks: h2h.racksWon[p1Id] || 0,
-            p2Racks: h2h.racksWon[p2Id] || 0,
-            p1Balls: h2h.ballsWon[p1Id] || 0,
-            p2Balls: h2h.ballsWon[p2Id] || 0,
-            p1Fouls: (h2h.fouls && h2h.fouls[p1Id]) || 0,
-            p2Fouls: (h2h.fouls && h2h.fouls[p2Id]) || 0,
+            p1Games: h2hMapValue(h2h.gamesWon, lookupId1),
+            p2Games: h2hMapValue(h2h.gamesWon, lookupId2),
+            p1Racks: h2hMapValue(h2h.racksWon, lookupId1),
+            p2Racks: h2hMapValue(h2h.racksWon, lookupId2),
+            p1Balls: h2hMapValue(h2h.ballsWon, lookupId1),
+            p2Balls: h2hMapValue(h2h.ballsWon, lookupId2),
+            p1Fouls: h2hMapValue(h2h.fouls, lookupId1),
+            p2Fouls: h2hMapValue(h2h.fouls, lookupId2),
             p1HighestBreak: isStraightPoolGameType(gameType)
-                ? (h2h.highestRun[p1Id] || 0)
-                : (h2h.highestBreak[p1Id] || 0),
+                ? h2hMapValue(h2h.highestRun, lookupId1)
+                : h2hMapValue(h2h.highestBreak, lookupId1),
             p2HighestBreak: isStraightPoolGameType(gameType)
-                ? (h2h.highestRun[p2Id] || 0)
-                : (h2h.highestBreak[p2Id] || 0),
+                ? h2hMapValue(h2h.highestRun, lookupId2)
+                : h2hMapValue(h2h.highestBreak, lookupId2),
             p1BreakAndRuns: p1TypeStats.breakAndRuns || 0,
             p2BreakAndRuns: p2TypeStats.breakAndRuns || 0,
             p1TableRuns: p1TypeStats.tableRuns || 0,
@@ -5945,19 +6153,21 @@
         if (racksToggle) {
             actions.push(racksToggle);
         }
-        actions.push(statsActionButton({
-            attrs: 'onclick="openMatchEditModal(\'' + String(matchId).replace(/'/g, "\\'") + '\')"',
-            icon: 'edit',
-            label: 'Edit',
-            title: 'Edit match'
-        }));
-        actions.push(statsActionButton({
-            className: 'stats-delete-btn',
-            attrs: 'onclick="confirmDeleteMatch(\'' + String(matchId).replace(/'/g, "\\'") + '\')"',
-            icon: 'clear',
-            label: 'Del',
-            title: 'Delete match'
-        }));
+        if (cloudCanMutateMatch(match)) {
+            actions.push(statsActionButton({
+                attrs: 'onclick="openMatchEditModal(\'' + String(matchId).replace(/'/g, "\\'") + '\')"',
+                icon: 'edit',
+                label: 'Edit',
+                title: 'Edit match'
+            }));
+            actions.push(statsActionButton({
+                className: 'stats-delete-btn',
+                attrs: 'onclick="confirmDeleteMatch(\'' + String(matchId).replace(/'/g, "\\'") + '\')"',
+                icon: 'clear',
+                label: 'Del',
+                title: 'Delete match'
+            }));
+        }
         return '<td class="stats-match-actions">' + actions.join('') + '</td>';
     }
 
@@ -6061,6 +6271,10 @@
             findCloudMatchById(matchId).then(function (match) {
                 if (!match) {
                     alert('Match not found.');
+                    return;
+                }
+                if (!cloudCanMutateMatch(match)) {
+                    alert('This dock key cannot edit that match.');
                     return;
                 }
                 populateCloudMatchEditForm(match);
@@ -6526,6 +6740,11 @@
             return;
         }
         if (isCloudStatsMode()) {
+            const match = await findCloudMatchById(matchId);
+            if (!cloudCanMutateMatch(match)) {
+                alert('This dock key cannot delete that match.');
+                return;
+            }
             if (!confirm('Delete this match from cloud stats? This cannot be undone.')) {
                 return;
             }
@@ -6611,6 +6830,10 @@
     async function openPlayerRenameModal() {
         if (!statsModalSelectedPlayerId) {
             alert('Select a player from the leaderboard first.');
+            return;
+        }
+        if (isCloudStatsMode() && !cloudCanManagePlayers()) {
+            alert('This dock key cannot rename players.');
             return;
         }
         let playerName = '';
@@ -6737,6 +6960,10 @@
             return;
         }
         const isCloud = isCloudStatsMode();
+        if (isCloud && !cloudCanManagePlayers()) {
+            alert('This dock key cannot delete players.');
+            return;
+        }
         let playerName = statsModalSelectedPlayerId;
         let matchCount = 0;
         if (isCloud) {
@@ -7340,14 +7567,19 @@
             }).join('');
 
         const matchRows = renderMatchHistoryRows(uiMatches, { viewerPlayerId: key, colspan: 5 });
+        const canManagePlayers = cloudCanManagePlayers();
+        const playerActions = canManagePlayers
+            ? ('<div class="hover obs28 button stats-edit-btn" onclick="promptRenamePlayer()">Edit Name</div>' +
+                '<div class="hover obs28 button stats-edit-btn stats-danger-btn" onclick="confirmDeletePlayer()">Delete Player</div>')
+            : '';
 
         detailPanel.innerHTML =
             '<div class="stats-player-header">' +
             '<h3>' + escapeHtml(player.name) + '</h3>' +
-            '<div class="stats-player-header-actions">' +
-            '<div class="hover obs28 button stats-edit-btn" onclick="promptRenamePlayer()">Edit Name</div>' +
-            '<div class="hover obs28 button stats-edit-btn stats-danger-btn" onclick="confirmDeletePlayer()">Delete Player</div>' +
-            '</div></div>' +
+            (playerActions
+                ? ('<div class="stats-player-header-actions">' + playerActions + '</div>')
+                : '') +
+            '</div>' +
             '<div class="stats-section">' + renderPlayerSummaryCards(player, winStreak) + '</div>' +
             '<div class="stats-section stats-opponent-row">' +
             '<label>Opponent:' +
@@ -7645,6 +7877,7 @@
         isStatVisible: isStatVisible,
         readStatsVisibilityGameType: readStatsVisibilityGameType,
         isCloudStatsMode: isCloudStatsMode,
+        skipLocalCareerWrites: skipLocalCareerWrites,
         invalidateCloudStatsCache: invalidateCloudStatsCache
     };
 
@@ -7703,8 +7936,16 @@
         if (banner) updateStatsCloudBanner();
         var cta = document.getElementById('cloudStatsCtaRow');
         if (cta) cta.style.display = cloud ? '' : 'none';
+        if (typeof broadcastOverlayStatsIfEnabled === 'function') {
+            broadcastOverlayStatsIfEnabled();
+        }
+    }
+    function onCloudRoleChange() {
+        invalidateCloudStatsCache();
+        refreshStatsUI();
     }
     window.addEventListener('cloudRelayStateChange', onCloudStateChange);
+    window.addEventListener('cloudRelayRoleChange', onCloudRoleChange);
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', updateStatsTabAvailability);
     } else {

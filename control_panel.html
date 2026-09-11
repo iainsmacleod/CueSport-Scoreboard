@@ -15,13 +15,14 @@ for more information about Salotto please visit https://salotto.app
 <html>
 
 <head>
+    <meta charset="UTF-8" />
     <link rel="stylesheet" href="./common/css/control_panel/dark.css?v=8.0.0" />
     <link rel="stylesheet" href="./common/css/control_panel/yami.css?v=8.0.0" />
     <link rel="stylesheet" href="./common/css/control_panel/acri.css?v=8.0.0" />
     <link rel="stylesheet" href="./common/css/control_panel/grey.css?v=8.0.0" />
     <link rel="stylesheet" href="./common/css/control_panel/light.css?v=8.0.0" />
     <link rel="stylesheet" href="./common/css/control_panel/rachni.css?v=8.0.0" />
-    <link rel="stylesheet" href="./common/css/control_panel/required.css?v=8.0.0.38" />
+    <link rel="stylesheet" href="./common/css/control_panel/required.css?v=8.0.0.42" />
     <script>
         //---------------------------------------------------------------------------------------------
         var versionNum = "8.1.0";
@@ -31,12 +32,13 @@ for more information about Salotto please visit https://salotto.app
     <script src="./common/js/jquery.js?v=8.0.0"></script>
     <script src="./common/js/scoreboard_helpers.js?v=8.0.0"></script>
     <script src="./common/js/match_racks.js?v=8.0.0"></script>
-    <script src="./common/js/cloud_relay.js?v=8.0.0.12"></script>
+    <script src="./common/js/cloud_relay.js?v=8.0.0.14"></script>
     <script src="./common/js/stream_sharing.js?v=8.0.0.3"></script>
-    <script src="./common/js/player_stats.js?v=8.1.0"></script>
-    <script src="./common/js/control_panel.js?v=8.0.0.41"></script>
+    <script src="./common/js/player_stats.js?v=8.1.0.3"></script>
+    <script src="./common/js/control_panel.js?v=8.0.0.44"></script>
     <script src="./common/js/cloud_commands.js?v=8.0.0.7"></script>
     <script src="./common/js/cloud_auth.js?v=8.0.0.1"></script>
+    <script src="./common/js/cloud_remote.js?v=8.1.0.5"></script>
     <script src="hotkeys.js?v=8.0.0"></script>
 
     <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
@@ -66,6 +68,7 @@ for more information about Salotto please visit https://salotto.app
             <button id="controlsTab" class="tablinks" onclick="openTab(event, 'Controls')">Controls</button>
             <button id="imagesTab" class="tablinks" onclick="openTab(event, 'Images')">Images</button>
             <button id="statsTab" class="tablinks" onclick="openTab(event, 'StatsSettings')">Stats</button>
+            <button id="remoteTab" class="tablinks tablinks-disabled" onclick="openTab(event, 'RemoteSettings')" aria-disabled="true" title="Connect CueSport Scoreboard Cloud in Settings to use Remote">Remote</button>
             <button id="generalSettingsTab" class="tablinks" onclick="openTab(event, 'GeneralSettings')">Settings</button>
         </div>
         <!-- Player/Team/Game Information Tab -->
@@ -206,7 +209,7 @@ for more information about Salotto please visit https://salotto.app
         <div id="Controls" class="tabcontent">
             <div id="playerTrackingBlock">
             <!-- Player Tracking and Ball Scoring -->
-            <div class="section-header" id="playerToggleLabel">Player Tracking and Ball Scoring</div>
+            <div class="section-header" id="playerToggleLabel">Player Tracking and Ball Scoring - 8-Ball</div>
             <div class="column" id="playerToggle">
                 <div id="playerSlotPicker" class="rack-breaker-picker">
                     <span class="rack-breaker-question" id="playerSlotQuestion">Active Player</span>
@@ -589,6 +592,33 @@ for more information about Salotto please visit https://salotto.app
             </div>
             <div id="statsVisibilityPanel" class="stats-visibility-panel"></div>
         </div>
+        <!-- Remote Tab (guest QR) -->
+        <div id="RemoteSettings" class="tabcontent">
+            <div class="section-header">Guest control</div>
+            <p class="stats-tab-help">Share this table's guest scorer link. Guests can score; they cannot edit names or use replay. One device per link. QR and URL stay hidden until you press Show.</p>
+            <div class="cloud-remote-default">
+                <div class="cloud-remote-qr-wrap is-obscured" id="cloudRemoteQrWrap">
+                    <img id="cloudRemoteQr" class="noShow" alt="Guest control QR code" />
+                    <div class="cloud-remote-qr-placeholder" id="cloudRemoteQrPlaceholder" aria-hidden="true"></div>
+                    <div class="cloud-remote-reveal-overlay">
+                        <div class="hover obs28 button" id="cloudRemoteRevealBtn" role="button" tabindex="0" title="Show guest link">Show</div>
+                    </div>
+                </div>
+                <div class="cloud-remote-url-row is-obscured" id="cloudRemoteUrlRow">
+                    <input id="cloudRemoteUrl" type="text" readonly value="" placeholder="Hidden — press Show" autocomplete="off" />
+                    <div class="hover obs28 button" id="cloudRemoteCopyBtn">Copy</div>
+                </div>
+                <p class="stats-hint" id="cloudRemoteStatus"></p>
+            </div>
+            <div id="cloudRemoteExtras" class="cloud-remote-extras">
+                <div class="section-header">Guest links</div>
+                <div id="cloudRemoteCreateRow" class="cloud-remote-extra-row noShow">
+                    <input id="cloudRemoteExtraLabel" type="text" maxlength="40" required placeholder="Name required (e.g. Helper, Phone)" />
+                    <div class="hover obs28 button" id="cloudRemoteCreateBtn">Create link</div>
+                </div>
+                <ul id="cloudRemoteExtraList" class="cloud-remote-extra-list"></ul>
+            </div>
+        </div>
         <!-- General Settings Tab -->
         <div id="GeneralSettings" class="tabcontent">
             <div class="section-header" id="uiSettingLabel">UI Setting</div>
@@ -682,7 +712,7 @@ for more information about Salotto please visit https://salotto.app
             <!-- CueSport Cloud Section -->
             <div class="section-header-with-controls">
                 <span id="cloudRelayLabel">
-                    CueSport Cloud (<a href="https://cuesports.macleod.systems" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: underline;">cloud stats and control</a>)
+                    CueSport Scoreboard Cloud Control
                 </span>
                 <div class="section-controls">
                     <button class="settings-cog-btn" id="cloudSelfHostCog" onclick="openCloudConnectionModal()" title="Connection settings">
@@ -694,6 +724,7 @@ for more information about Salotto please visit https://salotto.app
                     </label>
                 </div>
             </div>
+            <p class="stats-tab-help" id="cloudRelayBlurb">Cloud statistics and mobile overlay management.</p>
             <div class="column form-rows" style="margin-bottom: 10px;">
                 <div class="form-row cloud-meta-row" id="cloudMetaRow">
                     <div class="field cloud-stats-cta" id="cloudStatsCtaRow" style="display: none;">
@@ -936,7 +967,7 @@ for more information about Salotto please visit https://salotto.app
             <p class="stats-hint">Clears instance settings - does not effect player statistics - use Stats &gt; Clear to remove statistics history.</p>
             <div id="localStorageUsage" class="local-storage-usage" aria-live="polite">
                 <div class="local-storage-usage-title">Local Storage Use (This Browser)</div>
-                <div id="localStorageUsageBody" class="local-storage-usage-body">Measuring…</div>
+                <div id="localStorageUsageBody" class="local-storage-usage-body">Measuring...</div>
             </div>
         </div> <!-- General Settings Tab-->
     </div> <!-- End of tab content -->
@@ -969,7 +1000,7 @@ for more information about Salotto please visit https://salotto.app
                             </tr>
                         </thead>
                         <tbody id="statsLeaderboardBody">
-                            <tr><td colspan="5" class="stats-empty">Loading…</td></tr>
+                            <tr><td colspan="5" class="stats-empty">Loading...</td></tr>
                         </tbody>
                     </table>
                     </div>
@@ -1050,7 +1081,7 @@ for more information about Salotto please visit https://salotto.app
                 <div class="form-row">
                     <div class="field stats-match-game-info-field">
                         <label for="statsMatchGameInfo">Event Info:</label>
-                        <input type="text" id="statsMatchGameInfo" maxlength="60" placeholder="Optional — league, event, notes…" />
+                        <input type="text" id="statsMatchGameInfo" maxlength="60" placeholder="Optional - league, event, notes..." />
                     </div>
                 </div>
                 <div id="statsMatchCloudScoresRow" class="form-row stats-match-form-row noShow">
@@ -1064,7 +1095,7 @@ for more information about Salotto please visit https://salotto.app
                     </div>
                 </div>
                 <div id="statsMatchLocalRacksBlock">
-                <div class="stats-match-score-summary" id="statsMatchScoreSummary">Match: 0 – 0</div>
+                <div class="stats-match-score-summary" id="statsMatchScoreSummary">Match: 0 - 0</div>
                 <div class="stats-match-racks-editor-wrap">
                     <div class="stats-match-racks-editor-header">
                         <span id="statsMatchRacksEditorLabel">Racks</span>

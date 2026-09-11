@@ -181,6 +181,7 @@ export function summarizeAccountStats(events) {
     const match = {
       id: start.payload?.sessionId || start.session_id || start.id,
       startEventId: start.id,
+      api_key_id: start.api_key_id || null,
       endEventId: end ? end.id : null,
       roomId: start.room_id,
       tableLabel: label,

@@ -310,7 +310,7 @@ export async function fetchPlayers(serverUrl, token, query = '', limit = 8) {
   return data.players || [];
 }
 
-export async function createApiKey(serverUrl, token, label) {
+export async function createApiKey(serverUrl, token, label, role) {
   const base = serverUrl.replace(/\/$/, '');
   const res = await fetch(`${base}/api/api-keys`, {
     method: 'POST',
@@ -318,7 +318,7 @@ export async function createApiKey(serverUrl, token, label) {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ label }),
+    body: JSON.stringify({ label, role }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -340,6 +340,10 @@ export async function fetchApiKey(serverUrl, token, keyId) {
 }
 
 export async function renameApiKey(serverUrl, token, keyId, label) {
+  return patchApiKey(serverUrl, token, keyId, { label });
+}
+
+export async function patchApiKey(serverUrl, token, keyId, patch) {
   const base = serverUrl.replace(/\/$/, '');
   const res = await fetch(`${base}/api/api-keys/${encodeURIComponent(keyId)}`, {
     method: 'PATCH',
@@ -347,26 +351,37 @@ export async function renameApiKey(serverUrl, token, keyId, label) {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ label }),
+    body: JSON.stringify(patch || {}),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || err.message || 'Failed to rename API key');
+    throw new Error(err.error || err.message || 'Failed to update API key');
   }
   return res.json();
 }
 
-export async function createGuestLink(serverUrl, token, roomId, label) {
+export async function createGuestLink(serverUrl, token, roomId, label, extraHeaders = {}) {
   const base = serverUrl.replace(/\/$/, '');
+  const name = String(label || '').trim();
+  if (!name) {
+    throw new Error('Enter a name for this guest link.');
+  }
+  const headers = {
+    'Content-Type': 'application/json',
+    ...extraHeaders,
+  };
+  if (!headers.Authorization && !headers['X-Api-Key'] && token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
   const res = await fetch(`${base}/api/rooms/${roomId}/guest-link`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ label: label || 'Guest scorer' }),
+    headers,
+    body: JSON.stringify({ label: name }),
   });
-  if (!res.ok) throw new Error('Failed to create guest link');
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || err.message || 'Failed to create guest link');
+  }
   return res.json();
 }
 
@@ -379,19 +394,6 @@ export async function revokeApiKey(serverUrl, token, keyId) {
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || 'Failed to remove API key');
-  }
-  return res.json();
-}
-
-export async function regenerateApiKey(serverUrl, token, keyId) {
-  const base = serverUrl.replace(/\/$/, '');
-  const res = await fetch(`${base}/api/api-keys/${encodeURIComponent(keyId)}/regenerate`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || err.message || 'Failed to regenerate API key');
   }
   return res.json();
 }

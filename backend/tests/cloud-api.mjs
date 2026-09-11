@@ -241,8 +241,8 @@ async function run() {
     // Rooms are created on dock connect — login may return null room.
     assert('Dev login room optional', login.body.room == null || !!login.body.room?.id);
     assert(
-      'Dev login returns api_key plaintext',
-      typeof login.body.api_key === 'string' && login.body.api_key.length > 0,
+      'Dev login does not mint api_key',
+      login.body.api_key == null,
       String(login.body.api_key)
     );
 
@@ -290,9 +290,29 @@ async function run() {
     });
     assert('POST /api/rooms disabled (410)', postRoomsGone.status === 410);
 
-    // Create API key (or use existing from prior runs / auto-created on first login)
+    // Create named OBS Dock Key (required label; default role trusted_operator)
     let apiKey = null;
     let apiKeyId = null;
+    const missingLabel = await fetchJson('/api/api-keys', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({}),
+    });
+    assert('POST /api/api-keys requires name', missingLabel.status === 400);
+
+    const badRole = await fetchJson('/api/api-keys', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ label: 'bad-role', role: 'owner' }),
+    });
+    assert('POST /api/api-keys invalid role 400', badRole.status === 400);
+
     const keyRes = await fetchJson('/api/api-keys', {
       method: 'POST',
       headers: {
@@ -303,6 +323,11 @@ async function run() {
     });
     if (keyRes.ok) {
       assert('POST /api/api-keys', keyRes.body.key?.length === 32);
+      assert(
+        'POST /api/api-keys default role trusted_operator',
+        keyRes.body.role === 'trusted_operator',
+        String(keyRes.body.role)
+      );
       apiKey = keyRes.body.key;
       apiKeyId = keyRes.body.id;
       const viewRes = await fetchJson(`/api/api-keys/${keyRes.body.id}`, {
@@ -358,30 +383,43 @@ async function run() {
       }
     }
 
-    // Regenerate the key currently in use (kick live dock), keep seat label
+    // Remove regenerate path — seat id stays stable; compromise = Remove then Create
     if (apiKeyId && apiKey && roomId) {
       let dockToKick = null;
-      let labelBefore = null;
       try {
-        const meKeys = await fetchJson('/api/me', { headers: { Authorization: `Bearer ${token}` } });
-        labelBefore = (meKeys.body.api_keys || []).find((k) => k.id === apiKeyId)?.label || null;
         dockToKick = await wsJoin({ client: 'dock', apiKey, instanceId: smokeInstance });
         const dockKeyId = dockToKick.data.api_key_id || apiKeyId;
         assert('Dock join reports api_key_id', !!dockToKick.data.api_key_id, JSON.stringify(dockToKick.data));
-        const kickedP = waitForWsErrorThenClose(dockToKick.ws);
-        const regenerated = await fetchJson(`/api/api-keys/${dockKeyId}/regenerate`, {
+        assert(
+          'Dock join includes role/permissions',
+          dockToKick.data.role === 'trusted_operator' && !!dockToKick.data.permissions,
+          JSON.stringify({ role: dockToKick.data.role, permissions: dockToKick.data.permissions })
+        );
+        const regenGone = await fetchJson(`/api/api-keys/${dockKeyId}/regenerate`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
         });
-        assert('POST /api/api-keys/:id/regenerate', regenerated.ok && regenerated.body.key?.length === 32);
-        assert('Regenerate keeps seat label', !labelBefore || regenerated.body.label === labelBefore, regenerated.body.label);
-        assert('Regenerate reports kicked', (regenerated.body.kicked || 0) >= 1, `kicked=${regenerated.body.kicked}`);
-        const kicked = await kickedP;
-        assert('Regenerate kicks dock with api_key_revoked', kicked.code === 'api_key_revoked');
-        apiKey = regenerated.body.key;
-        apiKeyId = regenerated.body.id;
+        assert('POST /api/api-keys/:id/regenerate removed', regenGone.status === 404);
+
+        // Default OBS Dock Owner guest token created on first dock join
+        const guestLinks = await fetchJson(`/api/rooms/${roomId}/guest-links`, {
+          headers: { 'X-Api-Key': apiKey },
+        });
+        assert('GET guest-links via dock key', guestLinks.ok);
+        const owners = (guestLinks.body.guest_links || []).filter((g) => g.label === 'OBS Dock Owner');
+        assert('Dock join creates OBS Dock Owner once', owners.length === 1, `count=${owners.length}`);
+        dockToKick.ws.close();
+        await sleep(150);
+        const dockAgain = await wsJoin({ client: 'dock', apiKey, instanceId: smokeInstance });
+        const guestLinks2 = await fetchJson(`/api/rooms/${roomId}/guest-links`, {
+          headers: { 'X-Api-Key': apiKey },
+        });
+        const owners2 = (guestLinks2.body.guest_links || []).filter((g) => g.label === 'OBS Dock Owner');
+        assert('Second dock join does not mint second OBS Dock Owner', owners2.length === 1);
+        dockAgain.ws.close();
+        await sleep(100);
       } catch (e) {
-        assert('Regenerate kicks dock with api_key_revoked', false, e.message);
+        assert('Dock join role + OBS Dock Owner guest', false, e.message);
         if (dockToKick) try { dockToKick.ws.close(); } catch (_) { /* ignore */ }
       }
     }
@@ -439,8 +477,8 @@ async function run() {
       body: JSON.stringify({ secret: devSecret }),
     });
     assert(
-      'Relogin returns existing api_key plaintext',
-      typeof relogin.body.api_key === 'string' && relogin.body.api_key.length > 0,
+      'Relogin does not mint api_key',
+      relogin.ok && relogin.body.api_key == null,
       String(relogin.body.api_key)
     );
     let tokenFresh = relogin.body.access_token;
@@ -653,6 +691,11 @@ async function run() {
         !!(rtMatch && rtMatch.player1Id && rtMatch.player2Id &&
           rtMatch.player1Id !== rtMatch.player2Id),
         rtMatch && `${rtMatch.player1Id}/${rtMatch.player2Id}`
+      );
+      assert(
+        'Stats round-trip stamps api_key_id',
+        !!(rtMatch && rtMatch.api_key_id === apiKeyId),
+        rtMatch && String(rtMatch.api_key_id)
       );
 
       const statsUnauth = await fetchJson('/api/stats');
@@ -1096,6 +1139,350 @@ async function run() {
       assert('Events persisted', false, 'dock join failed');
     }
 
+    // Dock key roles: dashboard JWT-only, operator/trusted/admin mutation gates, guest-link rules
+    // Self-host default quota is 2 OBS Dock Keys — reuse the primary key + one second seat.
+    try {
+      await wsJoin({ client: 'dashboard', apiKey });
+      assert('Dashboard WS join with API key rejected', false, 'should have failed');
+    } catch (e) {
+      assert(
+        'Dashboard WS join with API key rejected',
+        e.code === 'dashboard_jwt_required' || /dashboard|sign-in|jwt/i.test(e.message),
+        e.message
+      );
+    }
+
+    let secondKey = null;
+    let secondKeyId = null;
+    const secondRes = await fetchJson('/api/api-keys', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${tokenFresh}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ label: 'smoke-second', role: 'trusted_operator' }),
+    });
+    if (secondRes.ok && secondRes.body.key) {
+      secondKey = secondRes.body.key;
+      secondKeyId = secondRes.body.id;
+      assert('Create second trusted key', secondRes.body.role === 'trusted_operator');
+    } else {
+      assert(
+        'Create second trusted key',
+        false,
+        secondRes.body?.code || secondRes.body?.error || `status=${secondRes.status}`
+      );
+    }
+
+    const ownMatch = (await fetchJson('/api/stats', {
+      headers: { Authorization: `Bearer ${tokenFresh}` },
+    })).body?.matches?.find((m) => m.api_key_id === apiKeyId && m.status === 'completed' && m.startEventId);
+
+    if (ownMatch && apiKey) {
+      const trustedPatch = await fetchJson(`/api/stats/matches/${ownMatch.startEventId}`, {
+        method: 'PATCH',
+        headers: {
+          'X-Api-Key': apiKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          player1Name: ownMatch.player1Name,
+          player2Name: ownMatch.player2Name,
+          gameType: ownMatch.gameType || 'game1',
+          scores: ownMatch.scores || { p1: 2, p2: 1 },
+        }),
+      });
+      assert('Trusted PATCH own match OK', trustedPatch.ok, JSON.stringify(trustedPatch.body));
+    } else {
+      assert('Trusted PATCH own match OK', false, 'no stamped own match');
+    }
+
+    if (secondKey && secondKeyId && apiKey) {
+      const otherInst = `${smokeInstance}-other`;
+      try {
+        const otherDock = await wsJoin({ client: 'dock', apiKey: secondKey, instanceId: otherInst });
+        const otherRoom = otherDock.data.room_id;
+        const otherSession = `other-write-${Date.now().toString(36)}`;
+        otherDock.ws.send(JSON.stringify({
+          type: 'session',
+          room_id: otherRoom,
+          action: 'start',
+          payload: {
+            gameType: 'game1',
+            player1: 'OtherP1',
+            player2: 'OtherP2',
+            sessionId: otherSession,
+          },
+        }));
+        await sleep(200);
+        otherDock.ws.send(JSON.stringify({
+          type: 'session',
+          room_id: otherRoom,
+          action: 'end',
+          payload: {
+            matchId: otherSession,
+            sessionId: otherSession,
+            winnerSlot: '2',
+            scores: { p1: 0, p2: 1 },
+            reason: 'race_complete',
+          },
+        }));
+        await sleep(250);
+        otherDock.ws.close();
+        await sleep(100);
+        const otherStats = await fetchJson('/api/stats', {
+          headers: { Authorization: `Bearer ${tokenFresh}` },
+        });
+        const otherMatch = (otherStats.body.matches || []).find(
+          (m) => m.api_key_id === secondKeyId && m.status === 'completed'
+        );
+        assert('Other trusted match stamped', !!otherMatch?.startEventId);
+        if (otherMatch) {
+          const crossPatch = await fetchJson(`/api/stats/matches/${otherMatch.startEventId}`, {
+            method: 'PATCH',
+            headers: {
+              'X-Api-Key': apiKey,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              player1Name: otherMatch.player1Name,
+              player2Name: otherMatch.player2Name,
+              gameType: 'game1',
+              scores: { p1: 3, p2: 3 },
+            }),
+          });
+          assert('Trusted PATCH other key match 403', crossPatch.status === 403);
+          const trustedPlayerDel = await fetchJson(
+            `/api/stats/players/${encodeURIComponent(otherMatch.player1Id)}`,
+            {
+              method: 'DELETE',
+              headers: { 'X-Api-Key': apiKey },
+            }
+          );
+          assert('Trusted player delete 403', trustedPlayerDel.status === 403);
+        }
+      } catch (e) {
+        assert('Trusted other-key mutation gates', false, e.message);
+      }
+
+      // Flip second seat to operator
+      const toOp = await fetchJson(`/api/api-keys/${secondKeyId}`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${tokenFresh}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ role: 'operator' }),
+      });
+      assert('PATCH second key to operator', toOp.ok && toOp.body.role === 'operator');
+
+      if (ownMatch) {
+        const opPatch = await fetchJson(`/api/stats/matches/${ownMatch.startEventId}`, {
+          method: 'PATCH',
+          headers: {
+            'X-Api-Key': secondKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            player1Name: ownMatch.player1Name,
+            player2Name: ownMatch.player2Name,
+            gameType: ownMatch.gameType || 'game1',
+            scores: { p1: 9, p2: 0 },
+          }),
+        });
+        assert('Operator PATCH match 403', opPatch.status === 403);
+        const opDel = await fetchJson(`/api/stats/matches/${ownMatch.startEventId}`, {
+          method: 'DELETE',
+          headers: { 'X-Api-Key': secondKey },
+        });
+        assert('Operator DELETE match 403', opDel.status === 403);
+        const opPlayer = await fetchJson('/api/stats/players', {
+          method: 'PATCH',
+          headers: {
+            'X-Api-Key': secondKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ id: ownMatch.player1Id, to: 'Nope' }),
+        });
+        assert('Operator player rename 403', opPlayer.status === 403);
+      }
+
+      try {
+        // Reuse the second seat's existing room (selfhost table cap is 2).
+        const opDock = await wsJoin({
+          client: 'dock',
+          apiKey: secondKey,
+          instanceId: otherInst,
+        });
+        const opRoom = opDock.data.room_id;
+        const opSession = `op-write-${Date.now().toString(36)}`;
+        opDock.ws.send(JSON.stringify({
+          type: 'session',
+          room_id: opRoom,
+          action: 'start',
+          payload: { gameType: 'game1', player1: 'OpP1', player2: 'OpP2', sessionId: opSession },
+        }));
+        await sleep(200);
+        opDock.ws.send(JSON.stringify({
+          type: 'session',
+          room_id: opRoom,
+          action: 'end',
+          payload: {
+            matchId: opSession,
+            sessionId: opSession,
+            winnerSlot: '1',
+            scores: { p1: 1, p2: 0 },
+            reason: 'race_complete',
+          },
+        }));
+        await sleep(250);
+        const opList = await fetchJson(`/api/rooms/${opRoom}/guest-links`, {
+          headers: { 'X-Api-Key': secondKey },
+        });
+        assert('Operator GET default guest link OK', opList.ok);
+        const owners = (opList.body.guest_links || []).filter((g) => g.label === 'OBS Dock Owner');
+        assert('Operator room has OBS Dock Owner', owners.length >= 1);
+        const opCreate = await fetchJson(`/api/rooms/${opRoom}/guest-link`, {
+          method: 'POST',
+          headers: {
+            'X-Api-Key': secondKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ label: 'op-extra' }),
+        });
+        assert('Operator POST guest-link 403', opCreate.status === 403);
+        if (owners[0]?.token) {
+          const opRevoke = await fetchJson(`/api/guest-links/${owners[0].token}`, {
+            method: 'DELETE',
+            headers: { 'X-Api-Key': secondKey },
+          });
+          assert('Operator DELETE guest-link 403', opRevoke.status === 403);
+        }
+        opDock.ws.close();
+        await sleep(100);
+        const opStats = await fetchJson('/api/stats', {
+          headers: { Authorization: `Bearer ${tokenFresh}` },
+        });
+        const opMatch = (opStats.body.matches || []).find((m) => m.id === opSession || m.player1Name === 'OpP1');
+        assert('Operator session write still OK', !!opMatch && opMatch.api_key_id === secondKeyId);
+      } catch (e) {
+        assert('Operator session write / guest gates', false, e.message);
+      }
+
+      // Flip second seat to administrator — can mutate matches written by the primary key
+      const toAdmin = await fetchJson(`/api/api-keys/${secondKeyId}`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${tokenFresh}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ role: 'administrator' }),
+      });
+      assert('PATCH second key to administrator', toAdmin.ok && toAdmin.body.role === 'administrator');
+      if (ownMatch) {
+        const adminPatch = await fetchJson(`/api/stats/matches/${ownMatch.startEventId}`, {
+          method: 'PATCH',
+          headers: {
+            'X-Api-Key': secondKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            player1Name: ownMatch.player1Name,
+            player2Name: ownMatch.player2Name,
+            gameType: ownMatch.gameType || 'game1',
+            scores: ownMatch.scores || { p1: 2, p2: 1 },
+          }),
+        });
+        assert('Administrator key PATCH any match OK', adminPatch.ok, JSON.stringify(adminPatch.body));
+      }
+    }
+
+    if (apiKeyId) {
+      const rolePatch = await fetchJson(`/api/api-keys/${apiKeyId}`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${tokenFresh}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ role: 'administrator' }),
+      });
+      assert(
+        'PATCH /api/api-keys/:id role',
+        rolePatch.ok && rolePatch.body.role === 'administrator',
+        JSON.stringify(rolePatch.body)
+      );
+
+      if (apiKey && roomId) {
+        let liveDock = null;
+        try {
+          liveDock = await wsJoin({
+            client: 'dock',
+            apiKey,
+            instanceId: smokeInstance || `role-live-${Date.now()}`,
+          });
+          const roleWait = waitForWsMessage(liveDock.ws, (d) => d.type === 'role_updated', 5000);
+          const livePatch = await fetchJson(`/api/api-keys/${apiKeyId}`, {
+            method: 'PATCH',
+            headers: {
+              Authorization: `Bearer ${tokenFresh}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ role: 'operator' }),
+          });
+          assert(
+            'PATCH role while dock connected',
+            livePatch.ok && livePatch.body.role === 'operator' && Number(livePatch.body.notified) >= 1,
+            JSON.stringify(livePatch.body)
+          );
+          const roleMsg = await roleWait;
+          assert(
+            'Live dock receives role_updated',
+            roleMsg.role === 'operator' &&
+              roleMsg.permissions &&
+              roleMsg.permissions.canEditOwnMatch === false &&
+              roleMsg.permissions.canCreateGuestLinks === false,
+            JSON.stringify(roleMsg)
+          );
+          liveDock.ws.close();
+          await sleep(100);
+        } catch (e) {
+          assert('Live dock role update push', false, e.message);
+          if (liveDock) try { liveDock.ws.close(); } catch (_) { /* ignore */ }
+        }
+      }
+
+      await fetchJson(`/api/api-keys/${apiKeyId}`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${tokenFresh}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ role: 'trusted_operator' }),
+      });
+    }
+
+    if (apiKey && roomId) {
+      const trustedExtra = await fetchJson(`/api/rooms/${roomId}/guest-link`, {
+        method: 'POST',
+        headers: {
+          'X-Api-Key': apiKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ label: 'trusted-extra' }),
+      });
+      assert('Trusted create extra guest link on own room OK', trustedExtra.ok && !!trustedExtra.body.token);
+      const fakeRoom = '00000000-0000-0000-0000-000000000099';
+      const otherRoom = await fetchJson(`/api/rooms/${fakeRoom}/guest-link`, {
+        method: 'POST',
+        headers: {
+          'X-Api-Key': apiKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ label: 'nope' }),
+      });
+      assert('Trusted guest-link other room 403', otherRoom.status === 403 || otherRoom.status === 404);
+    }
+
     const guestLink = await fetchJson(`/api/rooms/${roomId}/guest-link`, {
       method: 'POST',
       headers: {
@@ -1105,14 +1492,48 @@ async function run() {
       body: JSON.stringify({ label: 'smoke-guest' }),
     });
     assert('POST /api/rooms/:roomId/guest-link', guestLink.ok && !!guestLink.body.token);
+
+    const guestLinkNoName = await fetchJson(`/api/rooms/${roomId}/guest-link`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${tokenFresh}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ label: '   ' }),
+    });
+    assert('POST guest-link requires name', guestLinkNoName.status === 400);
+
     if (guestLink.ok && guestLink.body.token) {
+      const revokeEmptyJson = await fetchJson(`/api/guest-links/${guestLink.body.token}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${tokenFresh}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      assert(
+        'DELETE guest-link with empty JSON content-type',
+        revokeEmptyJson.ok,
+        JSON.stringify(revokeEmptyJson.body)
+      );
+
+      const guestLink2 = await fetchJson(`/api/rooms/${roomId}/guest-link`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokenFresh}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ label: 'smoke-guest-2' }),
+      });
+      assert('POST replacement guest-link', guestLink2.ok && !!guestLink2.body.token);
+
       try {
-        const guestWs = await wsJoin({ guestToken: guestLink.body.token });
+        const guestWs = await wsJoin({ guestToken: guestLink2.body.token });
         assert('WS join guest token', guestWs.data.client === 'mobile_guest');
 
         let secondRejected = false;
         try {
-          await wsJoin({ guestToken: guestLink.body.token });
+          await wsJoin({ guestToken: guestLink2.body.token });
         } catch (e) {
           secondRejected = e.code === 'guest_link_in_use';
           assert('Second guest join rejected while first active', secondRejected, e.message);
@@ -1123,7 +1544,7 @@ async function run() {
 
         guestWs.ws.close();
         await new Promise((r) => setTimeout(r, 150));
-        const guestWs2 = await wsJoin({ guestToken: guestLink.body.token });
+        const guestWs2 = await wsJoin({ guestToken: guestLink2.body.token });
         assert('Guest can reconnect after prior session closes', guestWs2.data.client === 'mobile_guest');
 
         const guestKickedP = waitForWsErrorThenClose(guestWs2.ws);
@@ -1132,10 +1553,10 @@ async function run() {
           headers: { Authorization: `Bearer ${tokenFresh}` },
         });
         assert('POST /api/guest-links/revoke-all', revAll.ok && Number(revAll.body.revoked) >= 1);
-        const guestKicked = await guestKickedP;
-        assert('Revoke All Guest Sessions disconnects guests', guestKicked.code === 'guest_revoked');
+        const guestKick = await guestKickedP;
+        assert('Guest kicked on revoke-all', guestKick.code === 'guest_revoked');
       } catch (e) {
-        assert('Guest WS disconnect on revoke-all', false, e.message);
+        assert('Guest token join / one-device / revoke-all', false, e.message);
       }
     }
 

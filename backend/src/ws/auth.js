@@ -70,7 +70,7 @@ export async function authenticateJoin({ apiKey, accessToken, roomId, client }) 
     }
     const subErr = subscriptionRequired(client, result.account);
     if (subErr) return subErr;
-    return { account: result.account, authMethod: 'api_key', keyId: result.keyId };
+    return { account: result.account, authMethod: 'api_key', keyId: result.keyId, role: result.role };
   }
 
   if (accessToken) {

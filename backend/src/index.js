@@ -16,6 +16,18 @@ const webRoot = path.join(__dirname, '..', 'web');
 
 const app = Fastify({ logger: true });
 
+// Dock/mobile DELETE calls may send Content-Type: application/json with an empty body.
+// Fastify's default JSON parser rejects that as 400; treat empty as {}.
+app.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body, done) => {
+  try {
+    const raw = typeof body === 'string' ? body : '';
+    done(null, raw.trim() ? JSON.parse(raw) : {});
+  } catch (err) {
+    err.statusCode = 400;
+    done(err, undefined);
+  }
+});
+
 function sendWebHtml(reply, relativePath) {
   const filePath = path.join(webRoot, relativePath);
   if (!fs.existsSync(filePath)) {

@@ -12,13 +12,13 @@ import {
   createApiKey,
   fetchApiKey,
   revokeApiKey,
-  regenerateApiKey,
+  patchApiKey,
   renameApiKey,
   deleteRoom,
   invalidateAllSessions,
   revokeAllGuestLinks,
   GAME_TYPES,
-} from '../shared/cloud-client.js?v=8.0.0.6';
+} from '../shared/cloud-client.js?v=8.0.0.7';
 import {
   computeDurationSeconds,
   formatDurationSeconds,
@@ -28,6 +28,54 @@ import {
 
 const TOKEN_KEY = 'cuesport_token';
 const SERVER_KEY = 'cuesport_server';
+
+const DOCK_KEY_ROLE_LABELS = {
+  administrator: 'Administrator',
+  trusted_operator: 'Trusted Operator',
+  operator: 'Operator',
+};
+
+const DOCK_KEY_ROLE_DESCRIPTIONS = {
+  administrator: [
+    'Write matches',
+    'View all history',
+    'Edit or delete any match',
+    'Rename or delete players',
+    'Share the table’s default guest QR',
+    'Create additional guest links for this table',
+  ],
+  trusted_operator: [
+    'Write matches',
+    'View all history',
+    'Edit or delete only matches this key recorded',
+    'Share the table’s default guest QR',
+    'Create additional guest links for this table',
+  ],
+  operator: [
+    'Write matches',
+    'View all history',
+    'Cannot edit or delete recorded matches',
+    'Can share/copy the table’s default guest QR',
+    'Cannot create additional guest links',
+  ],
+};
+
+function dockKeyRoleLabel(role) {
+  return DOCK_KEY_ROLE_LABELS[role] || DOCK_KEY_ROLE_LABELS.trusted_operator;
+}
+
+function dockKeyRoleDescriptionItems(role) {
+  return DOCK_KEY_ROLE_DESCRIPTIONS[role] || DOCK_KEY_ROLE_DESCRIPTIONS.trusted_operator;
+}
+
+function updateDockKeyRoleDescription(role) {
+  const descEl = document.getElementById('dashCreateKeyRoleDesc');
+  if (!descEl) return;
+  const items = dockKeyRoleDescriptionItems(role || selectedDockKeyRole());
+  descEl.innerHTML =
+    '<strong class="dash-role-access-title">Access</strong>' +
+    `<ul class="dash-role-access-list">${items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`;
+}
 
 let dashClient = null;
 let reconnectTimer = null;
@@ -70,7 +118,25 @@ function show(id, visible) {
       if (visible) tabs.removeAttribute('hidden');
       else tabs.setAttribute('hidden', '');
     }
+    const accountBtn = document.getElementById('dashAccountMenuBtn');
+    if (accountBtn) accountBtn.classList.toggle('hidden', !visible);
+    if (!visible) closeDashAccountModal();
   }
+}
+
+function openDashAccountModal() {
+  const modal = document.getElementById('dashAccountModal');
+  const btn = document.getElementById('dashAccountMenuBtn');
+  if (!modal) return;
+  modal.classList.remove('hidden');
+  if (btn) btn.setAttribute('aria-expanded', 'true');
+}
+
+function closeDashAccountModal() {
+  const modal = document.getElementById('dashAccountModal');
+  const btn = document.getElementById('dashAccountMenuBtn');
+  if (modal) modal.classList.add('hidden');
+  if (btn) btn.setAttribute('aria-expanded', 'false');
 }
 
 function setError(msg) {
@@ -109,9 +175,25 @@ function confirmDashAction({
   }
   if (titleEl) titleEl.textContent = title;
   if (msgEl) msgEl.textContent = message;
-  okBtn.textContent = confirmLabel || 'Confirm';
+  const label = confirmLabel || 'Confirm';
+  let okIcon = 'check';
+  if (/remove|delete|revoke/i.test(label)) okIcon = 'trash';
+  else if (/kick/i.test(label)) okIcon = 'kick';
+  else if (/sign out/i.test(label)) okIcon = 'logOut';
+  setDashActionButtonContent(okBtn, {
+    icon: okIcon,
+    label,
+    title: label,
+  });
+  setDashActionButtonContent(cancelBtn, {
+    icon: 'cancel',
+    label: 'Cancel',
+    title: 'Cancel',
+  });
   okBtn.classList.toggle('danger', !!danger);
   okBtn.classList.toggle('primary', !danger);
+  okBtn.classList.toggle('cancel', false);
+  cancelBtn.classList.add('cancel');
   modal.classList.remove('hidden');
   okBtn.focus();
   return new Promise((resolve) => {
@@ -125,6 +207,120 @@ function closeDashConfirm(result) {
   const resolve = dashConfirmResolver;
   dashConfirmResolver = null;
   if (resolve) resolve(!!result);
+}
+
+let dockKeyModalMode = 'create';
+let dockKeyModalKey = null;
+
+function selectedDockKeyRole() {
+  const select = document.getElementById('dashCreateKeyRole');
+  return (select && select.value) || 'trusted_operator';
+}
+
+function setDockKeyRole(role) {
+  const value = role || 'trusted_operator';
+  const select = document.getElementById('dashCreateKeyRole');
+  if (select) select.value = DOCK_KEY_ROLE_LABELS[value] ? value : 'trusted_operator';
+  updateDockKeyRoleDescription(select?.value || 'trusted_operator');
+}
+
+function closeDockKeyModal() {
+  const modal = document.getElementById('dashCreateKeyModal');
+  if (modal) modal.classList.add('hidden');
+  dockKeyModalMode = 'create';
+  dockKeyModalKey = null;
+}
+
+function openDockKeyModal({ mode = 'create', key = null } = {}) {
+  const modal = document.getElementById('dashCreateKeyModal');
+  const titleEl = document.getElementById('dashCreateKeyTitle');
+  const hintEl = document.getElementById('dashCreateKeyHint');
+  const nameWrap = document.getElementById('dashCreateKeyLabel')?.closest('.stats-filter');
+  const roleWrap = document.getElementById('dashCreateKeyRoleWrap');
+  const submit = document.getElementById('dashCreateKeySubmitBtn');
+  const cancelBtn = document.getElementById('dashCreateKeyCancelBtn');
+  const nameInput = document.getElementById('dashCreateKeyLabel');
+  if (!modal) return;
+  const editing = mode === 'edit' || mode === 'role' || mode === 'rename';
+  dockKeyModalMode = editing ? 'edit' : 'create';
+  dockKeyModalKey = editing ? key : null;
+  if (titleEl) {
+    titleEl.textContent = editing
+      ? `Edit Dock Key — ${key?.label || 'Dock Key'}`
+      : 'Create Dock Key';
+  }
+  if (hintEl) {
+    hintEl.textContent = editing
+      ? 'Update the seat name/label and role. Remove a key and create a new one to replace a leaked secret.'
+      : 'Name the seat when creating. Remove a key and create a new one to replace a leaked secret.';
+  }
+  if (nameWrap) nameWrap.classList.remove('hidden');
+  if (roleWrap) roleWrap.classList.remove('hidden');
+  const submitLabel = editing ? 'Save' : 'Create';
+  const submitIcon = editing ? 'save' : 'plus';
+  if (submit) {
+    submit.classList.add('save');
+    submit.classList.remove('primary', 'danger', 'cancel');
+  }
+  if (cancelBtn) {
+    cancelBtn.classList.add('cancel');
+    cancelBtn.classList.remove('primary', 'danger', 'save');
+  }
+  setDashActionButtonContent(submit, {
+    icon: submitIcon,
+    label: submitLabel,
+    title: submitLabel,
+  });
+  setDashActionButtonContent(cancelBtn, {
+    icon: 'cancel',
+    label: 'Cancel',
+    title: 'Cancel',
+  });
+  if (nameInput) {
+    nameInput.value = editing ? String(key?.label || '') : '';
+  }
+  setDockKeyRole(key?.role || 'trusted_operator');
+  modal.classList.remove('hidden');
+  nameInput?.focus();
+  if (editing && nameInput) nameInput.select();
+}
+
+async function submitDockKeyModal() {
+  const nameInput = document.getElementById('dashCreateKeyLabel');
+  try {
+    setError('');
+    const label = String(nameInput?.value || '').trim().slice(0, 40);
+    if (!label) {
+      setError('Enter a name (1–40 characters) for this dock key.');
+      nameInput?.focus();
+      return;
+    }
+    const role = selectedDockKeyRole();
+    if (dockKeyModalMode === 'edit') {
+      if (!dockKeyModalKey?.id) return;
+      const result = await patchApiKey(getServerUrl(), getToken(), dockKeyModalKey.id, {
+        label,
+        role,
+      });
+      closeDockKeyModal();
+      if (result.api_keys) renderApiKeys(result.api_keys);
+      if (result.rooms) {
+        renderDebugRooms(result.rooms);
+        renderTableCards(result.rooms);
+      }
+      if (!result.api_keys) await renderDashboard();
+      return;
+    }
+    const created = await createApiKey(getServerUrl(), getToken(), label, role);
+    closeDockKeyModal();
+    if (created.quota) renderQuota(created.quota);
+    await renderDashboard();
+    if (created.key && created.label) {
+      revealKeyInList(created.label, created.key);
+    }
+  } catch (err) {
+    setError(err.message);
+  }
 }
 
 let keyCopyNoticeTimer = null;
@@ -428,11 +624,19 @@ function startDebugRoomRename(room, titleRow, currentTitle) {
   const saveBtn = document.createElement('button');
   saveBtn.type = 'submit';
   saveBtn.className = 'btn save';
-  saveBtn.textContent = 'Save';
+  setDashActionButtonContent(saveBtn, {
+    icon: 'save',
+    label: 'Save',
+    title: 'Save dock name',
+  });
   const cancelBtn = document.createElement('button');
   cancelBtn.type = 'button';
   cancelBtn.className = 'btn cancel debug-room-rename-cancel';
-  cancelBtn.textContent = 'Cancel';
+  setDashActionButtonContent(cancelBtn, {
+    icon: 'cancel',
+    label: 'Cancel',
+    title: 'Cancel rename',
+  });
   form.appendChild(input);
   form.appendChild(saveBtn);
   form.appendChild(cancelBtn);
@@ -483,7 +687,11 @@ function startDebugRoomRename(room, titleRow, currentTitle) {
       saveBtn.disabled = true;
       cancelBtn.disabled = true;
       input.disabled = true;
-      saveBtn.textContent = 'Saving…';
+      setDashActionButtonContent(saveBtn, {
+        icon: 'save',
+        label: 'Saving…',
+        title: 'Saving dock name',
+      });
       form.classList.add('is-busy');
       form.setAttribute('aria-busy', 'true');
       const result = await renameApiKey(getServerUrl(), getToken(), room.api_key_id, next);
@@ -504,7 +712,11 @@ function startDebugRoomRename(room, titleRow, currentTitle) {
       saveBtn.disabled = false;
       cancelBtn.disabled = false;
       input.disabled = false;
-      saveBtn.textContent = 'Save';
+      setDashActionButtonContent(saveBtn, {
+        icon: 'save',
+        label: 'Save',
+        title: 'Save dock name',
+      });
       form.classList.remove('is-busy');
       form.removeAttribute('aria-busy');
     }
@@ -513,7 +725,9 @@ function startDebugRoomRename(room, titleRow, currentTitle) {
 
 function apiKeySummaryText(k) {
   const when = formatLocalDateTime(k.created_at);
-  return when ? `${k.label} — created ${when}` : String(k.label || 'OBS Dock Key');
+  const role = dockKeyRoleLabel(k.role);
+  const name = String(k.label || 'OBS Dock Key');
+  return when ? `${name} · ${role} — created ${when}` : `${name} · ${role}`;
 }
 
 const API_KEY_COPY_ICON_SVG =
@@ -570,11 +784,45 @@ function dashActionIcon(kind) {
   if (kind === 'share') {
     return `<svg ${common}><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>`;
   }
+  if (kind === 'edit') {
+    return `<svg ${common}><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>`;
+  }
+  if (kind === 'check') {
+    return `<svg ${common}><polyline points="20 6 9 17 4 12"/></svg>`;
+  }
+  if (kind === 'copy') {
+    return `<svg ${common}><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+  }
+  if (kind === 'mail') {
+    return `<svg ${common}><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>`;
+  }
+  if (kind === 'sms') {
+    return `<svg ${common}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`;
+  }
+  if (kind === 'close') {
+    return `<svg ${common}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+  }
+  if (kind === 'logIn') {
+    return `<svg ${common}><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>`;
+  }
+  if (kind === 'logOut') {
+    return `<svg ${common}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>`;
+  }
+  if (kind === 'chevronLeft') {
+    return `<svg ${common}><polyline points="15 18 9 12 15 6"/></svg>`;
+  }
+  if (kind === 'chevronRight') {
+    return `<svg ${common}><polyline points="9 18 15 12 9 6"/></svg>`;
+  }
   return '';
 }
 
-function setDashActionButtonContent(btn, { icon, label, title }) {
+function setDashActionButtonContent(btn, { icon, label, title, className }) {
   if (!btn) return;
+  btn.classList.add('dash-action-btn');
+  if (className) {
+    String(className).split(/\s+/).filter(Boolean).forEach((c) => btn.classList.add(c));
+  }
   const iconHtml = dashActionIcon(icon);
   const safeLabel = escapeHtml(label || '');
   btn.innerHTML = `${iconHtml}<span class="dash-action-label">${safeLabel}</span>`;
@@ -678,6 +926,31 @@ function openDashShareKeyModal({ label, key }) {
   if (nativeBtn) {
     nativeBtn.classList.toggle('hidden', typeof navigator.share !== 'function');
   }
+  setDashActionButtonContent(nativeBtn, {
+    icon: 'share',
+    label: 'Share…',
+    title: 'Share with device share sheet',
+  });
+  setDashActionButtonContent(document.getElementById('dashShareKeyEmailBtn'), {
+    icon: 'mail',
+    label: 'Email',
+    title: 'Share by email',
+  });
+  setDashActionButtonContent(document.getElementById('dashShareKeySmsBtn'), {
+    icon: 'sms',
+    label: 'Text',
+    title: 'Share by text message',
+  });
+  setDashActionButtonContent(document.getElementById('dashShareKeyCopyBtn'), {
+    icon: 'copy',
+    label: 'Copy',
+    title: 'Copy share text',
+  });
+  setDashActionButtonContent(document.getElementById('dashShareKeyCloseBtn'), {
+    icon: 'close',
+    label: 'Close',
+    title: 'Close',
+  });
   modal.classList.remove('hidden');
 }
 
@@ -801,43 +1074,13 @@ function renderApiKeys(keys) {
       shareApiKey(k);
     });
 
-    const regenBtn = createDashActionButton({
+    const editBtn = createDashActionButton({
       className: 'secondary',
-      icon: 'refresh',
-      label: 'Regenerate',
-      title: 'Issue a new secret with the same seat name; disconnects docks using the old key',
+      icon: 'edit',
+      label: 'Edit',
+      title: 'Edit name/label and role',
     });
-    regenBtn.addEventListener('click', async () => {
-      const ok = await confirmDashAction({
-        title: 'Regenerate Dock Key',
-        message:
-          `Regenerate “${k.label}”?\n\n` +
-          'The old secret stops working immediately and any dock using it will disconnect. ' +
-          'Paste the new key into the dock to reconnect.',
-        confirmLabel: 'Regenerate',
-        danger: true,
-      });
-      if (!ok) return;
-      try {
-        setError('');
-        const result = await regenerateApiKey(getServerUrl(), getToken(), k.id);
-        if (result.quota) renderQuota(result.quota);
-        const kicked = Number(result.kicked) || 0;
-        const notice = document.getElementById('keyRevokeNotice');
-        if (notice) {
-          notice.textContent = kicked > 0
-            ? `Key regenerated — disconnected ${kicked} dock connection(s). Paste the new key into the dock.`
-            : 'Key regenerated. Paste the new key into the dock when you reconnect.';
-          notice.classList.remove('hidden');
-        }
-        await renderDashboard();
-        if (result.key && result.label) {
-          revealKeyInList(result.label, result.key);
-        }
-      } catch (err) {
-        setError(err.message);
-      }
-    });
+    editBtn.addEventListener('click', () => openDockKeyModal({ mode: 'edit', key: k }));
 
     const removeBtn = createDashActionButton({
       className: 'danger',
@@ -874,8 +1117,8 @@ function renderApiKeys(keys) {
     });
 
     actions.appendChild(viewBtn);
+    actions.appendChild(editBtn);
     actions.appendChild(shareBtn);
-    actions.appendChild(regenBtn);
     actions.appendChild(removeBtn);
     li.appendChild(label);
     li.appendChild(actions);
@@ -889,7 +1132,7 @@ function setActiveDashTab(which) {
   });
   show('tabTables', which === 'tables');
   show('tabStats', which === 'stats');
-  show('tabAccount', which === 'account');
+  show('tabSettings', which === 'settings' || which === 'account');
   if (which === 'stats') {
     selectedPlayerKey = '';
     playerDetailOpponentFilter = '';
@@ -1136,9 +1379,9 @@ function renderLeaderboardPager(pageInfo) {
   const to = Math.min(pageInfo.startIndex + pageInfo.items.length, pageInfo.total);
   pager.innerHTML = `
     <span class="stats-pager-label">Showing ${from}–${to} of ${pageInfo.total}</span>
-    <button type="button" class="btn" data-leaderboard-page="${pageInfo.page - 1}" ${pageInfo.page <= 1 ? 'disabled' : ''}>Previous</button>
+    <button type="button" class="btn dash-action-btn" data-leaderboard-page="${pageInfo.page - 1}" ${pageInfo.page <= 1 ? 'disabled' : ''}>${dashActionIcon('chevronLeft')}<span class="dash-action-label">Previous</span></button>
     <span>Page ${pageInfo.page} / ${pageInfo.totalPages}</span>
-    <button type="button" class="btn" data-leaderboard-page="${pageInfo.page + 1}" ${pageInfo.page >= pageInfo.totalPages ? 'disabled' : ''}>Next</button>
+    <button type="button" class="btn dash-action-btn" data-leaderboard-page="${pageInfo.page + 1}" ${pageInfo.page >= pageInfo.totalPages ? 'disabled' : ''}>${dashActionIcon('chevronRight')}<span class="dash-action-label">Next</span></button>
   `;
 }
 
@@ -2646,7 +2889,8 @@ async function renderDashboard() {
     const me = await fetchMe(getServerUrl(), token);
     show('loginSection', false);
     show('dashboardSection', true);
-    document.getElementById('userEmail').textContent = me.account.email;
+    const emailEl = document.getElementById('userEmail');
+    if (emailEl) emailEl.textContent = me.account.email;
     renderQuota(me.quota);
     renderApiKeys(me.api_keys);
     lastDashboardRooms = me.rooms || [];
@@ -3077,32 +3321,54 @@ document.getElementById('devSecret')?.addEventListener('keydown', (event) => {
     submitDevLogin();
   }
 });
+
+(function bindDevSecretToggle() {
+  const input = document.getElementById('devSecret');
+  const toggle = document.getElementById('devSecretToggle');
+  if (!input || !toggle) return;
+  function syncToggle() {
+    const revealed = input.type === 'text';
+    toggle.innerHTML = dashActionIcon(revealed ? 'eyeClosed' : 'eyeOpen');
+    toggle.setAttribute('aria-label', revealed ? 'Hide secret' : 'Show secret');
+    toggle.setAttribute('aria-pressed', revealed ? 'true' : 'false');
+    toggle.title = revealed ? 'Hide secret' : 'Show secret';
+  }
+  syncToggle();
+  toggle.addEventListener('click', () => {
+    input.type = input.type === 'password' ? 'text' : 'password';
+    syncToggle();
+    input.focus();
+  });
+}());
+
 document.getElementById('clearSavedLoginBtn')?.addEventListener('click', () => {
   if (!window.confirm('Clear Saved Login on this device? You will need to sign in again.')) return;
   clearSavedDashboardLogin();
 });
 
-document.getElementById('createKeyBtn').addEventListener('click', async () => {
-  try {
-    const created = await createApiKey(getServerUrl(), getToken());
-    if (created.quota) renderQuota(created.quota);
-    await renderDashboard();
-    if (created.key && created.label) {
-      revealKeyInList(created.label, created.key);
-      showKeyCopyNotice('New dock key created — click the key to copy, or use Hide when done.');
-    }
-  } catch (err) {
-    setError(err.message);
+document.getElementById('createKeyBtn').addEventListener('click', () => {
+  openDockKeyModal({ mode: 'create' });
+});
+document.getElementById('dashCreateKeyCancelBtn')?.addEventListener('click', () => closeDockKeyModal());
+document.getElementById('dashCreateKeySubmitBtn')?.addEventListener('click', () => submitDockKeyModal());
+document.getElementById('dashCreateKeyRole')?.addEventListener('change', (event) => {
+  updateDockKeyRoleDescription(event.target.value);
+});
+document.getElementById('dashCreateKeyLabel')?.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    submitDockKeyModal();
   }
 });
 
-document.getElementById('signOutBtn').addEventListener('click', async () => {
+document.getElementById('signOutBtn')?.addEventListener('click', async () => {
   const ok = await confirmDashAction({
     title: 'Sign Out',
     message: 'Sign out of this dashboard on this device?',
     confirmLabel: 'Sign Out',
   });
   if (!ok) return;
+  closeDashAccountModal();
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(SERVER_KEY);
   stopLiveFeed();
@@ -3126,6 +3392,7 @@ document.getElementById('invalidateSessionsBtn')?.addEventListener('click', asyn
     setError(err.message);
     return;
   }
+  closeDashAccountModal();
   localStorage.removeItem(TOKEN_KEY);
   stopLiveFeed();
   goToMainPage();
@@ -3133,11 +3400,11 @@ document.getElementById('invalidateSessionsBtn')?.addEventListener('click', asyn
 
 document.getElementById('revokeAllGuestsBtn')?.addEventListener('click', async () => {
   const ok = await confirmDashAction({
-    title: 'Revoke All Guest Sessions',
+    title: 'Revoke all',
     message:
-      'Revoke every guest link and disconnect all guest scorers?\n\n' +
+      'Revoke every guest link and disconnect all guest scorers across all tables?\n\n' +
       'They will need a new link to reconnect.',
-    confirmLabel: 'Revoke All',
+    confirmLabel: 'Revoke all',
     danger: true,
   });
   if (!ok) return;
@@ -3150,6 +3417,16 @@ document.getElementById('revokeAllGuestsBtn')?.addEventListener('click', async (
   } catch (err) {
     setError(err.message);
   }
+});
+
+document.getElementById('dashAccountMenuBtn')?.addEventListener('click', () => {
+  const modal = document.getElementById('dashAccountModal');
+  if (modal && !modal.classList.contains('hidden')) closeDashAccountModal();
+  else openDashAccountModal();
+});
+document.getElementById('dashAccountCloseBtn')?.addEventListener('click', () => closeDashAccountModal());
+document.getElementById('dashAccountModal')?.addEventListener('click', (event) => {
+  if (event.target && event.target.id === 'dashAccountModal') closeDashAccountModal();
 });
 
 document.getElementById('dashConfirmOkBtn')?.addEventListener('click', () => closeDashConfirm(true));
@@ -3166,6 +3443,12 @@ document.getElementById('dashShareKeyModal')?.addEventListener('click', (event) 
   if (event.target && event.target.id === 'dashShareKeyModal') closeDashShareKeyModal();
 });
 document.addEventListener('keydown', (event) => {
+  const accountModal = document.getElementById('dashAccountModal');
+  if (accountModal && !accountModal.classList.contains('hidden') && event.key === 'Escape') {
+    event.preventDefault();
+    closeDashAccountModal();
+    return;
+  }
   const shareModal = document.getElementById('dashShareKeyModal');
   if (shareModal && !shareModal.classList.contains('hidden') && event.key === 'Escape') {
     event.preventDefault();
@@ -3181,13 +3464,56 @@ document.addEventListener('keydown', (event) => {
 });
 
 document.getElementById('googleBtn').addEventListener('click', async () => {
+  setDashLoginMode('managed');
   const config = await fetchPublicConfig(getServerUrl());
   if (config.supabaseUrl && config.supabaseAnonKey) {
     window.location.href = `${config.supabaseUrl}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(window.location.href)}`;
   } else {
-    setError('Google OAuth not configured. Use dev login.');
+    setError('Google OAuth not configured on this server. Use Self-hosting with your dev auth secret.');
+    showDashLoginSelfHostPane();
   }
 });
+
+const DASH_LOGIN_MODE_KEY = 'cuesport_login_mode';
+
+function getDashLoginMode() {
+  return localStorage.getItem(DASH_LOGIN_MODE_KEY) === 'selfhost' ? 'selfhost' : 'managed';
+}
+
+function setDashLoginMode(mode) {
+  localStorage.setItem(DASH_LOGIN_MODE_KEY, mode === 'selfhost' ? 'selfhost' : 'managed');
+}
+
+function syncDashLoginPaneUI(mode) {
+  const managed = document.getElementById('dashLoginManagedPane');
+  const selfHost = document.getElementById('dashLoginSelfHostPane');
+  const isSelfHost = mode === 'selfhost';
+  if (managed) managed.classList.toggle('hidden', isSelfHost);
+  if (selfHost) selfHost.classList.toggle('hidden', !isSelfHost);
+}
+
+function showDashLoginManagedPane() {
+  setDashLoginMode('managed');
+  setError('');
+  syncDashLoginPaneUI('managed');
+}
+
+function showDashLoginSelfHostPane() {
+  setDashLoginMode('selfhost');
+  setError('');
+  syncDashLoginPaneUI('selfhost');
+  document.getElementById('devSecret')?.focus();
+}
+
+document.getElementById('dashShowSelfHostLink')?.addEventListener('click', (event) => {
+  event.preventDefault();
+  showDashLoginSelfHostPane();
+});
+document.getElementById('dashShowManagedLink')?.addEventListener('click', (event) => {
+  event.preventDefault();
+  showDashLoginManagedPane();
+});
+syncDashLoginPaneUI(getDashLoginMode());
 
 let liveFeedHiddenAt = 0;
 
@@ -3423,5 +3749,88 @@ setMatchModalActionButtons();
       title: 'Create a new OBS Dock Key',
     });
   }
+  setDashActionButtonContent(document.getElementById('statsPlayerRenameForm')?.querySelector('button[type="submit"]'), {
+    icon: 'save',
+    label: 'Save',
+    title: 'Save player name',
+  });
+  setDashActionButtonContent(document.getElementById('statsPlayerRenameCancelBtn'), {
+    icon: 'cancel',
+    label: 'Cancel',
+    title: 'Cancel rename',
+  });
+  {
+    const cancelBtn = document.getElementById('dashCreateKeyCancelBtn');
+    const submitBtn = document.getElementById('dashCreateKeySubmitBtn');
+    cancelBtn?.classList.add('cancel');
+    submitBtn?.classList.add('save');
+    setDashActionButtonContent(cancelBtn, {
+      icon: 'cancel',
+      label: 'Cancel',
+      title: 'Cancel',
+    });
+    setDashActionButtonContent(submitBtn, {
+      icon: 'plus',
+      label: 'Create',
+      title: 'Create Dock Key',
+    });
+    updateDockKeyRoleDescription('trusted_operator');
+  }
+  setDashActionButtonContent(document.getElementById('dashConfirmCancelBtn'), {
+    icon: 'cancel',
+    label: 'Cancel',
+    title: 'Cancel',
+  });
+  setDashActionButtonContent(document.getElementById('dashConfirmOkBtn'), {
+    icon: 'check',
+    label: 'Confirm',
+    title: 'Confirm',
+  });
+  setDashActionButtonContent(document.getElementById('dashShareKeyNativeBtn'), {
+    icon: 'share',
+    label: 'Share…',
+    title: 'Share with device share sheet',
+  });
+  setDashActionButtonContent(document.getElementById('dashShareKeyEmailBtn'), {
+    icon: 'mail',
+    label: 'Email',
+    title: 'Share by email',
+  });
+  setDashActionButtonContent(document.getElementById('dashShareKeySmsBtn'), {
+    icon: 'sms',
+    label: 'Text',
+    title: 'Share by text message',
+  });
+  setDashActionButtonContent(document.getElementById('dashShareKeyCopyBtn'), {
+    icon: 'copy',
+    label: 'Copy',
+    title: 'Copy share text',
+  });
+  setDashActionButtonContent(document.getElementById('dashShareKeyCloseBtn'), {
+    icon: 'close',
+    label: 'Close',
+    title: 'Close',
+  });
+  setDashActionButtonContent(document.getElementById('googleBtn'), {
+    icon: 'logIn',
+    label: 'Sign In with Google',
+    title: 'Sign In with Google',
+  });
+  setDashActionButtonContent(document.getElementById('devLoginBtn'), {
+    icon: 'logIn',
+    label: 'Dev Sign In',
+    title: 'Dev Sign In',
+  });
+  setDashActionButtonContent(document.getElementById('clearSavedLoginBtn'), {
+    icon: 'trash',
+    label: 'Clear Saved Login',
+    title: 'Clear Saved Login',
+  });
+  setDashActionButtonContent(document.getElementById('dashAccountCloseBtn'), {
+    icon: 'close',
+    label: 'Close',
+    title: 'Close',
+  });
 }
+
 renderDashboard();

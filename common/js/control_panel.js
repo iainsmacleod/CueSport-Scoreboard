@@ -211,6 +211,11 @@ function selectControlPanelTab(tabName) {
         !window.isStatsTabAvailable()) {
         return false;
     }
+    if (tabName === "RemoteSettings" &&
+        typeof window.isRemoteTabAvailable === "function" &&
+        !window.isRemoteTabAvailable()) {
+        return false;
+    }
     var i, tabcontent, tablinks;
     tabcontent = document.getElementsByClassName("tabcontent");
     for (i = 0; i < tabcontent.length; i++) {
@@ -228,6 +233,11 @@ function selectControlPanelTab(tabName) {
     setStorageItem("lastSelectedTab", tabName);
     if (tabName === "GeneralSettings") {
         refreshLocalStorageUsage();
+    }
+    if (tabName === "RemoteSettings" && typeof window.onRemoteTabShown === "function") {
+        window.onRemoteTabShown();
+    } else if (typeof window.hideRemoteDetailsForPrivacy === "function") {
+        window.hideRemoteDetailsForPrivacy();
     }
     return true;
 }
@@ -290,6 +300,11 @@ function openTab(evt, tabName) {
         !window.isStatsTabAvailable()) {
         return;
     }
+    if (tabName === "RemoteSettings" &&
+        typeof window.isRemoteTabAvailable === "function" &&
+        !window.isRemoteTabAvailable()) {
+        return;
+    }
     selectControlPanelTab(tabName);
     if (evt && evt.currentTarget) {
         // selectControlPanelTab already marked the mapped button; keep click target in sync
@@ -306,6 +321,7 @@ const TAB_BUTTON_BY_CONTENT = {
     Controls: "controlsTab",
     Images: "imagesTab",
     StatsSettings: "statsTab",
+    RemoteSettings: "remoteTab",
     GeneralSettings: "generalSettingsTab"
 };
 
@@ -323,6 +339,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Replay/Share was retired into Settings.
     if (tabToOpen === "ReplaySettings") {
+        tabToOpen = "GeneralSettings";
+    }
+    if (tabToOpen === "RemoteSettings" &&
+        typeof window.isRemoteTabAvailable === "function" &&
+        !window.isRemoteTabAvailable()) {
         tabToOpen = "GeneralSettings";
     }
 
@@ -892,6 +913,7 @@ function syncGameTypeSelect(value) {
     const select = document.getElementById(GAME_TYPE_SELECT_ID);
     const resolved = normalizeGameType(value || getStoredGameType());
     if (!select) {
+        updatePlayerTrackingHeader(resolved);
         return;
     }
     repairGameTypeSelectOptions();
@@ -902,6 +924,40 @@ function syncGameTypeSelect(value) {
             option.selected = true;
         }
     }
+    updatePlayerTrackingHeader(resolved);
+}
+
+function getGameTypeDisplayLabel(gameType) {
+    const resolved = normalizeGameType(gameType || getStoredGameType());
+    const select = document.getElementById(GAME_TYPE_SELECT_ID);
+    if (select) {
+        const option = select.querySelector('option[value="' + resolved + '"]');
+        if (option && option.textContent) {
+            return String(option.textContent).trim();
+        }
+    }
+    const labels = {
+        game1: '8-Ball',
+        game2: '9-Ball',
+        game3: '10-Ball',
+        game4: 'Straight',
+        game5: 'Bank',
+        game6: 'One Pocket',
+        game7: 'Custom',
+        game8: 'Snooker',
+    };
+    return labels[resolved] || resolved;
+}
+
+function updatePlayerTrackingHeader(gameType) {
+    const el = document.getElementById('playerToggleLabel');
+    if (!el) {
+        return;
+    }
+    const label = getGameTypeDisplayLabel(gameType);
+    el.textContent = label
+        ? ('Player Tracking and Ball Scoring - ' + label)
+        : 'Player Tracking and Ball Scoring';
 }
 
 function getPrimaryScoreSuffix() {

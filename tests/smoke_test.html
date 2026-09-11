@@ -403,6 +403,25 @@
             assert('Core', 'Stats tab restore uses statsTab button',
                 typeof cp.getTabButtonId === 'function' &&
                 cp.getTabButtonId('StatsSettings') === 'statsTab');
+            assert('Core', 'Remote tab present between Stats and Settings',
+                !!cp.document.getElementById('remoteTab') &&
+                !!cp.document.getElementById('RemoteSettings') &&
+                typeof cp.getTabButtonId === 'function' &&
+                cp.getTabButtonId('RemoteSettings') === 'remoteTab' &&
+                cp.document.getElementById('statsTab').nextElementSibling ===
+                    cp.document.getElementById('remoteTab') &&
+                cp.document.getElementById('remoteTab').nextElementSibling ===
+                    cp.document.getElementById('generalSettingsTab'));
+            assert('Core', 'Remote tab disabled until Cloud connected',
+                cp.document.getElementById('remoteTab').classList.contains('tablinks-disabled') &&
+                cp.document.getElementById('remoteTab').getAttribute('aria-disabled') === 'true' &&
+                typeof cp.isRemoteTabAvailable === 'function' &&
+                cp.isRemoteTabAvailable() === false);
+            assert('Core', 'Cloud Settings header and blurb',
+                (cp.document.getElementById('cloudRelayLabel')?.textContent || '').trim() ===
+                    'CueSport Scoreboard Cloud Control' &&
+                (cp.document.getElementById('cloudRelayBlurb')?.textContent || '').trim() ===
+                    'Cloud statistics and mobile overlay management.');
             cp.setStorageItem('lastSelectedTab', 'StatsSettings');
             cpFrame.src = '../control_panel.html?_=' + Date.now();
             await frameLoaded(cpFrame);
@@ -539,6 +558,14 @@
             // --- CueSport Cloud (client modules in control panel) ---
             assert('Cloud', 'cloudRelay loaded', typeof cp.cloudRelay === 'object');
             assert('Cloud', 'cloudCommands loaded', typeof cp.cloudCommands === 'object');
+            assert('Cloud', 'cloudRemote helpers loaded',
+                typeof cp.isRemoteTabAvailable === 'function' &&
+                typeof cp.updateRemoteTabAvailability === 'function');
+            assert('Cloud', 'PlayerStats cloud helpers',
+                typeof cp.PlayerStats.isCloudStatsMode === 'function' &&
+                typeof cp.PlayerStats.skipLocalCareerWrites === 'function' &&
+                cp.PlayerStats.isCloudStatsMode() === false &&
+                cp.PlayerStats.skipLocalCareerWrites() === false);
             assert('Cloud', 'signInWithGoogle exposed', typeof cp.signInWithGoogle === 'function');
             assert('Cloud', 'toggleCloudRelay exposed', typeof cp.toggleCloudRelay === 'function');
             assert('Cloud', 'cloudRelayToggle in DOM', !!cp.document.getElementById('cloudRelayToggle'));
@@ -714,6 +741,7 @@
                         assert('Cloud', 'Backend dev-login', loginRes.ok && loginBody.access_token?.startsWith('dev:'));
                         // Rooms are created on first dock join (seat model), not at login.
                         assert('Cloud', 'Backend dev-login room optional', loginBody.room == null || !!loginBody.room?.id);
+                        assert('Cloud', 'Backend dev-login has no api_key', loginBody.api_key == null);
                     }
                 }
             } catch (cloudErr) {

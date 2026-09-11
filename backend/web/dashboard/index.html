@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>CueSport Scoreboard Cloud — Dashboard</title>
-  <link rel="stylesheet" href="/web/shared/styles.css?v=8.1.0.6" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.1.0.20" />
 </head>
 <body>
   <header class="site-header">
@@ -16,8 +16,15 @@
         <nav class="site-nav">
           <a class="btn" href="/streams">
             <svg class="site-nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="14" height="12" rx="2"/><polygon points="22 8 16 12 22 16 22 8"/></svg>
-            Live Streams
+            <span class="site-nav-label">Live Streams</span>
           </a>
+          <button type="button" id="dashAccountMenuBtn" class="btn account-menu-btn hidden" title="Account" aria-label="Account" aria-haspopup="dialog" aria-expanded="false" aria-controls="dashAccountModal">
+            <svg class="site-nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+            </svg>
+            <span class="site-nav-label">Account</span>
+          </button>
         </nav>
       </div>
     </div>
@@ -25,13 +32,35 @@
   <main id="app" class="dashboard-main">
     <section id="loginSection" class="panel">
       <h2>Sign In</h2>
-      <p>Manage tables, API keys, and mobile control links.</p>
-      <button id="googleBtn" class="btn primary block">Sign In with Google</button>
-      <div class="dev-login">
-        <label>Dev Login (Local/Self-Host)</label>
-        <input type="password" id="devSecret" placeholder="Dev auth secret" autocomplete="current-password" />
-        <button id="devLoginBtn" class="btn block">Dev Sign In</button>
+      <p>Manage tables, OBS Dock Keys, and mobile control links.</p>
+      <div id="dashLoginManagedPane" class="dash-login-pane">
+        <div class="dash-login-intro hint">
+          <p>There are two implementation options: managed or self-hosted.</p>
+          <ul>
+            <li>Managed provides a simpler setup with various subscription levels.</li>
+            <li>Self-hosting lets you run CueSport Cloud on your own server.</li>
+          </ul>
+          <p>Sign in with Google to manage your account, create OBS Dock Keys, and open live tables.</p>
+        </div>
+        <button id="googleBtn" class="btn primary block">Sign In with Google</button>
+        <p class="dash-login-switch">
+          <a href="#" id="dashShowSelfHostLink" class="dash-text-link">Self-hosting</a>
+        </p>
+      </div>
+      <div id="dashLoginSelfHostPane" class="dash-login-pane hidden">
+        <div class="dash-login-intro hint">
+          <p>Sign in with your server&rsquo;s dev auth secret. Open this dashboard from your self-hosted Cloud URL.</p>
+        </div>
+        <label for="devSecret">Dev auth secret</label>
+        <div class="password-field">
+          <input type="password" id="devSecret" placeholder="Dev auth secret" autocomplete="current-password" />
+          <button type="button" id="devSecretToggle" class="password-toggle" aria-label="Show secret" title="Show secret" aria-pressed="false"></button>
+        </div>
+        <button id="devLoginBtn" class="btn primary block">Dev Sign In</button>
         <button type="button" id="clearSavedLoginBtn" class="btn block secondary">Clear Saved Login</button>
+        <p class="dash-login-switch">
+          <a href="#" id="dashShowManagedLink" class="dash-text-link">Managed service / Google sign-in?</a>
+        </p>
       </div>
       <p id="loginError" class="error hidden" role="alert"></p>
     </section>
@@ -152,35 +181,28 @@
         </div>
       </div>
 
-      <div id="tabAccount" class="dash-tab-panel hidden">
+      <div id="tabSettings" class="dash-tab-panel hidden">
         <div class="panel">
-          <h2>Signed In</h2>
-          <p id="userEmail" class="account-email"></p>
-          <p id="quotaSummary" class="hint"></p>
+          <h2>Guest Remote Control Sessions</h2>
+          <p class="hint">
+            Guest links are created and shared from the mobile Share tab or the OBS dock Remote tab.
+            Use this to disconnect every guest scorer across all tables at once.
+          </p>
           <div class="row account-session-actions">
-            <button type="button" id="signOutBtn" class="btn dash-action-btn" title="Sign Out" aria-label="Sign Out">
-              <svg class="dash-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-              <span class="dash-action-label">Sign Out</span>
-            </button>
-            <button type="button" id="invalidateSessionsBtn" class="btn secondary dash-action-btn" title="Sign Out Everywhere" aria-label="Sign Out Everywhere">
-              <svg class="dash-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-              <span class="dash-action-label">Sign Out Everywhere</span>
-            </button>
-            <button type="button" id="revokeAllGuestsBtn" class="btn danger dash-action-btn" title="Revoke All Guest Sessions" aria-label="Revoke All Guest Sessions">
+            <button type="button" id="revokeAllGuestsBtn" class="btn danger dash-action-btn" title="Revoke all" aria-label="Revoke all">
               <svg class="dash-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/><line x1="4" y1="4" x2="20" y2="20"/></svg>
-              <span class="dash-action-label">Revoke All Guest Sessions</span>
+              <span class="dash-action-label">Revoke all</span>
             </button>
           </div>
         </div>
         <div class="panel">
           <h2>OBS Dock Keys</h2>
           <p class="hint">One key per OBS CueSport Scoreboard dock; a second dock using the same key will be rejected.</p>
-          <p class="hint">Create a key for each table you wish to control, then paste it into that OBS CueSport Scoreboard dock’s CueSport Cloud settings.</p>
+          <p class="hint">Create a named key for each table, pick a role, then paste it into that OBS CueSport Scoreboard dock’s CueSport Cloud settings.</p>
           <p class="hint">
-            <strong>Share</strong> — allows you to copy and send the key to another manager of an OBS instance.<br />
-            <strong>Regenerate</strong> — rotates the secret and keeps the same seat name.<br />
-            <strong>Remove</strong> — frees the seat and disconnects any dock using it.<br />
-            <strong>Rename</strong> — allows you to rename a key to be more user-friendly.
+            <strong>Share</strong> — copy and send the key to another manager of an OBS instance.<br />
+            <strong>Edit</strong> — change the seat name/label and role (Administrator, Trusted Operator, or Operator).<br />
+            <strong>Remove</strong> — frees the seat and disconnects any dock using it. Create a new key to replace a leaked one.
           </p>
           <button id="createKeyBtn" class="btn dash-action-btn" type="button" title="Create Dock Key" aria-label="Create Dock Key">Create Dock Key</button>
           <p id="apiKeyLimitHint" class="hint hidden"></p>
@@ -217,11 +239,11 @@
       </svg>
       <span>Stats</span>
     </button>
-    <button type="button" class="dash-tab" data-tab="account">
+    <button type="button" class="dash-tab" data-tab="settings">
       <svg class="dash-tab-icon" viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v1.2h19.2v-1.2c0-3.2-6.4-4.8-9.6-4.8z"/>
+        <path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a7.2 7.2 0 0 0-1.62-.94l-.36-2.54A.48.48 0 0 0 14 2h-4a.48.48 0 0 0-.48.41l-.36 2.54c-.59.24-1.13.55-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.65 8.87a.49.49 0 0 0 .12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.38.3.59.22l2.39-.96c.5.39 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h4c.24 0 .44-.17.48-.41l.36-2.54c.59-.24 1.13-.55 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.61l-2.03-1.58zM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5z"/>
       </svg>
-      <span>Account</span>
+      <span>Settings</span>
     </button>
   </nav>
   <div id="statsMatchModal" class="dash-modal hidden" role="dialog" aria-modal="true" aria-labelledby="statsMatchModalTitle">
@@ -300,6 +322,31 @@
       </form>
     </div>
   </div>
+  <div id="dashCreateKeyModal" class="dash-modal hidden" role="dialog" aria-modal="true" aria-labelledby="dashCreateKeyTitle">
+    <div class="dash-modal-card panel dash-confirm-card">
+      <h2 id="dashCreateKeyTitle">Create Dock Key</h2>
+      <p class="hint" id="dashCreateKeyHint">Name the seat when creating. Remove a key and create a new one to replace a leaked secret.</p>
+      <label class="stats-filter">
+        Name/Label
+        <input id="dashCreateKeyLabel" type="text" maxlength="40" required autocomplete="off" placeholder="e.g. Main Table, Table 1, User Name, or OBS Instance" />
+      </label>
+      <div id="dashCreateKeyRoleWrap" class="dash-role-field">
+        <label class="stats-filter">
+          Role
+          <select id="dashCreateKeyRole">
+            <option value="administrator">Administrator</option>
+            <option value="trusted_operator" selected>Trusted Operator</option>
+            <option value="operator">Operator</option>
+          </select>
+        </label>
+        <div id="dashCreateKeyRoleDesc" class="dash-role-desc hint" aria-live="polite"></div>
+      </div>
+      <div class="stats-toolbar dash-confirm-actions">
+        <button type="button" id="dashCreateKeyCancelBtn" class="btn cancel dash-action-btn">Cancel</button>
+        <button type="button" id="dashCreateKeySubmitBtn" class="btn save dash-action-btn">Create</button>
+      </div>
+    </div>
+  </div>
   <div id="dashConfirmModal" class="dash-modal hidden" role="dialog" aria-modal="true" aria-labelledby="dashConfirmTitle">
     <div class="dash-modal-card panel dash-confirm-card">
       <h2 id="dashConfirmTitle">Confirm</h2>
@@ -323,6 +370,24 @@
       </div>
     </div>
   </div>
-  <script type="module" src="/web/dashboard/app.js?v=8.1.0.5"></script>
+  <div id="dashAccountModal" class="dash-modal hidden" role="dialog" aria-modal="true" aria-labelledby="dashAccountTitle">
+    <div class="dash-modal-card panel dash-confirm-card">
+      <h2 id="dashAccountTitle">Account</h2>
+      <p id="userEmail" class="account-email"></p>
+      <p id="quotaSummary" class="hint"></p>
+      <div class="stats-toolbar dash-confirm-actions account-session-actions">
+        <button type="button" id="signOutBtn" class="btn dash-action-btn" title="Sign Out" aria-label="Sign Out">
+          <svg class="dash-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          <span class="dash-action-label">Sign Out</span>
+        </button>
+        <button type="button" id="invalidateSessionsBtn" class="btn secondary dash-action-btn" title="Sign Out Everywhere" aria-label="Sign Out Everywhere">
+          <svg class="dash-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+          <span class="dash-action-label">Sign Out Everywhere</span>
+        </button>
+        <button type="button" id="dashAccountCloseBtn" class="btn cancel dash-action-btn" title="Close" aria-label="Close">Close</button>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/web/dashboard/app.js?v=8.1.0.20"></script>
 </body>
 </html>

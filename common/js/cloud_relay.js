@@ -24,6 +24,8 @@
     let stateHandlers = [];
     let presenceHandlers = [];
     let hadControlClient = false;
+    let dockRole = null;
+    let dockPermissions = null;
     /** request_id -> { resolve, reject, timer } for stats over WebSocket */
     const pendingStats = new Map();
 
@@ -815,6 +817,8 @@
         if (data.type === 'joined') {
             isJoined = true;
             if (data.room_id) setStorageItem('roomId', data.room_id);
+            dockRole = data.role || null;
+            dockPermissions = data.permissions || null;
             if (data.state) dispatchState(data.state);
             if (window.cloudCommands && typeof window.cloudCommands.initCloudCommands === 'function') {
                 window.cloudCommands.initCloudCommands();
@@ -822,6 +826,17 @@
             updateCloudUI();
             // Push authoritative dock snapshot to room (mobile + DB)
             pushDockStateSoon();
+            return;
+        }
+        if (data.type === 'role_updated') {
+            dockRole = data.role || null;
+            dockPermissions = data.permissions || null;
+            try {
+                window.dispatchEvent(new CustomEvent('cloudRelayRoleChange', {
+                    detail: { role: dockRole, permissions: dockPermissions },
+                }));
+            } catch (_) { /* ignore */ }
+            updateCloudUI();
             return;
         }
         if (data.type === 'stats') {
@@ -837,7 +852,11 @@
                         matches: Array.isArray(data.matches) ? data.matches : [],
                         summary: data.summary || null,
                         tables: Array.isArray(data.tables) ? data.tables : [],
+                        role: data.role || null,
+                        permissions: data.permissions || null,
                     });
+                    if (data.permissions) dockPermissions = data.permissions;
+                    if (data.role != null) dockRole = data.role;
                 }
             }
             return;
@@ -909,6 +928,8 @@
         isConnected = false;
         isJoined = false;
         hadControlClient = false;
+        dockRole = null;
+        dockPermissions = null;
         updateCloudUI();
     }
 
@@ -1071,6 +1092,8 @@
         getRoomId,
         getAccessToken,
         getApiKey,
+        getRole: function () { return dockRole; },
+        getPermissions: function () { return dockPermissions; },
     };
 
     if (document.readyState === 'loading') {

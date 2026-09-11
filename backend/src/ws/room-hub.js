@@ -7,6 +7,7 @@ import {
   getMaxControlConnections,
   isControlClient,
 } from '../quotas.js';
+import { permissionsForAuth } from '../lib/dock-roles.js';
 
 /** roomId -> Set<{ ws, client, accountId, sourceId }> */
 const rooms = new Map();
@@ -293,7 +294,20 @@ function handleStats(ws, meta, msg) {
   try {
     const limit = Math.min(Math.max(parseInt(msg.limit || 5000, 10) || 5000, 1), 10000);
     const stats = getAccountStats(meta.accountId, limit);
-    send(ws, { type: 'stats', request_id: requestId, ok: true, ...stats });
+    const auth = {
+      account: { id: meta.accountId },
+      authMethod: meta.authMethod || (meta.apiKeyId ? 'api_key' : 'jwt'),
+      keyId: meta.apiKeyId || null,
+      role: meta.role || null,
+    };
+    send(ws, {
+      type: 'stats',
+      request_id: requestId,
+      ok: true,
+      role: meta.role || null,
+      permissions: permissionsForAuth(auth),
+      ...stats,
+    });
   } catch (err) {
     send(ws, {
       type: 'stats',
@@ -393,8 +407,16 @@ async function handleJoin(ws, meta, msg, authenticateJoin) {
 
 /** Account-scoped dashboard feed: no room join; push tables on dock/state changes. */
 async function handleDashboardJoin(ws, meta, msg, authenticateJoin) {
+  if (msg.api_key && !msg.access_token) {
+    send(ws, {
+      type: 'error',
+      code: 'dashboard_jwt_required',
+      message: 'The dashboard requires account sign-in (not an OBS Dock Key).',
+    });
+    return;
+  }
   const auth = await authenticateJoin({
-    apiKey: msg.api_key,
+    apiKey: null,
     accessToken: msg.access_token,
     client: 'dashboard',
   });
@@ -476,8 +498,17 @@ async function handleRoomClientJoin(ws, meta, msg, authenticateJoin) {
         return;
       }
       meta.apiKeyId = auth.keyId;
+      meta.role = auth.role || null;
+      meta.authMethod = auth.authMethod;
       meta.client = 'dock';
       trackDockApiKey(ws, auth.keyId);
+    }
+
+    if (auth.authMethod) {
+      meta.authMethod = auth.authMethod;
+    }
+    if (auth.role) {
+      meta.role = auth.role;
     }
 
     roomId = resolveRoomIdForJoin(msg, auth, client);
@@ -557,6 +588,13 @@ async function handleRoomClientJoin(ws, meta, msg, authenticateJoin) {
     clients: listClientTypes(roomId),
     session_id: sessionId,
     state,
+    role: meta.role || null,
+    permissions: permissionsForAuth({
+      account: { id: accountId || room.account_id },
+      authMethod: meta.authMethod || (meta.apiKeyId ? 'api_key' : (meta.guestToken ? 'guest' : 'jwt')),
+      keyId: meta.apiKeyId || null,
+      role: meta.role || null,
+    }),
     ...(client === 'dock' && meta.apiKeyId ? { api_key_id: meta.apiKeyId } : {}),
   });
 
@@ -567,6 +605,7 @@ async function handleRoomClientJoin(ws, meta, msg, authenticateJoin) {
   }, ws);
 
   if (client === 'dock') {
+    sqlite.ensureDefaultDockOwnerGuestToken(roomId, accountId || room.account_id);
     cancelRoomCleanup(roomId);
     notifyAccountTables(accountId || room.account_id, { immediate: true });
   }
@@ -596,6 +635,7 @@ function persistEvent(meta, eventType, payload, sourceClient, sessionIdOverride)
     eventType,
     payload,
     sourceClient: sourceClient || meta.client,
+    apiKeyId: meta.apiKeyId || null,
   });
 }
 
@@ -672,6 +712,10 @@ function handleSession(ws, meta, msg) {
   if (action === 'start') {
     sessionId = uuidv4();
     sqlite.setRoomSessionId(meta.roomId, sessionId);
+    if (meta.accountId) {
+      sqlite.upsertAccountPlayer(meta.accountId, payload.player1, payload.player1Id || null);
+      sqlite.upsertAccountPlayer(meta.accountId, payload.player2, payload.player2Id || null);
+    }
   } else if (action === 'discard') {
     // Clear Game / abandon: remove the open cloud match from history (not a completed end).
     const matchKey = payload.matchId || payload.sessionId || sessionId || null;
@@ -860,6 +904,44 @@ export function kickApiKeyDocks(keyId) {
     n += 1;
   }
   docksByApiKeyId.delete(key);
+  return n;
+}
+
+/**
+ * Push an updated dock-key role to any live dock using that key
+ * so Remote/Stats permissions refresh without reconnect.
+ */
+export function notifyApiKeyRoleChange(keyId, role) {
+  if (!keyId) return 0;
+  const key = String(keyId);
+  const nextRole = role || null;
+  const targets = new Set();
+  const indexed = docksByApiKeyId.get(key);
+  if (indexed) {
+    for (const ws of indexed) targets.add(ws);
+  }
+  for (const [ws, meta] of connections) {
+    if (String(meta.apiKeyId || '') === key) targets.add(ws);
+  }
+  let n = 0;
+  for (const ws of targets) {
+    const meta = connections.get(ws);
+    if (!meta) continue;
+    meta.role = nextRole;
+    const permissions = permissionsForAuth({
+      account: { id: meta.accountId },
+      authMethod: meta.authMethod || 'api_key',
+      keyId: meta.apiKeyId || key,
+      role: nextRole,
+    });
+    send(ws, {
+      type: 'role_updated',
+      api_key_id: key,
+      role: nextRole,
+      permissions,
+    });
+    n += 1;
+  }
   return n;
 }
 

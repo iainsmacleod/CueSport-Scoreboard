@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
   <title>CueSport Scoreboard Cloud Control</title>
-  <link rel="stylesheet" href="/web/shared/styles.css?v=8.0.0.53" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.1.0.20" />
 </head>
 <body class="mobile">
   <header>
@@ -43,7 +43,10 @@
     <section id="loginSection" class="hidden">
       <p id="loginHint" class="hint">Sign in on the <a href="/dashboard">dashboard</a> first (same browser), or enter your <strong>dev auth secret</strong> once below.</p>
       <div id="devSecretRow">
-        <input type="password" id="devSecret" placeholder="Dev auth secret (only if needed)" autocomplete="current-password" />
+        <div class="password-field">
+          <input type="password" id="devSecret" placeholder="Dev auth secret (only if needed)" autocomplete="current-password" />
+          <button type="button" id="devSecretToggle" class="password-toggle" aria-label="Show secret" title="Show secret" aria-pressed="false"></button>
+        </div>
       </div>
       <button id="connectBtn" class="btn primary block">Connect</button>
       <button type="button" id="clearTokenBtn" class="btn block secondary">Clear Saved Login</button>
@@ -246,20 +249,34 @@
             replay functionality.
           </p>
           <p class="hint share-limitations">
-            Each guest link allows only one active device at a time.
+            Each guest link allows only one active device at a time. QR and URL stay hidden until you press Show.
           </p>
-          <div id="shareQrWrap" class="share-qr-wrap">
+          <div id="shareQrWrap" class="share-qr-wrap dash-guest-qr-wrap is-obscured">
             <img id="shareQrImg" class="share-qr hidden" alt="QR code for guest control link" />
-            <p id="shareStatus" class="hint">Preparing link…</p>
+            <div id="shareQrPlaceholder" class="dash-guest-qr-placeholder" aria-hidden="true"></div>
+            <div class="dash-guest-reveal-overlay">
+              <button type="button" id="shareRevealBtn" class="btn secondary" disabled>Show</button>
+            </div>
           </div>
-          <p id="shareUrl" class="share-url hidden"></p>
+          <p id="shareStatus" class="hint">Preparing link…</p>
+          <p id="shareUrl" class="share-url dash-guest-url is-obscured hidden">Hidden — press Show</p>
           <div class="row share-actions">
             <button type="button" id="shareCopyBtn" class="btn primary block" disabled>Copy link</button>
             <button type="button" id="shareNativeBtn" class="btn primary block hidden" disabled>Share link</button>
           </div>
           <h3 class="share-links-heading">Guest links</h3>
-          <p class="hint">Each link stays reusable after disconnect, but only one device can be connected with it at once. Revoke a link to invalidate it.</p>
-          <button type="button" id="shareNewLinkBtn" class="btn block">Create new link</button>
+          <p class="hint">Click a link to select it. Switching links or leaving Share hides QR and URL again. Name is required when creating a new link.</p>
+          <div class="dash-guest-create-row">
+            <input
+              id="shareNewLinkName"
+              type="text"
+              maxlength="40"
+              autocomplete="off"
+              placeholder="Name required (e.g. Helper, Phone)"
+              aria-label="Guest link name"
+            />
+            <button type="button" id="shareNewLinkBtn" class="btn primary">Create link</button>
+          </div>
           <ul id="guestLinkList" class="guest-link-list"></ul>
         </div>
       </div>
@@ -338,6 +355,6 @@
       <div id="poolRespotTargets" class="snooker-foul-targets"></div>
     </div>
   </div>
-  <script type="module" src="/web/mobile/app.js?v=8.0.0.26"></script>
+  <script type="module" src="/web/mobile/app.js?v=8.0.0.30"></script>
 </body>
 </html>

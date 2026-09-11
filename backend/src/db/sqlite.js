@@ -8,6 +8,11 @@ import {
   normalizePlayerNameKey,
   truncatePlayerName,
 } from '../lib/scoreboard-helpers.js';
+import {
+  DEFAULT_DOCK_KEY_ROLE,
+  OBS_DOCK_OWNER_GUEST_LABEL,
+  normalizeDockKeyRole,
+} from '../lib/dock-roles.js';
 
 function normalizePlayerName(name) {
   return normalizePlayerNameKey(name);
@@ -32,6 +37,7 @@ CREATE TABLE IF NOT EXISTS api_keys (
   key_hash TEXT NOT NULL,
   key_plaintext TEXT,
   label TEXT NOT NULL DEFAULT 'OBS Dock Key 1',
+  role TEXT NOT NULL DEFAULT 'trusted_operator',
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   revoked_at TEXT
 );
@@ -51,6 +57,7 @@ CREATE TABLE IF NOT EXISTS match_events (
   event_type TEXT NOT NULL,
   payload TEXT NOT NULL DEFAULT '{}',
   source_client TEXT,
+  api_key_id TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -104,6 +111,7 @@ CREATE INDEX IF NOT EXISTS idx_account_players_name ON account_players(account_i
 const MATCH_EVENTS_INDEXES = `
 CREATE INDEX IF NOT EXISTS idx_match_events_account ON match_events(account_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_match_events_room ON match_events(room_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_match_events_api_key ON match_events(api_key_id);
 `;
 
 let db;
@@ -127,11 +135,25 @@ function ensureApiKeyColumns(database) {
   if (!cols.has('key_plaintext')) {
     database.exec('ALTER TABLE api_keys ADD COLUMN key_plaintext TEXT');
   }
+  if (!cols.has('role')) {
+    database.exec(`ALTER TABLE api_keys ADD COLUMN role TEXT NOT NULL DEFAULT '${DEFAULT_DOCK_KEY_ROLE}'`);
+  }
   // Legacy signup keys were labeled "Default" — rename to the numbered scheme.
   database.prepare(
     `UPDATE api_keys SET label = 'OBS Dock Key 1'
      WHERE lower(trim(label)) = 'default'`
   ).run();
+}
+
+function ensureMatchEventColumns(database) {
+  const exists = database.prepare(
+    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='match_events'"
+  ).get();
+  if (!exists) return;
+  const cols = new Set(tableColumns(database, 'match_events'));
+  if (!cols.has('api_key_id')) {
+    database.exec('ALTER TABLE match_events ADD COLUMN api_key_id TEXT');
+  }
 }
 
 function ensureRoomDockColumns(database) {
@@ -164,10 +186,12 @@ function ensureMatchEventsAccountScoped(database) {
       event_type TEXT NOT NULL,
       payload TEXT NOT NULL DEFAULT '{}',
       source_client TEXT,
+      api_key_id TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
     CREATE INDEX IF NOT EXISTS idx_match_events_account ON match_events(account_id, created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_match_events_room ON match_events(room_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_match_events_api_key ON match_events(api_key_id);
   `);
 }
 
@@ -212,6 +236,7 @@ export function getDb() {
     ensureApiKeyColumns(db);
     ensureRoomDockColumns(db);
     ensureMatchEventsAccountScoped(db);
+    ensureMatchEventColumns(db);
     ensureAccountPlayersUuid(db);
     db.exec(MATCH_EVENTS_INDEXES);
   }
@@ -224,59 +249,20 @@ export function generateApiKeyPlaintext() {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-/** Next "OBS Dock Key N" among active (non-revoked) seats — fills gaps. */
-export function nextObsDockKeyLabel(accountId) {
-  const rows = getDb().prepare(
-    `SELECT label FROM api_keys WHERE account_id = ? AND revoked_at IS NULL`
-  ).all(accountId);
-  const used = new Set();
-  for (const row of rows) {
-    const m = String(row.label || '').match(/^OBS Dock Key\s+(\d+)$/i);
-    if (m) used.add(parseInt(m[1], 10) || 0);
+export function createApiKey(accountId, label, role) {
+  const database = getDb();
+  const plaintext = generateApiKeyPlaintext();
+  const id = uuidv4();
+  const resolvedLabel = String(label || '').trim().slice(0, 40);
+  if (!resolvedLabel) {
+    return null;
   }
-  let n = 1;
-  while (used.has(n)) n += 1;
-  return `OBS Dock Key ${n}`;
-}
-
-function shouldAutoNumberApiKeyLabel(label) {
-  const t = String(label || '').trim().toLowerCase();
-  return !t || t === 'default' || t === 'api key' || t === 'obs dock key';
-}
-
-export function createApiKey(accountId, label) {
-  const database = getDb();
-  const plaintext = generateApiKeyPlaintext();
-  const id = uuidv4();
-  const resolvedLabel = shouldAutoNumberApiKeyLabel(label)
-    ? nextObsDockKeyLabel(accountId)
-    : String(label).trim();
+  const resolvedRole = normalizeDockKeyRole(role);
   database.prepare(
-    `INSERT INTO api_keys (id, account_id, key_hash, key_plaintext, label) VALUES (?, ?, ?, ?, ?)`
-  ).run(id, accountId, hashApiKey(plaintext), plaintext, resolvedLabel);
-  return { id, plaintext, label: resolvedLabel };
-}
-
-/** Rotate secret in place: revoke old row, insert new with the same label. */
-export function regenerateApiKey(keyId, accountId) {
-  const database = getDb();
-  const existing = database.prepare(
-    `SELECT id, label FROM api_keys
-     WHERE id = ? AND account_id = ? AND revoked_at IS NULL`
-  ).get(keyId, accountId);
-  if (!existing) return null;
-  const ok = revokeApiKey(keyId, accountId);
-  if (!ok) return null;
-  const plaintext = generateApiKeyPlaintext();
-  const id = uuidv4();
-  database.prepare(
-    `INSERT INTO api_keys (id, account_id, key_hash, key_plaintext, label) VALUES (?, ?, ?, ?, ?)`
-  ).run(id, accountId, hashApiKey(plaintext), plaintext, existing.label);
-  // Point live room mappings at the new seat id (label unchanged).
-  database.prepare(
-    `UPDATE room_docks SET api_key_id = ? WHERE api_key_id = ? AND account_id = ?`
-  ).run(id, keyId, accountId);
-  return { id, plaintext, label: existing.label, previous_id: keyId };
+    `INSERT INTO api_keys (id, account_id, key_hash, key_plaintext, label, role)
+     VALUES (?, ?, ?, ?, ?, ?)`
+  ).run(id, accountId, hashApiKey(plaintext), plaintext, resolvedLabel, resolvedRole);
+  return { id, plaintext, label: resolvedLabel, role: resolvedRole };
 }
 
 export function getApiKeyById(keyId) {
@@ -367,7 +353,7 @@ export function findAccountByApiKey(plaintextKey) {
   const database = getDb();
   // Select ak.id explicitly — `ak.*, a.*` would let accounts.id overwrite api_keys.id.
   const keys = database.prepare(
-    `SELECT ak.id AS key_id, ak.key_hash, ak.account_id,
+    `SELECT ak.id AS key_id, ak.key_hash, ak.account_id, ak.role,
             a.email, a.subscription_status, a.subscription_tier,
             a.sessions_invalid_after, a.session_epoch
      FROM api_keys ak
@@ -386,6 +372,7 @@ export function findAccountByApiKey(plaintextKey) {
           session_epoch: row.session_epoch,
         },
         keyId: row.key_id,
+        role: normalizeDockKeyRole(row.role),
       };
     }
   }
@@ -415,42 +402,60 @@ export function getRoomsForAccount(accountId) {
 
 export function getApiKeysForAccount(accountId) {
   return getDb().prepare(
-    `SELECT id, label, created_at, revoked_at,
+    `SELECT id, label, role, created_at, revoked_at,
             CASE WHEN key_plaintext IS NOT NULL AND length(key_plaintext) > 0 THEN 1 ELSE 0 END AS viewable
      FROM api_keys WHERE account_id = ? AND revoked_at IS NULL ORDER BY created_at`
   ).all(accountId).map((row) => ({
     id: row.id,
     label: row.label,
+    role: normalizeDockKeyRole(row.role),
     created_at: row.created_at,
     revoked_at: row.revoked_at,
     viewable: !!row.viewable,
   }));
 }
 
-/** Rename an active seat; syncs room / dock labels that use this key. */
-export function renameApiKey(keyId, accountId, label) {
-  const next = String(label || '').trim().slice(0, 40);
-  if (!next) return null;
+/** Rename and/or change role of an active seat. */
+export function updateApiKey(keyId, accountId, { label, role } = {}) {
   const database = getDb();
   const existing = database.prepare(
-    `SELECT id, label FROM api_keys
+    `SELECT id, label, role FROM api_keys
      WHERE id = ? AND account_id = ? AND revoked_at IS NULL`
   ).get(keyId, accountId);
   if (!existing) return null;
-  database.prepare(
-    `UPDATE api_keys SET label = ? WHERE id = ? AND account_id = ? AND revoked_at IS NULL`
-  ).run(next, keyId, accountId);
-  const docks = database.prepare(
-    `SELECT room_id FROM room_docks WHERE api_key_id = ? AND account_id = ?`
-  ).all(keyId, accountId);
-  for (const dock of docks) {
-    database.prepare(
-      `UPDATE room_docks SET label = ? WHERE room_id = ? AND account_id = ?`
-    ).run(next, dock.room_id, accountId);
-    database.prepare('UPDATE rooms SET label = ? WHERE id = ? AND account_id = ?')
-      .run(next, dock.room_id, accountId);
+  let nextLabel = existing.label;
+  if (label != null) {
+    nextLabel = String(label || '').trim().slice(0, 40);
+    if (!nextLabel) return null;
   }
-  return { id: keyId, label: next, previous_label: existing.label };
+  const nextRole = role != null ? normalizeDockKeyRole(role) : normalizeDockKeyRole(existing.role);
+  database.prepare(
+    `UPDATE api_keys SET label = ?, role = ? WHERE id = ? AND account_id = ? AND revoked_at IS NULL`
+  ).run(nextLabel, nextRole, keyId, accountId);
+  if (nextLabel !== existing.label) {
+    const docks = database.prepare(
+      `SELECT room_id FROM room_docks WHERE api_key_id = ? AND account_id = ?`
+    ).all(keyId, accountId);
+    for (const dock of docks) {
+      database.prepare(
+        `UPDATE room_docks SET label = ? WHERE room_id = ? AND account_id = ?`
+      ).run(nextLabel, dock.room_id, accountId);
+      database.prepare('UPDATE rooms SET label = ? WHERE id = ? AND account_id = ?')
+        .run(nextLabel, dock.room_id, accountId);
+    }
+  }
+  return {
+    id: keyId,
+    label: nextLabel,
+    role: nextRole,
+    previous_label: existing.label,
+    previous_role: normalizeDockKeyRole(existing.role),
+  };
+}
+
+/** Rename an active seat; syncs room / dock labels that use this key. */
+export function renameApiKey(keyId, accountId, label) {
+  return updateApiKey(keyId, accountId, { label });
 }
 
 /** Returns plaintext key for the account owner, or null if missing/revoked/legacy. */
@@ -515,14 +520,14 @@ export function invalidateAllSessions(accountId) {
   return getAccountById(accountId);
 }
 
-export function insertMatchEvent({ accountId, roomId, sessionId, eventType, payload, sourceClient }) {
+export function insertMatchEvent({ accountId, roomId, sessionId, eventType, payload, sourceClient, apiKeyId }) {
   if (!accountId) {
     throw new Error('accountId is required to insert match events');
   }
   const id = uuidv4();
   getDb().prepare(
-    `INSERT INTO match_events (id, account_id, room_id, session_id, event_type, payload, source_client)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO match_events (id, account_id, room_id, session_id, event_type, payload, source_client, api_key_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     id,
     accountId,
@@ -530,7 +535,8 @@ export function insertMatchEvent({ accountId, roomId, sessionId, eventType, payl
     sessionId || null,
     eventType,
     JSON.stringify(payload || {}),
-    sourceClient || null
+    sourceClient || null,
+    apiKeyId || null
   );
   return id;
 }
@@ -549,6 +555,7 @@ export function getAccountSessionEvents(accountId, limit = 5000) {
   const cap = Math.min(Math.max(parseInt(limit, 10) || 5000, 1), 10000);
   return getDb().prepare(
     `SELECT e.id, e.account_id, e.room_id, e.session_id, e.event_type, e.payload, e.created_at,
+            e.api_key_id,
             r.label AS room_label,
             d.instance_key, d.label AS dock_label
      FROM match_events e
@@ -813,6 +820,37 @@ export function createGuestToken(roomId, accountId, label = 'Guest scorer') {
     `INSERT INTO room_guest_tokens (token, room_id, account_id, label) VALUES (?, ?, ?, ?)`
   ).run(token, roomId, accountId, label);
   return token;
+}
+
+export function findDefaultDockOwnerGuestToken(roomId, accountId) {
+  if (!roomId || !accountId) return null;
+  return getDb().prepare(
+    `SELECT * FROM room_guest_tokens
+     WHERE room_id = ? AND account_id = ? AND revoked_at IS NULL AND label = ?
+     ORDER BY created_at ASC
+     LIMIT 1`
+  ).get(roomId, accountId, OBS_DOCK_OWNER_GUEST_LABEL) || null;
+}
+
+export function isDefaultDockOwnerGuestToken(row) {
+  return !!(row && String(row.label || '') === OBS_DOCK_OWNER_GUEST_LABEL);
+}
+
+/** One built-in guest scorer QR per table. Recreated after revoke-all. */
+export function ensureDefaultDockOwnerGuestToken(roomId, accountId) {
+  if (!roomId || !accountId) return null;
+  const existing = findDefaultDockOwnerGuestToken(roomId, accountId);
+  if (existing) return existing;
+  const token = createGuestToken(roomId, accountId, OBS_DOCK_OWNER_GUEST_LABEL);
+  return findGuestToken(token);
+}
+
+export function getRoomIdForApiKey(apiKeyId) {
+  if (!apiKeyId) return null;
+  const row = getDb().prepare(
+    `SELECT room_id FROM room_docks WHERE api_key_id = ? LIMIT 1`
+  ).get(apiKeyId);
+  return row?.room_id || null;
 }
 
 export function findGuestToken(token) {

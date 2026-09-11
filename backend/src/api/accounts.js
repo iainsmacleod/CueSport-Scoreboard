@@ -13,6 +13,7 @@ import {
   kickAccountAdminClients,
   kickAccountGuestClients,
   kickApiKeyDocks,
+  notifyApiKeyRoleChange,
   performDeleteRoom,
   getRoomCleanupAfter,
   resolveRoomApiKeyId,
@@ -22,6 +23,13 @@ import {
   assertCanCreateApiKey,
   getAccountQuota,
 } from '../quotas.js';
+import {
+  OBS_DOCK_OWNER_GUEST_LABEL,
+  isAccountAdminAuth,
+  isValidDockKeyRole,
+  normalizeDockKeyRole,
+  permissionsForAuth,
+} from '../lib/dock-roles.js';
 
 function enrichRoom(room) {
   const cleanupMs = getRoomCleanupAfter(room.id);
@@ -60,22 +68,6 @@ export async function registerAccountRoutes(app) {
       return reply.code(401).send({ error: 'Invalid dev auth secret', message: 'Invalid dev auth secret' });
     }
     const { account } = ensureDevAccount();
-    let apiKey = sqlite.getApiKeysForAccount(account.id)[0];
-    let apiKeyPlain = null;
-    if (!apiKey) {
-      const check = assertCanCreateApiKey(account);
-      if (!check.ok) {
-        return reply.code(403).send({
-          error: check.message,
-          code: check.code,
-          quota: check.quota,
-        });
-      }
-      const created = sqlite.createApiKey(account.id);
-      apiKeyPlain = created.plaintext;
-    } else {
-      apiKeyPlain = sqlite.getApiKeyPlaintext(apiKey.id, account.id);
-    }
     const firstRoom = sqlite.getRoomsForAccount(account.id)[0] || null;
     return {
       access_token: issueDevToken(account),
@@ -86,7 +78,6 @@ export async function registerAccountRoutes(app) {
         subscription_tier: account.subscription_tier,
       },
       room: firstRoom ? { id: firstRoom.id, label: firstRoom.label } : null,
-      api_key: apiKeyPlain,
       quota: getAccountQuota(account),
     };
   });
@@ -96,8 +87,12 @@ export async function registerAccountRoutes(app) {
   });
 
   app.get('/api/me', async (request, reply) => {
-    const account = await resolveAccountFromRequest(request);
-    if (!account) return reply.code(401).send({ error: 'Unauthorized' });
+    const auth = await resolveAuthFromRequest(request);
+    if (!auth?.account) return reply.code(401).send({ error: 'Unauthorized' });
+    if (!isAccountAdminAuth(auth)) {
+      return reply.code(403).send({ error: 'Account sign-in required' });
+    }
+    const account = auth.account;
     const rooms = sqlite.getRoomsWithLiveState(account.id).map(enrichRoom);
     const keys = sqlite.getApiKeysForAccount(account.id);
     return {
@@ -119,55 +114,54 @@ export async function registerAccountRoutes(app) {
   });
 
   app.get('/api/players', async (request, reply) => {
-    const account = await resolveAccountFromRequest(request);
-    if (!account) return reply.code(401).send({ error: 'Unauthorized' });
+    const auth = await resolveAuthFromRequest(request);
+    if (!auth?.account) return reply.code(401).send({ error: 'Unauthorized' });
     const q = typeof request.query.q === 'string' ? request.query.q : '';
     const limit = request.query.limit || '8';
-    const players = sqlite.searchAccountPlayers(account.id, q, limit);
+    const players = sqlite.searchAccountPlayers(auth.account.id, q, limit);
     return { players };
   });
 
   app.post('/api/rooms/:roomId/guest-link', async (request, reply) => {
-    const account = await resolveAccountFromRequest(request);
-    if (!account) return reply.code(401).send({ error: 'Unauthorized' });
+    const auth = await resolveAuthFromRequest(request);
+    if (!auth?.account) return reply.code(401).send({ error: 'Unauthorized' });
     const { roomId } = request.params;
-    if (!sqlite.roomBelongsToAccount(roomId, account.id)) {
-      return reply.code(403).send({ error: 'Forbidden' });
+    const roomErr = guestLinkRoomAccessError(auth, roomId);
+    if (roomErr) return reply.code(roomErr.code).send({ error: roomErr.error });
+    const perms = permissionsForAuth(auth);
+    if (!perms.canCreateGuestLinks) {
+      return reply.code(403).send({ error: 'This dock key cannot create guest links' });
     }
     const { label } = request.body || {};
-    const token = sqlite.createGuestToken(roomId, account.id, label || 'Guest scorer');
-    const xfProto = request.headers['x-forwarded-proto'];
-    const xfHost = request.headers['x-forwarded-host'] || request.headers.host;
-    let base = config.publicUrl.replace(/\/$/, '');
-    if (xfHost) {
-      const proto = (Array.isArray(xfProto) ? xfProto[0] : xfProto) ||
-        (request.protocol === 'https' ? 'https' : 'http');
-      const host = String(Array.isArray(xfHost) ? xfHost[0] : xfHost).split(',')[0].trim();
-      base = `${proto}://${host}`.replace(/\/$/, '');
+    const requestedLabel = String(label || '').trim();
+    if (!requestedLabel) {
+      return reply.code(400).send({ error: 'Enter a name for this guest link.' });
     }
-    return {
-      token,
-      path: `/g/${token}`,
-      url: `${base}/g/${token}`,
-      label: label || 'Guest scorer',
-    };
+    if (requestedLabel === OBS_DOCK_OWNER_GUEST_LABEL) {
+      const existing = sqlite.ensureDefaultDockOwnerGuestToken(roomId, auth.account.id);
+      return guestLinkResponse(request, existing.token, existing.label);
+    }
+    const token = sqlite.createGuestToken(roomId, auth.account.id, requestedLabel);
+    return guestLinkResponse(request, token, requestedLabel);
   });
 
   app.get('/api/guest-links', async (request, reply) => {
-    const account = await resolveAccountFromRequest(request);
-    if (!account) return reply.code(401).send({ error: 'Unauthorized' });
-    return { guest_links: sqlite.listGuestTokensForAccount(account.id) };
+    const auth = await resolveAuthFromRequest(request);
+    if (!auth?.account) return reply.code(401).send({ error: 'Unauthorized' });
+    if (!isAccountAdminAuth(auth)) {
+      return reply.code(403).send({ error: 'Account sign-in required' });
+    }
+    return { guest_links: sqlite.listGuestTokensForAccount(auth.account.id) };
   });
 
   app.get('/api/rooms/:roomId/guest-links', async (request, reply) => {
-    const account = await resolveAccountFromRequest(request);
-    if (!account) return reply.code(401).send({ error: 'Unauthorized' });
+    const auth = await resolveAuthFromRequest(request);
+    if (!auth?.account) return reply.code(401).send({ error: 'Unauthorized' });
     const { roomId } = request.params;
-    if (!sqlite.roomBelongsToAccount(roomId, account.id)) {
-      return reply.code(403).send({ error: 'Forbidden' });
-    }
+    const roomErr = guestLinkRoomAccessError(auth, roomId);
+    if (roomErr) return reply.code(roomErr.code).send({ error: roomErr.error });
     const counts = guestConnectionCounts(roomId);
-    const guest_links = sqlite.listGuestTokensForRoom(roomId, account.id).map((g) => ({
+    const guest_links = sqlite.listGuestTokensForRoom(roomId, auth.account.id).map((g) => ({
       ...g,
       connected: counts[g.token] || 0,
     }));
@@ -175,10 +169,13 @@ export async function registerAccountRoutes(app) {
   });
 
   app.delete('/api/rooms/:roomId', async (request, reply) => {
-    const account = await resolveAccountFromRequest(request);
-    if (!account) return reply.code(401).send({ error: 'Unauthorized' });
+    const auth = await resolveAuthFromRequest(request);
+    if (!auth?.account) return reply.code(401).send({ error: 'Unauthorized' });
+    if (!isAccountAdminAuth(auth)) {
+      return reply.code(403).send({ error: 'Account sign-in required' });
+    }
     const { roomId } = request.params;
-    if (!sqlite.roomBelongsToAccount(roomId, account.id)) {
+    if (!sqlite.roomBelongsToAccount(roomId, auth.account.id)) {
       return reply.code(403).send({ error: 'Forbidden' });
     }
     const result = performDeleteRoom(roomId);
@@ -187,29 +184,42 @@ export async function registerAccountRoutes(app) {
     }
     return {
       ok: true,
-      quota: getAccountQuota(account),
-      rooms: sqlite.getRoomsWithLiveState(account.id).map(enrichRoom),
+      quota: getAccountQuota(auth.account),
+      rooms: sqlite.getRoomsWithLiveState(auth.account.id).map(enrichRoom),
     };
   });
 
   app.delete('/api/guest-links/:token', async (request, reply) => {
-    const account = await resolveAccountFromRequest(request);
-    if (!account) return reply.code(401).send({ error: 'Unauthorized' });
+    const auth = await resolveAuthFromRequest(request);
+    if (!auth?.account) return reply.code(401).send({ error: 'Unauthorized' });
     const { token } = request.params;
     const existing = sqlite.findGuestToken(token);
-    if (!existing || existing.account_id !== account.id) {
+    if (!existing || existing.account_id !== auth.account.id) {
       return reply.code(404).send({ error: 'Guest link not found' });
     }
-    sqlite.revokeGuestToken(token, account.id);
+    const roomErr = guestLinkRoomAccessError(auth, existing.room_id);
+    if (roomErr) return reply.code(roomErr.code).send({ error: roomErr.error });
+    const perms = permissionsForAuth(auth);
+    const isDefault = sqlite.isDefaultDockOwnerGuestToken(existing);
+    if (isDefault && !perms.canRevokeDefaultGuestLink) {
+      return reply.code(403).send({ error: 'The default guest link cannot be revoked from a dock key' });
+    }
+    if (!isDefault && !perms.canRevokeGuestLinks) {
+      return reply.code(403).send({ error: 'This dock key cannot revoke guest links' });
+    }
+    sqlite.revokeGuestToken(token, auth.account.id);
     kickGuestToken(token);
     return { ok: true };
   });
 
   app.post('/api/guest-links/revoke-all', async (request, reply) => {
-    const account = await resolveAccountFromRequest(request);
-    if (!account) return reply.code(401).send({ error: 'Unauthorized' });
-    const revoked = sqlite.revokeAllGuestTokens(account.id);
-    kickAccountGuestClients(account.id);
+    const auth = await resolveAuthFromRequest(request);
+    if (!auth?.account) return reply.code(401).send({ error: 'Unauthorized' });
+    if (!isAccountAdminAuth(auth)) {
+      return reply.code(403).send({ error: 'Account sign-in required' });
+    }
+    const revoked = sqlite.revokeAllGuestTokens(auth.account.id);
+    kickAccountGuestClients(auth.account.id);
     return { ok: true, revoked };
   });
 
@@ -223,9 +233,12 @@ export async function registerAccountRoutes(app) {
   });
 
   app.post('/api/api-keys', async (request, reply) => {
-    const account = await resolveAccountFromRequest(request);
-    if (!account) return reply.code(401).send({ error: 'Unauthorized' });
-    const check = assertCanCreateApiKey(account);
+    const auth = await resolveAuthFromRequest(request);
+    if (!auth?.account) return reply.code(401).send({ error: 'Unauthorized' });
+    if (!isAccountAdminAuth(auth)) {
+      return reply.code(403).send({ error: 'Account sign-in required' });
+    }
+    const check = assertCanCreateApiKey(auth.account);
     if (!check.ok) {
       return reply.code(403).send({
         error: check.message,
@@ -233,21 +246,35 @@ export async function registerAccountRoutes(app) {
         quota: check.quota,
       });
     }
-    const { label } = request.body || {};
-    const created = sqlite.createApiKey(account.id, label);
+    const { label, role } = request.body || {};
+    const resolvedLabel = String(label || '').trim().slice(0, 40);
+    if (!resolvedLabel) {
+      return reply.code(400).send({ error: 'Enter a name (1–40 characters) for this dock key.' });
+    }
+    if (role != null && String(role).trim() && !isValidDockKeyRole(role)) {
+      return reply.code(400).send({ error: 'Invalid role' });
+    }
+    const created = sqlite.createApiKey(auth.account.id, resolvedLabel, role);
+    if (!created) {
+      return reply.code(400).send({ error: 'Enter a name (1–40 characters) for this dock key.' });
+    }
     return {
       id: created.id,
       key: created.plaintext,
       label: created.label,
-      quota: getAccountQuota(account),
+      role: created.role,
+      quota: getAccountQuota(auth.account),
     };
   });
 
   app.get('/api/api-keys/:keyId', async (request, reply) => {
-    const account = await resolveAccountFromRequest(request);
-    if (!account) return reply.code(401).send({ error: 'Unauthorized' });
+    const auth = await resolveAuthFromRequest(request);
+    if (!auth?.account) return reply.code(401).send({ error: 'Unauthorized' });
+    if (!isAccountAdminAuth(auth)) {
+      return reply.code(403).send({ error: 'Account sign-in required' });
+    }
     const { keyId } = request.params;
-    const key = sqlite.getApiKeyPlaintext(keyId, account.id);
+    const key = sqlite.getApiKeyPlaintext(keyId, auth.account.id);
     if (!key) {
       return reply.code(404).send({
         error: 'API key not found or was created before viewable keys. Create a new key to view it later.',
@@ -257,68 +284,77 @@ export async function registerAccountRoutes(app) {
     return { id: keyId, key };
   });
 
-  /** Rename seat label (who you shared the key with). Does not rotate the secret. */
+  /** Rename and/or change role. Does not rotate the secret. */
   app.patch('/api/api-keys/:keyId', async (request, reply) => {
-    const account = await resolveAccountFromRequest(request);
-    if (!account) return reply.code(401).send({ error: 'Unauthorized' });
-    const { keyId } = request.params;
-    const { label } = request.body || {};
-    const next = String(label || '').trim();
-    if (!next) {
-      return reply.code(400).send({ error: 'Enter a name (1–40 characters) for this dock key.' });
+    const auth = await resolveAuthFromRequest(request);
+    if (!auth?.account) return reply.code(401).send({ error: 'Unauthorized' });
+    if (!isAccountAdminAuth(auth)) {
+      return reply.code(403).send({ error: 'Account sign-in required' });
     }
+    const { keyId } = request.params;
+    const { label, role } = request.body || {};
     const existing = sqlite.getApiKeyById(keyId);
-    if (!existing || existing.account_id !== account.id || existing.revoked_at) {
+    if (!existing || existing.account_id !== auth.account.id || existing.revoked_at) {
       return reply.code(404).send({ error: 'API key not found' });
     }
-    const renamed = sqlite.renameApiKey(keyId, account.id, next);
-    if (!renamed) {
+    const patch = {};
+    if (label != null) {
+      const next = String(label || '').trim();
+      if (!next) {
+        return reply.code(400).send({ error: 'Enter a name (1–40 characters) for this dock key.' });
+      }
+      patch.label = next;
+    }
+    if (role != null) {
+      if (!isValidDockKeyRole(role)) {
+        return reply.code(400).send({ error: 'Invalid role' });
+      }
+      patch.role = normalizeDockKeyRole(role);
+    }
+    if (!Object.keys(patch).length) {
+      return reply.code(400).send({ error: 'Nothing to update' });
+    }
+    const updated = sqlite.updateApiKey(keyId, auth.account.id, patch);
+    if (!updated) {
       return reply.code(400).send({ error: 'Enter a name (1–40 characters) for this dock key.' });
+    }
+    let notified = 0;
+    if (patch.role != null) {
+      notified = notifyApiKeyRoleChange(updated.id, updated.role);
     }
     return {
       ok: true,
-      id: renamed.id,
-      label: renamed.label,
-      api_keys: sqlite.getApiKeysForAccount(account.id),
-      rooms: sqlite.getRoomsWithLiveState(account.id).map(enrichRoom),
+      id: updated.id,
+      label: updated.label,
+      role: updated.role,
+      notified,
+      api_keys: sqlite.getApiKeysForAccount(auth.account.id),
+      rooms: sqlite.getRoomsWithLiveState(auth.account.id).map(enrichRoom),
     };
   });
 
-  /** Rotate secret; keep seat label. Kicks docks still using the old secret. */
-  app.post('/api/api-keys/:keyId/regenerate', async (request, reply) => {
-    const account = await resolveAccountFromRequest(request);
-    if (!account) return reply.code(401).send({ error: 'Unauthorized' });
-    const { keyId } = request.params;
-    const created = sqlite.regenerateApiKey(keyId, account.id);
-    if (!created) return reply.code(404).send({ error: 'API key not found' });
-    const kicked = kickApiKeyDocks(keyId);
-    return {
-      id: created.id,
-      key: created.plaintext,
-      label: created.label,
-      previous_id: created.previous_id,
-      kicked,
-      quota: getAccountQuota(account),
-      api_keys: sqlite.getApiKeysForAccount(account.id),
-    };
-  });
-
-  /** Remove seat (frees quota). Prefer regenerate when rotating a compromised key. */
+  /** Remove seat (frees quota). Create a new named key to replace a leaked one. */
   app.delete('/api/api-keys/:keyId', async (request, reply) => {
-    const account = await resolveAccountFromRequest(request);
-    if (!account) return reply.code(401).send({ error: 'Unauthorized' });
+    const auth = await resolveAuthFromRequest(request);
+    if (!auth?.account) return reply.code(401).send({ error: 'Unauthorized' });
+    if (!isAccountAdminAuth(auth)) {
+      return reply.code(403).send({ error: 'Account sign-in required' });
+    }
     const { keyId } = request.params;
-    const ok = sqlite.revokeApiKey(keyId, account.id);
+    const ok = sqlite.revokeApiKey(keyId, auth.account.id);
     if (!ok) return reply.code(404).send({ error: 'API key not found' });
     const kicked = kickApiKeyDocks(keyId);
-    return { ok: true, kicked, quota: getAccountQuota(account) };
+    return { ok: true, kicked, quota: getAccountQuota(auth.account) };
   });
 
   app.post('/api/sessions/invalidate-all', async (request, reply) => {
-    const account = await resolveAccountFromRequest(request);
-    if (!account) return reply.code(401).send({ error: 'Unauthorized' });
-    const updated = sqlite.invalidateAllSessions(account.id);
-    kickAccountAdminClients(account.id);
+    const auth = await resolveAuthFromRequest(request);
+    if (!auth?.account) return reply.code(401).send({ error: 'Unauthorized' });
+    if (!isAccountAdminAuth(auth)) {
+      return reply.code(403).send({ error: 'Account sign-in required' });
+    }
+    const updated = sqlite.invalidateAllSessions(auth.account.id);
+    kickAccountAdminClients(auth.account.id);
     return {
       ok: true,
       session_epoch: updated.session_epoch,
@@ -335,27 +371,69 @@ export async function registerAccountRoutes(app) {
   }));
 }
 
-async function resolveAccountFromRequest(request) {
+async function resolveAuthFromRequest(request) {
   const auth = request.headers.authorization || '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
 
-  // API key auth (self-host / dock REST calls)
   const apiKeyHeader = request.headers['x-api-key'] || '';
   if (!token && apiKeyHeader) {
     const result = sqlite.findAccountByApiKey(apiKeyHeader);
-    return result ? result.account : null;
+    if (!result) return null;
+    return {
+      account: result.account,
+      keyId: result.keyId,
+      role: result.role,
+      authMethod: 'api_key',
+    };
   }
 
   if (!token) return null;
 
   if (token.startsWith('dev:')) {
-    return resolveDevAccountFromToken(token);
+    const account = resolveDevAccountFromToken(token);
+    if (!account) return null;
+    return { account, authMethod: 'dev' };
   }
 
   const { authenticateJoin } = await import('../ws/auth.js');
   const result = await authenticateJoin({ accessToken: token, client: 'dashboard' });
   if (result.error) return null;
-  return result.account;
+  return { account: result.account, authMethod: result.authMethod || 'jwt' };
 }
 
-export { resolveAccountFromRequest };
+async function resolveAccountFromRequest(request) {
+  const auth = await resolveAuthFromRequest(request);
+  return auth?.account || null;
+}
+
+function guestLinkRoomAccessError(auth, roomId) {
+  if (!sqlite.roomBelongsToAccount(roomId, auth.account.id)) {
+    return { code: 403, error: 'Forbidden' };
+  }
+  if (isAccountAdminAuth(auth)) return null;
+  const ownRoomId = sqlite.getRoomIdForApiKey(auth.keyId);
+  if (!ownRoomId || ownRoomId !== roomId) {
+    return { code: 403, error: 'Forbidden' };
+  }
+  return null;
+}
+
+function guestLinkResponse(request, token, label) {
+  const xfProto = request.headers['x-forwarded-proto'];
+  const xfHost = request.headers['x-forwarded-host'] || request.headers.host;
+  let base = config.publicUrl.replace(/\/$/, '');
+  if (xfHost) {
+    const proto = (Array.isArray(xfProto) ? xfProto[0] : xfProto) ||
+      (request.protocol === 'https' ? 'https' : 'http');
+    const host = String(Array.isArray(xfHost) ? xfHost[0] : xfHost).split(',')[0].trim();
+    base = `${proto}://${host}`.replace(/\/$/, '');
+  }
+  return {
+    token,
+    path: `/g/${token}`,
+    url: `${base}/g/${token}`,
+    label,
+  };
+}
+
+export { resolveAccountFromRequest, resolveAuthFromRequest };

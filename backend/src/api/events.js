@@ -1,11 +1,12 @@
 import * as sqlite from '../db/sqlite.js';
-import { resolveAccountFromRequest } from './accounts.js';
+import { resolveAuthFromRequest } from './accounts.js';
 import { getAccountStats, pairSessionEvents } from '../stats/account-stats.js';
 import {
   clampScore,
   normalizePlayerDisplayName,
 } from '../lib/scoreboard-helpers.js';
 import { broadcastRoomCommand, notifyAccountTables, getConnectedDockPromotedStreams } from '../ws/room-hub.js';
+import { canMutateMatch, permissionsForAuth } from '../lib/dock-roles.js';
 
 const GAME_TYPE_IDS = new Set(['game1', 'game2', 'game3', 'game4', 'game5', 'game6', 'game7', 'game8']);
 
@@ -150,10 +151,10 @@ function assertEventAccount(event, accountId) {
 
 export async function registerEventRoutes(app) {
   app.get('/api/rooms/:roomId/events', async (request, reply) => {
-    const account = await resolveAccountFromRequest(request);
-    if (!account) return reply.code(401).send({ error: 'Unauthorized' });
+    const auth = await resolveAuthFromRequest(request);
+    if (!auth?.account) return reply.code(401).send({ error: 'Unauthorized' });
     const { roomId } = request.params;
-    if (!sqlite.roomBelongsToAccount(roomId, account.id)) {
+    if (!sqlite.roomBelongsToAccount(roomId, auth.account.id)) {
       return reply.code(403).send({ error: 'Forbidden' });
     }
     const limit = parseInt(request.query.limit || '100', 10);
@@ -161,19 +162,22 @@ export async function registerEventRoutes(app) {
   });
 
   app.get('/api/stats', async (request, reply) => {
-    const account = await resolveAccountFromRequest(request);
-    if (!account) return reply.code(401).send({ error: 'Unauthorized' });
+    const auth = await resolveAuthFromRequest(request);
+    if (!auth?.account) return reply.code(401).send({ error: 'Unauthorized' });
     const limit = parseInt(request.query.limit || '5000', 10);
-    return getAccountStats(account.id, limit);
+    return getAccountStats(auth.account.id, limit);
   });
 
   app.patch('/api/stats/matches/:startEventId', async (request, reply) => {
-    const account = await resolveAccountFromRequest(request);
-    if (!account) return reply.code(401).send({ error: 'Unauthorized' });
+    const auth = await resolveAuthFromRequest(request);
+    if (!auth?.account) return reply.code(401).send({ error: 'Unauthorized' });
     const { startEventId } = request.params;
-    const pair = findPairByStartId(account.id, startEventId);
-    if (!pair?.start || !assertEventAccount(pair.start, account.id)) {
+    const pair = findPairByStartId(auth.account.id, startEventId);
+    if (!pair?.start || !assertEventAccount(pair.start, auth.account.id)) {
       return reply.code(404).send({ error: 'Match not found' });
+    }
+    if (!canMutateMatch(auth, pair.start.api_key_id)) {
+      return reply.code(403).send({ error: 'Forbidden' });
     }
     if (!pair.end) {
       return reply.code(400).send({ error: 'Only completed matches can be edited' });
@@ -189,8 +193,8 @@ export async function registerEventRoutes(app) {
     const prevStart = pair.start.payload || {};
     let player1Id = String(body.player1Id || prevStart.player1Id || '').trim() || null;
     let player2Id = String(body.player2Id || prevStart.player2Id || '').trim() || null;
-    player1Id = sqlite.upsertAccountPlayer(account.id, player1Name, player1Id);
-    player2Id = sqlite.upsertAccountPlayer(account.id, player2Name, player2Id);
+    player1Id = sqlite.upsertAccountPlayer(auth.account.id, player1Name, player1Id);
+    player2Id = sqlite.upsertAccountPlayer(auth.account.id, player2Name, player2Id);
     if (!player1Id || !player2Id) {
       return reply.code(400).send({ error: 'Could not resolve players' });
     }
@@ -282,12 +286,15 @@ export async function registerEventRoutes(app) {
   });
 
   app.delete('/api/stats/matches/:startEventId', async (request, reply) => {
-    const account = await resolveAccountFromRequest(request);
-    if (!account) return reply.code(401).send({ error: 'Unauthorized' });
+    const auth = await resolveAuthFromRequest(request);
+    if (!auth?.account) return reply.code(401).send({ error: 'Unauthorized' });
     const { startEventId } = request.params;
-    const pair = findPairByStartId(account.id, startEventId);
-    if (!pair?.start || !assertEventAccount(pair.start, account.id)) {
+    const pair = findPairByStartId(auth.account.id, startEventId);
+    if (!pair?.start || !assertEventAccount(pair.start, auth.account.id)) {
       return reply.code(404).send({ error: 'Match not found' });
+    }
+    if (!canMutateMatch(auth, pair.start.api_key_id)) {
+      return reply.code(403).send({ error: 'Forbidden' });
     }
     const abandoned = !pair.end;
     const roomId = pair.start.room_id || null;
@@ -313,31 +320,34 @@ export async function registerEventRoutes(app) {
         message: 'This match was killed from CueSport Cloud. The game has been cleared.',
       });
     }
-    notifyAccountTables(account.id, { immediate: true });
+    notifyAccountTables(auth.account.id, { immediate: true });
 
     return { ok: true, deleted, abandoned, dockNotified };
   });
 
   app.patch('/api/stats/players', async (request, reply) => {
-    const account = await resolveAccountFromRequest(request);
-    if (!account) return reply.code(401).send({ error: 'Unauthorized' });
+    const auth = await resolveAuthFromRequest(request);
+    if (!auth?.account) return reply.code(401).send({ error: 'Unauthorized' });
+    if (!permissionsForAuth(auth).canManagePlayers) {
+      return reply.code(403).send({ error: 'Forbidden' });
+    }
     const playerId = String(request.body?.id || request.body?.playerId || '').trim();
     const toName = normalizePlayerDisplayName(request.body?.to || request.body?.name);
     if (!playerId || !toName) {
       return reply.code(400).send({ error: 'player id and to name are required' });
     }
-    const existing = sqlite.getAccountPlayer(account.id, playerId);
+    const existing = sqlite.getAccountPlayer(auth.account.id, playerId);
     if (!existing) {
       return reply.code(404).send({ error: 'Player not found' });
     }
     if (existing.name === toName) {
       return { ok: true, updated: 0, id: playerId, name: toName };
     }
-    const events = sqlite.getAccountSessionEvents(account.id, 10000);
+    const events = sqlite.getAccountSessionEvents(auth.account.id, 10000);
     let updated = 0;
     for (const ev of events) {
       if (ev.event_type !== 'session:start') continue;
-      if (ev.account_id !== account.id) continue;
+      if (ev.account_id !== auth.account.id) continue;
       const payload = { ...(ev.payload || {}) };
       let changed = false;
       if (payload.player1Id === playerId || (!payload.player1Id && namesEqual(payload.player1, existing.name))) {
@@ -355,7 +365,7 @@ export async function registerEventRoutes(app) {
         updated += 1;
       }
     }
-    sqlite.renameAccountPlayerRoster(account.id, playerId, toName);
+    sqlite.renameAccountPlayerRoster(auth.account.id, playerId, toName);
     return { ok: true, updated, id: playerId, name: toName };
   });
 
@@ -364,18 +374,21 @@ export async function registerEventRoutes(app) {
    * (same semantics as local Delete Player).
    */
   app.delete('/api/stats/players/:playerId', async (request, reply) => {
-    const account = await resolveAccountFromRequest(request);
-    if (!account) return reply.code(401).send({ error: 'Unauthorized' });
+    const auth = await resolveAuthFromRequest(request);
+    if (!auth?.account) return reply.code(401).send({ error: 'Unauthorized' });
+    if (!permissionsForAuth(auth).canManagePlayers) {
+      return reply.code(403).send({ error: 'Forbidden' });
+    }
     const playerId = String(request.params.playerId || '').trim();
     if (!playerId) {
       return reply.code(400).send({ error: 'player id is required' });
     }
-    const existing = sqlite.getAccountPlayer(account.id, playerId);
+    const existing = sqlite.getAccountPlayer(auth.account.id, playerId);
     if (!existing) {
       return reply.code(404).send({ error: 'Player not found' });
     }
 
-    const events = sqlite.getAccountSessionEvents(account.id, 10000);
+    const events = sqlite.getAccountSessionEvents(auth.account.id, 10000);
     const pairs = pairSessionEvents(events);
     const eventIds = [];
     const abandonedRooms = [];
@@ -420,8 +433,8 @@ export async function registerEventRoutes(app) {
         message: 'A player in this match was deleted from CueSport Cloud. The game has been cleared.',
       });
     }
-    const rosterDeleted = sqlite.deleteAccountPlayerRoster(account.id, playerId);
-    notifyAccountTables(account.id, { immediate: true });
+    const rosterDeleted = sqlite.deleteAccountPlayerRoster(auth.account.id, playerId);
+    notifyAccountTables(auth.account.id, { immediate: true });
 
     return {
       ok: true,

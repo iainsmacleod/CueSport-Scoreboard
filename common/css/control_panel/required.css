@@ -996,13 +996,15 @@ select.dropdown option,
 
 .cloud-meta-row {
 	column-gap: 12px;
-	font-size: 0.85em;
+	font-family: inherit;
+	font-size: 10pt;
 }
 
 .cloud-meta-row .cloud-stats-cta {
 	justify-content: flex-start;
 	flex: 1 1 auto;
 	min-width: 0;
+	font: inherit;
 }
 
 /* Text links in the dock (readable on dark + light themes; matches Support Developer). */
@@ -1011,6 +1013,7 @@ a.cp-text-link {
 	color: red;
 	text-decoration: underline;
 	cursor: pointer;
+	font: inherit;
 }
 .cp-text-link:hover,
 a.cp-text-link:hover {
@@ -1022,6 +1025,7 @@ a.cp-text-link:hover {
 	margin-left: auto;
 	flex: 0 0 auto;
 	white-space: nowrap;
+	font: inherit;
 }
 
 .field {
@@ -1450,6 +1454,11 @@ label.switch.toggle-disabled {
 	opacity: 0.4;
 	pointer-events: none;
 	cursor: not-allowed;
+}
+
+#remoteTab.tablinks-disabled,
+#remoteTab[aria-disabled="true"] {
+	pointer-events: auto;
 }
 
 .zoom-controls {
@@ -2828,7 +2837,10 @@ label.switch.toggle-disabled {
 .stats-tab-help {
 	margin: 0 0 12px 0;
 	max-width: 720px;
-	opacity: 0.9;
+	font-family: inherit;
+	font-size: 10pt;
+	line-height: normal;
+	opacity: 1;
 }
 
 .stats-visibility-toolbar {
@@ -2873,4 +2885,158 @@ label.switch.toggle-disabled {
 .stats-visibility-toggle {
 	flex-shrink: 0;
 	margin: 0;
+}
+
+.cloud-remote-default {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	max-width: 640px;
+}
+
+.cloud-remote-qr-wrap {
+	position: relative;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	padding: 12px 0;
+	min-height: 244px;
+}
+
+.cloud-remote-qr-wrap img,
+.cloud-remote-qr-placeholder {
+	width: 220px;
+	height: 220px;
+	border-radius: 8px;
+}
+
+.cloud-remote-qr-wrap img {
+	background: #fff;
+}
+
+.cloud-remote-qr-placeholder {
+	background:
+		repeating-linear-gradient(
+			-45deg,
+			rgba(255, 255, 255, 0.08),
+			rgba(255, 255, 255, 0.08) 8px,
+			rgba(0, 0, 0, 0.18) 8px,
+			rgba(0, 0, 0, 0.18) 16px
+		);
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	filter: blur(6px);
+}
+
+.cloud-remote-qr-wrap.is-obscured img {
+	filter: blur(14px);
+	opacity: 0.45;
+	user-select: none;
+	pointer-events: none;
+}
+
+.cloud-remote-reveal-overlay {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	pointer-events: none;
+}
+
+.cloud-remote-qr-wrap.is-obscured .cloud-remote-reveal-overlay,
+.cloud-remote-qr-wrap:not(.is-obscured) .cloud-remote-reveal-overlay {
+	pointer-events: auto;
+}
+
+.cloud-remote-qr-wrap:not(.is-obscured) .cloud-remote-reveal-overlay {
+	align-items: flex-start;
+	justify-content: flex-end;
+	padding: 18px 18px 0 0;
+}
+
+.cloud-remote-reveal-overlay .button.disabled {
+	opacity: 0.45;
+	pointer-events: none;
+}
+
+.cloud-remote-url-row {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+
+.cloud-remote-url-row input {
+	flex: 1;
+	min-width: 0;
+}
+
+.cloud-remote-url-row.is-obscured input {
+	filter: blur(0);
+	letter-spacing: 0.02em;
+	color: rgba(255, 255, 255, 0.55);
+}
+
+.cloud-remote-url-row .button.disabled {
+	opacity: 0.45;
+	pointer-events: none;
+}
+
+.cloud-remote-extra-row {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	margin-bottom: 8px;
+}
+
+.cloud-remote-extra-row input {
+	flex: 1;
+	min-width: 0;
+}
+
+.cloud-remote-extra-list {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+}
+
+.cloud-remote-extra-list li,
+.cloud-remote-link-item {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	justify-content: space-between;
+	padding: 8px 10px;
+	border-radius: 6px;
+	cursor: pointer;
+	border: 1px solid transparent;
+}
+
+.cloud-remote-link-item:hover {
+	background: rgba(255, 255, 255, 0.05);
+}
+
+.cloud-remote-link-item.is-current {
+	background: rgba(125, 207, 255, 0.12);
+	border-color: rgba(125, 207, 255, 0.35);
+}
+
+.cloud-remote-link-label {
+	flex: 1 1 auto;
+	min-width: 0;
+	word-break: break-word;
+}
+
+.cloud-remote-owner-badge {
+	flex-shrink: 0;
+	font-size: 0.75rem;
+	opacity: 0.7;
+	padding: 2px 8px;
+	border-radius: 999px;
+	border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.cloud-remote-empty {
+	opacity: 0.7;
+	cursor: default;
+	padding: 6px 0;
 }

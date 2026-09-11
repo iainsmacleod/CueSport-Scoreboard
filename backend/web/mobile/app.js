@@ -40,6 +40,8 @@ let activeView = 'control';
 let initialViewChosen = false;
 let cachedGuestShareUrl = '';
 let cachedGuestShareToken = '';
+let cachedGuestShareLabel = '';
+let guestShareRevealed = false;
 let guestSharePromise = null;
 
 function pathContext() {
@@ -144,7 +146,11 @@ function setActiveView(view) {
   }
 
   if (view === 'share') {
-    ensureGuestShareLink({ refreshList: true }).catch((err) => setError(err.message || 'Failed to create guest link'));
+    hideGuestShareDetails();
+    ensureGuestShareLink({ refreshList: true, forceHide: true })
+      .catch((err) => setError(err.message || 'Failed to create guest link'));
+  } else {
+    hideGuestShareDetails();
   }
 }
 
@@ -188,30 +194,120 @@ function guestUrlFromLink(link) {
   return '';
 }
 
-async function ensureGuestShareLink({ refreshList = false } = {}) {
+function syncShareActionButtons({ enable = false } = {}) {
+  const copyBtn = document.getElementById('shareCopyBtn');
+  const shareBtn = document.getElementById('shareNativeBtn');
+  const revealBtn = document.getElementById('shareRevealBtn');
+  const useShare = typeof navigator.share === 'function';
+  if (copyBtn) {
+    copyBtn.classList.toggle('hidden', useShare);
+    copyBtn.disabled = !(enable && !useShare);
+  }
+  if (shareBtn) {
+    shareBtn.classList.toggle('hidden', !useShare);
+    shareBtn.disabled = !(enable && useShare);
+  }
+  if (revealBtn) {
+    revealBtn.disabled = !cachedGuestShareUrl;
+    revealBtn.textContent = guestShareRevealed ? 'Hide' : 'Show';
+  }
+}
+
+function setGuestShareRevealed(revealed) {
+  guestShareRevealed = !!revealed && !!cachedGuestShareUrl;
+  const wrap = document.getElementById('shareQrWrap');
+  const urlEl = document.getElementById('shareUrl');
+  const qr = document.getElementById('shareQrImg');
+  const placeholder = document.getElementById('shareQrPlaceholder');
+  const status = document.getElementById('shareStatus');
+  if (wrap) wrap.classList.toggle('is-obscured', !guestShareRevealed);
+  if (urlEl) urlEl.classList.toggle('is-obscured', !guestShareRevealed);
+
+  if (qr) {
+    if (guestShareRevealed && cachedGuestShareUrl) {
+      const base = window.location.origin.replace(/\/$/, '');
+      qr.src = `${base}/api/qr?size=220&margin=2&data=${encodeURIComponent(cachedGuestShareUrl)}`;
+      qr.classList.remove('hidden');
+    } else {
+      qr.removeAttribute('src');
+      qr.classList.add('hidden');
+    }
+  }
+  if (placeholder) placeholder.classList.toggle('hidden', guestShareRevealed && !!cachedGuestShareUrl);
+
+  if (urlEl) {
+    if (guestShareRevealed && cachedGuestShareUrl) {
+      urlEl.textContent = cachedGuestShareUrl;
+      urlEl.classList.remove('hidden');
+    } else if (cachedGuestShareUrl) {
+      urlEl.textContent = 'Hidden — press Show';
+      urlEl.classList.remove('hidden');
+    } else {
+      urlEl.textContent = '';
+      urlEl.classList.add('hidden');
+    }
+  }
+
+  if (status) {
+    if (!cachedGuestShareUrl) {
+      status.textContent = 'Preparing link…';
+      status.classList.remove('hidden');
+    } else {
+      const label = cachedGuestShareLabel || 'Guest link';
+      status.textContent = guestShareRevealed ? `${label} — visible` : `${label} — hidden`;
+      status.classList.remove('hidden');
+    }
+  }
+
+  syncShareActionButtons({ enable: guestShareRevealed });
+}
+
+function hideGuestShareDetails() {
+  guestShareRevealed = false;
+  setGuestShareRevealed(false);
+}
+
+function selectGuestShareLink(link, { keepReveal = false } = {}) {
+  const nextToken = link?.token || '';
+  const tokenChanged = nextToken !== cachedGuestShareToken;
+  const stayRevealed = keepReveal && !tokenChanged && guestShareRevealed;
+  cachedGuestShareToken = nextToken;
+  cachedGuestShareUrl = guestUrlFromLink(link);
+  cachedGuestShareLabel = link?.label || '';
+  setGuestShareRevealed(stayRevealed);
+  const list = document.getElementById('guestLinkList');
+  if (!list) return;
+  list.querySelectorAll('.guest-link-item').forEach((row) => {
+    row.classList.toggle('is-current', row.dataset.token === cachedGuestShareToken);
+  });
+}
+
+async function ensureGuestShareLink({ refreshList = false, forceHide = true } = {}) {
   if (guestSharePromise) return guestSharePromise;
   const token = localStorage.getItem(TOKEN_KEY);
   if (!roomId || !token) {
     throw new Error('Sign in required to create a guest control link');
   }
   const status = document.getElementById('shareStatus');
-  if (!cachedGuestShareUrl && status) {
+  if (status) {
     status.textContent = 'Preparing link…';
     status.classList.remove('hidden');
   }
+  if (forceHide) hideGuestShareDetails();
   guestSharePromise = (async () => {
     let links = await fetchGuestLinks(window.location.origin, token, roomId);
-    if (!links.length) {
-      const created = await createGuestLink(window.location.origin, token, roomId);
+    const owner = (links || []).find((g) => g.label === 'OBS Dock Owner');
+    if (!links.length || !owner) {
+      const created = await createGuestLink(window.location.origin, token, roomId, 'OBS Dock Owner');
       links = await fetchGuestLinks(window.location.origin, token, roomId);
       if (!links.length) {
         links = [{ token: created.token, path: created.path, url: created.url, label: created.label, connected: 0 }];
       }
     }
-    const chosen = links.find((g) => g.token === cachedGuestShareToken) || links[0];
-    cachedGuestShareToken = chosen.token;
-    cachedGuestShareUrl = guestUrlFromLink(chosen);
-    renderShareLink(cachedGuestShareUrl);
+    const chosen = links.find((g) => g.token === cachedGuestShareToken)
+      || links.find((g) => g.label === 'OBS Dock Owner')
+      || links[0];
+    selectGuestShareLink(chosen, { keepReveal: !forceHide });
     renderGuestLinks(links);
     return cachedGuestShareUrl;
   })()
@@ -231,71 +327,57 @@ function renderGuestLinks(links) {
   }
   links.forEach((g) => {
     const li = document.createElement('li');
-    li.className = 'token-list-item';
+    li.className = 'token-list-item guest-link-item';
+    li.dataset.token = g.token || '';
+    const isOwner = g.label === 'OBS Dock Owner';
+    if (isOwner) li.classList.add('is-owner');
     const n = Number(g.connected) || 0;
     const label = document.createElement('span');
-    const status = n > 0
-      ? `${n} connected`
-      : 'Offline';
+    const status = n > 0 ? `${n} connected` : 'Offline';
     label.textContent = `${g.label || 'Guest'} · ${formatLocalDateTime(g.created_at) || g.created_at} · ${status}`;
     if (g.token === cachedGuestShareToken) li.classList.add('is-current');
+
+    const actions = document.createElement('div');
+    actions.className = 'token-list-actions';
+    if (isOwner) {
+      const badge = document.createElement('span');
+      badge.className = 'dash-guest-owner-badge';
+      badge.textContent = 'Default';
+      actions.appendChild(badge);
+    }
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'btn danger';
     btn.textContent = 'Revoke';
-    btn.addEventListener('click', async () => {
-      if (!window.confirm('Revoke this guest link? Anyone using it will be disconnected.')) return;
+    btn.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      const msg = isOwner
+        ? 'Revoke OBS Dock Owner? Anyone using this default guest link will be disconnected.'
+        : 'Revoke this guest link? Anyone using it will be disconnected.';
+      if (!window.confirm(msg)) return;
       try {
         await revokeGuestLink(window.location.origin, localStorage.getItem(TOKEN_KEY), g.token);
         if (cachedGuestShareToken === g.token) {
           cachedGuestShareToken = '';
           cachedGuestShareUrl = '';
+          cachedGuestShareLabel = '';
+          guestShareRevealed = false;
         }
-        await ensureGuestShareLink({ refreshList: true });
+        await ensureGuestShareLink({ refreshList: true, forceHide: true });
       } catch (err) {
         setError(err.message);
       }
     });
+    actions.appendChild(btn);
+
+    li.addEventListener('click', () => {
+      const same = g.token === cachedGuestShareToken;
+      selectGuestShareLink(g, { keepReveal: same });
+    });
     li.appendChild(label);
-    li.appendChild(btn);
+    li.appendChild(actions);
     list.appendChild(li);
   });
-}
-
-function canNativeShare() {
-  return typeof navigator.share === 'function';
-}
-
-/** Desktop → Copy; phones/tablets with Web Share API → Share. */
-function syncShareActionButtons({ enable = false } = {}) {
-  const copyBtn = document.getElementById('shareCopyBtn');
-  const shareBtn = document.getElementById('shareNativeBtn');
-  const useShare = canNativeShare();
-  if (copyBtn) {
-    copyBtn.classList.toggle('hidden', useShare);
-    if (enable && !useShare) copyBtn.disabled = false;
-  }
-  if (shareBtn) {
-    shareBtn.classList.toggle('hidden', !useShare);
-    if (enable && useShare) shareBtn.disabled = false;
-  }
-}
-
-function renderShareLink(url) {
-  const status = document.getElementById('shareStatus');
-  const urlEl = document.getElementById('shareUrl');
-  const qr = document.getElementById('shareQrImg');
-  if (status) status.classList.add('hidden');
-  if (urlEl) {
-    urlEl.textContent = url;
-    urlEl.classList.remove('hidden');
-  }
-  if (qr) {
-    const base = window.location.origin.replace(/\/$/, '');
-    qr.src = `${base}/api/qr?size=220&margin=2&data=${encodeURIComponent(url)}`;
-    qr.classList.remove('hidden');
-  }
-  syncShareActionButtons({ enable: true });
 }
 
 function wireMobileNav() {
@@ -318,23 +400,45 @@ function wireMobileNav() {
   const newLinkBtn = document.getElementById('shareNewLinkBtn');
   if (newLinkBtn) {
     newLinkBtn.addEventListener('click', async () => {
-      if (!window.confirm('Create a new guest link? Existing links stay valid until you revoke them.')) return;
       try {
         const token = localStorage.getItem(TOKEN_KEY);
         if (!roomId || !token) throw new Error('Sign in required to create a guest control link');
-        const created = await createGuestLink(window.location.origin, token, roomId);
+        const nameInput = document.getElementById('shareNewLinkName');
+        const name = String(nameInput?.value || '').trim();
+        if (!name) {
+          setError('Enter a name for this guest link.');
+          nameInput?.focus();
+          return;
+        }
+        const created = await createGuestLink(window.location.origin, token, roomId, name);
+        if (nameInput) nameInput.value = '';
         cachedGuestShareToken = created.token;
         cachedGuestShareUrl = guestUrlFromLink(created);
-        await ensureGuestShareLink();
+        cachedGuestShareLabel = created.label || name;
+        guestShareRevealed = false;
+        await ensureGuestShareLink({ forceHide: true });
       } catch (err) {
         setError(err.message || 'Failed to create guest link');
       }
     });
   }
+  document.getElementById('shareNewLinkName')?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      document.getElementById('shareNewLinkBtn')?.click();
+    }
+  });
+  document.getElementById('shareRevealBtn')?.addEventListener('click', () => {
+    if (!cachedGuestShareUrl) return;
+    setGuestShareRevealed(!guestShareRevealed);
+  });
   const copyBtn = document.getElementById('shareCopyBtn');
   if (copyBtn) {
     copyBtn.addEventListener('click', async () => {
-      if (!cachedGuestShareUrl) return;
+      if (!guestShareRevealed || !cachedGuestShareUrl) {
+        setError('Press Show before copying the link.');
+        return;
+      }
       try {
         await navigator.clipboard.writeText(cachedGuestShareUrl);
         copyBtn.textContent = 'Copied';
@@ -347,9 +451,11 @@ function wireMobileNav() {
   const nativeShareBtn = document.getElementById('shareNativeBtn');
   if (nativeShareBtn) {
     nativeShareBtn.addEventListener('click', async () => {
-      if (!cachedGuestShareUrl || !canNativeShare()) return;
+      if (!guestShareRevealed || !cachedGuestShareUrl || typeof navigator.share !== 'function') {
+        if (!guestShareRevealed) setError('Press Show before sharing the link.');
+        return;
+      }
       try {
-        // URL only — share-sheet "Copy" concatenates `text` with the link on many phones.
         await navigator.share({
           title: 'CueSport guest control link',
           url: cachedGuestShareUrl,
@@ -359,6 +465,14 @@ function wireMobileNav() {
       }
     });
   }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && activeView === 'share') {
+      hideGuestShareDetails();
+    }
+  });
+  window.addEventListener('pageshow', () => {
+    if (activeView === 'share') hideGuestShareDetails();
+  });
   syncShareActionButtons();
 }
 
@@ -2335,6 +2449,29 @@ document.getElementById('devSecret')?.addEventListener('keydown', (event) => {
     connect();
   }
 });
+
+(function bindDevSecretToggle() {
+  const input = document.getElementById('devSecret');
+  const toggle = document.getElementById('devSecretToggle');
+  if (!input || !toggle) return;
+  const common = 'viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+  const eyeOpen = `<svg ${common}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+  const eyeClosed = `<svg ${common}><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
+  function syncToggle() {
+    const revealed = input.type === 'text';
+    toggle.innerHTML = revealed ? eyeClosed : eyeOpen;
+    toggle.setAttribute('aria-label', revealed ? 'Hide secret' : 'Show secret');
+    toggle.setAttribute('aria-pressed', revealed ? 'true' : 'false');
+    toggle.title = revealed ? 'Hide secret' : 'Show secret';
+  }
+  syncToggle();
+  toggle.addEventListener('click', () => {
+    input.type = input.type === 'password' ? 'text' : 'password';
+    syncToggle();
+    input.focus();
+  });
+}());
+
 document.getElementById('clearTokenBtn')?.addEventListener('click', () => {
   if (!window.confirm('Clear Saved Login on this device? You will return to the main page to sign in again.')) return;
   wantConnection = false;
