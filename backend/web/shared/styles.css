@@ -1307,6 +1307,10 @@ body.controls-locked #reconnectBanner {
   color: #c0caf5;
   background: rgba(122, 162, 247, 0.12);
 }
+.stats-player-delete-btn:hover {
+  color: #f7768e;
+  background: rgba(247, 118, 142, 0.14);
+}
 .stats-player-edit-btn svg {
   width: 1.15rem;
   height: 1.15rem;

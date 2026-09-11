@@ -207,8 +207,11 @@ export function summarizeAccountStats(events) {
     const p2 = getPlayer(p2Id, p2Name);
     if (!p1 || !p2) continue;
 
-    // Racks/frames always come from the final scoreline (including draws).
-    applyMatchScoresToPlayers(p1, p2, ep.scores);
+    // Racks/frames always come from the final scoreline (including draws),
+    // except Straight Pool where scores are points — not racks.
+    if (gameType !== 'game4') {
+      applyMatchScoresToPlayers(p1, p2, ep.scores);
+    }
 
     if (result.winnerSlot === '1' || result.winnerSlot === '2') {
       const winner = result.winnerSlot === '1' ? p1 : p2;
@@ -241,9 +244,7 @@ export function summarizeAccountStats(events) {
   }
 
   matches.sort((a, b) => String(b.completedAt || b.startedAt || '').localeCompare(String(a.completedAt || a.startedAt || '')));
-  const players = Array.from(playerMap.values()).sort((a, b) =>
-    b.gamesWon - a.gamesWon || b.racksWon - a.racksWon || a.name.localeCompare(b.name)
-  );
+  const players = Array.from(playerMap.values());
 
   return {
     summary: {
@@ -257,11 +258,77 @@ export function summarizeAccountStats(events) {
   };
 }
 
+function emptyRosterPlayer(row) {
+  return {
+    id: row.id,
+    name: row.name || row.id,
+    gamesWon: 0,
+    gamesDrawn: 0,
+    gamesLost: 0,
+    racksWon: 0,
+    racksLost: 0,
+    highestBreak: 0,
+    highestRun: 0,
+    breakAndRuns: 0,
+    tableRuns: 0,
+    ballsPotted: 0,
+    fouls: 0,
+    lastPlayedAt: null,
+  };
+}
+
+function playerHasRecord(player) {
+  return (Number(player?.gamesWon) || 0)
+    + (Number(player?.gamesDrawn) || 0)
+    + (Number(player?.gamesLost) || 0) > 0;
+}
+
+/** Ranked players first (by W/L), then zero-stat roster names A→Z. */
+export function sortStatsPlayers(players) {
+  return (players || []).slice().sort((a, b) => {
+    const aPlayed = playerHasRecord(a);
+    const bPlayed = playerHasRecord(b);
+    if (aPlayed !== bPlayed) return aPlayed ? -1 : 1;
+    if (!aPlayed) {
+      return String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' });
+    }
+    return b.gamesWon - a.gamesWon
+      || b.racksWon - a.racksWon
+      || String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' });
+  });
+}
+
+/** Merge account_players rows that have no match history into the stats player list. */
+export function mergeRosterPlayersIntoStats(stats, rosterRows) {
+  if (!stats || !Array.isArray(rosterRows) || !rosterRows.length) {
+    if (stats?.players) stats.players = sortStatsPlayers(stats.players);
+    if (stats?.summary) stats.summary.players = (stats.players || []).length;
+    return stats;
+  }
+  const byId = new Map((stats.players || []).map((p) => [String(p.id), p]));
+  for (const row of rosterRows) {
+    const id = String(row?.id || '').trim();
+    if (!id) continue;
+    if (byId.has(id)) {
+      const existing = byId.get(id);
+      if (row.name && (!existing.name || existing.name === id)) {
+        existing.name = row.name;
+      }
+      continue;
+    }
+    byId.set(id, emptyRosterPlayer(row));
+  }
+  stats.players = sortStatsPlayers(Array.from(byId.values()));
+  if (stats.summary) stats.summary.players = stats.players.length;
+  return stats;
+}
+
 /** Account stats for HTTP and WebSocket dock clients. */
 export function getAccountStats(accountId, limit = 5000) {
   sqlite.syncAccountPlayersFromMatchEvents(accountId);
   const events = sqlite.getAccountSessionEvents(accountId, limit);
   const stats = summarizeAccountStats(events);
+  mergeRosterPlayersIntoStats(stats, sqlite.listAccountPlayers(accountId));
   for (const match of stats.matches || []) {
     if (!match || match.status === 'completed' || !match.roomId) continue;
     const { state } = sqlite.getRoomSessionState(match.roomId);

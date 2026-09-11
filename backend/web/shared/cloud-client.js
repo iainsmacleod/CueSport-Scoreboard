@@ -284,6 +284,19 @@ export async function renameAccountPlayer(serverUrl, token, playerId, to) {
   return res.json();
 }
 
+export async function deleteAccountPlayer(serverUrl, token, playerId) {
+  const base = serverUrl.replace(/\/$/, '');
+  const res = await fetch(`${base}/api/stats/players/${encodeURIComponent(playerId)}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to delete player');
+  }
+  return res.json();
+}
+
 export async function fetchPlayers(serverUrl, token, query = '', limit = 8) {
   const base = serverUrl.replace(/\/$/, '');
   const params = new URLSearchParams();

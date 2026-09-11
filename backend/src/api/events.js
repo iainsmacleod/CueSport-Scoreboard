@@ -201,14 +201,14 @@ export async function registerEventRoutes(app) {
     const normalizedRacks = Object.prototype.hasOwnProperty.call(body, 'racks')
       ? normalizeCloudRacks(body.racks, gameType)
       : null;
-    if (normalizedRacks && normalizedRacks.length === 0) {
+    if (normalizedRacks && normalizedRacks.length === 0 && gameType !== 'game4') {
       return reply.code(400).send({ error: 'Add at least one rack/frame with a winner' });
     }
 
     let scores;
     let winnerSlot;
     let rackExtras = null;
-    if (normalizedRacks) {
+    if (normalizedRacks && normalizedRacks.length > 0) {
       rackExtras = aggregateExtrasFromRacks(normalizedRacks, gameType);
       scores = rackExtras.scores;
       winnerSlot = deriveWinnerSlot(scores.p1, scores.p2);
@@ -268,8 +268,10 @@ export async function registerEventRoutes(app) {
       foulsP1: clampScore(rackExtras ? rackExtras.foulsP1 : (body.foulsP1 ?? prevEnd.foulsP1 ?? 0)),
       foulsP2: clampScore(rackExtras ? rackExtras.foulsP2 : (body.foulsP2 ?? prevEnd.foulsP2 ?? 0)),
     };
-    if (normalizedRacks) {
+    if (normalizedRacks && normalizedRacks.length > 0) {
       endPayload.racks = normalizedRacks;
+    } else if (gameType === 'game4' && normalizedRacks) {
+      endPayload.racks = [];
     } else if (Array.isArray(prevEnd.racks)) {
       endPayload.racks = prevEnd.racks;
     }
@@ -355,6 +357,80 @@ export async function registerEventRoutes(app) {
     }
     sqlite.renameAccountPlayerRoster(account.id, playerId, toName);
     return { ok: true, updated, id: playerId, name: toName };
+  });
+
+  /**
+   * Delete a roster player and every cloud match that involves them
+   * (same semantics as local Delete Player).
+   */
+  app.delete('/api/stats/players/:playerId', async (request, reply) => {
+    const account = await resolveAccountFromRequest(request);
+    if (!account) return reply.code(401).send({ error: 'Unauthorized' });
+    const playerId = String(request.params.playerId || '').trim();
+    if (!playerId) {
+      return reply.code(400).send({ error: 'player id is required' });
+    }
+    const existing = sqlite.getAccountPlayer(account.id, playerId);
+    if (!existing) {
+      return reply.code(404).send({ error: 'Player not found' });
+    }
+
+    const events = sqlite.getAccountSessionEvents(account.id, 10000);
+    const pairs = pairSessionEvents(events);
+    const eventIds = [];
+    const abandonedRooms = [];
+    let deletedMatches = 0;
+
+    function startInvolvesPlayer(start) {
+      const sp = start?.payload || {};
+      if (sp.player1Id === playerId || sp.player2Id === playerId) {
+        return true;
+      }
+      // Legacy starts without UUID keys: match by display name.
+      if (!sp.player1Id && namesEqual(sp.player1, existing.name)) return true;
+      if (!sp.player2Id && namesEqual(sp.player2, existing.name)) return true;
+      return false;
+    }
+
+    for (const pair of pairs) {
+      if (!pair?.start || !startInvolvesPlayer(pair.start)) continue;
+      deletedMatches += 1;
+      eventIds.push(pair.start.id);
+      if (pair.end?.id) eventIds.push(pair.end.id);
+      if (!pair.end && pair.start.room_id) {
+        abandonedRooms.push({
+          roomId: pair.start.room_id,
+          startEventId: pair.start.id,
+          dockMatchId: pair.start.payload?.sessionId || pair.start.payload?.matchId || null,
+          cloudSessionId: pair.start.session_id || null,
+        });
+      }
+    }
+
+    const deletedEvents = sqlite.deleteMatchEvents(eventIds);
+    for (const abandoned of abandonedRooms) {
+      sqlite.setRoomSessionId(abandoned.roomId, null);
+      const matchKey = abandoned.dockMatchId || abandoned.cloudSessionId || null;
+      broadcastRoomCommand(abandoned.roomId, 'abandon_match', {
+        matchId: matchKey,
+        sessionId: matchKey,
+        dockMatchId: abandoned.dockMatchId,
+        cloudSessionId: abandoned.cloudSessionId,
+        startEventId: abandoned.startEventId,
+        message: 'A player in this match was deleted from CueSport Cloud. The game has been cleared.',
+      });
+    }
+    const rosterDeleted = sqlite.deleteAccountPlayerRoster(account.id, playerId);
+    notifyAccountTables(account.id, { immediate: true });
+
+    return {
+      ok: true,
+      id: playerId,
+      name: existing.name,
+      deletedMatches,
+      deletedEvents,
+      rosterDeleted,
+    };
   });
 
   app.get('/api/streams', async () => {

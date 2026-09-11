@@ -17,8 +17,12 @@ dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 const BASE = (process.argv[2] || process.env.CLOUD_TEST_URL || 'http://localhost:3000').replace(/\/$/, '');
 const WS_BASE = BASE.replace(/^http/, 'ws');
-const SQLITE_PATH = process.env.SQLITE_PATH
+const SQLITE_PATH_RAW = process.env.SQLITE_PATH
   || path.join(__dirname, '..', 'data', 'cuesport.db');
+// Relative SQLITE_PATH values are resolved from backend/ (same as the server), not CWD.
+const SQLITE_PATH = path.isAbsolute(SQLITE_PATH_RAW)
+  ? SQLITE_PATH_RAW
+  : path.resolve(path.join(__dirname, '..'), SQLITE_PATH_RAW);
 
 let passed = 0;
 let failed = 0;
@@ -568,6 +572,89 @@ async function run() {
       });
       assert('Events persisted', events.ok && Array.isArray(events.body) && events.body.length > 0);
 
+      // Round-trip: unique match → GET /api/stats returns player W/L + match history
+      const rtSuffix = Date.now().toString(36).slice(-6);
+      const rtSessionId = `stats-rt-${rtSuffix}`;
+      const rtP1Name = `RtP1_${rtSuffix}`;
+      const rtP2Name = `RtP2_${rtSuffix}`;
+      dock2.ws.send(JSON.stringify({
+        type: 'session',
+        room_id: roomId,
+        action: 'start',
+        payload: {
+          gameType: 'game1',
+          player1: rtP1Name,
+          player2: rtP2Name,
+          sessionId: rtSessionId,
+          gameInfo: `CloudStatsRT ${rtSuffix}`,
+        },
+      }));
+      await sleep(1100);
+      dock2.ws.send(JSON.stringify({
+        type: 'session',
+        room_id: roomId,
+        action: 'end',
+        payload: {
+          matchId: rtSessionId,
+          sessionId: rtSessionId,
+          winnerSlot: '1',
+          scores: { p1: 2, p2: 1 },
+          reason: 'race_complete',
+          breakAndRunsP1: 1,
+          tableRunsP2: 1,
+          ballsP1: 9,
+          ballsP2: 6,
+        },
+      }));
+      await sleep(300);
+      const rtStats = await fetchJson('/api/stats', {
+        headers: { Authorization: `Bearer ${tokenFresh}` },
+      });
+      assert(
+        'Stats round-trip GET /api/stats',
+        rtStats.ok && Array.isArray(rtStats.body.players) && Array.isArray(rtStats.body.matches)
+      );
+      const rtMatch = (rtStats.body.matches || []).find(
+        (m) => m.status === 'completed' &&
+          ((m.id === rtSessionId) || (m.player1Name === rtP1Name && m.player2Name === rtP2Name))
+      );
+      assert('Stats round-trip match in history', !!rtMatch, `session=${rtSessionId}`);
+      assert(
+        'Stats round-trip match score 2-1',
+        !!(rtMatch && rtMatch.scores && rtMatch.scores.p1 === 2 && rtMatch.scores.p2 === 1),
+        rtMatch && JSON.stringify(rtMatch.scores)
+      );
+      assert(
+        'Stats round-trip winnerSlot P1',
+        !!(rtMatch && String(rtMatch.winnerSlot) === '1'),
+        rtMatch && String(rtMatch.winnerSlot)
+      );
+      const rtPlayer1 = (rtStats.body.players || []).find((p) => p.name === rtP1Name);
+      const rtPlayer2 = (rtStats.body.players || []).find((p) => p.name === rtP2Name);
+      assert('Stats round-trip P1 on leaderboard', !!rtPlayer1);
+      assert('Stats round-trip P2 on leaderboard', !!rtPlayer2);
+      assert(
+        'Stats round-trip P1 gamesWon ≥ 1',
+        !!(rtPlayer1 && rtPlayer1.gamesWon >= 1),
+        rtPlayer1 && JSON.stringify(rtPlayer1)
+      );
+      assert(
+        'Stats round-trip P2 gamesLost ≥ 1',
+        !!(rtPlayer2 && rtPlayer2.gamesLost >= 1),
+        rtPlayer2 && JSON.stringify(rtPlayer2)
+      );
+      assert(
+        'Stats round-trip P1 racksWon ≥ 2',
+        !!(rtPlayer1 && rtPlayer1.racksWon >= 2),
+        rtPlayer1 && String(rtPlayer1.racksWon)
+      );
+      assert(
+        'Stats round-trip match player ids present',
+        !!(rtMatch && rtMatch.player1Id && rtMatch.player2Id &&
+          rtMatch.player1Id !== rtMatch.player2Id),
+        rtMatch && `${rtMatch.player1Id}/${rtMatch.player2Id}`
+      );
+
       const statsUnauth = await fetchJson('/api/stats');
       assert('GET /api/stats unauthorized', statsUnauth.status === 401);
       const stats = await fetchJson('/api/stats', {
@@ -824,6 +911,131 @@ async function run() {
           headers: { Authorization: `Bearer ${tokenFresh}` },
         });
         assert('DELETE /api/stats/matches/:id', deleted.ok && deleted.body.ok === true);
+
+        // Dedicated player + match for DELETE /api/stats/players/:id
+        const victimPlayerId = crypto.randomUUID();
+        const opponentPlayerId = crypto.randomUUID();
+        const deleteVictimStart = crypto.randomUUID();
+        const deleteVictimEnd = crypto.randomUUID();
+        const deleteVictimSession = `del-player-${deleteVictimStart.slice(0, 8)}`;
+        const seedDb = new Database(SQLITE_PATH);
+        seedDb.pragma('foreign_keys = ON');
+        seedDb.prepare(
+          `INSERT INTO account_players (id, account_id, name, name_normalized, last_seen_at)
+           VALUES (?, ?, ?, ?, datetime('now'))`
+        ).run(victimPlayerId, accountId, 'DeleteMe', 'deleteme');
+        seedDb.prepare(
+          `INSERT INTO account_players (id, account_id, name, name_normalized, last_seen_at)
+           VALUES (?, ?, ?, ?, datetime('now'))`
+        ).run(opponentPlayerId, accountId, 'KeepMe', 'keepme');
+        seedDb.prepare(
+          `INSERT INTO match_events (id, account_id, room_id, session_id, event_type, payload, source_client)
+           VALUES (?, ?, ?, ?, 'session:start', ?, 'dock')`
+        ).run(
+          deleteVictimStart,
+          accountId,
+          roomId,
+          deleteVictimSession,
+          JSON.stringify({
+            sessionId: deleteVictimSession,
+            player1: 'DeleteMe',
+            player2: 'KeepMe',
+            player1Id: victimPlayerId,
+            player2Id: opponentPlayerId,
+            gameType: 'game1',
+          }),
+        );
+        seedDb.prepare(
+          `INSERT INTO match_events (id, account_id, room_id, session_id, event_type, payload, source_client)
+           VALUES (?, ?, ?, ?, 'session:end', ?, 'dock')`
+        ).run(
+          deleteVictimEnd,
+          accountId,
+          roomId,
+          deleteVictimSession,
+          JSON.stringify({
+            matchId: deleteVictimSession,
+            sessionId: deleteVictimSession,
+            scores: { p1: 2, p2: 1 },
+            winner: '1',
+          }),
+        );
+        seedDb.close();
+
+        const deletedPlayer = await fetchJson(`/api/stats/players/${encodeURIComponent(victimPlayerId)}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${tokenFresh}` },
+        });
+        assert(
+          'DELETE /api/stats/players/:id',
+          deletedPlayer.ok && deletedPlayer.body.ok === true && deletedPlayer.body.rosterDeleted === true,
+          JSON.stringify(deletedPlayer.body),
+        );
+        assert(
+          'DELETE player removes matches',
+          Number(deletedPlayer.body.deletedMatches) >= 1,
+          String(deletedPlayer.body.deletedMatches),
+        );
+        const statsAfterDeletePlayer = await fetchJson('/api/stats', {
+          headers: { Authorization: `Bearer ${tokenFresh}` },
+        });
+        assert(
+          'Deleted player gone from roster',
+          !(statsAfterDeletePlayer.body.players || []).some((p) => p.id === victimPlayerId),
+        );
+        assert(
+          'Deleted player matches gone',
+          !(statsAfterDeletePlayer.body.matches || []).some(
+            (m) => m.player1Id === victimPlayerId || m.player2Id === victimPlayerId,
+          ),
+        );
+        const rosterCheck = new Database(SQLITE_PATH, { readonly: true });
+        const victimRow = rosterCheck.prepare(
+          'SELECT id FROM account_players WHERE id = ? AND account_id = ?'
+        ).get(victimPlayerId, accountId);
+        const keepRow = rosterCheck.prepare(
+          'SELECT id FROM account_players WHERE id = ? AND account_id = ?'
+        ).get(opponentPlayerId, accountId);
+        rosterCheck.close();
+        assert('Deleted player removed from account_players', !victimRow);
+        assert('Peer player kept in account_players', !!keepRow);
+
+        // Zero-stat roster players still appear in GET /api/stats (for delete / browse).
+        const zeroStatId = crypto.randomUUID();
+        const zeroStatDb = new Database(SQLITE_PATH);
+        zeroStatDb.pragma('foreign_keys = ON');
+        zeroStatDb.prepare(
+          `INSERT INTO account_players (id, account_id, name, name_normalized, last_seen_at)
+           VALUES (?, ?, ?, ?, datetime('now'))`
+        ).run(zeroStatId, accountId, 'ZeroStatZed', 'zerostatzed');
+        zeroStatDb.close();
+        const statsWithZero = await fetchJson('/api/stats', {
+          headers: { Authorization: `Bearer ${tokenFresh}` },
+        });
+        const zeroPlayer = (statsWithZero.body.players || []).find((p) => p.id === zeroStatId);
+        assert(
+          'Zero-stat roster player in GET /api/stats',
+          !!zeroPlayer && zeroPlayer.name === 'ZeroStatZed'
+            && Number(zeroPlayer.gamesWon || 0) === 0
+            && Number(zeroPlayer.gamesLost || 0) === 0,
+          JSON.stringify(zeroPlayer),
+        );
+        const rankedBeforeZero = (statsWithZero.body.players || []).findIndex((p) =>
+          (Number(p.gamesWon) || 0) + (Number(p.gamesDrawn) || 0) + (Number(p.gamesLost) || 0) > 0
+        );
+        const zeroIndex = (statsWithZero.body.players || []).findIndex((p) => p.id === zeroStatId);
+        let orderOk = true;
+        let seenUnplayed = false;
+        for (const p of statsWithZero.body.players || []) {
+          const played = (Number(p.gamesWon) || 0) + (Number(p.gamesDrawn) || 0) + (Number(p.gamesLost) || 0) > 0;
+          if (!played) seenUnplayed = true;
+          else if (seenUnplayed) orderOk = false;
+        }
+        assert(
+          'Zero-stat player listed after ranked players',
+          zeroIndex >= 0 && orderOk && (rankedBeforeZero < 0 || zeroIndex > rankedBeforeZero),
+          `zero=${zeroIndex} ranked=${rankedBeforeZero} orderOk=${orderOk}`,
+        );
       } else {
         assert('PATCH /api/stats/matches/:id', false, 'no completed match to edit');
       }

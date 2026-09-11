@@ -556,7 +556,7 @@ export function getAccountSessionEvents(accountId, limit = 5000) {
      LEFT JOIN room_docks d ON d.room_id = e.room_id
      WHERE e.account_id = ?
        AND e.event_type IN ('session:start', 'session:end')
-     ORDER BY e.created_at DESC
+     ORDER BY e.created_at DESC, e.rowid DESC
      LIMIT ?`
   ).all(accountId, cap).map((row) => ({
     ...row,
@@ -895,6 +895,17 @@ export function getAccountPlayer(accountId, playerId) {
   ).get(playerId, accountId) || null;
 }
 
+/** Full account roster (including players with no recorded matches). */
+export function listAccountPlayers(accountId) {
+  if (!accountId) return [];
+  seedAccountPlayersFromSessions(accountId);
+  return getDb().prepare(
+    `SELECT id, name, last_seen_at FROM account_players
+     WHERE account_id = ?
+     ORDER BY name COLLATE NOCASE ASC`
+  ).all(accountId);
+}
+
 export function upsertAccountPlayersFromState(accountId, state) {
   if (!accountId || !state || typeof state !== 'object') return;
   if (state.player1Name) {
@@ -993,5 +1004,14 @@ export function renameAccountPlayerRoster(accountId, playerId, toName) {
      SET name = ?, name_normalized = ?, last_seen_at = datetime('now')
      WHERE id = ? AND account_id = ?`
   ).run(toDisplay, toNorm, playerId, accountId);
+  return result.changes > 0;
+}
+
+/** Remove a player from the account roster. Match events are deleted separately. */
+export function deleteAccountPlayerRoster(accountId, playerId) {
+  if (!accountId || !playerId) return false;
+  const result = getDb().prepare(
+    'DELETE FROM account_players WHERE id = ? AND account_id = ?'
+  ).run(playerId, accountId);
   return result.changes > 0;
 }

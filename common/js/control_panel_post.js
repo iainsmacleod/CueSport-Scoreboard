@@ -93,6 +93,11 @@ function initBallClickTargets() {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 window.onload = function () {
+	// Fresh installs / newly introduced Feature Settings keys (Shot Clock stays off).
+	if (typeof ensureFeatureSettingDefaults === "function") {
+		ensureFeatureSettingDefaults();
+	}
+
 	// Set local storage values if not previously configured
 	if (getStorageItem("usePlayer1") === null) {
 		setStorageItem("usePlayer1", "yes");
@@ -302,9 +307,9 @@ window.onload = function () {
 	}
 
 	if (getStorageItem("enableBallTracker") === null) {
-		setStorageItem("enableBallTracker", "no");
-		document.getElementById("ballTrackerCheckbox").checked = false;
-		document.getElementById("ballTrackerDiv").classList.add("noShow");
+		setStorageItem("enableBallTracker", "yes");
+		document.getElementById("ballTrackerCheckbox").checked = true;
+		document.getElementById("ballTrackerDiv").classList.remove("noShow");
 	} else if ((getStorageItem("enableBallTracker") === "yes")) {
 		setStorageItem("enableBallTracker", "yes");
 		document.getElementById("ballTrackerCheckbox").checked = true;
@@ -315,15 +320,16 @@ window.onload = function () {
 		document.getElementById("ballTrackerDiv").classList.add("noShow");
 	}
 
-	// Migrate / init Display Balls (overlay). Cannot be on without Ball Tracker; never for snooker.
-	const snookerModeInit = getStorageItem("gameType") === "game8" || getStorageItem("ballSelection") === "snooker";
+	// Display Balls: only seed a missing key here. Do not force-off yet — ballSelection may
+	// still be a stale "snooker" from a prior session until gameType(..., { restore: true })
+	// normalizes it below. Final sync happens after that restore.
 	if (getStorageItem("enableBallDisplay") === null) {
-		// Preserve prior behavior: tracker on + non-snooker meant overlay was shown
-		const legacyShow = getStorageItem("enableBallTracker") === "yes" && !snookerModeInit;
-		setStorageItem("enableBallDisplay", legacyShow ? "yes" : "no");
-	}
-	if (snookerModeInit || getStorageItem("enableBallTracker") !== "yes") {
-		setStorageItem("enableBallDisplay", "no");
+		const gameTypeSeed = getStorageItem("gameType");
+		const ballSelectionSeed = getStorageItem("ballSelection");
+		const snookerSeed = gameTypeSeed === "game8" ||
+			(gameTypeSeed === "game7" && ballSelectionSeed === "snooker");
+		const trackerOn = getStorageItem("enableBallTracker") === "yes";
+		setStorageItem("enableBallDisplay", (!snookerSeed && trackerOn) ? "yes" : "no");
 	}
 	const ballDisplayCheckbox = document.getElementById("ballDisplayCheckbox");
 	if (ballDisplayCheckbox) {
@@ -334,11 +340,11 @@ window.onload = function () {
 		document.getElementById("ballTrackerCheckbox").checked = true;
 		document.getElementById("ballTrackerDiv").classList.remove("noShow");
 		console.log(`Ball tracker enabled`);
-		bc.postMessage({ displayBallTracker: getStorageItem("enableBallDisplay") === "yes" && !snookerModeInit });
+		bc.postMessage({ displayBallTracker: getStorageItem("enableBallDisplay") === "yes" && getStorageItem("gameType") !== "game8" && getStorageItem("ballSelection") !== "snooker" });
 	} else if (getStorageItem("enableBallTracker") === "yes") {
 		document.getElementById("ballTrackerCheckbox").checked = true;
 		document.getElementById("ballTrackerDiv").classList.remove("noShow");
-		bc.postMessage({ displayBallTracker: getStorageItem("enableBallDisplay") === "yes" && !snookerModeInit });
+		bc.postMessage({ displayBallTracker: getStorageItem("enableBallDisplay") === "yes" && getStorageItem("gameType") !== "game8" && getStorageItem("ballSelection") !== "snooker" });
 	} else {
 		document.getElementById("ballTrackerCheckbox").checked = false;
 		setStorageItem("enableBallTracker", "no");
@@ -399,8 +405,14 @@ window.onload = function () {
 
 	// Properly initialize ball tracker visibility
 	useBallTracker();
+	// After gameType restore (which clears stale snooker ballSelection), finalize Display Balls.
+	if (typeof syncBallDisplayAfterModeChange === "function") {
+		syncBallDisplayAfterModeChange();
+	} else if (typeof syncBallDisplayControls === "function") {
+		syncBallDisplayControls();
+	}
 	if (getStorageItem("useBallSet") === null) {
-		setStorageItem("useBallSet", "no");
+		setStorageItem("useBallSet", "yes");
 	}
 	if (typeof syncControlsTabLayout === "function") {
 		syncControlsTabLayout();
@@ -641,6 +653,9 @@ else {
 }
 
 ensureDefaultGameType();
+if (typeof ensureFeatureSettingDefaults === "function") {
+	ensureFeatureSettingDefaults();
+}
 
 if (getStorageItem('p1ScoreCtrlPanel') > 0 || getStorageItem('p1ScoreCtrlPanel') == "") {
 	p1ScoreValue = getStorageItem('p1ScoreCtrlPanel');
@@ -689,17 +704,18 @@ if (getStorageItem("useClock") == "yes") {
 	clockSetting();
 } else {
 	console.log("Clock disabled");
-	clockSetting()
+	document.getElementById("useClockSetting").checked = false;
+	clockSetting();
 }
 
-if (getStorageItem("winAnimation") === "no" || getStorageItem("winAnimation") === null) {
-	console.log("Win animation disabled");
-	document.getElementById("winAnimation").checked = false;
-	setStorageItem("winAnimation", "no");
-} else {
+if (getStorageItem("winAnimation") === "yes") {
 	console.log("Win animation enabled");
 	document.getElementById("winAnimation").checked = true;
 	setStorageItem("winAnimation", "yes");
+} else {
+	console.log("Win animation disabled");
+	document.getElementById("winAnimation").checked = false;
+	setStorageItem("winAnimation", "no");
 }
 if (typeof syncWinAnimationControls === "function") {
 	syncWinAnimationControls();

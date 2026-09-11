@@ -517,6 +517,12 @@
     // Names truncate to 20 chars — keep discriminating prefix first so A/B never collide.
     const p1 = await cp.PlayerStats.ensurePlayer(('A' + tag + game.id).slice(0, 20));
     const p2 = await cp.PlayerStats.ensurePlayer(('B' + tag + game.id).slice(0, 20));
+    const beforeP1 = await cp.PlayerStats.getPlayer(p1.id);
+    const beforeP2 = await cp.PlayerStats.getPlayer(p2.id);
+    const beforeW1 = (beforeP1 && beforeP1.stats && beforeP1.stats.gamesWon) || 0;
+    const beforeL1 = (beforeP1 && beforeP1.stats && beforeP1.stats.gamesLost) || 0;
+    const beforeW2 = (beforeP2 && beforeP2.stats && beforeP2.stats.gamesWon) || 0;
+    const beforeL2 = (beforeP2 && beforeP2.stats && beforeP2.stats.gamesLost) || 0;
     await setPlayers(cp, p1, p2);
     await setupGame(cp, game.id, 5);
     cp.document.getElementById('gameInfoTxt').value = suite + ' scenario ' + tag;
@@ -599,6 +605,13 @@
       (breakdown.indexOf('B&R') !== -1 || breakdown.indexOf('B&amp;R') !== -1),
       breakdown && breakdown.slice(0, 240));
 
+    const scoreP1 = match.finalScore
+      ? (Number(match.finalScore.p1) || 0)
+      : parseInt(cp.getStorageItem('p1ScoreCtrlPanel') || '0', 10);
+    const scoreP2 = match.finalScore
+      ? (Number(match.finalScore.p2) || 0)
+      : parseInt(cp.getStorageItem('p2ScoreCtrlPanel') || '0', 10);
+
     await finishMatch(cp);
     const history = await cp.PlayerStats.getMatchesForPlayer(p1.id);
     const saved = (history || []).find((m) => m.gameType === game.id &&
@@ -606,6 +619,10 @@
     assert(suite, 'Match saved to history with ≥5 racks',
       !!(saved && saved.racks && saved.racks.length >= 5),
       saved && String(saved.racks && saved.racks.length));
+    assert(suite, 'History finalScore matches scoreboard',
+      !!(saved && saved.finalScore &&
+        saved.finalScore.p1 === scoreP1 && saved.finalScore.p2 === scoreP2),
+      saved && JSON.stringify(saved.finalScore) + ' vs ' + scoreP1 + '-' + scoreP2);
 
     const statsP1 = await cp.PlayerStats.getPlayer(p1.id);
     const statsP2 = await cp.PlayerStats.getPlayer(p2.id);
@@ -614,6 +631,24 @@
     const careerBr = (typed1 && typed1.breakAndRuns || 0) + (typed2 && typed2.breakAndRuns || 0);
     assert(suite, 'Career B&R credited to someone', careerBr >= 1,
       JSON.stringify({ p1: typed1 && typed1.breakAndRuns, p2: typed2 && typed2.breakAndRuns }));
+
+    if (scoreP1 > scoreP2) {
+      assert(suite, 'Winner career gamesWon +1 (P1)',
+        statsP1 && statsP1.stats && statsP1.stats.gamesWon === beforeW1 + 1,
+        statsP1 && String(statsP1.stats.gamesWon));
+      assert(suite, 'Loser career gamesLost +1 (P2)',
+        statsP2 && statsP2.stats && statsP2.stats.gamesLost === beforeL2 + 1,
+        statsP2 && String(statsP2.stats.gamesLost));
+    } else if (scoreP2 > scoreP1) {
+      assert(suite, 'Winner career gamesWon +1 (P2)',
+        statsP2 && statsP2.stats && statsP2.stats.gamesWon === beforeW2 + 1,
+        statsP2 && String(statsP2.stats.gamesWon));
+      assert(suite, 'Loser career gamesLost +1 (P1)',
+        statsP1 && statsP1.stats && statsP1.stats.gamesLost === beforeL1 + 1,
+        statsP1 && String(statsP1.stats.gamesLost));
+    } else {
+      assert(suite, 'Match produced a decisive scoreline', false, scoreP1 + '-' + scoreP2);
+    }
   }
 
   function buildSnookerFrames(rand) {

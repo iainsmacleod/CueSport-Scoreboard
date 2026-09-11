@@ -21,7 +21,7 @@
 
     const STAT_VISIBILITY_CATALOG = [
         { id: 'gamesWL', label: 'Matches Won (H2H)', gameTypes: ['game1', 'game2', 'game3', 'game4', 'game5', 'game6', 'game7', 'game8'] },
-        { id: 'racksWL', label: 'Racks / Frames Won (H2H)', gameTypes: ['game1', 'game2', 'game3', 'game4', 'game5', 'game6', 'game7', 'game8'] },
+        { id: 'racksWL', label: 'Racks / Frames Won (H2H)', gameTypes: ['game1', 'game2', 'game3', 'game5', 'game6', 'game7', 'game8'] },
         { id: 'winStreak', label: 'Win Streak', gameTypes: ['game1', 'game2', 'game3', 'game4', 'game5', 'game6', 'game7', 'game8'] },
         { id: 'currentBreak', label: 'Current Break / Run', gameTypes: ['game4', 'game8'] },
         { id: 'possibleBreak', label: 'Possible Break', gameTypes: ['game8'] },
@@ -99,11 +99,8 @@
                 extras.highestRunP1 = Math.max(extras.highestRunP1, clampScore(match.matchHighestRun[p1Id]));
                 extras.highestRunP2 = Math.max(extras.highestRunP2, clampScore(match.matchHighestRun[p2Id]));
             }
-            // Legacy straight sessions stored run length under matchHighestBreak.
-            if (match.matchHighestBreak) {
-                extras.highestRunP1 = Math.max(extras.highestRunP1, clampScore(match.matchHighestBreak[p1Id]));
-                extras.highestRunP2 = Math.max(extras.highestRunP2, clampScore(match.matchHighestBreak[p2Id]));
-            }
+            extras.foulsP1 += clampScore(match.foulsP1);
+            extras.foulsP2 += clampScore(match.foulsP2);
         } else if (match.matchHighestBreak) {
             extras.highestBreakP1 = Math.max(
                 extras.highestBreakP1,
@@ -285,12 +282,12 @@
         if (typeof window.cloudRelay.requestStats === 'function' && isCloudStatsMode()) {
             try {
                 const payload = await window.cloudRelay.requestStats(5000);
-                const result = {
+                const result = scrubCloudStatsStraightRacks({
                     players: Array.isArray(payload.players) ? payload.players : [],
                     matches: Array.isArray(payload.matches) ? payload.matches : [],
                     summary: payload.summary || null,
                     tables: Array.isArray(payload.tables) ? payload.tables : [],
-                };
+                });
                 cloudStatsCache = result;
                 cloudStatsCacheTs = Date.now();
                 return result;
@@ -338,12 +335,12 @@
                 throw new Error(errBody.error || ('HTTP ' + res.status));
             }
             const payload = await res.json();
-            const result = {
+            const result = scrubCloudStatsStraightRacks({
                 players: Array.isArray(payload.players) ? payload.players : [],
                 matches: Array.isArray(payload.matches) ? payload.matches : [],
                 summary: payload.summary || null,
                 tables: Array.isArray(payload.tables) ? payload.tables : [],
-            };
+            });
             cloudStatsCache = result;
             cloudStatsCacheTs = Date.now();
             return result;
@@ -363,6 +360,49 @@
             }
             return { players: [], matches: [], error: msg };
         }
+    }
+
+    /**
+     * Straight Pool scores are points — never racks. Rebuild racks W/L from completed
+     * non-Straight matches so older cloud rollups (or cached payloads) cannot show
+     * "120 racks" for a race to 120.
+     */
+    function scrubCloudStatsStraightRacks(data) {
+        if (!data || !Array.isArray(data.players)) {
+            return data;
+        }
+        const players = data.players;
+        const matches = Array.isArray(data.matches) ? data.matches : [];
+        const byKey = {};
+        players.forEach(function (p) {
+            const key = cloudPlayerKey(p.id || p.name);
+            if (!key) return;
+            byKey[key] = p;
+            p.racksWon = 0;
+            p.racksLost = 0;
+        });
+        matches.forEach(function (m) {
+            if (!m || m.status !== 'completed' || m.gameType === 'game4') {
+                return;
+            }
+            const scores = m.scores || m.finalScore || {};
+            const s1 = Number(scores.p1) || 0;
+            const s2 = Number(scores.p2) || 0;
+            if (!s1 && !s2) {
+                return;
+            }
+            const p1 = byKey[cloudPlayerKey(m.player1Id || m.player1Name)];
+            const p2 = byKey[cloudPlayerKey(m.player2Id || m.player2Name)];
+            if (p1) {
+                p1.racksWon += s1;
+                p1.racksLost += s2;
+            }
+            if (p2) {
+                p2.racksWon += s2;
+                p2.racksLost += s1;
+            }
+        });
+        return data;
     }
 
     /**
@@ -454,10 +494,13 @@
                 if (ep.scores) {
                     var r1 = Number(ep.scores.p1) || 0;
                     var r2 = Number(ep.scores.p2) || 0;
-                    p1.racksWon += r1;
-                    p1.racksLost += r2;
-                    p2.racksWon += r2;
-                    p2.racksLost += r1;
+                    // Straight Pool scores are points, not racks.
+                    if ((sp.gameType || 'game1') !== 'game4') {
+                        p1.racksWon += r1;
+                        p1.racksLost += r2;
+                        p2.racksWon += r2;
+                        p2.racksLost += r1;
+                    }
                 }
                 if (slot === '1' || slot === '2') {
                     var winner = slot === '1' ? p1 : p2;
@@ -563,6 +606,19 @@
         return String(name || '').trim().toLowerCase();
     }
 
+    /** True when a cloud match involves this player UUID and/or display name. */
+    function cloudMatchInvolvesPlayer(match, playerKey) {
+        const key = String(playerKey || '').trim();
+        if (!key || !match) return false;
+        const keyLower = cloudPlayerKey(key);
+        const id1 = String(match.player1Id || '').trim();
+        const id2 = String(match.player2Id || '').trim();
+        if (id1 && (id1 === key || cloudPlayerKey(id1) === keyLower)) return true;
+        if (id2 && (id2 === key || cloudPlayerKey(id2) === keyLower)) return true;
+        return cloudPlayerKey(match.player1Name) === keyLower ||
+            cloudPlayerKey(match.player2Name) === keyLower;
+    }
+
     function adaptCloudRacks(m) {
         const p1 = String(m.player1Id || '').trim() || cloudPlayerKey(m.player1Name);
         const p2 = String(m.player2Id || '').trim() || cloudPlayerKey(m.player2Name);
@@ -622,12 +678,20 @@
             completedAt: m.completedAt,
             startedAt: m.startedAt,
             durationSeconds: Number(m.durationSeconds) || null,
-            finalScore: m.scores || { p1: 0, p2: 0 },
+            finalScore: m.scores || m.finalScore || { p1: 0, p2: 0 },
             racks: adaptCloudRacks(m),
             highestBreakP1: Number(m.highestBreakP1) || 0,
             highestBreakP2: Number(m.highestBreakP2) || 0,
             highestRunP1: Number(m.highestRunP1) || 0,
             highestRunP2: Number(m.highestRunP2) || 0,
+            matchHighestRun: (function () {
+                const map = {};
+                const hr1 = Number(m.highestRunP1) || 0;
+                const hr2 = Number(m.highestRunP2) || 0;
+                if (hr1 > 0) map[p1Id] = hr1;
+                if (hr2 > 0) map[p2Id] = hr2;
+                return map;
+            }()),
             breakAndRunsP1: Number(m.breakAndRunsP1) || 0,
             breakAndRunsP2: Number(m.breakAndRunsP2) || 0,
             tableRunsP1: Number(m.tableRunsP1) || 0,
@@ -645,11 +709,8 @@
     }
 
     function cloudMatchesForPlayer(matches, playerKey) {
-        const key = String(playerKey || '').trim();
-        const keyLower = cloudPlayerKey(playerKey);
         return (matches || []).filter(function (m) {
-            if (m.player1Id === key || m.player2Id === key) return true;
-            return cloudPlayerKey(m.player1Name) === keyLower || cloudPlayerKey(m.player2Name) === keyLower;
+            return cloudMatchInvolvesPlayer(m, playerKey);
         }).map(adaptCloudMatchForUi);
     }
 
@@ -669,10 +730,12 @@
                 const won = (m.winnerSlot === '1' && isP1) || (m.winnerSlot === '2' && !isP1);
                 if (won) typed.gamesWon += 1;
                 else typed.gamesLost += 1;
-                const own = isP1 ? (m.finalScore.p1 || 0) : (m.finalScore.p2 || 0);
-                const opp = isP1 ? (m.finalScore.p2 || 0) : (m.finalScore.p1 || 0);
-                typed.racksWon += own;
-                typed.racksLost += opp;
+                if (gt !== 'game4') {
+                    const own = isP1 ? (m.finalScore.p1 || 0) : (m.finalScore.p2 || 0);
+                    const opp = isP1 ? (m.finalScore.p2 || 0) : (m.finalScore.p1 || 0);
+                    typed.racksWon += own;
+                    typed.racksLost += opp;
+                }
             }
             if (isP1) {
                 typed.highestBreak = Math.max(typed.highestBreak || 0, m.highestBreakP1);
@@ -730,9 +793,9 @@
         };
         (cloudData.matches || []).forEach(function (raw) {
             if (!raw || raw.status !== 'completed') return;
-            const a = cloudPlayerKey(raw.player1Name);
-            const b = cloudPlayerKey(raw.player2Name);
-            if (!((a === id1 && b === id2) || (a === id2 && b === id1))) return;
+            if (!cloudMatchInvolvesPlayer(raw, playerId1) || !cloudMatchInvolvesPlayer(raw, playerId2)) {
+                return;
+            }
             const m = adaptCloudMatchForUi(raw);
             summary.matches.push(m);
             if (m.winnerSlot === '1') {
@@ -740,8 +803,10 @@
             } else if (m.winnerSlot === '2') {
                 summary.gamesWon[m.player2Id] = (summary.gamesWon[m.player2Id] || 0) + 1;
             }
-            summary.racksWon[m.player1Id] = (summary.racksWon[m.player1Id] || 0) + (m.finalScore.p1 || 0);
-            summary.racksWon[m.player2Id] = (summary.racksWon[m.player2Id] || 0) + (m.finalScore.p2 || 0);
+            if (m.gameType !== 'game4') {
+                summary.racksWon[m.player1Id] = (summary.racksWon[m.player1Id] || 0) + (m.finalScore.p1 || 0);
+                summary.racksWon[m.player2Id] = (summary.racksWon[m.player2Id] || 0) + (m.finalScore.p2 || 0);
+            }
             summary.ballsWon[m.player1Id] = (summary.ballsWon[m.player1Id] || 0) + m.ballsP1;
             summary.ballsWon[m.player2Id] = (summary.ballsWon[m.player2Id] || 0) + m.ballsP2;
             summary.fouls[m.player1Id] = (summary.fouls[m.player1Id] || 0) + m.foulsP1;
@@ -774,26 +839,63 @@
         if (modal) {
             modal.dataset.cloud = isCloud ? '1' : '';
         }
-        // Cloud matches use the same racks/frames editor as local storage.
-        const localBlock = document.getElementById('statsMatchLocalRacksBlock');
-        const cloudScores = document.getElementById('statsMatchCloudScoresRow');
-        if (localBlock) localBlock.classList.remove('noShow');
-        if (cloudScores) cloudScores.classList.add('noShow');
+        // Cloud matches use the same racks/frames editor as local storage (except Straight).
+        syncMatchEditorLayoutForGameType();
         syncMatchExtrasVisibilityForEdit();
     }
 
+    function syncMatchEditorLayoutForGameType() {
+        const select = document.getElementById('statsMatchGameType');
+        const gameType = (select && select.value) || 'game1';
+        const straight = isStraightPoolGameType(gameType);
+        const localBlock = document.getElementById('statsMatchLocalRacksBlock');
+        const scoreRow = document.getElementById('statsMatchCloudScoresRow');
+        if (localBlock) {
+            localBlock.classList.toggle('noShow', straight);
+        }
+        if (scoreRow) {
+            scoreRow.classList.toggle('noShow', !straight);
+            if (straight) {
+                const p1Label = document.getElementById('statsMatchScoreP1Label');
+                const p2Label = document.getElementById('statsMatchScoreP2Label');
+                if (p1Label) {
+                    p1Label.textContent = 'Balls (' + (matchEditPlayerNames.p1 || 'P1') + '):';
+                }
+                if (p2Label) {
+                    p2Label.textContent = 'Balls (' + (matchEditPlayerNames.p2 || 'P2') + '):';
+                }
+            }
+        }
+    }
+
     function syncMatchExtrasVisibilityForEdit() {
-        // Match local dock edit: per-rack HB/fouls/runs live in the racks editor.
-        // Only optional balls remain as match-level fields.
+        const select = document.getElementById('statsMatchGameType');
+        const gameType = (select && select.value) || 'game1';
+        const straight = isStraightPoolGameType(gameType);
         const hbEl = document.getElementById('statsMatchExtrasHb');
         const hrEl = document.getElementById('statsMatchExtrasHr');
         const runsEl = document.getElementById('statsMatchExtrasRuns');
         const foulsEl = document.getElementById('statsMatchExtrasFouls');
+        // Non-Straight: per-rack HB/fouls/runs live in the racks editor.
+        // Straight: match-level longest run (+ optional fouls).
         if (hbEl) hbEl.classList.add('noShow');
-        if (hrEl) hrEl.classList.add('noShow');
         if (runsEl) runsEl.classList.add('noShow');
-        if (foulsEl) foulsEl.classList.add('noShow');
+        if (hrEl) {
+            hrEl.classList.toggle('noShow', !straight);
+            if (straight) {
+                const p1Label = document.getElementById('statsMatchHrP1Label');
+                const p2Label = document.getElementById('statsMatchHrP2Label');
+                if (p1Label) {
+                    p1Label.textContent = 'Longest run (' + (matchEditPlayerNames.p1 || 'P1') + '):';
+                }
+                if (p2Label) {
+                    p2Label.textContent = 'Longest run (' + (matchEditPlayerNames.p2 || 'P2') + '):';
+                }
+            }
+        }
+        if (foulsEl) foulsEl.classList.toggle('noShow', !straight);
         updateMatchBallFieldsVisibility();
+        syncMatchEditorLayoutForGameType();
     }
 
     function readNumInput(id) {
@@ -890,6 +992,7 @@
         document.getElementById('statsMatchBallsP1').value = match.ballsP1 || 0;
         document.getElementById('statsMatchBallsP2').value = match.ballsP2 || 0;
         renderMatchRacksEditor(match.racks || []);
+        fillStraightMatchScoreFields(match);
         updateMatchBallFieldsVisibility();
         updateMatchScoreSummary();
         syncMatchExtrasVisibilityForEdit();
@@ -907,30 +1010,54 @@
             alert('Missing cloud match id.');
             return;
         }
-        const editorRacks = collectMatchRacksFromEditor();
-        if (!editorRacks.length) {
-            alert('Add at least one rack/frame with a winner.');
-            return;
-        }
-        const scores = scoresFromEditorRacks(editorRacks);
         const gameType = document.getElementById('statsMatchGameType').value;
-        const racks = serializeEditorRacksForCloud(editorRacks, gameType);
+        const straight = isStraightPoolGameType(gameType);
+        let scores;
+        let racks;
+        let highestRunP1 = 0;
+        let highestRunP2 = 0;
+        let foulsP1 = 0;
+        let foulsP2 = 0;
+        if (straight) {
+            const straightPayload = readStraightMatchScorePayload();
+            scores = { p1: straightPayload.scoreP1, p2: straightPayload.scoreP2 };
+            racks = [];
+            highestRunP1 = straightPayload.highestRunP1;
+            highestRunP2 = straightPayload.highestRunP2;
+            foulsP1 = straightPayload.foulsP1;
+            foulsP2 = straightPayload.foulsP2;
+        } else {
+            const editorRacks = collectMatchRacksFromEditor();
+            if (!editorRacks.length) {
+                alert('Add at least one rack/frame with a winner.');
+                return;
+            }
+            scores = scoresFromEditorRacks(editorRacks);
+            racks = serializeEditorRacksForCloud(editorRacks, gameType);
+        }
         const dateVal = document.getElementById('statsMatchDate').value;
         setMatchEditBusy(true, 'save');
         try {
+            const body = {
+                player1Name: modal.dataset.player1Name || matchEditPlayerNames.p1,
+                player2Name: modal.dataset.player2Name || matchEditPlayerNames.p2,
+                gameType: gameType,
+                gameInfo: (document.getElementById('statsMatchGameInfo') || {}).value || '',
+                scores: scores,
+                racks: racks,
+                completedAt: dateVal ? (dateVal + 'T12:00:00.000Z') : undefined,
+                ballsP1: readNumInput('statsMatchBallsP1'),
+                ballsP2: readNumInput('statsMatchBallsP2')
+            };
+            if (straight) {
+                body.highestRunP1 = highestRunP1;
+                body.highestRunP2 = highestRunP2;
+                body.foulsP1 = foulsP1;
+                body.foulsP2 = foulsP2;
+            }
             await cloudApiFetch('/api/stats/matches/' + encodeURIComponent(startEventId), {
                 method: 'PATCH',
-                body: {
-                    player1Name: modal.dataset.player1Name || matchEditPlayerNames.p1,
-                    player2Name: modal.dataset.player2Name || matchEditPlayerNames.p2,
-                    gameType: gameType,
-                    gameInfo: (document.getElementById('statsMatchGameInfo') || {}).value || '',
-                    scores: scores,
-                    racks: racks,
-                    completedAt: dateVal ? (dateVal + 'T12:00:00.000Z') : undefined,
-                    ballsP1: readNumInput('statsMatchBallsP1'),
-                    ballsP2: readNumInput('statsMatchBallsP2')
-                }
+                body: body
             });
             matchEditBusy = false;
             closeMatchEditModal();
@@ -2315,15 +2442,25 @@
             return;
         }
 
-        let straightRunLength = 0;
-        if (context.gameType === 'game4') {
+        // Straight Pool: points update score + run only — never racks W/L or per-point rack rows.
+        if (isStraightPoolGameType(context.gameType)) {
             if (activeMatchSession.straightPoolRunSlot === playerSlot) {
                 activeMatchSession.straightPoolRunLength += 1;
             } else {
                 activeMatchSession.straightPoolRunSlot = playerSlot;
                 activeMatchSession.straightPoolRunLength = 1;
             }
-            straightRunLength = activeMatchSession.straightPoolRunLength;
+            const straightRunLength = activeMatchSession.straightPoolRunLength;
+            const p1Score = parseInt(getStorageItem('p1ScoreCtrlPanel'), 10) || 0;
+            const p2Score = parseInt(getStorageItem('p2ScoreCtrlPanel'), 10) || 0;
+            match.finalScore = { p1: p1Score, p2: p2Score };
+            match.racks = match.racks || [];
+            activeMatchSession.lastRackWinnerSlot = playerSlot;
+            await applyHighestRunIfBetter(ids.winnerId, straightRunLength, 'game4');
+            await checkMatchCompletion();
+            await persistPendingSession();
+            broadcastOverlayStatsIfEnabled();
+            return;
         }
 
         const rackEntry = {
@@ -2331,11 +2468,6 @@
             winnerId: ids.winnerId
         };
         applyRackTiming(match, rackEntry);
-        if (context.gameType === 'game4') {
-            // Store current run length for the scorer (editable in match history).
-            rackEntry.highestRunP1 = playerSlot === '1' ? straightRunLength : 0;
-            rackEntry.highestRunP2 = playerSlot === '2' ? straightRunLength : 0;
-        }
         if (isTrackerRackWinGameType(context.gameType)) {
             // Prefer classification captured before breaker state was cleared for next rack.
             let runClass = (options && options.rackRunClass)
@@ -2401,10 +2533,6 @@
             setStorageItem('snookerFrameFoulsP2', '0');
         }
         activeMatchSession.lastRackWinnerSlot = playerSlot;
-
-        if (context.gameType === 'game4') {
-            await applyHighestRunIfBetter(ids.winnerId, straightRunLength, 'game4');
-        }
 
         await checkMatchCompletion();
         await persistPendingSession();
@@ -2661,12 +2789,39 @@
         }
 
         const match = getActivePendingMatch();
-        if (!match || match.racks.length === 0) {
+        if (!match) {
+            return;
+        }
+
+        const context = getCurrentContext();
+        const p1Score = parseInt(getStorageItem('p1ScoreCtrlPanel'), 10) || 0;
+        const p2Score = parseInt(getStorageItem('p2ScoreCtrlPanel'), 10) || 0;
+        match.finalScore = { p1: p1Score, p2: p2Score };
+
+        if (isStraightPoolGameType(context.gameType)) {
+            if (activeMatchSession.matchCompletedRecorded) {
+                await revertMatchCompletion(match);
+            }
+            if (activeMatchSession.straightPoolRunSlot === playerSlot &&
+                activeMatchSession.straightPoolRunLength > 0) {
+                activeMatchSession.straightPoolRunLength -= 1;
+                if (activeMatchSession.straightPoolRunLength <= 0) {
+                    activeMatchSession.straightPoolRunSlot = null;
+                    activeMatchSession.straightPoolRunLength = 0;
+                }
+            }
+            const remaining = playerSlot === '1' ? p1Score : p2Score;
+            activeMatchSession.lastRackWinnerSlot = remaining > 0 ? playerSlot : null;
+            await persistPendingSession();
+            broadcastOverlayStatsIfEnabled();
+            return;
+        }
+
+        if (!match.racks || match.racks.length === 0) {
             return;
         }
 
         const lastRack = match.racks[match.racks.length - 1];
-        const context = getCurrentContext();
         const winnerId = lastRack.winnerId;
         const loserId = winnerId === activeMatchSession.player1Id
             ? activeMatchSession.player2Id
@@ -2679,9 +2834,6 @@
                     || match.racks[match.racks.length - 1].startedAt)
                 : match.startedAt)
             || null;
-        const p1Score = parseInt(getStorageItem('p1ScoreCtrlPanel'), 10) || 0;
-        const p2Score = parseInt(getStorageItem('p2ScoreCtrlPanel'), 10) || 0;
-        match.finalScore = { p1: p1Score, p2: p2Score };
 
         if (activeMatchSession.matchCompletedRecorded) {
             await revertMatchCompletion(match);
@@ -2711,35 +2863,8 @@
         activeMatchSession.lastRackWinnerSlot = match.racks.length > 0
             ? (match.racks[match.racks.length - 1].winnerId === activeMatchSession.player1Id ? '1' : '2')
             : null;
-        if (context.gameType === 'game4') {
-            // Rebuild current run from trailing consecutive racks for the same player.
-            recomputeStraightPoolRunFromRacks();
-        }
         await persistPendingSession();
         broadcastOverlayStatsIfEnabled();
-    }
-
-    /** Straight Pool: current run = trailing streak of primary-score racks for one player. */
-    function recomputeStraightPoolRunFromRacks() {
-        const match = getActivePendingMatch();
-        if (!match || !match.racks || match.racks.length === 0) {
-            activeMatchSession.straightPoolRunSlot = null;
-            activeMatchSession.straightPoolRunLength = 0;
-            return;
-        }
-        const lastWinnerId = match.racks[match.racks.length - 1].winnerId;
-        let length = 0;
-        for (let i = match.racks.length - 1; i >= 0; i--) {
-            if (match.racks[i].winnerId !== lastWinnerId) {
-                break;
-            }
-            length += 1;
-        }
-        const slot = lastWinnerId === activeMatchSession.player1Id
-            ? '1'
-            : (lastWinnerId === activeMatchSession.player2Id ? '2' : null);
-        activeMatchSession.straightPoolRunSlot = slot;
-        activeMatchSession.straightPoolRunLength = slot ? length : 0;
     }
 
     async function recordBallWin(playerSlot) {
@@ -2932,6 +3057,7 @@
     /**
      * Append any missing rack rows so match.racks counts match the live scoreboard.
      * Used before Call Match Early / End Match so async recordRackWin cannot under-count.
+     * Straight Pool skips this — points are not racks.
      */
     async function reconcileMatchRacksWithScores(match, scores) {
         if (!match || !scores) {
@@ -2940,13 +3066,17 @@
         if (!match.racks) {
             match.racks = [];
         }
-        const p1Id = match.player1Id;
-        const p2Id = match.player2Id;
         const wantP1 = clampScore(scores.p1);
         const wantP2 = clampScore(scores.p2);
+        const gameType = match.gameType || activeMatchSession.gameType || 'game1';
+        if (isStraightPoolGameType(gameType)) {
+            match.finalScore = { p1: wantP1, p2: wantP2 };
+            return;
+        }
+        const p1Id = match.player1Id;
+        const p2Id = match.player2Id;
         let p1Have = match.racks.filter(function (r) { return r.winnerId === p1Id; }).length;
         let p2Have = match.racks.filter(function (r) { return r.winnerId === p2Id; }).length;
-        const gameType = match.gameType || activeMatchSession.gameType || 'game1';
         const now = new Date().toISOString();
         const missingP1 = wantP1 - p1Have;
         const missingP2 = wantP2 - p2Have;
@@ -2962,10 +3092,6 @@
                 winnerId: p1Id,
                 timestamp: now
             };
-            if (isStraightPoolGameType(gameType)) {
-                entry.highestRunP1 = 0;
-                entry.highestRunP2 = 0;
-            }
             match.racks.push(entry);
             if (p1Player && p2Player) {
                 mutateRackDelta(p1Player, p2Player, gameType, 1, now);
@@ -2978,10 +3104,6 @@
                 winnerId: p2Id,
                 timestamp: now
             };
-            if (isStraightPoolGameType(gameType)) {
-                entry.highestRunP1 = 0;
-                entry.highestRunP2 = 0;
-            }
             match.racks.push(entry);
             if (p1Player && p2Player) {
                 mutateRackDelta(p2Player, p1Player, gameType, 1, now);
@@ -3252,11 +3374,18 @@
                 }
                 activeMatchSession.cloudSessionStarted = false;
             }
-            if (match && (match.racks.length > 0 || (match.balls && match.balls.length > 0))) {
+            if (match && (
+                (match.racks && match.racks.length > 0) ||
+                (match.balls && match.balls.length > 0) ||
+                (isStraightPoolGameType(match.gameType) &&
+                    match.finalScore &&
+                    ((match.finalScore.p1 || 0) > 0 || (match.finalScore.p2 || 0) > 0))
+            )) {
                 await undoAllRacksInMatch(match);
                 match.finalScore = { p1: 0, p2: 0 };
                 match.racks = [];
                 match.balls = [];
+                match.matchHighestRun = {};
             }
             activeMatchSession.matchCompletedRecorded = false;
             activeMatchSession.status = 'active';
@@ -3430,26 +3559,8 @@
             return 0;
         }
         let best = 0;
-        (match.racks || []).forEach(function (r) {
-            let run = 0;
-            if (match.player1Id === playerId) {
-                run = parseInt(r.highestRunP1 != null ? r.highestRunP1 : r.highestBreakP1, 10) || 0;
-            } else if (match.player2Id === playerId) {
-                run = parseInt(r.highestRunP2 != null ? r.highestRunP2 : r.highestBreakP2, 10) || 0;
-            }
-            if (run > best) {
-                best = run;
-            }
-        });
         if (match.matchHighestRun && match.matchHighestRun[playerId]) {
             best = Math.max(best, match.matchHighestRun[playerId] || 0);
-        }
-        if (match.matchHighestBreak && match.matchHighestBreak[playerId]) {
-            best = Math.max(best, match.matchHighestBreak[playerId] || 0);
-        }
-        const derivedRun = longestConsecutiveRackWins(match, playerId);
-        if (derivedRun > best) {
-            best = derivedRun;
         }
         return best;
     }
@@ -3458,11 +3569,14 @@
         if (!summary || !match) {
             return;
         }
-        (match.racks || []).forEach(function (r) {
-            if (r.winnerId) {
-                summary.racksWon[r.winnerId] = (summary.racksWon[r.winnerId] || 0) + 1;
-            }
-        });
+        const straight = isStraightPoolGameType(match.gameType);
+        if (!straight) {
+            (match.racks || []).forEach(function (r) {
+                if (r.winnerId) {
+                    summary.racksWon[r.winnerId] = (summary.racksWon[r.winnerId] || 0) + 1;
+                }
+            });
+        }
         if (match.balls) {
             match.balls.forEach(function (b) {
                 if (b.winnerId) {
@@ -3700,48 +3814,39 @@
             return;
         }
 
-        const matches = await getMatchesForPlayer(playerId);
+        const matches = await getMatchesForPlayer(playerId, { includePending: true });
         player.stats = createEmptyStats();
         let lastPlayed = null;
 
         matches.forEach(function (m) {
             const opponentId = m.player1Id === playerId ? m.player2Id : m.player1Id;
             const gameType = m.gameType || 'game1';
+            const straight = isStraightPoolGameType(gameType);
 
             (m.racks || []).forEach(function (r) {
-                if (r.winnerId === playerId) {
-                    player.stats.racksWon++;
-                    ensureTypeStats(player.stats, gameType).racksWon++;
-                } else if (r.winnerId === opponentId) {
-                    player.stats.racksLost++;
-                    ensureTypeStats(player.stats, gameType).racksLost++;
+                if (!straight) {
+                    if (r.winnerId === playerId) {
+                        player.stats.racksWon++;
+                        ensureTypeStats(player.stats, gameType).racksWon++;
+                    } else if (r.winnerId === opponentId) {
+                        player.stats.racksLost++;
+                        ensureTypeStats(player.stats, gameType).racksLost++;
+                    }
                 }
 
                 let frameBreak = 0;
-                let frameRun = 0;
                 if (m.player1Id === playerId) {
                     frameBreak = parseInt(r.highestBreakP1, 10) || 0;
-                    frameRun = parseInt(r.highestRunP1 != null ? r.highestRunP1 : (isStraightPoolGameType(gameType) ? r.highestBreakP1 : 0), 10) || 0;
                 } else if (m.player2Id === playerId) {
                     frameBreak = parseInt(r.highestBreakP2, 10) || 0;
-                    frameRun = parseInt(r.highestRunP2 != null ? r.highestRunP2 : (isStraightPoolGameType(gameType) ? r.highestBreakP2 : 0), 10) || 0;
                 }
-                if (!isStraightPoolGameType(gameType) && frameBreak > 0) {
+                if (!straight && frameBreak > 0) {
                     if (frameBreak > (player.stats.highestBreak || 0)) {
                         player.stats.highestBreak = frameBreak;
                     }
                     const typeStats = ensureTypeStats(player.stats, gameType);
                     if (frameBreak > (typeStats.highestBreak || 0)) {
                         typeStats.highestBreak = frameBreak;
-                    }
-                }
-                if (isStraightPoolGameType(gameType) && frameRun > 0) {
-                    if (frameRun > (player.stats.highestRun || 0)) {
-                        player.stats.highestRun = frameRun;
-                    }
-                    const typeStats = ensureTypeStats(player.stats, gameType);
-                    if (frameRun > (typeStats.highestRun || 0)) {
-                        typeStats.highestRun = frameRun;
                     }
                 }
                 if (r.breakAndRun && r.winnerId === playerId) {
@@ -3765,20 +3870,27 @@
                 }
             });
 
-            // Straight Pool legacy matches may lack per-ball run fields — derive from streaks.
-            if (isStraightPoolGameType(gameType)) {
-                const derivedRun = longestConsecutiveRackWins(m, playerId);
-                if (derivedRun > (player.stats.highestRun || 0)) {
-                    player.stats.highestRun = derivedRun;
+            if (straight) {
+                const matchRun = highestRunFromMatchForPlayer(m, playerId);
+                if (matchRun > (player.stats.highestRun || 0)) {
+                    player.stats.highestRun = matchRun;
                 }
                 const typeStats = ensureTypeStats(player.stats, gameType);
-                if (derivedRun > (typeStats.highestRun || 0)) {
-                    typeStats.highestRun = derivedRun;
+                if (matchRun > (typeStats.highestRun || 0)) {
+                    typeStats.highestRun = matchRun;
                 }
-                // Clear legacy straight totals wrongly stored as highestBreak.
                 if ((typeStats.highestBreak || 0) > 0) {
-                    typeStats.highestRun = Math.max(typeStats.highestRun || 0, typeStats.highestBreak || 0);
                     typeStats.highestBreak = 0;
+                }
+                let matchFouls = 0;
+                if (m.player1Id === playerId) {
+                    matchFouls = parseInt(m.foulsP1, 10) || 0;
+                } else if (m.player2Id === playerId) {
+                    matchFouls = parseInt(m.foulsP2, 10) || 0;
+                }
+                if (matchFouls > 0) {
+                    player.stats.fouls = (player.stats.fouls || 0) + matchFouls;
+                    typeStats.fouls = (typeStats.fouls || 0) + matchFouls;
                 }
             }
 
@@ -3876,7 +3988,29 @@
         let racks;
         let scoreP1;
         let scoreP2;
-        if (Array.isArray(matchPayload.racks)) {
+        const straight = isStraightPoolGameType(match.gameType);
+        if (straight) {
+            // Straight Pool: point scoreline + longest run — never synthesize racks from points.
+            if (Array.isArray(matchPayload.racks) && matchPayload.racks.length > 0 &&
+                matchPayload.scoreP1 == null && matchPayload.scoreP2 == null) {
+                // Reject rack-list saves that would treat points as racks.
+                throw new Error('Straight Pool matches use a point score and longest run, not racks.');
+            }
+            scoreP1 = clampScore(matchPayload.scoreP1);
+            scoreP2 = clampScore(matchPayload.scoreP2);
+            racks = [];
+            const hr1 = clampScore(matchPayload.highestRunP1);
+            const hr2 = clampScore(matchPayload.highestRunP2);
+            match.matchHighestRun = {};
+            if (hr1 > 0) {
+                match.matchHighestRun[match.player1Id] = hr1;
+            }
+            if (hr2 > 0) {
+                match.matchHighestRun[match.player2Id] = hr2;
+            }
+            match.foulsP1 = clampScore(matchPayload.foulsP1);
+            match.foulsP2 = clampScore(matchPayload.foulsP2);
+        } else if (Array.isArray(matchPayload.racks)) {
             racks = normalizeRacksPayload(matchPayload.racks, match.player1Id, match.player2Id, match.gameType);
             if (racks.length === 0) {
                 throw new Error('Add at least one ' + rackFrameWord(match.gameType, false).toLowerCase() + '.');
@@ -4007,17 +4141,41 @@
         const includeBalls = gameTypeHasBallScoring(gameType);
         const ballsP1 = includeBalls ? clampScore(matchPayload.ballsP1) : 0;
         const ballsP2 = includeBalls ? clampScore(matchPayload.ballsP2) : 0;
+        const straight = isStraightPoolGameType(gameType);
 
         await undoAllRacksInMatch(match);
 
-        const racks = normalizeRacksPayload(
-            matchPayload.racks || [],
-            match.player1Id,
-            match.player2Id,
-            gameType
-        );
-        const scoreP1 = racks.filter(function (r) { return r.winnerId === match.player1Id; }).length;
-        const scoreP2 = racks.filter(function (r) { return r.winnerId === match.player2Id; }).length;
+        let racks = [];
+        let scoreP1;
+        let scoreP2;
+        if (straight) {
+            scoreP1 = clampScore(matchPayload.scoreP1);
+            scoreP2 = clampScore(matchPayload.scoreP2);
+            const hr1 = clampScore(matchPayload.highestRunP1);
+            const hr2 = clampScore(matchPayload.highestRunP2);
+            match.matchHighestRun = {};
+            if (hr1 > 0) {
+                match.matchHighestRun[match.player1Id] = hr1;
+            }
+            if (hr2 > 0) {
+                match.matchHighestRun[match.player2Id] = hr2;
+            }
+            if (hr1 > 0) {
+                await applyHighestRunIfBetter(match.player1Id, hr1, 'game4');
+            }
+            if (hr2 > 0) {
+                await applyHighestRunIfBetter(match.player2Id, hr2, 'game4');
+            }
+        } else {
+            racks = normalizeRacksPayload(
+                matchPayload.racks || [],
+                match.player1Id,
+                match.player2Id,
+                gameType
+            );
+            scoreP1 = racks.filter(function (r) { return r.winnerId === match.player1Id; }).length;
+            scoreP2 = racks.filter(function (r) { return r.winnerId === match.player2Id; }).length;
+        }
 
         match.racks = racks;
         match.balls = includeBalls ? synthesizeBallsFromCounts(match, ballsP1, ballsP2) : [];
@@ -4029,7 +4187,9 @@
             match.gameInfo = String(matchPayload.gameInfo).trim();
             activeMatchSession.gameInfo = match.gameInfo;
         }
-        refreshMatchHighestBreakFromRacks(match);
+        if (!straight) {
+            refreshMatchHighestBreakFromRacks(match);
+        }
 
         for (let i = 0; i < racks.length; i++) {
             const rack = racks[i];
@@ -4065,27 +4225,22 @@
 
         activeMatchSession.status = 'active';
         activeMatchSession.matchCompletedRecorded = false;
-        activeMatchSession.lastRackWinnerSlot = racks.length > 0
-            ? (racks[racks.length - 1].winnerId === match.player1Id ? '1' : '2')
-            : null;
-        activeMatchSession.lastBallWinnerSlot = match.balls && match.balls.length > 0
-            ? (match.balls[match.balls.length - 1].winnerId === match.player1Id ? '1' : '2')
-            : null;
-
-        if (isStraightPoolGameType(gameType)) {
-            recomputeStraightPoolRunFromRacks();
-            if (activeMatchSession.straightPoolRunSlot && activeMatchSession.straightPoolRunLength > 0) {
-                const runIds = getSlotPlayerIds(activeMatchSession.straightPoolRunSlot);
-                await applyHighestBreakIfBetter(
-                    runIds.winnerId,
-                    activeMatchSession.straightPoolRunLength,
-                    'game4'
-                );
-            }
+        if (straight) {
+            activeMatchSession.lastRackWinnerSlot = scoreP1 > 0 || scoreP2 > 0
+                ? (scoreP1 >= scoreP2 ? '1' : '2')
+                : null;
+            activeMatchSession.straightPoolRunSlot = null;
+            activeMatchSession.straightPoolRunLength = 0;
         } else {
+            activeMatchSession.lastRackWinnerSlot = racks.length > 0
+                ? (racks[racks.length - 1].winnerId === match.player1Id ? '1' : '2')
+                : null;
             activeMatchSession.straightPoolRunSlot = null;
             activeMatchSession.straightPoolRunLength = 0;
         }
+        activeMatchSession.lastBallWinnerSlot = match.balls && match.balls.length > 0
+            ? (match.balls[match.balls.length - 1].winnerId === match.player1Id ? '1' : '2')
+            : null;
 
         syncLiveScoreboardFromMatch(match);
         await persistPendingSession();
@@ -5316,7 +5471,29 @@
 
     const expandedMatchRacks = new Set();
 
+    function matchHasStraightDetail(match) {
+        if (!match || !isStraightPoolGameType(match.gameType)) {
+            return false;
+        }
+        const score = match.finalScore || match.scores || {};
+        if ((Number(score.p1) || 0) > 0 || (Number(score.p2) || 0) > 0) {
+            return true;
+        }
+        if (match.matchHighestRun) {
+            const vals = Object.keys(match.matchHighestRun).map(function (k) {
+                return Number(match.matchHighestRun[k]) || 0;
+            });
+            if (vals.some(function (v) { return v > 0; })) {
+                return true;
+            }
+        }
+        return !!(match.highestRunP1 || match.highestRunP2);
+    }
+
     function matchRackCount(match) {
+        if (isStraightPoolGameType(match && match.gameType)) {
+            return matchHasStraightDetail(match) ? 1 : 0;
+        }
         return enrichRacksWithDuration(match).length;
     }
 
@@ -5413,13 +5590,16 @@
             return '';
         }
         const expanded = isMatchRacksExpanded(key);
+        const straight = isStraightPoolGameType(match.gameType);
         return statsActionButton({
             className: 'stats-match-racks-toggle',
             attrs: 'data-toggle-racks="' + escapeHtml(key) + '" aria-expanded="' +
                 (expanded ? 'true' : 'false') + '"',
             icon: expanded ? 'eyeClosed' : 'eyeOpen',
-            label: 'Racks',
-            title: expanded ? 'Hide rack details' : 'Show rack details'
+            label: straight ? 'Details' : 'Racks',
+            title: expanded
+                ? (straight ? 'Hide match details' : 'Hide rack details')
+                : (straight ? 'Show match details' : 'Show rack details')
         });
     }
 
@@ -5463,18 +5643,69 @@
         return '\u2014';
     }
 
-    /** Per-rack/frame breakdown for match history (Winner/Breaker + per-player lines). */
-    function renderMatchRackBreakdown(match, options) {
-        const timedRacks = enrichRacksWithDuration(match);
-        if (timedRacks.length === 0) {
+    /** Straight Pool match detail: point scoreline + longest run (not per-point racks). */
+    function renderStraightMatchSummary(match, options) {
+        if (!match || !matchHasStraightDetail(match)) {
             return '';
         }
         const opts = options || {};
         const viewerId = opts.viewerPlayerId || null;
+        const viewerIsP2 = !!(viewerId && match.player2Id === viewerId);
+        const score = match.finalScore || match.scores || { p1: 0, p2: 0 };
+        const p1Score = Number(score.p1) || 0;
+        const p2Score = Number(score.p2) || 0;
+        const hr1 = highestRunFromMatchForPlayer(match, match.player1Id) ||
+            clampScore(match.highestRunP1);
+        const hr2 = highestRunFromMatchForPlayer(match, match.player2Id) ||
+            clampScore(match.highestRunP2);
+        const playerOrder = viewerIsP2 ? ['2', '1'] : ['1', '2'];
+        const scoreLabel = escapeHtml(String(p1Score) + '\u2013' + String(p2Score));
+        const winner = match.winnerId
+            ? ('Winner: ' + escapeHtml(winnerDisplayName(match, match.winnerId)))
+            : 'Score';
+        const playerLines = playerOrder.map(function (slot) {
+            const isP1 = slot === '1';
+            const name = isP1
+                ? (match.player1Name || 'Player 1')
+                : (match.player2Name || 'Player 2');
+            const run = isP1 ? hr1 : hr2;
+            return '<div class="stats-rack-player-line">' +
+                '<span class="stats-rack-player-id">' +
+                '<span class="stats-rack-player-name">' + escapeHtml(name) + '</span></span>' +
+                '<span>Longest Run: ' + escapeHtml(String(run)) + '</span>' +
+                '</div>';
+        }).join('');
+        const matchLabel = formatDurationSeconds(
+            match.durationSeconds != null ? match.durationSeconds : sumRackDurationSeconds(match)
+        );
+        const footer = matchLabel
+            ? '<div class="stats-match-duration-footer">' + escapeHtml('Match ' + matchLabel) + '</div>'
+            : '';
+        return '<div class="stats-match-racks-wrap">' +
+            '<div class="stats-rack-list">' +
+            '<div class="stats-rack-card">' +
+            '<div class="stats-rack-primary">' +
+            '<span class="stats-rack-score">' + scoreLabel + '</span>' +
+            '<span class="stats-rack-outcome">' + winner + '</span>' +
+            '</div>' +
+            '<div class="stats-rack-players">' + playerLines + '</div>' +
+            '</div></div>' + footer + '</div>';
+    }
+
+    /** Per-rack/frame breakdown for match history (Winner/Breaker + per-player lines). */
+    function renderMatchRackBreakdown(match, options) {
+        const opts = options || {};
+        const viewerId = opts.viewerPlayerId || null;
         const isSnooker = isSnookerGameType(match.gameType);
-        const isStraight = isStraightPoolGameType(match.gameType);
+        if (isStraightPoolGameType(match.gameType)) {
+            return renderStraightMatchSummary(match, { viewerPlayerId: viewerId });
+        }
+        const timedRacks = enrichRacksWithDuration(match);
+        if (timedRacks.length === 0) {
+            return '';
+        }
         const isPoolRunGame = isTrackerRackWinGameType(match.gameType);
-        const showBalls = !isSnooker && !isStraight;
+        const showBalls = !isSnooker;
         const viewerIsP2 = !!(viewerId && match.player2Id === viewerId);
 
         function durationCell(r) {
@@ -5563,12 +5794,8 @@
             const isTableRun = !!(r.tableRun && !isBreakAndRun);
             const ballCounts = showBalls ? rackBallCounts(r, rackIndex) : null;
             const fs = r.frameScore || { p1: 0, p2: 0 };
-            const hb1 = isStraight
-                ? (parseInt(r.highestRunP1 != null ? r.highestRunP1 : r.highestBreakP1, 10) || 0)
-                : (parseInt(r.highestBreakP1, 10) || 0);
-            const hb2 = isStraight
-                ? (parseInt(r.highestRunP2 != null ? r.highestRunP2 : r.highestBreakP2, 10) || 0)
-                : (parseInt(r.highestBreakP2, 10) || 0);
+            const hb1 = parseInt(r.highestBreakP1, 10) || 0;
+            const hb2 = parseInt(r.highestBreakP2, 10) || 0;
 
             if (isSnooker) {
                 primary.push(
@@ -5614,10 +5841,6 @@
                 if (isSnooker) {
                     parts.push(
                         '<span>HB: ' + escapeHtml(String(isP1 ? hb1 : hb2)) + '</span>'
-                    );
-                } else if (isStraight) {
-                    parts.push(
-                        '<span>Run: ' + escapeHtml(String(isP1 ? hb1 : hb2)) + '</span>'
                     );
                 }
                 if (isPoolRunGame && winnerSlot === slot) {
@@ -5747,6 +5970,43 @@
         }
     }
 
+    function fillStraightMatchScoreFields(match) {
+        const score = (match && (match.finalScore || match.scores)) || { p1: 0, p2: 0 };
+        const scoreP1 = document.getElementById('statsMatchScoreP1');
+        const scoreP2 = document.getElementById('statsMatchScoreP2');
+        if (scoreP1) scoreP1.value = clampScore(score.p1);
+        if (scoreP2) scoreP2.value = clampScore(score.p2);
+        const hr1 = document.getElementById('statsMatchHrP1');
+        const hr2 = document.getElementById('statsMatchHrP2');
+        let run1 = 0;
+        let run2 = 0;
+        if (match) {
+            if (match.matchHighestRun) {
+                run1 = clampScore(match.matchHighestRun[match.player1Id]);
+                run2 = clampScore(match.matchHighestRun[match.player2Id]);
+            }
+            run1 = Math.max(run1, clampScore(match.highestRunP1));
+            run2 = Math.max(run2, clampScore(match.highestRunP2));
+        }
+        if (hr1) hr1.value = run1;
+        if (hr2) hr2.value = run2;
+        const foulsP1 = document.getElementById('statsMatchFoulsP1');
+        const foulsP2 = document.getElementById('statsMatchFoulsP2');
+        if (foulsP1) foulsP1.value = clampScore(match && match.foulsP1);
+        if (foulsP2) foulsP2.value = clampScore(match && match.foulsP2);
+    }
+
+    function readStraightMatchScorePayload() {
+        return {
+            scoreP1: readNumInput('statsMatchScoreP1'),
+            scoreP2: readNumInput('statsMatchScoreP2'),
+            highestRunP1: readNumInput('statsMatchHrP1'),
+            highestRunP2: readNumInput('statsMatchHrP2'),
+            foulsP1: readNumInput('statsMatchFoulsP1'),
+            foulsP2: readNumInput('statsMatchFoulsP2')
+        };
+    }
+
     function populateMatchEditForm(match, options) {
         const opts = options || {};
         const inProgress = !!opts.inProgress;
@@ -5779,9 +6039,11 @@
         document.getElementById('statsMatchBallsP1').value = countBallsForPlayer(match, match.player1Id);
         document.getElementById('statsMatchBallsP2').value = countBallsForPlayer(match, match.player2Id);
         setMatchEditMode(false);
+        fillStraightMatchScoreFields(match);
         renderMatchRacksEditor(match.racks || []);
         updateMatchBallFieldsVisibility();
         updateMatchScoreSummary();
+        syncMatchExtrasVisibilityForEdit();
         modal.style.display = 'block';
     }
 
@@ -5867,9 +6129,11 @@
                 }
                 document.getElementById('statsMatchBallsP1').value = 0;
                 document.getElementById('statsMatchBallsP2').value = 0;
+                fillStraightMatchScoreFields(null);
                 renderMatchRacksEditor([]);
                 updateMatchBallFieldsVisibility();
                 updateMatchScoreSummary();
+                syncMatchExtrasVisibilityForEdit();
                 modal.style.display = 'block';
             });
         }
@@ -5926,16 +6190,23 @@
         if (!summary) {
             return;
         }
-        const racks = collectMatchRacksFromEditor();
+        const select = document.getElementById('statsMatchGameType');
+        const gameType = (select && select.value) || 'game1';
         let p1 = 0;
         let p2 = 0;
-        racks.forEach(function (r) {
-            if (r.winnerId === '1') {
-                p1++;
-            } else if (r.winnerId === '2') {
-                p2++;
-            }
-        });
+        if (isStraightPoolGameType(gameType)) {
+            p1 = readNumInput('statsMatchScoreP1');
+            p2 = readNumInput('statsMatchScoreP2');
+        } else {
+            const racks = collectMatchRacksFromEditor();
+            racks.forEach(function (r) {
+                if (r.winnerId === '1') {
+                    p1++;
+                } else if (r.winnerId === '2') {
+                    p2++;
+                }
+            });
+        }
         summary.textContent = 'Match: ' + matchEditPlayerNames.p1 + ' ' + p1 +
             ' \u2013 ' + p2 + ' ' + matchEditPlayerNames.p2;
     }
@@ -6220,17 +6491,22 @@
 
         setMatchEditBusy(true, 'save');
         try {
+            const gameType = document.getElementById('statsMatchGameType').value;
             const payload = {
                 id: matchId || undefined,
                 player1Id: player1Id,
                 player2Id: player2Id,
                 date: document.getElementById('statsMatchDate').value,
-                gameType: document.getElementById('statsMatchGameType').value,
+                gameType: gameType,
                 gameInfo: (document.getElementById('statsMatchGameInfo') || {}).value || '',
-                racks: collectMatchRacksFromEditor(),
                 ballsP1: document.getElementById('statsMatchBallsP1').value,
                 ballsP2: document.getElementById('statsMatchBallsP2').value
             };
+            if (isStraightPoolGameType(gameType)) {
+                Object.assign(payload, readStraightMatchScorePayload());
+            } else {
+                payload.racks = collectMatchRacksFromEditor();
+            }
             if (inProgress) {
                 await savePendingMatchEdit(payload);
             } else {
@@ -6433,13 +6709,11 @@
         setPlayerRenameBusy(true);
         try {
             if (isCloudStatsMode()) {
-                const fromName = modal.dataset.fromName || '';
                 await cloudApiFetch('/api/stats/players', {
                     method: 'PATCH',
-                    body: { from: fromName, to: newName }
+                    body: { id: playerId, to: newName }
                 });
                 invalidateCloudStatsCache();
-                statsModalSelectedPlayerId = cloudPlayerKey(newName);
             } else {
                 await updatePlayerName(playerId, newName);
                 if (typeof postNames === 'function') {
@@ -6462,24 +6736,50 @@
         if (!statsModalSelectedPlayerId) {
             return;
         }
-        if (isCloudStatsMode()) {
-            alert('Deleting players is not available while CueSport Cloud is connected. Rename the player, or delete individual matches instead.');
-            return;
+        const isCloud = isCloudStatsMode();
+        let playerName = statsModalSelectedPlayerId;
+        let matchCount = 0;
+        if (isCloud) {
+            const data = await fetchCloudStats();
+            const key = cloudPlayerKey(statsModalSelectedPlayerId);
+            const cloudPlayer = (data.players || []).find(function (p) {
+                return cloudPlayerKey(p.id || p.name) === key;
+            });
+            if (!cloudPlayer) {
+                alert('Player not found in cloud stats.');
+                return;
+            }
+            playerName = cloudPlayer.name || key;
+            matchCount = (data.matches || []).filter(function (m) {
+                return m && cloudMatchInvolvesPlayer(m, statsModalSelectedPlayerId);
+            }).length;
+        } else {
+            const player = await getPlayer(statsModalSelectedPlayerId);
+            if (!player) {
+                return;
+            }
+            playerName = player.name;
+            const matches = await getMatchesForPlayer(statsModalSelectedPlayerId);
+            matchCount = matches.length;
         }
-        const player = await getPlayer(statsModalSelectedPlayerId);
-        if (!player) {
-            return;
-        }
-        const matches = await getMatchesForPlayer(statsModalSelectedPlayerId);
-        if (!confirm('Delete "' + player.name + '" and ' + matches.length + ' match(es)? This cannot be undone.')) {
+        if (!confirm('Delete "' + playerName + '" and ' + matchCount + ' match(es)? This cannot be undone.')) {
             return;
         }
         if (!confirm('Are you absolutely sure?')) {
             return;
         }
         try {
-            await deletePlayer(statsModalSelectedPlayerId);
-            document.getElementById('statsPlayerDetail').innerHTML = '<p class="stats-empty">Select a player from the leaderboard.</p>';
+            if (isCloud) {
+                await cloudApiFetch(
+                    '/api/stats/players/' + encodeURIComponent(statsModalSelectedPlayerId),
+                    { method: 'DELETE' }
+                );
+                invalidateCloudStatsCache();
+            } else {
+                await deletePlayer(statsModalSelectedPlayerId);
+            }
+            document.getElementById('statsPlayerDetail').innerHTML =
+                '<p class="stats-empty">Select a player from the leaderboard.</p>';
             statsModalSelectedPlayerId = null;
             await refreshStatsUI();
         } catch (err) {
@@ -6588,7 +6888,17 @@
         players.sort(function (a, b) {
             const aStats = a.stats || createEmptyStats();
             const bStats = b.stats || createEmptyStats();
-            return bStats.gamesWon - aStats.gamesWon || bStats.racksWon - aStats.racksWon;
+            const aPlayed = (aStats.gamesWon || 0) + (aStats.gamesDrawn || 0) + (aStats.gamesLost || 0) > 0;
+            const bPlayed = (bStats.gamesWon || 0) + (bStats.gamesDrawn || 0) + (bStats.gamesLost || 0) > 0;
+            if (aPlayed !== bPlayed) {
+                return aPlayed ? -1 : 1;
+            }
+            if (!aPlayed) {
+                return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+            }
+            return bStats.gamesWon - aStats.gamesWon
+                || bStats.racksWon - aStats.racksWon
+                || a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
         });
 
         if (players.length === 0) {
@@ -6627,8 +6937,8 @@
             return;
         }
         tbody.innerHTML = data.players.map(function (p) {
-            const total = p.gamesWon + p.gamesLost;
-            const wr = total > 0 ? Math.round((p.gamesWon / total) * 100) : 0;
+            const total = (p.gamesWon || 0) + (p.gamesDrawn || 0) + (p.gamesLost || 0);
+            const wr = total > 0 ? Math.round(((p.gamesWon || 0) / total) * 100) : 0;
             return '<tr class="stats-row" data-player-id="' + escapeHtml(p.id) + '">' +
                 '<td>' + escapeHtml(p.name) + '</td>' +
                 '<td>' + formatWL(p.gamesWon, p.gamesLost) + '</td>' +
@@ -7007,13 +7317,15 @@
             return;
         }
 
-        const playerMatches = (data.matches || []).filter(function (m) {
-            return m.status === 'completed' &&
-                (cloudPlayerKey(m.player1Name) === key || cloudPlayerKey(m.player2Name) === key);
+        const rawMatches = (data.matches || []).filter(function (m) {
+            return m && m.status === 'completed' && cloudMatchInvolvesPlayer(m, playerId);
         });
-        const player = buildCloudPlayerDetailShape(cloudPlayer, playerMatches);
-        const uiMatches = playerMatches.map(adaptCloudMatchForUi);
-        const winStreak = getCurrentWinStreak(key, uiMatches);
+        const player = buildCloudPlayerDetailShape(cloudPlayer, rawMatches);
+        const uiMatches = rawMatches.map(adaptCloudMatchForUi);
+        const winStreak = getCurrentWinStreak(
+            String(cloudPlayer.id || '').trim() || key,
+            uiMatches
+        );
 
         const opponentOptions = (data.players || [])
             .filter(function (p) { return cloudPlayerKey(p.id || p.name) !== key; })
@@ -7029,6 +7341,7 @@
             '<h3>' + escapeHtml(player.name) + '</h3>' +
             '<div class="stats-player-header-actions">' +
             '<div class="hover obs28 button stats-edit-btn" onclick="promptRenamePlayer()">Edit Name</div>' +
+            '<div class="hover obs28 button stats-edit-btn stats-danger-btn" onclick="confirmDeletePlayer()">Delete Player</div>' +
             '</div></div>' +
             '<div class="stats-section">' + renderPlayerSummaryCards(player, winStreak) + '</div>' +
             '<div class="stats-section stats-opponent-row">' +
@@ -7249,10 +7562,22 @@
         broadcastOverlayStatsIfEnabled();
     }
 
+    async function recomputeAllPlayerStats() {
+        const players = await getAllPlayers();
+        for (let i = 0; i < players.length; i++) {
+            if (players[i] && players[i].id) {
+                await recomputePlayerStats(players[i].id);
+            }
+        }
+    }
+
     async function initPlayerStats() {
         await openDatabase();
         await repairPlayerRecords();
         await restorePendingSession();
+        // Rebuild career totals so stale Straight Pool points-as-racks drop out of Racks W/L.
+        // Pending match is restored first so live non-Straight rack/ball deltas survive.
+        await recomputeAllPlayerStats();
         playerStatsReady = true;
         // Set initial cloud stats UI state
         var cloud = isCloudStatsMode();
@@ -7271,6 +7596,7 @@
         searchPlayers: searchPlayers,
         getPlayer: getPlayer,
         getAllPlayers: getAllPlayers,
+        putPlayer: putPlayer,
         recordRackWin: recordRackWin,
         undoLastRack: undoLastRack,
         recordBallWin: recordBallWin,
@@ -7291,6 +7617,7 @@
         saveMatch: saveMatch,
         deleteMatch: deleteMatch,
         recomputePlayerStats: recomputePlayerStats,
+        recomputeAllPlayerStats: recomputeAllPlayerStats,
         updatePlayerName: updatePlayerName,
         deletePlayer: deletePlayer,
         exportData: exportData,
@@ -7306,6 +7633,8 @@
         renderMatchRackBreakdown: renderMatchRackBreakdown,
         getActivePendingMatch: getActivePendingMatch,
         buildCloudMatchExtras: buildCloudMatchExtras,
+        cloudMatchesForPlayer: cloudMatchesForPlayer,
+        buildCloudHeadToHead: buildCloudHeadToHead,
         syncActiveMatchGameInfoFromUI: captureActiveMatchGameInfo,
         renderStatsVisibilityPanel: renderStatsVisibilityPanel,
         isStatVisible: isStatVisible,

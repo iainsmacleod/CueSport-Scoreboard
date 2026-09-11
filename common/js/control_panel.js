@@ -3961,6 +3961,10 @@ function applyGameTypeChange(value, options) {
         // Leaving Snooker: drop forced snooker ball set (Custom may still choose snooker via Ball Type)
         if (getStorageItem("ballSelection") === "snooker") {
             setStorageItem("ballSelection", "american");
+            // Snooker forced Display Balls off — restore Feature Settings default when tracker is on.
+            if (getStorageItem("enableBallTracker") === "yes") {
+                setStorageItem("enableBallDisplay", "yes");
+            }
         }
         const currentBall = getStorageItem("ballSelection") || "american";
         document.getElementById("ballSelection").value = currentBall;
@@ -3998,6 +4002,9 @@ function applyGameTypeChange(value, options) {
         }
         if (getStorageItem("ballSelection") === "snooker") {
             setStorageItem("ballSelection", "american");
+            if (getStorageItem("enableBallTracker") === "yes") {
+                setStorageItem("enableBallDisplay", "yes");
+            }
         }
         document.getElementById("ballSelection").value = getStorageItem("ballSelection") || "american";
         ballType(document.getElementById("ballSelection").value);
@@ -4221,6 +4228,23 @@ function isBallDisplayEnabled() {
     return getStorageItem("enableBallDisplay") === "yes" &&
         getStorageItem("enableBallTracker") === "yes" &&
         isBallDisplayAllowed();
+}
+
+/**
+ * Apply Display Balls rules for the current mode (after gameType / ballSelection settle).
+ * Snooker / no tracker → forced off. Otherwise leave an existing yes/no preference alone;
+ * only seed missing keys to the Feature Settings default (on).
+ */
+function syncBallDisplayAfterModeChange(options) {
+    const opts = options || {};
+    const trackerOn = getStorageItem("enableBallTracker") === "yes";
+    if (!trackerOn || !isBallDisplayAllowed()) {
+        setStorageItem("enableBallDisplay", "no");
+    } else if (getStorageItem("enableBallDisplay") === null || opts.restoreDefaultOn) {
+        setStorageItem("enableBallDisplay", "yes");
+    }
+    syncBallDisplayControls();
+    broadcastBallDisplayState();
 }
 
 function syncBallDisplayControls() {
@@ -5105,8 +5129,10 @@ function debitStraightPoolUnpot(ballId) {
 }
 
 /**
- * 14.1: when only one object ball remains on the tracker, re-enable the pocketed
- * balls (re-rack) without changing scores.
+ * 14.1 Continuous: when only one object ball remains, re-enable the pocketed
+ * balls (re-rack) without changing scores. The Active Player keeps the table —
+ * they continue the run by attempting the remaining ball (typically caroming
+ * into the fresh rack). Do not re-prompt Breaking Player.
  */
 function maybeStraightPoolRerack() {
     if (!isStraightPool()) {
@@ -5146,8 +5172,15 @@ function maybeStraightPoolRerack() {
     if (restored > 0) {
         setStorageItem("ballState", JSON.stringify(ballState));
         setPocketBallOwners(owners);
-        console.log("Straight Pool: re-rack — restored " + restored + " balls (one remaining)");
-        maybeShowRackBreakerPickerAfterRackChange();
+        console.log("Straight Pool: re-rack — restored " + restored + " balls (one remaining); Active Player continues");
+        // Keep Active Player / breaker slot — 14.1 is continuous; only a miss/foul
+        // (manual Active Player switch) ends the run.
+        if (typeof updateRackBreakerBallLock === "function") {
+            updateRackBreakerBallLock();
+        }
+        if (typeof syncPlayerSlotPickerUI === "function") {
+            syncPlayerSlotPickerUI();
+        }
     }
 }
 
@@ -6910,6 +6943,42 @@ function getStorageItem(key, defaultValue = null) {
 const DEFAULT_GAME_TYPE = "game1";
 const VALID_GAME_TYPES = ["game1", "game2", "game3", "game4", "game5", "game6", "game7", "game8"];
 const GAME_TYPE_SELECT_ID = "gameTypeSelect";
+
+/**
+ * Feature Settings defaults for fresh installs and newly introduced keys.
+ * Only writes when a key is absent — never overrides an explicit user choice.
+ * Shot Clock stays off; all other Feature Settings toggles default on.
+ */
+function getFeatureSettingDefaults() {
+    return {
+        usePlayer1: "yes",
+        usePlayer2: "yes",
+        scoreDisplay: "yes",
+        usePlayerToggle: "yes",
+        useClock: "no",
+        winAnimation: "yes",
+        enableBallTracker: "yes",
+        useBallSet: "yes"
+    };
+}
+
+function ensureFeatureSettingDefaults() {
+    const defaults = getFeatureSettingDefaults();
+    Object.keys(defaults).forEach(function (key) {
+        if (getStorageItem(key) === null) {
+            setStorageItem(key, defaults[key]);
+        }
+    });
+    if (getStorageItem("enableBallDisplay") === null) {
+        const gameType = getStorageItem("gameType") || DEFAULT_GAME_TYPE;
+        const ballSelection = getStorageItem("ballSelection") || "american";
+        // Only treat as snooker when the game is Snooker, or Custom with snooker balls.
+        // Ignore stale ballSelection=snooker left over on pool games (8/9/10/Straight/…).
+        const snooker = gameType === "game8" || (gameType === "game7" && ballSelection === "snooker");
+        const trackerOn = getStorageItem("enableBallTracker") === "yes";
+        setStorageItem("enableBallDisplay", (!snooker && trackerOn) ? "yes" : "no");
+    }
+}
 
 function normalizeGameType(value) {
     return VALID_GAME_TYPES.includes(value) ? value : DEFAULT_GAME_TYPE;

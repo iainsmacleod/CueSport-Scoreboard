@@ -3,13 +3,15 @@
  * Run all CueSport test suites:
  *   1) backend API/WS (headless) — cd backend && npm test
  *   2) smoke_test.html (Playwright)
- *   3) cloud_relay_test.html (Playwright)
+ *   3) game_type_scenarios_test.html (Playwright) — play matches → stats/history
+ *   4) cloud_relay_test.html (Playwright)
  *
  * Usage (from repo root or tests/):
  *   cd tests && npm install
  *   node run-all.mjs
  *   node run-all.mjs --cloud http://localhost:4003
  *   node run-all.mjs --skip-smoke
+ *   node run-all.mjs --skip-scenarios
  *   node run-all.mjs --headed
  *
  * Requires CueSport Cloud listening (npm start or Docker). Reads DEV_AUTH_SECRET
@@ -33,6 +35,7 @@ function parseArgs(argv) {
     devSecret: process.env.DEV_AUTH_SECRET || '',
     skipApi: false,
     skipSmoke: false,
+    skipScenarios: false,
     skipRelay: false,
     headed: false,
     staticPort: STATIC_PORT,
@@ -45,6 +48,7 @@ function parseArgs(argv) {
     else if (a.startsWith('--dev-secret=')) out.devSecret = a.slice('--dev-secret='.length);
     else if (a === '--skip-api') out.skipApi = true;
     else if (a === '--skip-smoke') out.skipSmoke = true;
+    else if (a === '--skip-scenarios') out.skipScenarios = true;
     else if (a === '--skip-relay') out.skipRelay = true;
     else if (a === '--headed') out.headed = true;
     else if (a === '--help' || a === '-h') out.help = true;
@@ -187,6 +191,7 @@ Options:
   --dev-secret SECRET  DEV_AUTH_SECRET (default: backend/.env)
   --skip-api           Skip backend npm test
   --skip-smoke         Skip smoke_test.html
+  --skip-scenarios     Skip game_type_scenarios_test.html
   --skip-relay         Skip cloud_relay_test.html
   --headed             Show the browser window
   -h, --help           Show this help
@@ -224,7 +229,7 @@ async function main() {
 
   let staticServer = null;
   let ownStatic = false;
-  if (!args.skipSmoke || !args.skipRelay) {
+  if (!args.skipSmoke || !args.skipRelay || !args.skipScenarios) {
     if (await portOpen(args.staticPort)) {
       console.log(`\nUsing existing static server on :${args.staticPort}`);
     } else {
@@ -244,7 +249,7 @@ async function main() {
       else console.log('    PASS  backend npm test');
     }
 
-    if (!args.skipSmoke || !args.skipRelay) {
+    if (!args.skipSmoke || !args.skipRelay || !args.skipScenarios) {
       const browser = await chromium.launch({ headless: !args.headed });
       try {
         const secretQ = encodeURIComponent(args.devSecret);
@@ -258,6 +263,16 @@ async function main() {
             timeoutMs: 15 * 60 * 1000,
           });
           results.push({ name: 'smoke', ok: smoke.ok });
+        }
+        if (!args.skipScenarios) {
+          const scenarios = await runBrowserSuite(browser, {
+            name: 'game_type_scenarios_test.html',
+            url:
+              `http://127.0.0.1:${args.staticPort}/tests/game_type_scenarios_test.html` +
+              `?autorun=1&loops=1&seed=1`,
+            timeoutMs: 20 * 60 * 1000,
+          });
+          results.push({ name: 'game_type_scenarios', ok: scenarios.ok });
         }
         if (!args.skipRelay) {
           const relay = await runBrowserSuite(browser, {
