@@ -12,6 +12,8 @@
     let isObsStreaming = false;
     let streamingCheckInterval = null;
     let publishGeneration = 0;
+    let lastPromotionHeartbeatAt = 0;
+    const PROMOTION_HEARTBEAT_MS = 45000;
 
     function getStorageItem(key) {
         const prefixedKey = STORAGE_PREFIX + key;
@@ -285,6 +287,24 @@
         sendGameState();
     }
 
+    function shouldListPromotion() {
+        return !!(isEnabled && isObsStreaming && isCloudReady() && getManualStreamUrl());
+    }
+
+    function maybeHeartbeatPromotionListing() {
+        if (!shouldListPromotion()) return;
+        const now = Date.now();
+        if (now - lastPromotionHeartbeatAt < PROMOTION_HEARTBEAT_MS) return;
+        lastPromotionHeartbeatAt = now;
+        publishPromotionState();
+    }
+
+    function republishPromotionIfActive() {
+        if (!shouldListPromotion()) return;
+        lastPromotionHeartbeatAt = Date.now();
+        publishPromotionState();
+    }
+
     function canUseStreamPromotion() {
         return isCloudEnabled() && !!isObsStreaming;
     }
@@ -343,8 +363,8 @@
         setStorageItem('streamPromotionEnabled', 'false');
     }
 
-    function handleStreamingStopped() {
-        if (isEnabled) {
+    function handleStreamingStopped({ clearPreference = true } = {}) {
+        if (clearPreference && isEnabled) {
             clearPromotionEnabled();
         }
         updateStreamPromotionToggle();
@@ -358,7 +378,8 @@
                 const wasStreaming = isObsStreaming;
                 isObsStreaming = false;
                 if (wasStreaming) {
-                    handleStreamingStopped();
+                    // OBS socket dropped briefly — pause listing, keep the user's toggle preference.
+                    handleStreamingStopped({ clearPreference: false });
                 } else {
                     updateStreamPromotionToggle();
                     updateStreamSharingVisibility();
@@ -372,34 +393,41 @@
                 isObsStreaming = status.outputActive === true;
 
                 if (wasStreaming && !isObsStreaming) {
-                    handleStreamingStopped();
-                }
-
-                if (!wasStreaming && isObsStreaming) {
+                    // Confirmed stream end — turn promotion off so the next go-live is opt-in.
+                    handleStreamingStopped({ clearPreference: true });
+                } else if (!wasStreaming && isObsStreaming) {
                     if (isEnabled) {
                         publishPromotionState();
                     }
+                } else if (isEnabled && isObsStreaming) {
+                    // Keep live_streams.updated_at fresh while idle between scoring events.
+                    maybeHeartbeatPromotionListing();
                 }
 
                 updateStreamPromotionToggle();
                 updateStreamSharingVisibility();
             } catch (error) {
                 console.warn('Could not check OBS streaming status:', error);
-                if (isObsStreaming) {
-                    handleStreamingStopped();
-                }
+                const wasStreaming = isObsStreaming;
                 isObsStreaming = false;
-                updateStreamPromotionToggle();
-                updateStreamSharingVisibility();
+                if (wasStreaming) {
+                    // Transient GetStreamStatus failure — unlist only, keep preference.
+                    handleStreamingStopped({ clearPreference: false });
+                } else {
+                    updateStreamPromotionToggle();
+                    updateStreamSharingVisibility();
+                }
             }
         } catch (error) {
             console.warn('Error checking OBS streaming status:', error);
-            if (isObsStreaming) {
-                handleStreamingStopped();
-            }
+            const wasStreaming = isObsStreaming;
             isObsStreaming = false;
-            updateStreamPromotionToggle();
-            updateStreamSharingVisibility();
+            if (wasStreaming) {
+                handleStreamingStopped({ clearPreference: false });
+            } else {
+                updateStreamPromotionToggle();
+                updateStreamSharingVisibility();
+            }
         }
     }
 
@@ -494,10 +522,11 @@
                 }
             } else {
                 setTimeout(() => {
-                    if (isEnabled && isObsStreaming && isCloudReady()) {
-                        publishPromotionState();
-                    }
+                    republishPromotionIfActive();
                 }, 500);
+                setTimeout(() => {
+                    republishPromotionIfActive();
+                }, 2500);
             }
         }
     }
@@ -592,6 +621,8 @@
         refreshUi: function() {
             updateStreamPromotionToggle();
             updateStreamSharingVisibility();
+            // Cloud often joins after OBS is already live — republish so /streams lists us.
+            republishPromotionIfActive();
         },
 
         toggle: toggleStreamPromotion,

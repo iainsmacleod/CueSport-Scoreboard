@@ -10,7 +10,7 @@
   <header class="site-header">
     <div class="site-header-inner">
       <div>
-        <h1>CueSport Scoreboard Cloud</h1>
+        <h1>CueSport Scoreboard Cloud <span class="site-version">v8.0.0</span></h1>
         <p class="subtitle">Remote scoring, multi-table control, and live stream discovery</p>
       </div>
       <nav class="site-nav">
@@ -77,35 +77,49 @@
     }
 
     async function loadStreams() {
-      const res = await fetch('/api/streams');
-      const streams = await res.json();
       const list = document.getElementById('streamList');
       const empty = document.getElementById('empty');
-      list.innerHTML = '';
-      if (!streams.length) {
+      if (!list || !empty) return;
+      try {
+        const res = await fetch('/api/streams');
+        const payload = await res.json().catch(() => []);
+        const streams = Array.isArray(payload) ? payload : (Array.isArray(payload?.streams) ? payload.streams : []);
+        list.innerHTML = '';
+        if (!res.ok) {
+          empty.textContent = 'Could not load live streams right now.';
+          empty.classList.remove('hidden');
+          return;
+        }
+        if (!streams.length) {
+          empty.textContent = 'No one is streaming with promotion enabled right now.';
+          empty.classList.remove('hidden');
+          return;
+        }
+        empty.classList.add('hidden');
+        streams.forEach((s) => {
+          const st = s.state || {};
+          const li = document.createElement('li');
+          li.className = 'stream-card';
+          const p1 = escapeHtml(st.player1Name || 'Player 1');
+          const p2 = escapeHtml(st.player2Name || 'Player 2');
+          const score = st.dualScoreMode
+            ? `${st.p1Balls ?? 0} — ${st.p2Balls ?? 0} <span class="stream-subscore">(${st.p1Score ?? 0}–${st.p2Score ?? 0} frames)</span>`
+            : `${st.p1Score ?? 0} — ${st.p2Score ?? 0}`;
+          const meta = escapeHtml(`${st.gameInfo || st.gameType || ''}${st.raceInfo ? ' · ' + st.raceInfo : ''}`.trim());
+          const url = typeof s.stream_url === 'string' && /^https?:\/\//i.test(s.stream_url) ? s.stream_url : '';
+          li.innerHTML = `
+            <h3>${p1} vs ${p2}</h3>
+            <p class="score">${score}</p>
+            ${meta ? `<p class="stream-meta">${meta}</p>` : ''}
+            ${url ? `<a class="stream-watch" href="${escapeHtml(url)}" target="_blank" rel="noopener">Watch Stream</a>` : ''}
+          `;
+          list.appendChild(li);
+        });
+      } catch (err) {
+        list.innerHTML = '';
+        empty.textContent = 'Could not load live streams right now.';
         empty.classList.remove('hidden');
-        return;
       }
-      empty.classList.add('hidden');
-      streams.forEach((s) => {
-        const st = s.state || {};
-        const li = document.createElement('li');
-        li.className = 'stream-card';
-        const p1 = escapeHtml(st.player1Name || 'Player 1');
-        const p2 = escapeHtml(st.player2Name || 'Player 2');
-        const score = st.dualScoreMode
-          ? `${st.p1Balls ?? 0} — ${st.p2Balls ?? 0} <span class="stream-subscore">(${st.p1Score ?? 0}–${st.p2Score ?? 0} frames)</span>`
-          : `${st.p1Score ?? 0} — ${st.p2Score ?? 0}`;
-        const meta = escapeHtml(`${st.gameInfo || st.gameType || ''}${st.raceInfo ? ' · ' + st.raceInfo : ''}`.trim());
-        const url = typeof s.stream_url === 'string' && /^https?:\/\//i.test(s.stream_url) ? s.stream_url : '';
-        li.innerHTML = `
-          <h3>${p1} vs ${p2}</h3>
-          <p class="score">${score}</p>
-          ${meta ? `<p class="stream-meta">${meta}</p>` : ''}
-          ${url ? `<a class="stream-watch" href="${escapeHtml(url)}" target="_blank" rel="noopener">Watch Stream</a>` : ''}
-        `;
-        list.appendChild(li);
-      });
     }
     syncAuthNav();
     loadStreams();

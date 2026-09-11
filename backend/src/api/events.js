@@ -5,7 +5,7 @@ import {
   clampScore,
   normalizePlayerDisplayName,
 } from '../lib/scoreboard-helpers.js';
-import { broadcastRoomCommand, notifyAccountTables } from '../ws/room-hub.js';
+import { broadcastRoomCommand, notifyAccountTables, getConnectedDockPromotedStreams } from '../ws/room-hub.js';
 
 const GAME_TYPE_IDS = new Set(['game1', 'game2', 'game3', 'game4', 'game5', 'game6', 'game7', 'game8']);
 
@@ -434,6 +434,17 @@ export async function registerEventRoutes(app) {
   });
 
   app.get('/api/streams', async () => {
-    return sqlite.getActiveLiveStreams(30);
+    const fromTable = sqlite.getActiveLiveStreams(30);
+    const fromDocks = getConnectedDockPromotedStreams();
+    const byRoom = new Map();
+    for (const row of fromTable) {
+      if (row?.room_id) byRoom.set(row.room_id, row);
+    }
+    for (const row of fromDocks) {
+      if (row?.room_id) byRoom.set(row.room_id, row);
+    }
+    return Array.from(byRoom.values()).sort((a, b) =>
+      String(b.updated_at || '').localeCompare(String(a.updated_at || ''))
+    );
   });
 }

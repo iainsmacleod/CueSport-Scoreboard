@@ -744,6 +744,41 @@ export function roomHasConnectedDock(roomId) {
   return false;
 }
 
+/**
+ * Promoted streams from rooms that currently have a dock connected.
+ * Authoritative while the dock is online (avoids idle TTL drops between score updates).
+ */
+export function getConnectedDockPromotedStreams() {
+  const out = [];
+  for (const [roomId, clients] of rooms.entries()) {
+    let hasDock = false;
+    for (const conn of clients) {
+      if (conn.client === 'dock' && conn.ws.readyState === 1) {
+        hasDock = true;
+        break;
+      }
+    }
+    if (!hasDock) continue;
+    const { state } = sqlite.getRoomSessionState(roomId);
+    const streamUrl = String(state?.streamUrl || '').trim();
+    const listed = state?.streamPromotionListed === true
+      && state?.obsStreaming === true
+      && !!streamUrl;
+    if (!listed) continue;
+    const room = sqlite.getRoom(roomId);
+    out.push({
+      room_id: roomId,
+      stream_url: streamUrl,
+      state: state || {},
+      room_label: room?.label || null,
+      account_id: room?.account_id || null,
+      updated_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
+      source: 'dock_presence',
+    });
+  }
+  return out;
+}
+
 /** Live guest sockets keyed by guest token for a room. */
 export function guestConnectionCounts(roomId) {
   const counts = {};
