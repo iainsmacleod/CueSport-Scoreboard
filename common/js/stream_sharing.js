@@ -574,10 +574,29 @@
         updateStreamSharingVisibility();
     }
 
+    async function toggleObsStreaming() {
+        if (typeof obs === 'undefined' || !obs || typeof isObsReady === 'undefined' || !isObsReady) {
+            throw new Error('OBS WebSocket is not connected');
+        }
+        const status = await obs.call('GetStreamStatus');
+        const active = status && status.outputActive === true;
+        if (active) {
+            await obs.call('StopStream');
+        } else {
+            await obs.call('StartStream');
+        }
+        await checkObsStreamingStatus();
+        if (window.cloudRelay && typeof window.cloudRelay.pushDockStateSoon === 'function') {
+            window.cloudRelay.pushDockStateSoon(0);
+        }
+        return { streaming: !active };
+    }
+
     window.openStreamPromotionSettingsModal = openStreamPromotionSettingsModal;
     window.closeStreamPromotionSettingsModal = closeStreamPromotionSettingsModal;
     window.saveStreamPromotionSettings = saveStreamPromotionSettings;
     window.toggleStreamPromotion = toggleStreamPromotion;
+    window.toggleObsStreaming = toggleObsStreaming;
 
     window.streamSharing = {
         sendUpdate: function() {
@@ -626,6 +645,7 @@
         },
 
         toggle: toggleStreamPromotion,
+        toggleObsStreaming: toggleObsStreaming,
     };
 
     if (document.readyState === 'loading') {

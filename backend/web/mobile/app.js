@@ -1613,20 +1613,27 @@ function syncMatchActionButtons(state) {
 }
 
 /**
- * Match control_panel: Instant Replay only while monitoring; clips only when that slot
- * exists; Monitor label reflects start/stop / Replay Active.
+ * Stream tab: account-owner OBS start/stop, plus monitoring/clips when available.
  */
 function syncReplayPanel(state) {
   const monitoring = !!state.monitoringActive;
   const replayPlaying = !!state.replayPlaybackActive;
+  const streaming = state.obsStreaming === true;
   // Monitoring implies OBS was usable; don't hide clips if obsConnected lagged false.
-  const obsConnected = state.obsConnected === true || monitoring || replayPlaying;
+  const obsConnected = state.obsConnected === true || monitoring || replayPlaying || streaming;
   const clips = Array.isArray(state.replayClips)
     ? state.replayClips
     : Array.from({ length: 5 }, (_, i) => i < (Number(state.replayClipCount) || 0));
 
   const hint = document.getElementById('replayObsHint');
-  if (hint) hint.classList.toggle('hidden', obsConnected || monitoring || replayPlaying);
+  if (hint) hint.classList.toggle('hidden', obsConnected);
+
+  const streamBtn = document.getElementById('streamToggleBtn');
+  if (streamBtn) {
+    streamBtn.textContent = streaming ? 'Stop Streaming' : 'Start Streaming';
+    streamBtn.classList.toggle('stream-active', streaming);
+    streamBtn.disabled = !obsConnected;
+  }
 
   const monitorBtn = document.getElementById('monitorBtn');
   if (monitorBtn) {
@@ -1639,7 +1646,7 @@ function syncReplayPanel(state) {
       monitorBtn.textContent = monitoring ? 'Stop Monitoring' : 'Resume Monitoring';
       monitorBtn.classList.toggle('monitor-active', monitoring);
       monitorBtn.classList.remove('replay-active');
-      monitorBtn.disabled = false;
+      monitorBtn.disabled = !obsConnected;
     }
   }
 

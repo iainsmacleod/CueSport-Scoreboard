@@ -654,11 +654,27 @@ function handleEvent(ws, meta, msg) {
   broadcast(meta.roomId, envelope, ws);
 }
 
+/** Commands only the Cloud account owner (JWT/dev) may send. */
+const ACCOUNT_OWNER_COMMANDS = new Set([
+  'toggle_streaming',
+]);
+
 function handleCommand(ws, meta, msg) {
   if (!requireJoined(ws, meta)) return;
   if (meta.client === 'mobile_guest' && !GUEST_ALLOWED_COMMANDS.has(msg.action)) {
     send(ws, { type: 'error', code: 'guest_forbidden', message: 'Not available on guest scorer links' });
     return;
+  }
+  if (ACCOUNT_OWNER_COMMANDS.has(msg.action)) {
+    const isOwner = meta.authMethod === 'jwt' || meta.authMethod === 'dev';
+    if (!isOwner) {
+      send(ws, {
+        type: 'error',
+        code: 'owner_forbidden',
+        message: 'Only the account owner can start or stop OBS streaming',
+      });
+      return;
+    }
   }
   const envelope = {
     type: 'command',

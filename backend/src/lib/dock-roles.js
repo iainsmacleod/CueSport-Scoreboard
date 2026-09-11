@@ -43,6 +43,7 @@ export function permissionsForAuth(auth) {
     canCreateGuestLinks: accountAdmin || role === 'administrator' || role === 'trusted_operator',
     canRevokeGuestLinks: accountAdmin || role === 'administrator' || role === 'trusted_operator',
     canRevokeDefaultGuestLink: accountAdmin,
+    canControlObsStream: accountAdmin,
   };
 }
 

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
   <title>CueSport Scoreboard Cloud Control</title>
-  <link rel="stylesheet" href="/web/shared/styles.css?v=8.1.0.20" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.1.0.21" />
 </head>
 <body class="mobile">
   <header>
@@ -208,32 +208,42 @@
 
       <div id="viewReplay" class="mobile-view hidden">
         <div class="panel" id="replayPanel">
-          <h2>Replay</h2>
-          <p id="replayObsHint" class="hint hidden">Connect OBS WebSocket on the dock Settings tab to use monitoring and clips.</p>
-          <div class="row clips" id="replayMonitorRow">
-            <button type="button" class="btn monitor-btn" id="monitorBtn" data-cmd="toggle_monitoring">Monitor Game</button>
-            <button type="button" class="btn hidden" id="instantReplayBtn" data-cmd="instant_replay">Instant Replay</button>
+          <h2>Stream</h2>
+          <p id="replayObsHint" class="hint hidden">Connect OBS WebSocket on the dock Settings tab to control streaming, monitoring, and clips.</p>
+          <div class="stream-section" id="streamOutputSection">
+            <h3 class="share-links-heading">Live stream</h3>
+            <p class="hint">Start or stop the OBS stream output for this table.</p>
+            <div class="row clips" id="streamOutputRow">
+              <button type="button" class="btn stream-btn" id="streamToggleBtn" data-cmd="toggle_streaming">Start Streaming</button>
+            </div>
           </div>
-          <div class="row clips hidden" id="replayClipsRow">
-            <div class="clip-wrap hidden" data-clip-index="0">
-              <button type="button" class="btn" data-cmd="play_clip" data-index="0">Clip 1</button>
-              <button type="button" class="btn danger clip-clear" data-delete-index="0" title="Clear clip" aria-label="Clear clip 1">×</button>
+          <div class="stream-section" id="streamReplaySection">
+            <h3 class="share-links-heading">Monitoring and clips</h3>
+            <div class="row clips" id="replayMonitorRow">
+              <button type="button" class="btn monitor-btn" id="monitorBtn" data-cmd="toggle_monitoring">Monitor Game</button>
+              <button type="button" class="btn hidden" id="instantReplayBtn" data-cmd="instant_replay">Instant Replay</button>
             </div>
-            <div class="clip-wrap hidden" data-clip-index="1">
-              <button type="button" class="btn" data-cmd="play_clip" data-index="1">Clip 2</button>
-              <button type="button" class="btn danger clip-clear" data-delete-index="1" title="Clear clip" aria-label="Clear clip 2">×</button>
-            </div>
-            <div class="clip-wrap hidden" data-clip-index="2">
-              <button type="button" class="btn" data-cmd="play_clip" data-index="2">Clip 3</button>
-              <button type="button" class="btn danger clip-clear" data-delete-index="2" title="Clear clip" aria-label="Clear clip 3">×</button>
-            </div>
-            <div class="clip-wrap hidden" data-clip-index="3">
-              <button type="button" class="btn" data-cmd="play_clip" data-index="3">Clip 4</button>
-              <button type="button" class="btn danger clip-clear" data-delete-index="3" title="Clear clip" aria-label="Clear clip 4">×</button>
-            </div>
-            <div class="clip-wrap hidden" data-clip-index="4">
-              <button type="button" class="btn" data-cmd="play_clip" data-index="4">Clip 5</button>
-              <button type="button" class="btn danger clip-clear" data-delete-index="4" title="Clear clip" aria-label="Clear clip 5">×</button>
+            <div class="row clips hidden" id="replayClipsRow">
+              <div class="clip-wrap hidden" data-clip-index="0">
+                <button type="button" class="btn" data-cmd="play_clip" data-index="0">Clip 1</button>
+                <button type="button" class="btn danger clip-clear" data-delete-index="0" title="Clear clip" aria-label="Clear clip 1">×</button>
+              </div>
+              <div class="clip-wrap hidden" data-clip-index="1">
+                <button type="button" class="btn" data-cmd="play_clip" data-index="1">Clip 2</button>
+                <button type="button" class="btn danger clip-clear" data-delete-index="1" title="Clear clip" aria-label="Clear clip 2">×</button>
+              </div>
+              <div class="clip-wrap hidden" data-clip-index="2">
+                <button type="button" class="btn" data-cmd="play_clip" data-index="2">Clip 3</button>
+                <button type="button" class="btn danger clip-clear" data-delete-index="2" title="Clear clip" aria-label="Clear clip 3">×</button>
+              </div>
+              <div class="clip-wrap hidden" data-clip-index="3">
+                <button type="button" class="btn" data-cmd="play_clip" data-index="3">Clip 4</button>
+                <button type="button" class="btn danger clip-clear" data-delete-index="3" title="Clear clip" aria-label="Clear clip 4">×</button>
+              </div>
+              <div class="clip-wrap hidden" data-clip-index="4">
+                <button type="button" class="btn" data-cmd="play_clip" data-index="4">Clip 5</button>
+                <button type="button" class="btn danger clip-clear" data-delete-index="4" title="Clear clip" aria-label="Clear clip 5">×</button>
+              </div>
             </div>
           </div>
         </div>
@@ -303,11 +313,11 @@
       </svg>
       <span>Control</span>
     </button>
-    <button type="button" id="navReplayBtn" class="mobile-nav-btn admin-only hidden" aria-label="Replay">
+    <button type="button" id="navReplayBtn" class="mobile-nav-btn admin-only hidden" aria-label="Stream">
       <svg class="mobile-nav-icon" viewBox="0 0 24 24" aria-hidden="true">
         <path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
       </svg>
-      <span>Replay</span>
+      <span>Stream</span>
     </button>
     <button type="button" id="navShareBtn" class="mobile-nav-btn admin-only">
       <svg class="mobile-nav-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -355,6 +365,6 @@
       <div id="poolRespotTargets" class="snooker-foul-targets"></div>
     </div>
   </div>
-  <script type="module" src="/web/mobile/app.js?v=8.0.0.30"></script>
+  <script type="module" src="/web/mobile/app.js?v=8.0.0.31"></script>
 </body>
 </html>

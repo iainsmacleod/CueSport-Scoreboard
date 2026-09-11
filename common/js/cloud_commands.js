@@ -313,6 +313,10 @@
                 return Promise.resolve(
                     typeof toggleReplayMonitoring === 'function' ? toggleReplayMonitoring() : undefined
                 ).then(publishAfterScoring);
+            case 'toggle_streaming':
+                return Promise.resolve(
+                    typeof toggleObsStreaming === 'function' ? toggleObsStreaming() : undefined
+                ).then(publishAfterScoring);
             case 'play_clip':
                 if (payload && payload.index != null && typeof playPreviousReplay === 'function') {
                     return Promise.resolve(playPreviousReplay(parseInt(payload.index, 10))).then(publishAfterScoring);
