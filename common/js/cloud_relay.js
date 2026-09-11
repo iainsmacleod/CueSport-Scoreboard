@@ -229,6 +229,7 @@
         const msg = {
             type: 'join',
             client: getClientType(),
+            // Cloud room identity is the OBS Dock Key; instance_id is local metadata only.
             instance_id: getInstanceKey(),
         };
         if (roomId) msg.room_id = roomId;
@@ -749,7 +750,7 @@
             return;
         }
         if (!getRoomId()) {
-            console.warn('cloudRelay: room will be assigned on join (instance: ' + getInstanceKey() + ')');
+            console.warn('cloudRelay: room will be assigned on join (Dock Key; instance metadata: ' + getInstanceKey() + ')');
         }
         if (!getApiKey()) {
             console.warn('cloudRelay: cannot connect without OBS Dock Key');

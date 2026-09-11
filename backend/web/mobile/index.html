@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
   <title>CueSport Scoreboard Cloud Control</title>
-  <link rel="stylesheet" href="/web/shared/styles.css?v=8.1.0.23" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.1.0.24" />
 </head>
 <body class="mobile">
   <header>
@@ -59,8 +59,14 @@
           <div class="panel live-inline-panel" id="playerSlotPanel">
             <h2 id="playerSlotQuestion">Active Player</h2>
             <div class="row equal">
-              <button type="button" class="btn" id="playerSlotP1Btn" data-cmd="player_slot" data-slot="1">P1</button>
-              <button type="button" class="btn" id="playerSlotP2Btn" data-cmd="player_slot" data-slot="2">P2</button>
+              <button type="button" class="btn" id="playerSlotP1Btn" data-cmd="player_slot" data-slot="1">
+                <span class="slot-name">P1</span>
+                <img class="slot-ball hidden" id="playerSlotP1Ball" alt="" />
+              </button>
+              <button type="button" class="btn" id="playerSlotP2Btn" data-cmd="player_slot" data-slot="2">
+                <span class="slot-name">P2</span>
+                <img class="slot-ball hidden" id="playerSlotP2Ball" alt="" />
+              </button>
             </div>
           </div>
           <div class="live-ball-section hidden" id="ballGridPanel">
@@ -337,8 +343,12 @@
       <span>Control</span>
     </button>
     <button type="button" id="navReplayBtn" class="mobile-nav-btn admin-only hidden" aria-label="Stream">
-      <svg class="mobile-nav-icon" viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
+      <svg class="mobile-nav-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/>
+        <path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.4"/>
+        <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/>
+        <path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.4"/>
+        <path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1"/>
       </svg>
       <span>Stream</span>
     </button>
@@ -388,6 +398,6 @@
       <div id="poolRespotTargets" class="snooker-foul-targets"></div>
     </div>
   </div>
-  <script type="module" src="/web/mobile/app.js?v=8.0.0.35"></script>
+  <script type="module" src="/web/mobile/app.js?v=8.0.0.36"></script>
 </body>
 </html>

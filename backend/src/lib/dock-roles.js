@@ -23,27 +23,32 @@ export function isAccountAdminAuth(auth) {
   return !!(auth && (auth.authMethod === 'jwt' || auth.authMethod === 'dev'));
 }
 
+export function isDockOwnerGuestAuth(auth) {
+  return !!(auth && auth.authMethod === 'guest_dock_owner');
+}
+
 export function effectiveDockRole(auth) {
   if (!auth) return 'operator';
-  if (isAccountAdminAuth(auth)) return 'administrator';
+  if (isAccountAdminAuth(auth) || isDockOwnerGuestAuth(auth)) return 'administrator';
   return normalizeDockKeyRole(auth.role);
 }
 
 export function permissionsForAuth(auth) {
   const accountAdmin = isAccountAdminAuth(auth);
+  const dockOwnerGuest = isDockOwnerGuestAuth(auth);
   const role = effectiveDockRole(auth);
   return {
-    role: accountAdmin ? null : role,
+    role: accountAdmin || dockOwnerGuest ? null : role,
     authMethod: auth?.authMethod || null,
     keyId: auth?.keyId || null,
     canManageKeys: accountAdmin,
     canEditAnyMatch: accountAdmin || role === 'administrator',
     canEditOwnMatch: accountAdmin || role === 'administrator' || role === 'trusted_operator',
     canManagePlayers: accountAdmin || role === 'administrator',
-    canCreateGuestLinks: accountAdmin || role === 'administrator' || role === 'trusted_operator',
-    canRevokeGuestLinks: accountAdmin || role === 'administrator' || role === 'trusted_operator',
-    canRevokeDefaultGuestLink: accountAdmin,
-    canControlObsStream: accountAdmin,
+    canCreateGuestLinks: accountAdmin || dockOwnerGuest || role === 'administrator' || role === 'trusted_operator',
+    canRevokeGuestLinks: accountAdmin || dockOwnerGuest || role === 'administrator' || role === 'trusted_operator',
+    canRevokeDefaultGuestLink: accountAdmin || dockOwnerGuest,
+    canControlObsStream: accountAdmin || dockOwnerGuest,
   };
 }
 

@@ -34,6 +34,7 @@ let bootConnectStarted = false;
 
 let guestToken = '';
 let isGuestMode = false;
+let isDockOwnerGuest = false;
 /** @type {'control' | 'setup' | 'replay' | 'share'} */
 let activeView = 'control';
 /** Only auto-open Setup once per connection when names still look like defaults. */
@@ -74,18 +75,47 @@ function syncLoginPanel() {
   }
 }
 
+function canUseAdminTabs() {
+  return !isGuestMode || isDockOwnerGuest;
+}
+
+function shareAuthHeaders() {
+  if (isDockOwnerGuest && guestToken) {
+    return { 'X-Guest-Token': guestToken };
+  }
+  return {};
+}
+
+function shareAuthToken() {
+  if (isDockOwnerGuest) return '';
+  return localStorage.getItem(TOKEN_KEY) || '';
+}
+
 function applyGuestUI() {
   const title = document.getElementById('pageTitle');
-  if (title) title.textContent = 'CueSport Scoreboard Guest Control';
-  // Guests get full match controls (Restart/End/Call); replay and share stay admin-only.
-  ['adminPlayersPanel', 'viewReplay', 'viewShare'].forEach((id) => show(id, false));
-  document.querySelectorAll('.admin-only').forEach((el) => el.classList.add('hidden'));
-  const replayBtn = document.getElementById('navReplayBtn');
-  if (replayBtn) replayBtn.classList.add('hidden');
-  const shareBtn = document.getElementById('navShareBtn');
-  if (shareBtn) shareBtn.classList.add('hidden');
+  if (title) {
+    title.textContent = isDockOwnerGuest
+      ? 'CueSport Scoreboard Remote'
+      : 'CueSport Scoreboard Guest Control';
+  }
+  show('adminPlayersPanel', false);
+  if (!isDockOwnerGuest) {
+    show('viewReplay', false);
+    show('viewShare', false);
+  }
+  document.querySelectorAll('.admin-only').forEach((el) => {
+    if ((el.id === 'navReplayBtn' || el.id === 'navShareBtn') && isDockOwnerGuest) {
+      el.classList.remove('hidden');
+      return;
+    }
+    el.classList.add('hidden');
+  });
   const dash = document.getElementById('dashboardLink');
   if (dash) dash.classList.add('hidden');
+  if (!isDockOwnerGuest) {
+    document.getElementById('navReplayBtn')?.classList.add('hidden');
+    document.getElementById('navShareBtn')?.classList.add('hidden');
+  }
 }
 
 function showMobileNav(visible) {
@@ -100,7 +130,7 @@ function isReplayEnabled(state = lastState) {
 }
 
 function syncReplayNavVisibility(state = lastState) {
-  if (isGuestMode) return;
+  if (isGuestMode && !isDockOwnerGuest) return;
   const enabled = isReplayEnabled(state);
   const replayBtn = document.getElementById('navReplayBtn');
   if (replayBtn) {
@@ -115,13 +145,13 @@ function setActiveView(view) {
   if (view !== 'control' && view !== 'setup' && view !== 'replay' && view !== 'share') {
     view = 'control';
   }
-  if (isGuestMode && (view === 'replay' || view === 'share')) view = 'control';
+  if (isGuestMode && !isDockOwnerGuest && (view === 'replay' || view === 'share')) view = 'control';
   if (view === 'replay' && !isReplayEnabled()) view = 'control';
   activeView = view;
   show('viewControl', view === 'control');
   show('viewSetup', view === 'setup');
-  show('viewReplay', view === 'replay' && !isGuestMode && isReplayEnabled());
-  show('viewShare', view === 'share' && !isGuestMode);
+  show('viewReplay', view === 'replay' && canUseAdminTabs() && isReplayEnabled());
+  show('viewShare', view === 'share' && canUseAdminTabs());
 
   const controlBtn = document.getElementById('navControlBtn');
   if (controlBtn) {
@@ -135,12 +165,13 @@ function setActiveView(view) {
   }
   const replayBtn = document.getElementById('navReplayBtn');
   if (replayBtn) {
-    replayBtn.classList.toggle('hidden', isGuestMode || !isReplayEnabled());
+    replayBtn.classList.toggle('hidden', !canUseAdminTabs() || !isReplayEnabled());
     replayBtn.classList.toggle('active', view === 'replay');
     replayBtn.setAttribute('aria-current', view === 'replay' ? 'page' : 'false');
   }
   const shareBtn = document.getElementById('navShareBtn');
   if (shareBtn) {
+    shareBtn.classList.toggle('hidden', !canUseAdminTabs());
     shareBtn.classList.toggle('active', view === 'share');
     shareBtn.setAttribute('aria-current', view === 'share' ? 'page' : 'false');
   }
@@ -284,8 +315,9 @@ function selectGuestShareLink(link, { keepReveal = false } = {}) {
 
 async function ensureGuestShareLink({ refreshList = false, forceHide = true } = {}) {
   if (guestSharePromise) return guestSharePromise;
-  const token = localStorage.getItem(TOKEN_KEY);
-  if (!roomId || !token) {
+  const token = shareAuthToken();
+  const headers = shareAuthHeaders();
+  if (!roomId || (!token && !headers['X-Guest-Token'])) {
     throw new Error('Sign in required to create a guest control link');
   }
   const status = document.getElementById('shareStatus');
@@ -295,11 +327,11 @@ async function ensureGuestShareLink({ refreshList = false, forceHide = true } = 
   }
   if (forceHide) hideGuestShareDetails();
   guestSharePromise = (async () => {
-    let links = await fetchGuestLinks(window.location.origin, token, roomId);
+    let links = await fetchGuestLinks(window.location.origin, token, roomId, headers);
     const owner = (links || []).find((g) => g.label === 'OBS Dock Owner');
     if (!links.length || !owner) {
-      const created = await createGuestLink(window.location.origin, token, roomId, 'OBS Dock Owner');
-      links = await fetchGuestLinks(window.location.origin, token, roomId);
+      const created = await createGuestLink(window.location.origin, token, roomId, 'OBS Dock Owner', headers);
+      links = await fetchGuestLinks(window.location.origin, token, roomId, headers);
       if (!links.length) {
         links = [{ token: created.token, path: created.path, url: created.url, label: created.label, connected: 0 }];
       }
@@ -356,7 +388,7 @@ function renderGuestLinks(links) {
         : 'Revoke this guest link? Anyone using it will be disconnected.';
       if (!window.confirm(msg)) return;
       try {
-        await revokeGuestLink(window.location.origin, localStorage.getItem(TOKEN_KEY), g.token);
+        await revokeGuestLink(window.location.origin, shareAuthToken(), g.token, shareAuthHeaders());
         if (cachedGuestShareToken === g.token) {
           cachedGuestShareToken = '';
           cachedGuestShareUrl = '';
@@ -401,8 +433,8 @@ function wireMobileNav() {
   if (newLinkBtn) {
     newLinkBtn.addEventListener('click', async () => {
       try {
-        const token = localStorage.getItem(TOKEN_KEY);
-        if (!roomId || !token) throw new Error('Sign in required to create a guest control link');
+        const token = shareAuthToken();
+        if (!roomId || (!token && !shareAuthHeaders()['X-Guest-Token'])) throw new Error('Sign in required to create a guest control link');
         const nameInput = document.getElementById('shareNewLinkName');
         const name = String(nameInput?.value || '').trim();
         if (!name) {
@@ -410,7 +442,7 @@ function wireMobileNav() {
           nameInput?.focus();
           return;
         }
-        const created = await createGuestLink(window.location.origin, token, roomId, name);
+        const created = await createGuestLink(window.location.origin, token, roomId, name, shareAuthHeaders());
         if (nameInput) nameInput.value = '';
         cachedGuestShareToken = created.token;
         cachedGuestShareUrl = guestUrlFromLink(created);
@@ -805,8 +837,13 @@ function applyState(state) {
     }
   }
   if (slotP1 && slotP2) {
-    slotP1.textContent = p1Name || 'P1';
-    slotP2.textContent = p2Name || 'P2';
+    const p1NameEl = slotP1.querySelector('.slot-name');
+    const p2NameEl = slotP2.querySelector('.slot-name');
+    if (p1NameEl) p1NameEl.textContent = p1Name || 'P1';
+    else slotP1.textContent = p1Name || 'P1';
+    if (p2NameEl) p2NameEl.textContent = p2Name || 'P2';
+    else slotP2.textContent = p2Name || 'P2';
+    syncPlayerSlotBallBadges(state, slotP1, slotP2);
     slotP1.classList.remove('selected', 'rack-breaker-match-locked', 'rack-breaker-inactive', 'rack-breaker-current');
     slotP2.classList.remove('selected', 'rack-breaker-match-locked', 'rack-breaker-inactive', 'rack-breaker-current');
     slotP1.disabled = false;
@@ -1041,6 +1078,46 @@ function ballImageFile(n, selection) {
     return files[n] || `${n}ball_small.png`;
   }
   return `${n}ball_small.png`;
+}
+
+/** Show assigned 8-ball group badges on slot buttons (same mapping as overlay). */
+function syncPlayerSlotBallBadges(state, slotP1, slotP2) {
+  const img1 = document.getElementById('playerSlotP1Ball') || slotP1?.querySelector('.slot-ball');
+  const img2 = document.getElementById('playerSlotP2Ball') || slotP2?.querySelector('.slot-ball');
+  if (!img1 || !img2) return;
+  const use = state.useBallSet === true;
+  const set = state.playerBallSet || 'p1Open';
+  const assigned = use && (set === 'p1red/smalls' || set === 'p1yellow/bigs');
+  if (!assigned) {
+    img1.classList.add('hidden');
+    img2.classList.add('hidden');
+    img1.removeAttribute('src');
+    img2.removeAttribute('src');
+    return;
+  }
+  const style = state.ballSelection || 'american';
+  let p1File;
+  let p2File;
+  if (style === 'international') {
+    if (set === 'p1red/smalls') {
+      p1File = 'red-international-small-ball.png';
+      p2File = 'yellow-international-small-ball.png';
+    } else {
+      p1File = 'yellow-international-small-ball.png';
+      p2File = 'red-international-small-ball.png';
+    }
+  } else {
+    const p1Num = set === 'p1red/smalls' ? 1 : 15;
+    const p2Num = set === 'p1red/smalls' ? 15 : 1;
+    p1File = ballImageFile(p1Num, style);
+    p2File = ballImageFile(p2Num, style);
+  }
+  img1.src = `${BALL_IMG}/${p1File}`;
+  img2.src = `${BALL_IMG}/${p2File}`;
+  img1.alt = set === 'p1red/smalls' ? 'Solids' : 'Stripes';
+  img2.alt = set === 'p1red/smalls' ? 'Stripes' : 'Solids';
+  img1.classList.remove('hidden');
+  img2.classList.remove('hidden');
 }
 
 function ballImageBasename(file) {
@@ -1650,10 +1727,10 @@ function syncReplayPanel(state) {
   const enableBtn = document.getElementById('replayControlsEnableBtn');
   if (unlockSection) {
     // Account owner (non-guest mobile) can unlock when OBS socket is up but replay controls are off.
-    unlockSection.classList.toggle('hidden', isGuestMode || !obsConnected || replayControlsEnabled);
+    unlockSection.classList.toggle('hidden', (isGuestMode && !isDockOwnerGuest) || !obsConnected || replayControlsEnabled);
   }
   if (enableBtn) {
-    enableBtn.disabled = !obsConnected || isGuestMode;
+    enableBtn.disabled = !obsConnected || (isGuestMode && !isDockOwnerGuest);
   }
   if (replaySection) {
     replaySection.classList.toggle('hidden', !replayControlsEnabled);
@@ -2501,6 +2578,7 @@ function wireReplayClearButtons() {
 }
 
 async function connectGuestSession({ quiet, isCurrent }) {
+  isDockOwnerGuest = false;
   applyGuestUI();
   if (client) {
     try { client.disconnect(); } catch (_) { /* ignore */ }
@@ -2539,6 +2617,9 @@ async function connectGuestSession({ quiet, isCurrent }) {
   try {
     const joined = await client.connect();
     if (!isCurrent()) return;
+    isDockOwnerGuest = !!joined.is_dock_owner;
+    if (joined.room_id) roomId = joined.room_id;
+    applyGuestUI();
     showControl();
     dockPresent = (joined.clients || []).includes('dock');
     if (joined.state && Object.keys(joined.state).length) {
@@ -2547,6 +2628,7 @@ async function connectGuestSession({ quiet, isCurrent }) {
       setActiveView('setup');
       initialViewChosen = false;
     }
+    syncReplayNavVisibility(joined.state || lastState || {});
     setConnectionStatus(dockPresent ? 'connected' : 'waiting');
     reconnectAttempt = 0;
     if (connectionIsOpen()) setReconnectBanner(false);
@@ -2706,6 +2788,7 @@ async function connect(options = {}) {
   const ctx = pathContext();
   guestToken = ctx.guestToken || '';
   isGuestMode = !!guestToken;
+  isDockOwnerGuest = false;
   roomId = ctx.roomId || '';
   wantConnection = true;
   if (quiet) {

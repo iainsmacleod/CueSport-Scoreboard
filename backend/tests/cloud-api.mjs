@@ -531,6 +531,62 @@ async function run() {
       }
     }
 
+    // Keys = tables: two Dock Keys with the same instance_id get two rooms
+    if (apiKey) {
+      const keyBRes = await fetchJson('/api/api-keys', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ label: `table-b-${Date.now().toString(36)}` }),
+      });
+      if (keyBRes.ok) {
+        let dockA;
+        let dockB;
+        try {
+          dockA = await wsJoin({ client: 'dock', apiKey, instanceId: 'default' });
+          dockB = await wsJoin({ client: 'dock', apiKey: keyBRes.body.key, instanceId: 'default' });
+          assert(
+            'Two keys + default instance → two rooms',
+            !!dockA.data.room_id &&
+              !!dockB.data.room_id &&
+              dockA.data.room_id !== dockB.data.room_id,
+            `${dockA.data.room_id} vs ${dockB.data.room_id}`
+          );
+          const roomA = dockA.data.room_id;
+          dockA.ws.close();
+          await sleep(100);
+          const reconnect = await wsJoin({ client: 'dock', apiKey, instanceId: 'default' });
+          assert(
+            'Same key reconnect reuses room',
+            reconnect.data.room_id === roomA,
+            reconnect.data.room_id
+          );
+          reconnect.ws.close();
+          dockA = null;
+        } catch (e) {
+          assert('Two keys + default instance → two rooms', false, e.message);
+        } finally {
+          try { dockA?.ws.close(); } catch (_) { /* ignore */ }
+          try { dockB?.ws.close(); } catch (_) { /* ignore */ }
+          await sleep(100);
+          if (keyBRes.body.id) {
+            await fetchJson(`/api/api-keys/${keyBRes.body.id}`, {
+              method: 'DELETE',
+              headers: { Authorization: `Bearer ${token}` },
+            });
+          }
+        }
+      } else {
+        assert(
+          'Two keys + default instance → two rooms',
+          false,
+          `second key create failed: ${keyBRes.status} ${JSON.stringify(keyBRes.body)}`
+        );
+      }
+    }
+
     // WebSocket: dock api key
     let dockJoin;
     try {

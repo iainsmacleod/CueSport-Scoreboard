@@ -666,6 +666,28 @@ ul { padding-left: 1.2rem; }
   cursor: default;
 }
 .row.equal .btn.rack-breaker-match-locked { opacity: 0.55; }
+#playerSlotP1Btn,
+#playerSlotP2Btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+}
+#playerSlotP1Btn .slot-name,
+#playerSlotP2Btn .slot-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#playerSlotP1Btn .slot-ball,
+#playerSlotP2Btn .slot-ball {
+  width: 1.35rem;
+  height: 1.35rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  object-fit: contain;
+}
 .ball-grid {
   display: flex;
   flex-wrap: wrap;

@@ -26,6 +26,7 @@ import {
 import {
   OBS_DOCK_OWNER_GUEST_LABEL,
   isAccountAdminAuth,
+  isDockOwnerGuestAuth,
   isValidDockKeyRole,
   normalizeDockKeyRole,
   permissionsForAuth,
@@ -375,6 +376,20 @@ async function resolveAuthFromRequest(request) {
   const auth = request.headers.authorization || '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
 
+  const guestTokenHeader = String(request.headers['x-guest-token'] || '').trim();
+  if (!token && guestTokenHeader) {
+    const guest = sqlite.findGuestToken(guestTokenHeader);
+    if (!guest || !sqlite.isDefaultDockOwnerGuestToken(guest)) return null;
+    const account = sqlite.getAccountById(guest.account_id);
+    if (!account) return null;
+    return {
+      account,
+      authMethod: 'guest_dock_owner',
+      guestToken: guest.token,
+      guestRoomId: guest.room_id,
+    };
+  }
+
   const apiKeyHeader = request.headers['x-api-key'] || '';
   if (!token && apiKeyHeader) {
     const result = sqlite.findAccountByApiKey(apiKeyHeader);
@@ -411,6 +426,12 @@ function guestLinkRoomAccessError(auth, roomId) {
     return { code: 403, error: 'Forbidden' };
   }
   if (isAccountAdminAuth(auth)) return null;
+  if (isDockOwnerGuestAuth(auth)) {
+    if (auth.guestRoomId !== roomId) {
+      return { code: 403, error: 'Forbidden' };
+    }
+    return null;
+  }
   const ownRoomId = sqlite.getRoomIdForApiKey(auth.keyId);
   if (!ownRoomId || ownRoomId !== roomId) {
     return { code: 403, error: 'Forbidden' };

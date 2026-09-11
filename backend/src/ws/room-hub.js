@@ -362,32 +362,34 @@ function countControlConnections(roomId, excludeWs = null) {
 }
 
 function resolveRoomIdForJoin(msg, auth, client) {
-  let roomId = msg.room_id || msg.room || null;
-  if (client === 'dock' && auth?.account && msg.instance_id) {
-    const key = String(msg.instance_id || 'default').trim() || 'default';
-    const apiKeyId = auth.keyId || null;
-    const existing = sqlite.peekRoomDock(auth.account.id, key);
+  // Dock tables are keyed by OBS Dock Key (api_key_id), not ?instance=.
+  if (client === 'dock' && auth?.account && auth.keyId) {
+    const apiKeyId = auth.keyId;
+    const existing = sqlite.peekRoomDockByApiKey(apiKeyId);
     if (existing) {
-      const room = sqlite.ensureRoomForInstance(
-        auth.account.id,
-        msg.instance_id,
-        msg.instance_label || null,
-        apiKeyId
-      );
+      const room = sqlite.ensureRoomForApiKey(auth.account.id, apiKeyId, {
+        instanceKey: msg.instance_id || 'default',
+        label: msg.instance_label || null,
+      });
+      if (!room) {
+        return { error: 'room_forbidden', message: 'No access to this room' };
+      }
       return { roomId: room.id };
     }
     const check = assertCanCreateRoom(auth.account);
     if (!check.ok) {
       return { error: check.code, message: check.message, quota: check.quota };
     }
-    const room = sqlite.ensureRoomForInstance(
-      auth.account.id,
-      msg.instance_id,
-      msg.instance_label || null,
-      apiKeyId
-    );
+    const room = sqlite.ensureRoomForApiKey(auth.account.id, apiKeyId, {
+      instanceKey: msg.instance_id || 'default',
+      label: msg.instance_label || null,
+    });
+    if (!room) {
+      return { error: 'room_create_failed', message: 'Could not create table for this Dock Key' };
+    }
     return { roomId: room.id };
   }
+  let roomId = msg.room_id || msg.room || null;
   if (!roomId && client === 'dock' && auth?.account) {
     const roomsForAccount = sqlite.getRoomsForAccount(auth.account.id);
     if (roomsForAccount.length) roomId = roomsForAccount[0].id;
@@ -467,6 +469,8 @@ async function handleRoomClientJoin(ws, meta, msg, authenticateJoin) {
     meta.client = client;
     meta.accountId = accountId;
     meta.guestToken = msg.guest_token;
+    meta.isDockOwnerGuest = sqlite.isDefaultDockOwnerGuestToken(guest);
+    meta.guestLabel = guest.label || null;
   } else {
     // Docks must use an OBS Dock Key (same seat model for hosted + self-host).
     if (client === 'dock' && !msg.api_key) {
@@ -527,11 +531,8 @@ async function handleRoomClientJoin(ws, meta, msg, authenticateJoin) {
     accountId = auth.account.id;
     meta.accountId = accountId;
 
-    if (client === 'dock' && msg.instance_id) {
-      sqlite.touchRoomDock(accountId, msg.instance_id);
-    }
-    if (client === 'dock' && meta.apiKeyId && roomId) {
-      sqlite.setRoomDockApiKey(roomId, meta.apiKeyId);
+    if (client === 'dock' && meta.apiKeyId) {
+      sqlite.touchRoomDockByApiKey(meta.apiKeyId, msg.instance_id || 'default');
     }
   }
 
@@ -596,6 +597,10 @@ async function handleRoomClientJoin(ws, meta, msg, authenticateJoin) {
       role: meta.role || null,
     }),
     ...(client === 'dock' && meta.apiKeyId ? { api_key_id: meta.apiKeyId } : {}),
+    ...(meta.guestToken ? {
+      is_dock_owner: !!meta.isDockOwnerGuest,
+      guest_label: meta.guestLabel || null,
+    } : {}),
   });
 
   broadcast(roomId, {
@@ -662,14 +667,16 @@ const ACCOUNT_OWNER_COMMANDS = new Set([
 
 function handleCommand(ws, meta, msg) {
   if (!requireJoined(ws, meta)) return;
-  if (meta.client === 'mobile_guest' && !GUEST_ALLOWED_COMMANDS.has(msg.action)) {
+  const isDockOwnerGuest = !!(meta.guestToken && meta.isDockOwnerGuest);
+  if (meta.client === 'mobile_guest' && !isDockOwnerGuest && !GUEST_ALLOWED_COMMANDS.has(msg.action)) {
     send(ws, { type: 'error', code: 'guest_forbidden', message: 'Not available on guest scorer links' });
     return;
   }
   if (ACCOUNT_OWNER_COMMANDS.has(msg.action)) {
     const isOwner = meta.authMethod === 'jwt'
       || meta.authMethod === 'dev'
-      || (meta.client === 'mobile' && !!meta.accountId && !meta.guestToken);
+      || (meta.client === 'mobile' && !!meta.accountId && !meta.guestToken)
+      || isDockOwnerGuest;
     if (!isOwner) {
       send(ws, {
         type: 'error',

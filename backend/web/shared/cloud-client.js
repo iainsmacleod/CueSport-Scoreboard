@@ -370,7 +370,7 @@ export async function createGuestLink(serverUrl, token, roomId, label, extraHead
     'Content-Type': 'application/json',
     ...extraHeaders,
   };
-  if (!headers.Authorization && !headers['X-Api-Key'] && token) {
+  if (!headers.Authorization && !headers['X-Api-Key'] && !headers['X-Guest-Token'] && token) {
     headers.Authorization = `Bearer ${token}`;
   }
   const res = await fetch(`${base}/api/rooms/${roomId}/guest-link`, {
@@ -411,24 +411,30 @@ export async function deleteRoom(serverUrl, token, roomId) {
   return res.json();
 }
 
-export async function fetchGuestLinks(serverUrl, token, roomId) {
+export async function fetchGuestLinks(serverUrl, token, roomId, extraHeaders = {}) {
   const base = serverUrl.replace(/\/$/, '');
   const path = roomId
     ? `/api/rooms/${encodeURIComponent(roomId)}/guest-links`
     : '/api/guest-links';
-  const res = await fetch(`${base}${path}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const headers = { ...extraHeaders };
+  if (!headers.Authorization && !headers['X-Api-Key'] && !headers['X-Guest-Token'] && token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  const res = await fetch(`${base}${path}`, { headers });
   if (!res.ok) throw new Error('Failed to load guest links');
   const data = await res.json();
   return data.guest_links || [];
 }
 
-export async function revokeGuestLink(serverUrl, token, guestToken) {
+export async function revokeGuestLink(serverUrl, token, guestToken, extraHeaders = {}) {
   const base = serverUrl.replace(/\/$/, '');
+  const headers = { ...extraHeaders };
+  if (!headers.Authorization && !headers['X-Api-Key'] && !headers['X-Guest-Token'] && token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
   const res = await fetch(`${base}/api/guest-links/${encodeURIComponent(guestToken)}`, {
     method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
+    headers,
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));

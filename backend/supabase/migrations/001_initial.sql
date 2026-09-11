@@ -67,16 +67,17 @@ create table if not exists room_sessions (
 );
 
 create table if not exists room_docks (
+  room_id uuid primary key references rooms(id) on delete cascade,
   account_id uuid not null references accounts(id) on delete cascade,
-  instance_key text not null,
-  room_id uuid not null references rooms(id) on delete cascade,
+  api_key_id uuid not null unique,
+  instance_key text not null default 'default',
   label text not null default 'Table',
-  api_key_id uuid,
-  last_seen_at timestamptz,
-  primary key (account_id, instance_key)
+  last_seen_at timestamptz
 );
 
 create index if not exists idx_room_docks_room on room_docks(room_id);
+create index if not exists idx_room_docks_account on room_docks(account_id);
+create index if not exists idx_room_docks_api_key on room_docks(api_key_id);
 
 create table if not exists room_guest_tokens (
   token text primary key,

@@ -76,13 +76,12 @@ CREATE TABLE IF NOT EXISTS room_sessions (
 );
 
 CREATE TABLE IF NOT EXISTS room_docks (
+  room_id TEXT PRIMARY KEY REFERENCES rooms(id) ON DELETE CASCADE,
   account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-  instance_key TEXT NOT NULL,
-  room_id TEXT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+  api_key_id TEXT NOT NULL UNIQUE,
+  instance_key TEXT NOT NULL DEFAULT 'default',
   label TEXT NOT NULL DEFAULT 'Table',
-  api_key_id TEXT,
-  last_seen_at TEXT,
-  PRIMARY KEY (account_id, instance_key)
+  last_seen_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS room_guest_tokens (
@@ -106,6 +105,8 @@ CREATE INDEX IF NOT EXISTS idx_api_keys_account ON api_keys(account_id);
 CREATE INDEX IF NOT EXISTS idx_rooms_account ON rooms(account_id);
 CREATE INDEX IF NOT EXISTS idx_account_players_account ON account_players(account_id);
 CREATE INDEX IF NOT EXISTS idx_account_players_name ON account_players(account_id, name_normalized);
+CREATE INDEX IF NOT EXISTS idx_room_docks_account ON room_docks(account_id);
+CREATE INDEX IF NOT EXISTS idx_room_docks_api_key ON room_docks(api_key_id);
 `;
 
 const MATCH_EVENTS_INDEXES = `
@@ -157,10 +158,33 @@ function ensureMatchEventColumns(database) {
 }
 
 function ensureRoomDockColumns(database) {
-  const cols = new Set(tableColumns(database, 'room_docks'));
-  if (!cols.has('api_key_id')) {
-    database.exec('ALTER TABLE room_docks ADD COLUMN api_key_id TEXT');
+  const exists = database.prepare(
+    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='room_docks'"
+  ).get();
+  if (!exists) return;
+
+  const pkCols = database.prepare('PRAGMA table_info(room_docks)').all()
+    .filter((row) => row.pk > 0)
+    .sort((a, b) => a.pk - b.pk)
+    .map((row) => row.name);
+  const keyPrimary = pkCols.length === 1 && pkCols[0] === 'room_id';
+  if (!keyPrimary) {
+    // Dev only: drop legacy instance-keyed table; wipe local DB if you need clean docks.
+    console.warn('[sqlite] Dropping legacy room_docks (instance-keyed) — recreating Dock Key schema.');
+    database.exec('DROP TABLE IF EXISTS room_docks');
+    database.exec(`
+      CREATE TABLE room_docks (
+        room_id TEXT PRIMARY KEY REFERENCES rooms(id) ON DELETE CASCADE,
+        account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+        api_key_id TEXT NOT NULL UNIQUE,
+        instance_key TEXT NOT NULL DEFAULT 'default',
+        label TEXT NOT NULL DEFAULT 'Table',
+        last_seen_at TEXT
+      );
+    `);
   }
+  database.exec('CREATE INDEX IF NOT EXISTS idx_room_docks_account ON room_docks(account_id)');
+  database.exec('CREATE INDEX IF NOT EXISTS idx_room_docks_api_key ON room_docks(api_key_id)');
 }
 
 /** Drop legacy room-owned match_events (no backfill — local/test wipe). */
@@ -722,30 +746,43 @@ function defaultInstanceLabel(instanceKey) {
   return instanceKey.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-/** One room per OBS instance key (URL ?instance=) under an account.
- *  Returns existing mapping or creates a new room + room_docks row.
- *  Callers must enforce room quotas before create (see room-hub).
- */
+/** One room per OBS Dock Key (api_key_id). instance_key is last-seen metadata only. */
+export function peekRoomDockByApiKey(apiKeyId) {
+  if (!apiKeyId) return null;
+  return getDb().prepare(
+    'SELECT * FROM room_docks WHERE api_key_id = ?'
+  ).get(apiKeyId) || null;
+}
+
+/** @deprecated Prefer peekRoomDockByApiKey — instance is no longer room identity. */
 export function peekRoomDock(accountId, instanceKey) {
   const key = (instanceKey || 'default').trim() || 'default';
   return getDb().prepare(
-    'SELECT * FROM room_docks WHERE account_id = ? AND instance_key = ?'
+    'SELECT * FROM room_docks WHERE account_id = ? AND instance_key = ? ORDER BY last_seen_at DESC LIMIT 1'
   ).get(accountId, key) || null;
 }
 
-export function ensureRoomForInstance(accountId, instanceKey, label, apiKeyId = null) {
+/**
+ * One room per Dock Key under an account.
+ * Callers must enforce room quotas before create (see room-hub).
+ */
+export function ensureRoomForApiKey(accountId, apiKeyId, { instanceKey, label } = {}) {
+  if (!accountId || !apiKeyId) return null;
   const database = getDb();
   const key = (instanceKey || 'default').trim() || 'default';
   const keyLabel = connectionLabelForApiKey(apiKeyId);
   const resolvedLabel = keyLabel || label || null;
-  let row = peekRoomDock(accountId, key);
+  let row = peekRoomDockByApiKey(apiKeyId);
   if (row) {
+    if (row.account_id !== accountId) {
+      return null;
+    }
     database.prepare(
       `UPDATE room_docks SET last_seen_at = datetime('now'),
-        label = COALESCE(?, label),
-        api_key_id = CASE WHEN ? IS NOT NULL THEN ? ELSE api_key_id END
-       WHERE account_id = ? AND instance_key = ?`
-    ).run(resolvedLabel, apiKeyId || null, apiKeyId || null, accountId, key);
+        instance_key = ?,
+        label = COALESCE(?, label)
+       WHERE api_key_id = ?`
+    ).run(key, resolvedLabel, apiKeyId);
     if (resolvedLabel) {
       database.prepare('UPDATE rooms SET label = ? WHERE id = ?').run(resolvedLabel, row.room_id);
     }
@@ -756,21 +793,35 @@ export function ensureRoomForInstance(accountId, instanceKey, label, apiKeyId = 
   const roomLabel = resolvedLabel || defaultInstanceLabel(key);
   database.prepare('INSERT INTO rooms (id, account_id, label) VALUES (?, ?, ?)').run(roomId, accountId, roomLabel);
   database.prepare(
-    `INSERT INTO room_docks (account_id, instance_key, room_id, label, api_key_id, last_seen_at)
+    `INSERT INTO room_docks (room_id, account_id, api_key_id, instance_key, label, last_seen_at)
      VALUES (?, ?, ?, ?, ?, datetime('now'))`
-  ).run(accountId, key, roomId, roomLabel, apiKeyId || null);
+  ).run(roomId, accountId, apiKeyId, key, roomLabel);
   return getRoom(roomId);
 }
 
-/** Persist which OBS Dock Key owns this room mapping (backfill / reconnect). */
+/** @deprecated Prefer ensureRoomForApiKey. */
+export function ensureRoomForInstance(accountId, instanceKey, label, apiKeyId = null) {
+  if (apiKeyId) {
+    return ensureRoomForApiKey(accountId, apiKeyId, { instanceKey, label });
+  }
+  return null;
+}
+
+/** Persist label sync when a dock key is known for a room (reconnect backfill). */
 export function setRoomDockApiKey(roomId, apiKeyId) {
   if (!roomId || !apiKeyId) return false;
   const label = connectionLabelForApiKey(apiKeyId);
   const database = getDb();
+  const byKey = peekRoomDockByApiKey(apiKeyId);
+  if (byKey && byKey.room_id !== roomId) {
+    // Key already owns another room — do not reassign.
+    return false;
+  }
   const dock = database.prepare('SELECT * FROM room_docks WHERE room_id = ?').get(roomId);
   if (!dock) return false;
   database.prepare(
-    `UPDATE room_docks SET api_key_id = ?, label = COALESCE(?, label) WHERE room_id = ?`
+    `UPDATE room_docks SET api_key_id = ?, label = COALESCE(?, label), last_seen_at = datetime('now')
+     WHERE room_id = ?`
   ).run(apiKeyId, label, roomId);
   if (label) {
     database.prepare('UPDATE rooms SET label = ? WHERE id = ?').run(label, roomId);
@@ -778,6 +829,16 @@ export function setRoomDockApiKey(roomId, apiKeyId) {
   return true;
 }
 
+export function touchRoomDockByApiKey(apiKeyId, instanceKey) {
+  if (!apiKeyId) return;
+  const key = (instanceKey || 'default').trim() || 'default';
+  getDb().prepare(
+    `UPDATE room_docks SET last_seen_at = datetime('now'), instance_key = ?
+     WHERE api_key_id = ?`
+  ).run(key, apiKeyId);
+}
+
+/** @deprecated Prefer touchRoomDockByApiKey. */
 export function touchRoomDock(accountId, instanceKey) {
   const key = (instanceKey || 'default').trim() || 'default';
   getDb().prepare(
