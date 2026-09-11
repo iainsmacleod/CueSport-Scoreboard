@@ -844,14 +844,21 @@ function applyState(state) {
     if (p2NameEl) p2NameEl.textContent = p2Name || 'P2';
     else slotP2.textContent = p2Name || 'P2';
     syncPlayerSlotBallBadges(state, slotP1, slotP2);
-    slotP1.classList.remove('selected', 'rack-breaker-match-locked', 'rack-breaker-inactive', 'rack-breaker-current');
-    slotP2.classList.remove('selected', 'rack-breaker-match-locked', 'rack-breaker-inactive', 'rack-breaker-current');
+    slotP1.classList.remove('selected', 'rack-breaker-match-locked', 'rack-breaker-inactive', 'rack-breaker-current', 'rack-breaker-last-winner');
+    slotP2.classList.remove('selected', 'rack-breaker-match-locked', 'rack-breaker-inactive', 'rack-breaker-current', 'rack-breaker-last-winner');
     slotP1.disabled = false;
     slotP2.disabled = false;
     const breakerPending = isCommandPending('select_breaker');
     if (slotMode === 'breaker' || slotMode === 'match_locked') {
       slotP1.classList.toggle('rack-breaker-match-locked', slotMode === 'match_locked');
       slotP2.classList.toggle('rack-breaker-match-locked', slotMode === 'match_locked');
+      const lastWinner = state.lastRackWinnerSlot === '1' || state.lastRackWinnerSlot === '2'
+        ? state.lastRackWinnerSlot
+        : '';
+      if (slotMode === 'breaker' && lastWinner) {
+        slotP1.classList.toggle('rack-breaker-last-winner', lastWinner === '1');
+        slotP2.classList.toggle('rack-breaker-last-winner', lastWinner === '2');
+      }
       // Keep clickable when match-locked so tap can open End Match (same as dock).
       // While select_breaker is in flight, disable both to prevent double-send.
       if (breakerPending && slotMode === 'breaker') {

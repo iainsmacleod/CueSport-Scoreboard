@@ -688,6 +688,13 @@ ul { padding-left: 1.2rem; }
   border-radius: 50%;
   object-fit: contain;
 }
+#playerSlotP1Btn.rack-breaker-last-winner .slot-name,
+#playerSlotP2Btn.rack-breaker-last-winner .slot-name,
+#playerSlotP1Btn.rack-breaker-last-winner,
+#playerSlotP2Btn.rack-breaker-last-winner {
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
 .ball-grid {
   display: flex;
   flex-wrap: wrap;

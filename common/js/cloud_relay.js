@@ -501,6 +501,16 @@
             state.breakerPromptVisible = typeof window.isPlayerSlotPickerBreakerMode === 'function'
                 ? window.isPlayerSlotPickerBreakerMode()
                 : (rackBreakerPromptEnabled && !hasRackBreaker);
+            try {
+                const lastWinner = typeof window.getLastRackWinnerSlot === 'function'
+                    ? window.getLastRackWinnerSlot()
+                    : (window.PlayerStats && typeof window.PlayerStats.getLastRackWinnerSlot === 'function'
+                        ? window.PlayerStats.getLastRackWinnerSlot()
+                        : null);
+                state.lastRackWinnerSlot = lastWinner === '1' || lastWinner === '2' ? lastWinner : '';
+            } catch (_) {
+                state.lastRackWinnerSlot = '';
+            }
             state.playerSlotPickerVisible = computePlayerSlotPickerVisible(
                 computeBallTrackerVisible(),
                 rackBreakerPromptEnabled

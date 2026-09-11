@@ -656,9 +656,18 @@ function syncPlayerSlotPickerUI() {
     if (breakerMode) {
         setBreakerBtnState(btn1, locked);
         setBreakerBtnState(btn2, locked);
+        const lastWinner = (!locked && typeof window.getLastRackWinnerSlot === 'function')
+            ? window.getLastRackWinnerSlot()
+            : (!locked && window.PlayerStats && typeof window.PlayerStats.getLastRackWinnerSlot === 'function'
+                ? window.PlayerStats.getLastRackWinnerSlot()
+                : null);
+        btn1.classList.toggle('rack-breaker-last-winner', lastWinner === '1');
+        btn2.classList.toggle('rack-breaker-last-winner', lastWinner === '2');
     } else {
-        setActivePlayerBtnState(btn1, activeSlot === "1");
-        setActivePlayerBtnState(btn2, activeSlot === "2");
+        setActivePlayerBtnState(btn1, activeSlot === '1');
+        setActivePlayerBtnState(btn2, activeSlot === '2');
+        btn1.classList.remove('rack-breaker-last-winner');
+        btn2.classList.remove('rack-breaker-last-winner');
     }
 }
 

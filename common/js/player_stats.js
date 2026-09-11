@@ -1534,6 +1534,12 @@
         return activeMatchSession.pendingMatch || null;
     }
 
+    /** Last completed rack/frame winner slot ('1'|'2') or null if none. */
+    function getLastRackWinnerSlot() {
+        const slot = activeMatchSession.lastRackWinnerSlot;
+        return slot === '1' || slot === '2' ? slot : null;
+    }
+
     async function abandonActivePendingMatch(options) {
         const match = getActivePendingMatch();
         if (!match || activeMatchSession.matchCompletedRecorded) {
@@ -7874,6 +7880,7 @@
         buildOverlayStatsPayload: buildOverlayStatsPayload,
         renderMatchRackBreakdown: renderMatchRackBreakdown,
         getActivePendingMatch: getActivePendingMatch,
+        getLastRackWinnerSlot: getLastRackWinnerSlot,
         buildCloudMatchExtras: buildCloudMatchExtras,
         cloudMatchesForPlayer: cloudMatchesForPlayer,
         buildCloudHeadToHead: buildCloudHeadToHead,
@@ -7887,6 +7894,7 @@
     };
 
     window.openStatsModal = openStatsModal;
+    window.getLastRackWinnerSlot = getLastRackWinnerSlot;
     window.isStatsTabAvailable = isStatsTabAvailable;
     window.updateStatsTabAvailability = updateStatsTabAvailability;
     window.closeStatsModal = closeStatsModal;

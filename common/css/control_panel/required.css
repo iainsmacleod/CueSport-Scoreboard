@@ -1159,6 +1159,11 @@ a.cp-text-link:hover {
 	cursor: default;
 }
 
+.rack-breaker-btn.rack-breaker-last-winner {
+	text-decoration: underline;
+	text-underline-offset: 0.18em;
+}
+
 #ballTrackerDiv .ball.snooker-spacer {
 	visibility: hidden;
 	pointer-events: none;
