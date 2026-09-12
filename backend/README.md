@@ -57,9 +57,9 @@ docker build -f backend/Dockerfile -t cuesport-cloud:latest .
 ### Self-host (API key)
 
 1. Open **Connection settings** (⚙) → **Self-hosting** in the dock.
-2. Set **Server URL** (e.g. `http://localhost:3000`).
-3. Create an account on the dashboard (dev login) and copy **Room ID** + **API key**.
-4. Paste into the dock and enable cloud relay.
+2. Set **Server URL** (e.g. `http://localhost:3000` or `http://localhost:4003` with Docker).
+3. Create an account on the dashboard (dev login) and create an **OBS Dock Key**.
+4. Paste the Dock Key into the dock and enable cloud relay. **One Dock Key = one cloud table** (room identity is the key, not the dock `?instance=` query). Rooms are created when the dock connects.
 
 ## Environment variables
 
@@ -86,7 +86,7 @@ See [`.env.example`](.env.example).
 | `ROOM_CLEANUP_SWEEPER_MS` | How often the sweeper runs (default 10m) |
 
 Built-in defaults (all overridable via the env vars above).
-**One OBS Dock Key = one live dock connection** (create a separate key per dock and paste into each). Rooms are created when a dock connects and pruned after idle — match history is never deleted with the room.
+**One OBS Dock Key = one live dock connection and one cloud table** (create a separate key per table and paste into each dock). Rooms are keyed by Dock Key (`api_key_id`); the dock’s local `?instance=` only isolates localStorage / BroadcastChannel. Rooms are created when a dock connects and pruned after idle — match history is never deleted with the room.
 
 | Tier | Dock keys (seats) | Room safety cap | Mobile + guest / table |
 |------|-------------------|-----------------|------------------------|

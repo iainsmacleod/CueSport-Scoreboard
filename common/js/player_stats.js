@@ -5161,16 +5161,17 @@
         if (!mode) {
             return { visible: false };
         }
+        let payload;
         if (mode === 'p1') {
-            return buildPlayerOverlayPayload('1');
+            payload = await buildPlayerOverlayPayload('1');
+        } else if (mode === 'p2') {
+            payload = await buildPlayerOverlayPayload('2');
+        } else if (mode === 'h2h') {
+            payload = await buildH2HOverlayPayload();
+        } else {
+            payload = { visible: false };
         }
-        if (mode === 'p2') {
-            return buildPlayerOverlayPayload('2');
-        }
-        if (mode === 'h2h') {
-            return buildH2HOverlayPayload();
-        }
-        return { visible: false };
+        return applyLiveOverlayFields(payload);
     }
 
     function onScoreModeChanged() {
@@ -5201,6 +5202,72 @@
             return payload;
         }
         const gameType = payload.gameType || getActiveGameType();
+        if (payload.mode === 'h2h') {
+            const pending = getEditablePendingMatch();
+            const livePair = !!(pending &&
+                activeMatchSession.player1Id &&
+                activeMatchSession.player2Id &&
+                pendingMatchBelongsToPair(
+                    pending,
+                    activeMatchSession.player1Id,
+                    activeMatchSession.player2Id
+                ) &&
+                (!payload.gameType || pending.gameType === payload.gameType));
+            payload.hasLiveMatch = livePair;
+            if (!livePair) {
+                if (payload.p1RacksBase != null) payload.p1Racks = payload.p1RacksBase;
+                if (payload.p2RacksBase != null) payload.p2Racks = payload.p2RacksBase;
+                if (payload.p1BallsBase != null) payload.p1Balls = payload.p1BallsBase;
+                if (payload.p2BallsBase != null) payload.p2Balls = payload.p2BallsBase;
+                if (payload.p1FoulsBase != null) payload.p1Fouls = payload.p1FoulsBase;
+                if (payload.p2FoulsBase != null) payload.p2Fouls = payload.p2FoulsBase;
+                if (payload.p1HighestBreakBase != null) {
+                    payload.p1HighestBreak = payload.p1HighestBreakBase;
+                }
+                if (payload.p2HighestBreakBase != null) {
+                    payload.p2HighestBreak = payload.p2HighestBreakBase;
+                }
+                return payload;
+            }
+            const live1 = readMatchScopedStatsForSlot('1');
+            const live2 = readMatchScopedStatsForSlot('2');
+            const p1RacksBase = payload.p1RacksBase != null ? payload.p1RacksBase : (payload.p1Racks || 0);
+            const p2RacksBase = payload.p2RacksBase != null ? payload.p2RacksBase : (payload.p2Racks || 0);
+            const p1BallsBase = payload.p1BallsBase != null ? payload.p1BallsBase : (payload.p1Balls || 0);
+            const p2BallsBase = payload.p2BallsBase != null ? payload.p2BallsBase : (payload.p2Balls || 0);
+            const p1FoulsBase = payload.p1FoulsBase != null ? payload.p1FoulsBase : (payload.p1Fouls || 0);
+            const p2FoulsBase = payload.p2FoulsBase != null ? payload.p2FoulsBase : (payload.p2Fouls || 0);
+            const p1HbBase = payload.p1HighestBreakBase != null
+                ? payload.p1HighestBreakBase
+                : (payload.p1HighestBreak || 0);
+            const p2HbBase = payload.p2HighestBreakBase != null
+                ? payload.p2HighestBreakBase
+                : (payload.p2HighestBreak || 0);
+            payload.p1RacksBase = p1RacksBase;
+            payload.p2RacksBase = p2RacksBase;
+            payload.p1BallsBase = p1BallsBase;
+            payload.p2BallsBase = p2BallsBase;
+            payload.p1FoulsBase = p1FoulsBase;
+            payload.p2FoulsBase = p2FoulsBase;
+            payload.p1HighestBreakBase = p1HbBase;
+            payload.p2HighestBreakBase = p2HbBase;
+            payload.p1Racks = p1RacksBase + countPendingRacksForSlot(pending, '1');
+            payload.p2Racks = p2RacksBase + countPendingRacksForSlot(pending, '2');
+            payload.p1Balls = p1BallsBase + (live1.ballsPotted || 0);
+            payload.p2Balls = p2BallsBase + (live2.ballsPotted || 0);
+            payload.p1Fouls = p1FoulsBase + (live1.fouls || 0);
+            payload.p2Fouls = p2FoulsBase + (live2.fouls || 0);
+            const liveHb1 = isStraightPoolGameType(gameType)
+                ? (live1.highestRun || 0)
+                : (live1.highestBreak || 0);
+            const liveHb2 = isStraightPoolGameType(gameType)
+                ? (live2.highestRun || 0)
+                : (live2.highestBreak || 0);
+            payload.p1HighestBreak = Math.max(p1HbBase, liveHb1);
+            payload.p2HighestBreak = Math.max(p2HbBase, liveHb2);
+            payload.showFouls = overlayStatEnabled(gameType, 'fouls');
+            return payload;
+        }
         if (payload.mode !== 'p1' && payload.mode !== 'p2') {
             return payload;
         }
@@ -5236,10 +5303,20 @@
     let overlayBroadcastGeneration = 0;
     let overlayRebuildTimer = null;
 
-    /** Push live snooker visit stats immediately (no async DB wait). */
+    function pushOverlayStatsToClients(payload) {
+        persistOverlayStatsPayload(payload);
+        if (typeof bc !== 'undefined') {
+            bc.postMessage({ overlayStats: payload });
+        }
+        if (window.cloudRelay && typeof window.cloudRelay.pushDockStateSoon === 'function') {
+            window.cloudRelay.pushDockStateSoon(0);
+        }
+    }
+
+    /** Push live overlay fields immediately (no async DB wait). */
     function patchAndPublishLiveOverlayFields() {
         const mode = getOverlayStatsMode();
-        if (mode !== 'p1' && mode !== 'p2') {
+        if (mode !== 'p1' && mode !== 'p2' && mode !== 'h2h') {
             return false;
         }
         let payload;
@@ -5253,10 +5330,7 @@
             return false;
         }
         payload = applyLiveOverlayFields(payload);
-        persistOverlayStatsPayload(payload);
-        if (typeof bc !== 'undefined') {
-            bc.postMessage({ overlayStats: payload });
-        }
+        pushOverlayStatsToClients(payload);
         return true;
     }
 
@@ -5271,18 +5345,14 @@
                 if (gen !== overlayBroadcastGeneration) {
                     return;
                 }
-                payload = applyLiveOverlayFields(payload);
-                persistOverlayStatsPayload(payload);
-                if (typeof bc !== 'undefined') {
-                    bc.postMessage({ overlayStats: payload });
-                }
+                pushOverlayStatsToClients(payload);
             }).catch(function (err) {
                 console.error('Overlay stats rebuild error:', err);
             });
         }, 120);
     }
 
-    /** Snooker pots: sync live break fields first, then debounced full rebuild for balls potted etc. */
+    /** Live pots/fouls/breaks: sync immediately, then debounced full rebuild. */
     function publishSnookerOverlayLiveStats() {
         overlayBroadcastGeneration += 1;
         if (!patchAndPublishLiveOverlayFields()) {

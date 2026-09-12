@@ -750,6 +750,16 @@
             }
 
             // --- Overlay ---
+            // Ball Scoring must be on for P1/P2/H2H toggles (Controls Stats Overlay).
+            ensureScoresVisible(cp);
+            setBallScoring(cp, true);
+            await sleep(50);
+            assert('Overlay', 'Ball Scoring on allows overlay stats',
+                typeof cp.PlayerStats.isOverlayStatsAllowed === 'function' &&
+                cp.PlayerStats.isOverlayStatsAllowed() === true);
+            assert('Overlay', 'Overlay controls enabled when Ball Scoring on',
+                !cp.document.getElementById('statsOverlayControls')?.classList.contains('stats-overlay-disabled'));
+
             clearScopedStorage(cp, 'overlayStatsMode');
             cp.localStorage.setItem('h2hOverlayEnabled', 'yes');
             cp.PlayerStats.syncOverlayButtonsFromStorage();
@@ -768,6 +778,26 @@
             assert('Overlay', 'Payload hidden when off', offPayload.visible === false);
             assert('Overlay', 'No overlay button active after off',
                 h2hBtn && !h2hBtn.classList.contains('active'));
+
+            // Gate: Ball Scoring off disables overlay and clears an active mode.
+            cp.toggleOverlayStats('p1');
+            assert('Overlay', 'P1 on before Ball Scoring off', cp.getStorageItem('overlayStatsMode') === 'p1');
+            setBallScoring(cp, false);
+            await sleep(50);
+            assert('Overlay', 'Ball Scoring off disallows overlay stats',
+                cp.PlayerStats.isOverlayStatsAllowed() === false);
+            assert('Overlay', 'Overlay controls disabled when Ball Scoring off',
+                !!cp.document.getElementById('statsOverlayControls')?.classList.contains('stats-overlay-disabled'));
+            assert('Overlay', 'Active overlay cleared when Ball Scoring off',
+                (cp.getStorageItem('overlayStatsMode') || '') === '');
+            cp.toggleOverlayStats('h2h');
+            assert('Overlay', 'Toggle blocked when Ball Scoring off',
+                (cp.getStorageItem('overlayStatsMode') || '') === '');
+            setBallScoring(cp, true);
+            await sleep(50);
+            assert('Overlay', 'Ball Scoring on re-enables overlay controls',
+                cp.PlayerStats.isOverlayStatsAllowed() === true &&
+                !cp.document.getElementById('statsOverlayControls')?.classList.contains('stats-overlay-disabled'));
 
             bs = await reloadBSFrame();
             clearScopedStorage(bs, 'overlayStatsMode');
@@ -1816,23 +1846,26 @@
                 ballsP2: 4
             });
 
-            cp.document.getElementById('p1Name').value = bankPlayer.name;
-            cp.document.getElementById('p2Name').value = bankOpp.name;
-            cp.document.getElementById('p1Name').setAttribute('data-player-id', bankPlayer.id);
-            cp.document.getElementById('p2Name').setAttribute('data-player-id', bankOpp.id);
-
-            cp.setStorageItem('overlayStatsMode', 'p1');
-            let overlayPayload = await cp.PlayerStats.buildOverlayStatsPayload();
-            // Empty career for 8-Ball yields a stub payload; seed live pots before showBalls assert.
-
             // Live 8-Ball tracker pots increment match-scoped Balls Potted
             ensureScoresVisible(cp);
             setBallScoring(cp, true);
             await sleep(50);
+            cp.document.getElementById('gameTypeSelect').value = 'game1';
+            await cp.gameType('game1');
+            await sleep(100);
+            cp.document.getElementById('p1Name').value = bankPlayer.name;
+            cp.document.getElementById('p2Name').value = bankOpp.name;
+            cp.document.getElementById('p1Name').setAttribute('data-player-id', bankPlayer.id);
+            cp.document.getElementById('p2Name').setAttribute('data-player-id', bankOpp.id);
             cp.document.getElementById('raceInfoTxt').value = '5';
             cp.setStorageItem('raceInfo', '5');
             if (typeof cp.postNames === 'function') { cp.postNames(); }
             await sleep(200);
+            // Mode after Ball Scoring is on — gating clears mode when scoring is off.
+            cp.setStorageItem('overlayStatsMode', 'p1');
+            if (typeof cp.PlayerStats.syncOverlayButtonsFromStorage === 'function') {
+                cp.PlayerStats.syncOverlayButtonsFromStorage();
+            }
             cp.selectRackBreaker('1');
             await sleep(30);
             cp.resetBallTracker();
@@ -1842,9 +1875,15 @@
             cp.togglePot(cp.document.getElementById('ball 2'));
             await sleep(150);
             await cp.PlayerStats.flushRackRecordQueue();
-            overlayPayload = await cp.PlayerStats.buildOverlayStatsPayload();
+            let overlayPayload = await cp.PlayerStats.buildOverlayStatsPayload();
             assert('Ball Stats', 'P1 overlay can show Balls Potted in 8-Ball', overlayPayload.showBalls === true,
-                JSON.stringify({ showBalls: overlayPayload.showBalls, ballsPotted: overlayPayload.ballsPotted }));
+                JSON.stringify({
+                    showBalls: overlayPayload.showBalls,
+                    ballsPotted: overlayPayload.ballsPotted,
+                    empty: overlayPayload.emptyMessage,
+                    mode: cp.getStorageItem('overlayStatsMode'),
+                    allowed: cp.PlayerStats.isOverlayStatsAllowed && cp.PlayerStats.isOverlayStatsAllowed()
+                }));
             assert('Ball Stats', '8-Ball object pots count toward Balls Potted',
                 overlayPayload.ballsPotted === 2, String(overlayPayload.ballsPotted));
             cp.togglePot(cp.document.getElementById('ball 2'));
@@ -1859,13 +1898,22 @@
             cp.document.getElementById('raceInfoTxt').value = 'Race to 5';
             if (typeof cp.postNames === 'function') { cp.postNames(); }
             await sleep(300);
+            ensureScoresVisible(cp);
+            setBallScoring(cp, true);
+            cp.setStorageItem('overlayStatsMode', 'p1');
             assert('Ball Stats', 'Bank is dual score', cp.isDualScoreMode() === true);
             // Past matches do not count — pot in the current session
             for (let i = 0; i < 9; i++) {
                 await cp.PlayerStats.recordBallWin('1');
             }
             overlayPayload = await cp.PlayerStats.buildOverlayStatsPayload();
-            assert('Ball Stats', 'P1 overlay shows balls in Bank', overlayPayload.showBalls === true);
+            assert('Ball Stats', 'P1 overlay shows balls in Bank', overlayPayload.showBalls === true,
+                JSON.stringify({
+                    showBalls: overlayPayload.showBalls,
+                    ballsPotted: overlayPayload.ballsPotted,
+                    empty: overlayPayload.emptyMessage,
+                    mode: cp.getStorageItem('overlayStatsMode')
+                }));
             assert('Ball Stats', 'P1 overlay Balls Potted is a total',
                 typeof overlayPayload.ballsPotted === 'number' && overlayPayload.ballsWL === undefined,
                 String(overlayPayload.ballsPotted));
