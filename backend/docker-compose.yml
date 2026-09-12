@@ -1,9 +1,26 @@
 # CueSport Cloud — Docker Compose
 #
-# Copy .env.example → .env and set at least:
+# Copy .env.example → .env. Auth vars are loaded via env_file below (not hard-coded here).
+#
+# Self-host / local (dev login, no Google):
 #   PUBLIC_URL=http://localhost:4003
+#   ALLOW_DEV_AUTH=true
 #   DEV_AUTH_SECRET=...
 #   DEV_AUTH_ACCOUNT_EMAIL=you@example.com
+#
+# Google sign-in (Supabase Auth — enable Google provider in Supabase dashboard;
+# Google Client ID/Secret stay in Supabase, not in this Compose file):
+#   PUBLIC_URL=http://localhost:4003   # or https://your.domain
+#   SUPABASE_URL=https://xxxx.supabase.co
+#   SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+#   SUPABASE_SECRET_KEY=sb_secret_...
+#   SUPABASE_JWT_SECRET=               # optional; JWKS used when empty
+#   PLATFORM_ADMIN_EMAILS=you@gmail.com
+#   ALLOW_DEV_AUTH=false               # recommended once Google OAuth works
+# Supabase Auth redirect allowlist must include:
+#   {PUBLIC_URL}/dashboard
+#   {PUBLIC_URL}/web/dashboard/
+#   {PUBLIC_URL}/auth/callback
 #
 # Tier quotas (optional — defaults apply when unset):
 #   TIER_DEFAULT=selfhost          # with ALLOW_DEV_AUTH; else starter
@@ -35,8 +52,14 @@ services:
       PORT: 3000
       HOST: 0.0.0.0
       SQLITE_PATH: /app/data/cuesport.db
-      # Tier / auth vars are read from env_file (.env). Uncomment to force in Compose:
-      # ALLOW_DEV_AUTH: "true"
+      # Auth / Google OAuth / tiers come from env_file (.env). Uncomment to force in Compose:
+      # PUBLIC_URL: http://localhost:4003
+      # SUPABASE_URL: https://xxxx.supabase.co
+      # SUPABASE_PUBLISHABLE_KEY: sb_publishable_...
+      # SUPABASE_SECRET_KEY: sb_secret_...
+      # SUPABASE_JWT_SECRET: ""
+      # PLATFORM_ADMIN_EMAILS: you@gmail.com
+      # ALLOW_DEV_AUTH: "false"
       # TIER_DEFAULT: selfhost
     restart: unless-stopped
     healthcheck:
