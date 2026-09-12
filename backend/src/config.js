@@ -18,10 +18,10 @@ export const config = {
   dbDriver: process.env.DB_DRIVER || 'sqlite',
   sqlitePath: process.env.SQLITE_PATH || path.join(__dirname, '..', 'data', 'cuesport.db'),
   supabaseUrl: process.env.SUPABASE_URL || '',
-  /** Publishable key — used by browser OAuth and server createClient (non-admin). */
-  supabaseAnonKey: process.env.SUPABASE_ANON_KEY || '',
-  /** Secret admin key — server-only; never pass to browser createClient / public config. */
-  supabaseServiceKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+  /** Publishable key (`sb_publishable_…`) — browser OAuth + server createClient (non-admin). */
+  supabasePublishableKey: process.env.SUPABASE_PUBLISHABLE_KEY || '',
+  /** Secret key (`sb_secret_…`) — server-only; never pass to browser createClient / public config. */
+  supabaseSecretKey: process.env.SUPABASE_SECRET_KEY || '',
   supabaseJwtSecret: process.env.SUPABASE_JWT_SECRET || '',
   allowDevAuth: process.env.ALLOW_DEV_AUTH !== 'false',
   devAuthSecret: process.env.DEV_AUTH_SECRET || '',
@@ -41,6 +41,6 @@ export const config = {
   roomIdleTtlMs: parseEnvMs(process.env.ROOM_IDLE_TTL_MS, 14 * 24 * 60 * 60 * 1000),
   /** How often the sweeper looks for rooms to prune. */
   roomCleanupSweeperMs: parseEnvMs(process.env.ROOM_CLEANUP_SWEEPER_MS, 10 * 60 * 1000),
-  /** Google / Supabase Auth is usable when URL + anon (publishable) key are set. */
-  isSupabase: () => !!(process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY),
+  /** Google / Supabase Auth is usable when URL + publishable key are set. */
+  isSupabase: () => !!(process.env.SUPABASE_URL && process.env.SUPABASE_PUBLISHABLE_KEY),
 };

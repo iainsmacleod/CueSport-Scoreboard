@@ -3763,7 +3763,7 @@ document.addEventListener('keydown', (event) => {
 document.getElementById('googleBtn').addEventListener('click', async () => {
   setDashLoginMode('managed');
   const config = await fetchPublicConfig(getServerUrl());
-  if (config.supabaseUrl && config.supabaseAnonKey) {
+  if (config.supabaseUrl && config.supabasePublishableKey) {
     window.location.href = `${config.supabaseUrl}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(window.location.href)}`;
   } else {
     setError('Google OAuth not configured on this server. Use Self-hosting with your dev auth secret.');

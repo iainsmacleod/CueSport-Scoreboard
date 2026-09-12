@@ -369,7 +369,7 @@ export async function registerAccountRoutes(app) {
   app.get('/api/config/public', async () => ({
     publicUrl: config.publicUrl,
     supabaseUrl: config.supabaseUrl || null,
-    supabaseAnonKey: config.supabaseAnonKey || null,
+    supabasePublishableKey: config.supabasePublishableKey || null,
     allowDevAuth: config.allowDevAuth,
     devAuthConfigured: isDevAuthConfigured(),
   }));

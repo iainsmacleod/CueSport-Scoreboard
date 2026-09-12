@@ -70,8 +70,8 @@ See [`.env.example`](.env.example).
 | `PUBLIC_URL` | Public base URL for OAuth redirects and client config |
 | `DB_DRIVER` | `sqlite` (default) or `supabase` |
 | `SUPABASE_URL` | Supabase project URL (production auth) |
-| `SUPABASE_ANON_KEY` | Publishable key for browser OAuth + server `createClient` |
-| `SUPABASE_SERVICE_ROLE_KEY` | Server-only admin key (never send to browsers / public config) |
+| `SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_…` — browser OAuth + server `createClient` (not legacy `anon`) |
+| `SUPABASE_SECRET_KEY` | `sb_secret_…` — server-only (not legacy `service_role`; never send to browsers) |
 | `SUPABASE_JWT_SECRET` | JWT verification (or use JWKS) |
 | `ALLOW_DEV_AUTH` | Enable secret dev-login when Supabase not configured |
 | `DEV_AUTH_SECRET` | Shared secret for dev login (required when dev auth is on) |

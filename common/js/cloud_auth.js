@@ -65,7 +65,7 @@
     async function signInWithGoogle() {
         setConnectionMode('managed');
         const config = await fetchPublicConfig();
-        if (config && config.supabaseUrl && config.supabaseAnonKey) {
+        if (config && config.supabaseUrl && config.supabasePublishableKey) {
             const redirect = encodeURIComponent(`${config.publicUrl}/web/dashboard/?dock=1`);
             window.open(
                 `${config.supabaseUrl}/auth/v1/authorize?provider=google&redirect_to=${redirect}`,
