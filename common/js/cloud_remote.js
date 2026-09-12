@@ -326,7 +326,7 @@
                 revoke.textContent = 'Revoke';
                 revoke.addEventListener('click', function (event) {
                     event.stopPropagation();
-                    revokeGuest(g.token);
+                    revokeGuest(g);
                 });
                 li.appendChild(revoke);
             } else if (isOwnerLink(g)) {
@@ -415,7 +415,25 @@
         }
     }
 
-    async function revokeGuest(token) {
+    function revokeConfirmMessage(link) {
+        if (isOwnerLink(link)) {
+            return 'Revoke OBS Dock Owner?\n\n' +
+                'This is the default elevated remote link (scoring, Stream, and Share). ' +
+                'Anyone using it will be disconnected. Create or restore the default link later if needed.';
+        }
+        const name = link && link.label ? String(link.label) : 'this guest';
+        return 'Revoke guest link “' + name + '”?\n\n' +
+            'This is a scoring-only guest link (no Stream/Share). ' +
+            'Anyone using it will be disconnected.';
+    }
+
+    async function revokeGuest(linkOrToken) {
+        const link = linkOrToken && typeof linkOrToken === 'object'
+            ? linkOrToken
+            : (cachedLinks || []).find(function (g) { return g.token === linkOrToken; }) || { token: linkOrToken };
+        const token = link.token;
+        if (!token) return;
+        if (!window.confirm(revokeConfirmMessage(link))) return;
         try {
             await cloudFetch('/api/guest-links/' + encodeURIComponent(token), { method: 'DELETE' });
             if (selectedToken === token) {

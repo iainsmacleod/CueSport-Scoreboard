@@ -428,11 +428,14 @@ function formatTableCard(room, serverUrl) {
   ].filter(Boolean).join(' · ') || 'Match in progress';
   const controlUrl = `${serverUrl.replace(/\/$/, '')}/m/${room.id}`;
 
+  const connectionName = String(room.api_key_label || room.dock_label || '').trim()
+    || 'OBS Dock Connected';
+
   const card = document.createElement('a');
   card.className = 'table-card panel';
   card.href = controlUrl;
   card.innerHTML = `
-    <p class="table-status online">OBS Dock Connected</p>
+    <p class="table-status online">${escapeHtml(connectionName)}</p>
     <h3>${matchTitle}</h3>
     <p class="table-players">${p1} vs ${p2}</p>
     ${scoreHtml}
@@ -446,6 +449,7 @@ function tablesFingerprint(rooms) {
     id: room.id,
     instance_key: room.instance_key || null,
     dock_label: room.dock_label || null,
+    api_key_label: room.api_key_label || null,
     live_state: room.live_state || {},
   })));
 }
@@ -3692,10 +3696,11 @@ document.getElementById('invalidateSessionsBtn')?.addEventListener('click', asyn
 
 document.getElementById('revokeAllGuestsBtn')?.addEventListener('click', async () => {
   const ok = await confirmDashAction({
-    title: 'Revoke all',
+    title: 'Revoke all guest links',
     message:
-      'Revoke every guest link and disconnect all guest scorers across all tables?\n\n' +
-      'They will need a new link to reconnect.',
+      'Revoke every guest link on this account and disconnect anyone using them?\n\n' +
+      'This includes named scoring-only guest links and each table’s default OBS Dock Owner link (elevated Stream/Share access).\n\n' +
+      'Default OBS Dock Owner links are recreated the next time that table’s dock or Share flow needs them.',
     confirmLabel: 'Revoke all',
     danger: true,
   });

@@ -386,8 +386,8 @@ function renderGuestLinks(links) {
     btn.addEventListener('click', async (event) => {
       event.stopPropagation();
       const msg = isOwner
-        ? 'Revoke OBS Dock Owner? Anyone using this default guest link will be disconnected.'
-        : 'Revoke this guest link? Anyone using it will be disconnected.';
+        ? 'Revoke OBS Dock Owner?\n\nThis is the default elevated remote link (scoring, Stream, and Share). Anyone using it will be disconnected. Create or restore the default link later if needed.'
+        : `Revoke guest link “${g.label || 'Guest'}”?\n\nThis is a scoring-only guest link (no Stream/Share). Anyone using it will be disconnected.`;
       if (!window.confirm(msg)) return;
       try {
         await revokeGuestLink(window.location.origin, shareAuthToken(), g.token, shareAuthHeaders());
