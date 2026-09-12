@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url';
 import { config } from './config.js';
 import { handleConnection, getConnectionCount, startRoomCleanupSweeper } from './ws/room-hub.js';
 import { registerAccountRoutes } from './api/accounts.js';
+import { registerAdminRoutes } from './api/admin.js';
 import { registerEventRoutes } from './api/events.js';
 import { registerQrRoutes } from './api/qr.js';
 import * as sqlite from './db/sqlite.js';
@@ -154,6 +155,7 @@ app.get('/ws', { websocket: true }, (socket) => {
 });
 
 await registerAccountRoutes(app);
+await registerAdminRoutes(app);
 await registerEventRoutes(app);
 registerQrRoutes(app);
 

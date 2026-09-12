@@ -108,6 +108,10 @@ let leaderboardSortDir = 'desc';
 let leaderboardPage = 1;
 /** Expanded rack/frame breakdowns in match lists (collapsed by default). */
 const expandedMatchRacks = new Set();
+let isPlatformAdminUser = false;
+let adminAccountsCache = [];
+let adminSelectedId = '';
+let adminSearchTimer = null;
 
 function show(id, visible) {
   document.getElementById(id).classList.toggle('hidden', !visible);
@@ -1127,12 +1131,16 @@ function renderApiKeys(keys) {
 }
 
 function setActiveDashTab(which) {
+  if (which === 'admin' && !isPlatformAdminUser) {
+    which = 'tables';
+  }
   document.querySelectorAll('.dash-tab').forEach((t) => {
     t.classList.toggle('active', t.dataset.tab === which);
   });
   show('tabTables', which === 'tables');
   show('tabStats', which === 'stats');
   show('tabSettings', which === 'settings' || which === 'account');
+  show('tabAdmin', which === 'admin');
   if (which === 'stats') {
     selectedPlayerKey = '';
     playerDetailOpponentFilter = '';
@@ -1140,12 +1148,242 @@ function setActiveDashTab(which) {
     playerRenameEditing = false;
     loadAccountStats(true);
   }
+  if (which === 'admin') {
+    loadAdminAccounts();
+  }
 }
 
 function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text == null ? '' : String(text);
   return div.innerHTML;
+}
+
+function adminAuthHeaders() {
+  return { Authorization: `Bearer ${getToken()}` };
+}
+
+async function adminFetchJson(path, options = {}) {
+  const base = getServerUrl().replace(/\/$/, '');
+  const res = await fetch(`${base}${path}`, {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      ...adminAuthHeaders(),
+      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+    },
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(body.error || body.message || `Request failed (${res.status})`);
+  }
+  return body;
+}
+
+function formatSupportTrial(trialEndsAt) {
+  if (!trialEndsAt) return '—';
+  const d = parseUtcDate(trialEndsAt);
+  if (!d) return String(trialEndsAt);
+  const active = d.getTime() > Date.now();
+  return `${active ? 'Until' : 'Ended'} ${d.toLocaleString()}`;
+}
+
+function setAdminStatus(msg) {
+  const el = document.getElementById('adminStatus');
+  if (el) el.textContent = msg || '';
+}
+
+function setPlatformAdminUi(enabled) {
+  isPlatformAdminUser = !!enabled;
+  const tabBtn = document.getElementById('dashAdminTabBtn');
+  if (tabBtn) tabBtn.classList.toggle('hidden', !isPlatformAdminUser);
+  if (!isPlatformAdminUser) {
+    adminSelectedId = '';
+    adminAccountsCache = [];
+    const detail = document.getElementById('adminDetailPanel');
+    if (detail) detail.classList.add('hidden');
+    const activeAdmin = document.querySelector('.dash-tab.active[data-tab="admin"]');
+    if (activeAdmin) setActiveDashTab('tables');
+  }
+}
+
+async function loadAdminAccounts() {
+  if (!isPlatformAdminUser || !getToken()) return;
+  const q = document.getElementById('adminAccountSearch')?.value?.trim() || '';
+  setAdminStatus('Loading accounts…');
+  try {
+    const qs = q ? `?q=${encodeURIComponent(q)}` : '';
+    const data = await adminFetchJson(`/api/admin/accounts${qs}`);
+    adminAccountsCache = data.accounts || [];
+    renderAdminAccountsTable();
+    setAdminStatus(
+      adminAccountsCache.length
+        ? `${adminAccountsCache.length} account${adminAccountsCache.length === 1 ? '' : 's'}`
+        : 'No accounts found'
+    );
+    if (adminSelectedId) {
+      const stillThere = adminAccountsCache.some((a) => a.id === adminSelectedId);
+      if (stillThere) await loadAdminAccountDetail(adminSelectedId);
+      else closeAdminDetail();
+    }
+  } catch (err) {
+    setAdminStatus(err.message || 'Failed to load accounts');
+  }
+}
+
+function renderAdminAccountsTable() {
+  const body = document.getElementById('adminAccountsBody');
+  if (!body) return;
+  if (!adminAccountsCache.length) {
+    body.innerHTML = '<tr><td colspan="7">No accounts</td></tr>';
+    return;
+  }
+  body.innerHTML = adminAccountsCache.map((a) => `
+    <tr data-admin-account-id="${escapeHtml(a.id)}" class="${a.id === adminSelectedId ? 'admin-row-selected' : ''}" tabindex="0">
+      <td>${escapeHtml(a.email)}</td>
+      <td>${escapeHtml(a.subscription_status || '—')}</td>
+      <td>${escapeHtml(a.subscription_tier || '—')}</td>
+      <td>${escapeHtml(formatSupportTrial(a.trial_ends_at))}</td>
+      <td>${Number(a.api_key_count) || 0}</td>
+      <td>${Number(a.room_count) || 0}</td>
+      <td>${escapeHtml(a.last_activity_at ? formatLocalDate(a.last_activity_at) : '—')}</td>
+    </tr>
+  `).join('');
+}
+
+function closeAdminDetail() {
+  adminSelectedId = '';
+  const panel = document.getElementById('adminDetailPanel');
+  if (panel) panel.classList.add('hidden');
+  renderAdminAccountsTable();
+}
+
+async function loadAdminAccountDetail(accountId) {
+  adminSelectedId = accountId;
+  renderAdminAccountsTable();
+  const panel = document.getElementById('adminDetailPanel');
+  const title = document.getElementById('adminDetailTitle');
+  const body = document.getElementById('adminDetailBody');
+  if (!panel || !body) return;
+  panel.classList.remove('hidden');
+  body.innerHTML = '<p class="hint">Loading…</p>';
+  try {
+    const [{ account, quota }, stats] = await Promise.all([
+      adminFetchJson(`/api/admin/accounts/${encodeURIComponent(accountId)}`),
+      adminFetchJson(`/api/admin/accounts/${encodeURIComponent(accountId)}/stats`).catch(() => null),
+    ]);
+    if (title) title.textContent = account.email || 'Account';
+    const rooms = account.rooms || [];
+    const keys = account.api_keys || [];
+    const summary = stats?.summary || {};
+    body.innerHTML = `
+      <div class="admin-detail-meta">
+        <div><strong>Status:</strong> ${escapeHtml(account.subscription_status || '—')}</div>
+        <div><strong>Tier:</strong> ${escapeHtml(account.subscription_tier || '—')}</div>
+        <div><strong>Support trial:</strong> ${escapeHtml(formatSupportTrial(account.trial_ends_at))}</div>
+        <div><strong>Created:</strong> ${escapeHtml(account.created_at ? formatLocalDate(account.created_at) : '—')}</div>
+        <div><strong>Quota:</strong> ${
+          quota?.limits
+            ? `${quota.usage?.apiKeys ?? 0}/${quota.limits.maxApiKeys} keys · ${quota.usage?.rooms ?? 0}/${quota.limits.maxRooms} rooms`
+            : '—'
+        }</div>
+      </div>
+      <h3 class="stats-section-title">Support trial</h3>
+      <p class="hint">Time-boxed access override. Does not set a paid tier — Stripe owns product trials and billing.</p>
+      <form class="admin-trial-form" id="adminGrantTrialForm">
+        <label>
+          Days (1–90)
+          <input id="adminTrialDays" type="number" min="1" max="90" value="14" required />
+        </label>
+        <button type="submit" class="btn save dash-action-btn">Grant / extend</button>
+        <button type="button" class="btn danger dash-action-btn" id="adminEndTrialBtn">End support trial</button>
+      </form>
+      <div class="admin-detail-actions">
+        <button type="button" class="btn secondary dash-action-btn" id="adminInvalidateSessionsBtn">Invalidate sessions</button>
+      </div>
+      <h3 class="stats-section-title">Dock keys</h3>
+      <ul class="admin-key-list">
+        ${keys.length ? keys.map((k) => `
+          <li>
+            <span>${escapeHtml(k.label || k.id)} · ${escapeHtml(k.role || '')}</span>
+            <button type="button" class="btn danger dash-action-btn" data-admin-revoke-key="${escapeHtml(k.id)}">Revoke</button>
+          </li>
+        `).join('') : '<li class="hint">No active keys</li>'}
+      </ul>
+      <h3 class="stats-section-title">Rooms</h3>
+      <ul class="admin-room-list">
+        ${rooms.length ? rooms.map((r) => `
+          <li>
+            <span>${escapeHtml(r.dock_label || r.label || r.id)} · guests ${Number(r.guest_link_count) || 0}</span>
+            <span class="hint">${escapeHtml(r.last_seen_at ? `Seen ${formatLocalDate(r.last_seen_at)}` : 'No dock seen')}</span>
+          </li>
+        `).join('') : '<li class="hint">No rooms</li>'}
+      </ul>
+      <h3 class="stats-section-title">Stats snapshot</h3>
+      <div class="admin-stats-summary">
+        <span><strong>${Number(summary.matches) || 0}</strong> matches</span>
+        <span><strong>${Number(summary.players) || 0}</strong> players</span>
+        <span><strong>${Number(summary.tables) || 0}</strong> tables</span>
+      </div>
+    `;
+  } catch (err) {
+    body.innerHTML = `<p class="error">${escapeHtml(err.message || 'Failed to load account')}</p>`;
+  }
+}
+
+async function adminGrantTrial(days) {
+  if (!adminSelectedId) return;
+  await adminFetchJson(`/api/admin/accounts/${encodeURIComponent(adminSelectedId)}/trial`, {
+    method: 'POST',
+    body: JSON.stringify({ days }),
+  });
+  await loadAdminAccounts();
+}
+
+async function adminEndTrial() {
+  if (!adminSelectedId) return;
+  const ok = await confirmDashAction({
+    title: 'End support trial',
+    message: 'Clear the support trial for this account? Access falls back to Stripe subscription status.',
+    confirmLabel: 'End trial',
+    danger: true,
+  });
+  if (!ok) return;
+  await adminFetchJson(`/api/admin/accounts/${encodeURIComponent(adminSelectedId)}/trial`, {
+    method: 'DELETE',
+  });
+  await loadAdminAccounts();
+}
+
+async function adminInvalidateSelectedSessions() {
+  if (!adminSelectedId) return;
+  const ok = await confirmDashAction({
+    title: 'Invalidate sessions',
+    message: 'Sign this account out everywhere (dashboard and account mobile sessions)?',
+    confirmLabel: 'Invalidate',
+    danger: true,
+  });
+  if (!ok) return;
+  await adminFetchJson(`/api/admin/accounts/${encodeURIComponent(adminSelectedId)}/invalidate-sessions`, {
+    method: 'POST',
+  });
+  setAdminStatus('Sessions invalidated');
+}
+
+async function adminRevokeKey(keyId) {
+  if (!adminSelectedId || !keyId) return;
+  const ok = await confirmDashAction({
+    title: 'Revoke dock key',
+    message: 'Revoke this dock key and disconnect any dock using it?',
+    confirmLabel: 'Revoke',
+    danger: true,
+  });
+  if (!ok) return;
+  await adminFetchJson(
+    `/api/admin/accounts/${encodeURIComponent(adminSelectedId)}/api-keys/${encodeURIComponent(keyId)}/revoke`,
+    { method: 'POST' }
+  );
+  await loadAdminAccounts();
 }
 
 function parseUtcDate(value) {
@@ -2881,6 +3119,7 @@ async function renderDashboard() {
   if (!token) {
     stopLiveFeed();
     lastTablesFingerprint = '';
+    setPlatformAdminUi(false);
     show('loginSection', true);
     show('dashboardSection', false);
     return;
@@ -2891,6 +3130,7 @@ async function renderDashboard() {
     show('dashboardSection', true);
     const emailEl = document.getElementById('userEmail');
     if (emailEl) emailEl.textContent = me.account.email;
+    setPlatformAdminUi(!!me.is_platform_admin);
     renderQuota(me.quota);
     renderApiKeys(me.api_keys);
     lastDashboardRooms = me.rooms || [];
@@ -2904,6 +3144,7 @@ async function renderDashboard() {
     localStorage.removeItem(TOKEN_KEY);
     statsData = null;
     statsLoaded = false;
+    setPlatformAdminUi(false);
     setError(err.message);
     show('loginSection', true);
     show('dashboardSection', false);
@@ -3062,6 +3303,57 @@ function initStatsPlayerSearch() {
 
 document.querySelectorAll('.dash-tab').forEach((tab) => {
   tab.addEventListener('click', () => setActiveDashTab(tab.dataset.tab));
+});
+
+document.getElementById('adminAccountSearch')?.addEventListener('input', () => {
+  clearTimeout(adminSearchTimer);
+  adminSearchTimer = setTimeout(() => {
+    if (document.getElementById('tabAdmin')?.classList.contains('hidden')) return;
+    loadAdminAccounts();
+  }, 250);
+});
+
+document.getElementById('adminAccountsBody')?.addEventListener('click', (event) => {
+  const row = event.target.closest('tr[data-admin-account-id]');
+  if (!row) return;
+  loadAdminAccountDetail(row.getAttribute('data-admin-account-id'));
+});
+
+document.getElementById('adminAccountsBody')?.addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  const row = event.target.closest('tr[data-admin-account-id]');
+  if (!row) return;
+  event.preventDefault();
+  loadAdminAccountDetail(row.getAttribute('data-admin-account-id'));
+});
+
+document.getElementById('adminDetailCloseBtn')?.addEventListener('click', () => closeAdminDetail());
+
+document.getElementById('adminDetailBody')?.addEventListener('submit', async (event) => {
+  if (event.target?.id !== 'adminGrantTrialForm') return;
+  event.preventDefault();
+  const days = parseInt(document.getElementById('adminTrialDays')?.value, 10);
+  try {
+    await adminGrantTrial(days);
+  } catch (err) {
+    setAdminStatus(err.message || 'Failed to grant support trial');
+  }
+});
+
+document.getElementById('adminDetailBody')?.addEventListener('click', async (event) => {
+  const target = event.target.closest('button');
+  if (!target) return;
+  try {
+    if (target.id === 'adminEndTrialBtn') {
+      await adminEndTrial();
+    } else if (target.id === 'adminInvalidateSessionsBtn') {
+      await adminInvalidateSelectedSessions();
+    } else if (target.dataset.adminRevokeKey) {
+      await adminRevokeKey(target.dataset.adminRevokeKey);
+    }
+  } catch (err) {
+    setAdminStatus(err.message || 'Admin action failed');
+  }
 });
 
 function setActiveStatsPanel(which) {

@@ -31,6 +31,7 @@ import {
   normalizeDockKeyRole,
   permissionsForAuth,
 } from '../lib/dock-roles.js';
+import { isPlatformAdmin } from '../lib/platform-admin.js';
 
 function enrichRoom(room) {
   const cleanupMs = getRoomCleanupAfter(room.id);
@@ -102,7 +103,9 @@ export async function registerAccountRoutes(app) {
         email: account.email,
         subscription_status: account.subscription_status,
         subscription_tier: account.subscription_tier,
+        trial_ends_at: account.trial_ends_at || null,
       },
+      is_platform_admin: isPlatformAdmin(account),
       rooms,
       api_keys: keys,
       quota: getAccountQuota(account),

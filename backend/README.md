@@ -76,6 +76,7 @@ See [`.env.example`](.env.example).
 | `ALLOW_DEV_AUTH` | Enable secret dev-login when Supabase not configured |
 | `DEV_AUTH_SECRET` | Shared secret for dev login (required when dev auth is on) |
 | `DEV_AUTH_ACCOUNT_EMAIL` | Email for the single self-host account (required when dev auth is on; use your Google address to ease later managed migration) |
+| `PLATFORM_ADMIN_EMAILS` | Comma-separated Google emails allowed to use `/api/admin/*` and the dashboard **Admin** tab (hosted multi-tenant support) |
 | `TIER_DEFAULT` | Default subscription tier name (`starter`, `pro`, `enterprise`, `selfhost`) |
 | `TIER_LIMITS_JSON` | Optional JSON override of the full tier catalog |
 | `TIER_{TIER}_MAX_API_KEYS` | Per-tier OBS Dock Key (seat) cap |
@@ -98,12 +99,22 @@ Built-in defaults (all overridable via the env vars above).
 ## Supabase setup (production)
 
 1. Create a Supabase project.
-2. Run [`supabase/migrations/001_initial.sql`](supabase/migrations/001_initial.sql), [`002_session_epoch_quotas.sql`](supabase/migrations/002_session_epoch_quotas.sql), then [`003_account_players_uuid.sql`](supabase/migrations/003_account_players_uuid.sql) in the SQL editor.
+2. Run [`supabase/migrations/001_initial.sql`](supabase/migrations/001_initial.sql), [`002_session_epoch_quotas.sql`](supabase/migrations/002_session_epoch_quotas.sql), [`003_account_players_uuid.sql`](supabase/migrations/003_account_players_uuid.sql), [`004_dock_key_roles.sql`](supabase/migrations/004_dock_key_roles.sql), then [`005_admin_support_trial.sql`](supabase/migrations/005_admin_support_trial.sql) in the SQL editor.
 3. Enable **Google** provider under Authentication → Providers.
 4. Add redirect URLs: `{PUBLIC_URL}/web/dashboard/`, `{PUBLIC_URL}/auth/callback`.
-5. Set env vars in `.env` and deploy.
+5. Set env vars in `.env` (including `PLATFORM_ADMIN_EMAILS` for your ops Google accounts) and deploy.
 
 On first Google sign-in, the server links `auth.users.id` to an `accounts` row. Rooms are created later when an OBS dock connects with a Dock Key.
+
+### Platform admin + trials
+
+Hosted multi-tenant support is gated by **`PLATFORM_ADMIN_EMAILS`** (not Dock Key roles). Allowlisted users get `is_platform_admin` on `GET /api/me`, an **Admin** tab on the dashboard, and `/api/admin/*` routes (list tenants, read stats, revoke keys, invalidate sessions, grant/end **support trials**).
+
+Access for dock/mobile join allows when **any** of:
+- `subscription_status` is `active` or `trialing` (Stripe product path — Checkout/webhooks are future work), **or**
+- `accounts.trial_ends_at` is set and still in the future (**admin support trial** for demos / grace / pre-card).
+
+Paid tiers are **not** edited by the admin UI; product free trials belong on Stripe (`trial_period_days` / `trialing`). Admin only sets `trial_ends_at`.
 
 ## WebSocket protocol
 
@@ -123,7 +134,14 @@ This backend is GPL-licensed alongside the scoreboard. You may run your own inst
 |--------|------|-------------|
 | GET | `/api/config/public` | Client-facing config |
 | POST | `/api/auth/dev-login` | Dev auth (secret → signed token) |
-| GET | `/api/me` | Account, rooms, keys, quota (Bearer token) |
+| GET | `/api/me` | Account, rooms, keys, quota, `is_platform_admin` (Bearer token) |
+| GET | `/api/admin/accounts` | Platform admin: list tenants (optional `?q=` email filter) |
+| GET | `/api/admin/accounts/:id` | Platform admin: tenant detail + quota |
+| GET | `/api/admin/accounts/:id/stats` | Platform admin: account match stats |
+| POST | `/api/admin/accounts/:id/trial` | Platform admin: grant/extend support trial `{ days: 1–90 }` |
+| DELETE | `/api/admin/accounts/:id/trial` | Platform admin: end support trial |
+| POST | `/api/admin/accounts/:id/invalidate-sessions` | Platform admin: sign out everywhere for tenant |
+| POST | `/api/admin/accounts/:id/api-keys/:keyId/revoke` | Platform admin: revoke dock key |
 | POST | `/api/api-keys` | Create API key (tier-limited) |
 | GET | `/api/api-keys/:keyId` | View API key plaintext (account owner) |
 | DELETE | `/api/api-keys/:keyId` | Revoke API key (kicks connected dock) |

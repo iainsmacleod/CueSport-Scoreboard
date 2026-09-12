@@ -263,6 +263,14 @@ async function run() {
     assert('GET /api/me with dev token', me.ok && me.body.account?.email === devAccountEmail);
     assert('GET /api/me includes quota', !!me.body.quota?.limits?.maxApiKeys);
     assert('GET /api/me includes room_cleanup config', !!me.body.room_cleanup?.grace_ms);
+    assert(
+      'GET /api/me includes is_platform_admin boolean',
+      typeof me.body.is_platform_admin === 'boolean'
+    );
+    assert(
+      'GET /api/me includes trial_ends_at',
+      me.body.account && Object.prototype.hasOwnProperty.call(me.body.account, 'trial_ends_at')
+    );
     const accountId = me.body.account?.id;
 
     // Free seats/rooms from prior smoke runs so this account is under tier caps.
@@ -1707,6 +1715,214 @@ async function run() {
         );
       } catch (e) {
         assert('Stats survive room delete', false, e.message);
+      }
+    }
+
+    // --- Platform admin + support trial / Stripe access gate ---
+    {
+      const { hasCloudSubscriptionAccess } = await import('../src/lib/subscription-access.js');
+      assert(
+        'Access gate: active allowed',
+        hasCloudSubscriptionAccess({ subscription_status: 'active', trial_ends_at: null })
+      );
+      assert(
+        'Access gate: trialing allowed',
+        hasCloudSubscriptionAccess({ subscription_status: 'trialing', trial_ends_at: null })
+      );
+      assert(
+        'Access gate: inactive blocked',
+        !hasCloudSubscriptionAccess({ subscription_status: 'inactive', trial_ends_at: null })
+      );
+      const future = new Date(Date.now() + 86400000).toISOString();
+      const past = new Date(Date.now() - 86400000).toISOString();
+      assert(
+        'Access gate: admin support trial unlocks inactive',
+        hasCloudSubscriptionAccess({ subscription_status: 'inactive', trial_ends_at: future })
+      );
+      assert(
+        'Access gate: expired support trial blocked',
+        !hasCloudSubscriptionAccess({ subscription_status: 'inactive', trial_ends_at: past })
+      );
+
+      const adminUnauth = await fetchJson('/api/admin/accounts');
+      assert('GET /api/admin/accounts unauthorized', adminUnauth.status === 401);
+
+      const meAdmin = await fetchJson('/api/me', {
+        headers: { Authorization: `Bearer ${tokenFresh}` },
+      });
+      const isAdmin = !!meAdmin.body.is_platform_admin;
+      assert('is_platform_admin reflects allowlist', typeof isAdmin === 'boolean');
+
+      if (!isAdmin) {
+        const denied = await fetchJson('/api/admin/accounts', {
+          headers: { Authorization: `Bearer ${tokenFresh}` },
+        });
+        assert(
+          'Non-admin GET /api/admin/accounts 403',
+          denied.status === 403,
+          `${denied.status} ${JSON.stringify(denied.body)}`
+        );
+        const deniedTrial = await fetchJson(`/api/admin/accounts/${accountId}/trial`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${tokenFresh}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ days: 7 }),
+        });
+        assert('Non-admin POST trial 403', deniedTrial.status === 403);
+      } else {
+        const listed = await fetchJson('/api/admin/accounts', {
+          headers: { Authorization: `Bearer ${tokenFresh}` },
+        });
+        assert(
+          'Admin GET /api/admin/accounts',
+          listed.ok && Array.isArray(listed.body.accounts),
+          JSON.stringify(listed.body)
+        );
+        assert(
+          'Admin list includes self',
+          (listed.body.accounts || []).some((a) => a.id === accountId)
+        );
+        const detail = await fetchJson(`/api/admin/accounts/${accountId}`, {
+          headers: { Authorization: `Bearer ${tokenFresh}` },
+        });
+        assert(
+          'Admin GET account detail',
+          detail.ok && detail.body.account?.id === accountId && detail.body.quota?.limits,
+          JSON.stringify(detail.body)
+        );
+        const adminStats = await fetchJson(`/api/admin/accounts/${accountId}/stats`, {
+          headers: { Authorization: `Bearer ${tokenFresh}` },
+        });
+        assert(
+          'Admin GET account stats',
+          adminStats.ok && Array.isArray(adminStats.body.players),
+          JSON.stringify(adminStats.body)
+        );
+        const grant = await fetchJson(`/api/admin/accounts/${accountId}/trial`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${tokenFresh}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ days: 7 }),
+        });
+        assert(
+          'Admin grant support trial',
+          grant.ok && !!grant.body.trial_ends_at,
+          JSON.stringify(grant.body)
+        );
+        const badDays = await fetchJson(`/api/admin/accounts/${accountId}/trial`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${tokenFresh}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ days: 999 }),
+        });
+        assert('Admin trial days clamped 400', badDays.status === 400);
+        const endTrial = await fetchJson(`/api/admin/accounts/${accountId}/trial`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${tokenFresh}` },
+        });
+        assert('Admin end support trial', endTrial.ok && endTrial.body.trial_ends_at == null);
+      }
+
+      // WS subscription gate: inactive + support trial / trialing (mutate SQLite, restore after)
+      if (accountId && apiKey) {
+        let gateRoomId = roomId;
+        let gateDock = null;
+        try {
+          // Prefer a fresh dock room — earlier tests may have deleted roomId.
+          gateDock = await wsJoin({
+            client: 'dock',
+            apiKey,
+            instanceId: `admin-gate-${Date.now()}`,
+          });
+          gateRoomId = gateDock.data.room_id;
+        } catch (e) {
+          assert('Dock ready for subscription gate tests', false, e.message);
+          gateRoomId = null;
+        }
+        if (gateRoomId) {
+          const db = new Database(SQLITE_PATH);
+          const before = db.prepare(
+            'SELECT subscription_status, trial_ends_at FROM accounts WHERE id = ?'
+          ).get(accountId);
+          try {
+            db.prepare(
+              `UPDATE accounts SET subscription_status = 'inactive', trial_ends_at = NULL WHERE id = ?`
+            ).run(accountId);
+            try {
+              await wsJoin({ roomId: gateRoomId, client: 'mobile', accessToken: tokenFresh });
+              assert('Inactive blocks mobile join', false, 'should have failed');
+            } catch (e) {
+              assert(
+                'Inactive blocks mobile join',
+                e.code === 'subscription_required' || /subscription/i.test(e.message),
+                e.message
+              );
+            }
+
+            const trialIso = new Date(Date.now() + 2 * 86400000).toISOString();
+            db.prepare(
+              `UPDATE accounts SET trial_ends_at = ? WHERE id = ?`
+            ).run(trialIso, accountId);
+            try {
+              const unlocked = await wsJoin({
+                roomId: gateRoomId,
+                client: 'mobile',
+                accessToken: tokenFresh,
+              });
+              assert('Support trial unlocks mobile', !!unlocked.data?.room_id);
+              unlocked.ws.close();
+              await sleep(80);
+            } catch (e) {
+              assert('Support trial unlocks mobile', false, e.message);
+            }
+
+            const expiredIso = new Date(Date.now() - 86400000).toISOString();
+            db.prepare(
+              `UPDATE accounts SET trial_ends_at = ? WHERE id = ?`
+            ).run(expiredIso, accountId);
+            try {
+              await wsJoin({ roomId: gateRoomId, client: 'mobile', accessToken: tokenFresh });
+              assert('Expired support trial blocks mobile', false, 'should have failed');
+            } catch (e) {
+              assert(
+                'Expired support trial blocks mobile',
+                e.code === 'subscription_required' || /subscription/i.test(e.message),
+                e.message
+              );
+            }
+
+            db.prepare(
+              `UPDATE accounts SET subscription_status = 'trialing', trial_ends_at = NULL WHERE id = ?`
+            ).run(accountId);
+            try {
+              const trialing = await wsJoin({
+                roomId: gateRoomId,
+                client: 'mobile',
+                accessToken: tokenFresh,
+              });
+              assert('Stripe trialing unlocks mobile', !!trialing.data?.room_id);
+              trialing.ws.close();
+              await sleep(80);
+            } catch (e) {
+              assert('Stripe trialing unlocks mobile', false, e.message);
+            }
+          } finally {
+            db.prepare(
+              `UPDATE accounts SET subscription_status = ?, trial_ends_at = ? WHERE id = ?`
+            ).run(before?.subscription_status || 'active', before?.trial_ends_at ?? null, accountId);
+            db.close();
+          }
+        }
+        if (gateDock?.ws) {
+          try { gateDock.ws.close(); } catch { /* ignore */ }
+          await sleep(80);
+        }
       }
     }
   }

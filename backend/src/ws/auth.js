@@ -2,6 +2,7 @@ import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { createClient } from '@supabase/supabase-js';
 import { config } from '../config.js';
 import { isDevAuthConfigured, resolveDevAccountFromToken } from '../dev-auth.js';
+import { hasCloudSubscriptionAccess } from '../lib/subscription-access.js';
 import * as sqlite from '../db/sqlite.js';
 
 let supabase = null;
@@ -45,7 +46,7 @@ function sessionsInvalidated(account, jwtIssuedAtSec) {
 }
 
 function subscriptionRequired(client, account) {
-  if (account.subscription_status === 'active') return null;
+  if (hasCloudSubscriptionAccess(account)) return null;
   if (client === 'mobile' || client === 'mobile_guest') {
     return { error: 'subscription_required', message: 'Mobile control requires an active CueSport Cloud subscription' };
   }

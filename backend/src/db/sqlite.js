@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS accounts (
   stripe_customer_id TEXT,
   subscription_status TEXT NOT NULL DEFAULT 'active',
   subscription_tier TEXT NOT NULL DEFAULT 'starter',
+  trial_ends_at TEXT,
   sessions_invalid_after TEXT,
   session_epoch INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -128,6 +129,9 @@ function ensureAccountColumns(database) {
   }
   if (!cols.has('session_epoch')) {
     database.exec('ALTER TABLE accounts ADD COLUMN session_epoch INTEGER NOT NULL DEFAULT 1');
+  }
+  if (!cols.has('trial_ends_at')) {
+    database.exec('ALTER TABLE accounts ADD COLUMN trial_ends_at TEXT');
   }
 }
 
@@ -379,7 +383,7 @@ export function findAccountByApiKey(plaintextKey) {
   const keys = database.prepare(
     `SELECT ak.id AS key_id, ak.key_hash, ak.account_id, ak.role,
             a.email, a.subscription_status, a.subscription_tier,
-            a.sessions_invalid_after, a.session_epoch
+            a.trial_ends_at, a.sessions_invalid_after, a.session_epoch
      FROM api_keys ak
      JOIN accounts a ON a.id = ak.account_id
      WHERE ak.revoked_at IS NULL`
@@ -392,6 +396,7 @@ export function findAccountByApiKey(plaintextKey) {
           email: row.email,
           subscription_status: row.subscription_status,
           subscription_tier: row.subscription_tier,
+          trial_ends_at: row.trial_ends_at || null,
           sessions_invalid_after: row.sessions_invalid_after,
           session_epoch: row.session_epoch,
         },
@@ -541,6 +546,96 @@ export function invalidateAllSessions(accountId) {
          session_epoch = COALESCE(session_epoch, 1) + 1
      WHERE id = ?`
   ).run(accountId);
+  return getAccountById(accountId);
+}
+
+const ADMIN_ACCOUNT_SELECT = `
+  SELECT a.id, a.email, a.created_at, a.subscription_status, a.subscription_tier,
+         a.trial_ends_at, a.stripe_customer_id, a.session_epoch, a.sessions_invalid_after,
+         (SELECT COUNT(*) FROM api_keys ak WHERE ak.account_id = a.id AND ak.revoked_at IS NULL) AS api_key_count,
+         (SELECT COUNT(*) FROM rooms r WHERE r.account_id = a.id) AS room_count,
+         (SELECT COUNT(*) FROM room_guest_tokens g WHERE g.account_id = a.id AND g.revoked_at IS NULL) AS guest_link_count,
+         (SELECT MAX(d.last_seen_at) FROM room_docks d WHERE d.account_id = a.id) AS last_dock_seen_at
+  FROM accounts a
+`;
+
+export function listAccountsForAdmin({ q = '', limit = 100 } = {}) {
+  const database = getDb();
+  const cap = Math.min(Math.max(parseInt(limit, 10) || 100, 1), 500);
+  const needle = String(q || '').trim().toLowerCase();
+  const rows = needle
+    ? database.prepare(
+      `${ADMIN_ACCOUNT_SELECT}
+       WHERE lower(a.email) LIKE ?
+       ORDER BY a.created_at DESC
+       LIMIT ?`
+    ).all(`%${needle}%`, cap)
+    : database.prepare(
+      `${ADMIN_ACCOUNT_SELECT}
+       ORDER BY a.created_at DESC
+       LIMIT ?`
+    ).all(cap);
+  return rows.map(mapAdminAccountRow);
+}
+
+function mapAdminAccountRow(row) {
+  return {
+    id: row.id,
+    email: row.email,
+    created_at: row.created_at,
+    subscription_status: row.subscription_status,
+    subscription_tier: row.subscription_tier,
+    trial_ends_at: row.trial_ends_at || null,
+    stripe_customer_id: row.stripe_customer_id || null,
+    session_epoch: row.session_epoch,
+    sessions_invalid_after: row.sessions_invalid_after || null,
+    api_key_count: Number(row.api_key_count) || 0,
+    room_count: Number(row.room_count) || 0,
+    guest_link_count: Number(row.guest_link_count) || 0,
+    last_activity_at: row.last_dock_seen_at || null,
+  };
+}
+
+export function getAccountAdminDetail(accountId) {
+  const database = getDb();
+  const row = database.prepare(
+    `${ADMIN_ACCOUNT_SELECT} WHERE a.id = ?`
+  ).get(accountId);
+  if (!row) return null;
+  const account = mapAdminAccountRow(row);
+  const rooms = database.prepare(
+    `SELECT r.id, r.label, r.created_at,
+            d.api_key_id, d.label AS dock_label, d.last_seen_at,
+            (SELECT COUNT(*) FROM room_guest_tokens g
+             WHERE g.room_id = r.id AND g.revoked_at IS NULL) AS guest_link_count
+     FROM rooms r
+     LEFT JOIN room_docks d ON d.room_id = r.id
+     WHERE r.account_id = ?
+     ORDER BY r.created_at`
+  ).all(accountId).map((r) => ({
+    id: r.id,
+    label: r.label,
+    created_at: r.created_at,
+    api_key_id: r.api_key_id || null,
+    dock_label: r.dock_label || null,
+    last_seen_at: r.last_seen_at || null,
+    guest_link_count: Number(r.guest_link_count) || 0,
+  }));
+  const apiKeys = getApiKeysForAccount(accountId);
+  return {
+    ...account,
+    rooms,
+    api_keys: apiKeys,
+  };
+}
+
+/** Set or clear admin support trial end time (ISO / SQLite datetime string, or null). */
+export function setAccountTrialEndsAt(accountId, trialEndsAt) {
+  const existing = getAccountById(accountId);
+  if (!existing) return null;
+  getDb().prepare(
+    `UPDATE accounts SET trial_ends_at = ? WHERE id = ?`
+  ).run(trialEndsAt || null, accountId);
   return getAccountById(accountId);
 }
 

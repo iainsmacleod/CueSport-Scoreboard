@@ -27,6 +27,14 @@ export const config = {
   devAuthSecret: process.env.DEV_AUTH_SECRET || '',
   devAuthAccountEmail: (process.env.DEV_AUTH_ACCOUNT_EMAIL || '').trim(),
   tierDefault: process.env.TIER_DEFAULT || '',
+  /**
+   * Comma-separated Google account emails allowed to use /api/admin and the Admin dashboard tab.
+   * Compared case-insensitively to accounts.email.
+   */
+  platformAdminEmails: String(process.env.PLATFORM_ADMIN_EMAILS || '')
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean),
   /** After last dock leaves a room, wait this long before deleting the room row. */
   roomCleanupGraceMs: parseEnvMs(process.env.ROOM_CLEANUP_GRACE_MS, 45 * 60 * 1000),
   /** Delete mapped rooms whose last_seen_at is older than this (even if grace already passed). */

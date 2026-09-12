@@ -308,7 +308,7 @@ The OBS **dock remains the scoring authority**. Mobile and guest clients send co
 
 | Surface | URL | Purpose |
 |---------|-----|---------|
-| **Dashboard** | `/dashboard` | Sign in, see live tables, API keys, open mobile control |
+| **Dashboard** | `/dashboard` | Sign in, see live tables, API keys, open mobile control; platform admins (env allowlist) also get an **Admin** tab for support trials and tenant ops |
 | **Mobile control** | `/m/{room_id}` | Full remote (account owner): score, balls, setup, **Stream** (OBS start/stop + overlay P1/P2/H2H when Ball Scoring is on), Share |
 | **Guest control** | `/g/{token}` | Limited remote: score with the same action balls as the dock for that game (foul / undo; free ball on Snooker; respot on Bank / One Pocket), breaker, game type and its options (ball variant, win on break / early game, golden ball, point based), race, event info, and **Restart/End/Call Match** — no names. Standard guests have no Stream/Share; **OBS Dock Owner** guest links also get Stream + Share. **One active device per guest link** at a time (link stays valid until revoked). |
 | **Stream listing** | `/` or `/streams` | Public page of promoted live streams (requires Cloud + Promote toggle + OBS live + stream URL) |
@@ -356,7 +356,8 @@ See [`backend/README.md`](backend/README.md) for Supabase/Google OAuth productio
 |---|--------|-----------|
 | Auth | Google for account + OBS Dock Key per dock | Dev secret on dashboard; OBS Dock Key + server URL in dock Connection settings → Self-hosting |
 | Backend | `cuesports.macleod.systems` | Your own `backend/` deployment |
-| Cost | Optional paid tier (later) | Free (you run the server) |
+| Cost | Optional paid tier via Stripe (later); platform admins can grant a time-boxed **support trial** | Free (you run the server) |
+| Platform admin | `PLATFORM_ADMIN_EMAILS` allowlist → Admin tab + `/api/admin/*` | Usually unused; same env var works if you want it |
 
 ---
 
