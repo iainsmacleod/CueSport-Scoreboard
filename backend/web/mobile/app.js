@@ -6,7 +6,7 @@ import {
   revokeGuestLink,
   fetchPlayers,
   GAME_TYPES,
-} from '../shared/cloud-client.js?v=8.0.0.3';
+} from '../shared/cloud-client.js?v=8.0.0.8';
 import {
   parseRaceTarget,
   isRaceLocked,
@@ -21,6 +21,8 @@ let lastState = {};
 let raceDirty = false;
 let gameInfoDirty = false;
 let dockPresent = false;
+/** Last known dock presence — kept during soft reconnect grace so controls can queue. */
+let softDockPresent = false;
 /** Keep trying to stay joined (admin or guest) until sign-out / revoke. */
 let wantConnection = false;
 let reconnectTimer = null;
@@ -514,10 +516,11 @@ function setConnectionStatus(kind) {
   const map = {
     connected: 'Connected',
     waiting: 'Waiting for dock',
+    reconnecting: 'Reconnecting…',
     disconnected: 'Disconnected',
   };
   const label = map[kind] || map.disconnected;
-  el.classList.remove('connected', 'waiting', 'disconnected');
+  el.classList.remove('connected', 'waiting', 'disconnected', 'reconnecting');
   el.classList.add(map[kind] ? kind : 'disconnected');
   el.title = label;
   el.setAttribute('aria-label', label);
@@ -526,6 +529,15 @@ function setConnectionStatus(kind) {
 
 function connectionIsOpen() {
   return !!(client && typeof client.isOpen === 'function' && client.isOpen());
+}
+
+function connectionIsReconnecting() {
+  return !!(client && typeof client.isReconnecting === 'function' && client.isReconnecting());
+}
+
+function connectionIsUsable() {
+  if (client && typeof client.isUsable === 'function') return !!client.isUsable();
+  return connectionIsOpen();
 }
 
 function clearReconnectTimer() {
@@ -602,9 +614,12 @@ function ensureConnection(options = {}) {
   reconnectQuiet({ force: true }).catch(() => {});
 }
 
-/** Controls require a live cloud socket AND a dock in the room. */
+/** Controls require a live cloud socket AND a dock in the room.
+ *  During soft reconnect grace, allow queuing when the dock was recently present. */
 function controlsEnabled() {
-  return !!(connectionIsOpen() && dockPresent);
+  if (connectionIsOpen() && dockPresent) return true;
+  if (connectionIsReconnecting() && softDockPresent) return true;
+  return false;
 }
 
 function updateControlsLock() {
@@ -626,11 +641,46 @@ function wireClientLifecycle(c) {
   c.on('presence', (clients) => {
     if (client !== c) return;
     dockPresent = (clients || []).includes('dock');
+    softDockPresent = dockPresent;
     setConnectionStatus(dockPresent ? 'connected' : 'waiting');
   });
-  c.on('close', () => {
+  c.on('connection', (detail) => {
+    if (client !== c) return;
+    if (detail && detail.reconnecting) {
+      setConnectionStatus('reconnecting');
+      setReconnectBanner(true, 'Cloud reconnecting…');
+      updateControlsLock();
+      return;
+    }
+    if (detail && detail.connected) {
+      setReconnectBanner(false);
+      setConnectionStatus(dockPresent || softDockPresent ? 'connected' : 'waiting');
+      updateControlsLock();
+      return;
+    }
+    if (detail && !detail.usable) {
+      softDockPresent = false;
+      if (!connectionIsOpen()) {
+        setConnectionStatus('disconnected');
+        if (wantConnection) {
+          setReconnectBanner(true, 'Connection lost — tap Reconnect');
+        }
+      }
+      updateControlsLock();
+    }
+  });
+  c.on('close', (info) => {
     if (client !== c) return;
     dockPresent = false;
+    const reconnecting = !!(info && info.reconnecting) || connectionIsReconnecting();
+    if (reconnecting && wantConnection) {
+      setConnectionStatus('reconnecting');
+      setReconnectBanner(true, 'Cloud reconnecting…');
+      scheduleReconnect();
+      updateControlsLock();
+      return;
+    }
+    softDockPresent = false;
     setConnectionStatus('disconnected');
     if (wantConnection) {
       setReconnectBanner(true, 'Connection lost — tap Reconnect');
@@ -1703,7 +1753,8 @@ function syncReplayPanel(state) {
   const monitoring = !!state.monitoringActive;
   const replayPlaying = !!state.replayPlaybackActive;
   const streaming = state.obsStreaming === true;
-  const replayControlsEnabled = state.replayControlsEnabled === true || monitoring;
+  // Dock already folds active monitoring into replayControlsEnabled.
+  const replayControlsEnabled = state.replayControlsEnabled === true;
   // Monitoring implies OBS was usable; don't hide clips if obsConnected lagged false.
   const obsConnected = state.obsConnected === true || monitoring || replayPlaying || streaming;
   const clips = Array.isArray(state.replayClips)
@@ -1760,10 +1811,14 @@ function syncReplayPanel(state) {
 
   const instantBtn = document.getElementById('instantReplayBtn');
   if (instantBtn) {
-    // Match control_panel: Instant Replay is tied to monitoring, hidden while a clip plays
-    // (monitoring was stopped for playback).
-    instantBtn.classList.toggle('hidden', !monitoring || replayPlaying);
-    instantBtn.disabled = !monitoring || replayPlaying;
+    // Keep Instant Replay visible once unlocked; only hide while a historic clip plays
+    // (same moment the dock shows "Replay Active" and Instant Replay is unavailable).
+    const canInstant = monitoring && !replayPlaying;
+    instantBtn.classList.remove('hidden');
+    instantBtn.disabled = !canInstant;
+    instantBtn.title = replayPlaying
+      ? 'Unavailable while a replay is playing'
+      : (monitoring ? 'Save and play Instant Replay' : 'Start Monitor Game first');
   }
 
   const clipsRow = document.getElementById('replayClipsRow');
@@ -2086,6 +2141,7 @@ function syncSaveIcons() {
 }
 
 function controlLockMessage() {
+  if (connectionIsReconnecting()) return 'Cloud reconnecting — commands will queue briefly';
   if (!connectionIsOpen()) return 'Not connected to cloud — controls are paused';
   if (!dockPresent) return 'Waiting for dock — controls are paused';
   return 'Controls are paused';
@@ -2106,6 +2162,9 @@ function sendCmd(action, payload) {
     if (action === 'set_point_based') clearPendingSetup('pointBased');
     if (action === 'set_ball_selection') clearPendingSetup('ballSelection');
     return false;
+  }
+  if (connectionIsReconnecting()) {
+    setError('Queued — reconnecting…');
   }
   return true;
 }
@@ -2571,7 +2630,16 @@ function wireCommands() {
           el.disabled = false;
           return;
         }
-        setTimeout(() => syncReplayPanel(lastState || {}), 4000);
+        // Optimistic UI so Disable collapses immediately; dock state reconciles shortly after.
+        lastState = Object.assign({}, lastState || {}, {
+          replayControlsEnabled: enable,
+          monitoringActive: enable ? !!(lastState && lastState.monitoringActive) : false,
+        });
+        syncReplayPanel(lastState);
+        setTimeout(() => {
+          el.disabled = false;
+          syncReplayPanel(lastState || {});
+        }, 4000);
         return;
       }
       sendCmd(cmd, payload);
@@ -2654,6 +2722,8 @@ async function connectGuestSession({ quiet, isCurrent }) {
     syncReplayNavVisibility(joined.state || lastState || {});
     setConnectionStatus(dockPresent ? 'connected' : 'waiting');
     reconnectAttempt = 0;
+    setReconnectBanner(false);
+    setError('');
     if (connectionIsOpen()) setReconnectBanner(false);
     else setReconnectBanner(true, 'Connection lost — tap Reconnect');
   } catch (err) {
@@ -2767,6 +2837,8 @@ async function connectAuthenticatedSession({ quiet, isCurrent }) {
     }
     setConnectionStatus(dockPresent ? 'connected' : 'waiting');
     reconnectAttempt = 0;
+    setReconnectBanner(false);
+    setError('');
     if (connectionIsOpen()) setReconnectBanner(false);
     else {
       setReconnectBanner(true, 'Connection lost — tap Reconnect');

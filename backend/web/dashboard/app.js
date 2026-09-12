@@ -18,7 +18,7 @@ import {
   invalidateAllSessions,
   revokeAllGuestLinks,
   GAME_TYPES,
-} from '../shared/cloud-client.js?v=8.0.0.7';
+} from '../shared/cloud-client.js?v=8.0.0.8';
 import {
   computeDurationSeconds,
   formatDurationSeconds,

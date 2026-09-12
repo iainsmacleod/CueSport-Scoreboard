@@ -215,13 +215,17 @@
         return payload;
     }
 
-    /** Cloud toggle is on but WS join is not finished — local vs cloud stats are in flux. */
+    /** Cloud toggle is on but WS join is not finished and grace has expired — local vs cloud stats are in flux. */
     function isCloudStatsTransient() {
-        return !!(window.cloudRelay &&
+        if (!(window.cloudRelay &&
             typeof window.cloudRelay.isEnabled === 'function' &&
-            window.cloudRelay.isEnabled() &&
-            typeof window.cloudRelay.isConnected === 'function' &&
-            !window.cloudRelay.isConnected());
+            window.cloudRelay.isEnabled())) {
+            return false;
+        }
+        if (typeof window.cloudRelay.isUsableForTabs === 'function') {
+            return !window.cloudRelay.isUsableForTabs();
+        }
+        return typeof window.cloudRelay.isConnected === 'function' && !window.cloudRelay.isConnected();
     }
 
     function isStatsTabAvailable() {
@@ -237,6 +241,10 @@
             tab.setAttribute('aria-disabled', pending ? 'true' : 'false');
             if (pending) {
                 tab.title = 'Stats unlocks when CueSport Cloud finishes connecting';
+            } else if (window.cloudRelay &&
+                typeof window.cloudRelay.isReconnecting === 'function' &&
+                window.cloudRelay.isReconnecting()) {
+                tab.title = 'Cloud reconnecting…';
             } else {
                 tab.removeAttribute('title');
             }
@@ -255,11 +263,21 @@
 
     /** True when cloud relay is enabled and connected — stats should come from backend. */
     function isCloudStatsMode() {
-        return !!(window.cloudRelay &&
-            typeof window.cloudRelay.isConnected === 'function' &&
-            window.cloudRelay.isConnected() &&
+        if (!(window.cloudRelay &&
             typeof window.cloudRelay.isEnabled === 'function' &&
-            window.cloudRelay.isEnabled());
+            window.cloudRelay.isEnabled())) {
+            return false;
+        }
+        if (typeof window.cloudRelay.isConnected === 'function' && window.cloudRelay.isConnected()) {
+            return true;
+        }
+        // Soft reconnect grace: keep cloud UI + last cache instead of flipping to local IndexedDB.
+        if (typeof window.cloudRelay.isUsableForTabs === 'function' &&
+            window.cloudRelay.isUsableForTabs() &&
+            cloudStatsCache) {
+            return true;
+        }
+        return false;
     }
 
     /** While Cloud is connected, do not dual-write career stats into IndexedDB. */
@@ -315,7 +333,9 @@
         if (!window.cloudRelay) return { players: [], matches: [] };
 
         var wsErrMsg = '';
-        if (typeof window.cloudRelay.requestStats === 'function' && isCloudStatsMode()) {
+        if (typeof window.cloudRelay.requestStats === 'function' &&
+            typeof window.cloudRelay.isConnected === 'function' &&
+            window.cloudRelay.isConnected()) {
             try {
                 const payload = await window.cloudRelay.requestStats(5000);
                 const result = scrubCloudStatsStraightRacks({
@@ -331,6 +351,10 @@
                 wsErrMsg = wsErr && wsErr.message ? String(wsErr.message) : 'WebSocket stats failed';
                 console.warn('fetchCloudStats via WebSocket failed, trying HTTP:', wsErr);
             }
+        } else if (cloudStatsCache &&
+            typeof window.cloudRelay.isUsableForTabs === 'function' &&
+            window.cloudRelay.isUsableForTabs()) {
+            return cloudStatsCache;
         }
 
         const serverUrl = (window.cloudRelay.getServerUrl() || '').replace(/\/$/, '');
@@ -8213,8 +8237,12 @@
     window.confirmDeletePlayer = confirmDeletePlayer;
 
     // Refresh stats UI when cloud connection state changes
-    function onCloudStateChange() {
-        invalidateCloudStatsCache();
+    function onCloudStateChange(event) {
+        const detail = event && event.detail ? event.detail : {};
+        // Do not drop the cloud cache during soft reconnect grace.
+        if (!(detail.reconnecting || (detail.usable && !detail.connected))) {
+            invalidateCloudStatsCache();
+        }
         updateStatsTabAvailability();
         var cloud = isCloudStatsMode();
         updateStatsActionButtons(cloud);

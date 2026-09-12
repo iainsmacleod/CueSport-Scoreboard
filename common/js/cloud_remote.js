@@ -6,6 +6,33 @@
  */
 (function () {
     const OWNER_LABEL = 'OBS Dock Owner';
+    const REMOTE_TITLE_BY_ROLE = {
+        administrator: 'Administrator Control',
+        trusted_operator: 'Trusted Operator Control',
+        operator: 'Operator Control',
+    };
+    const REMOTE_TITLE_FALLBACK = 'Guest control';
+    const REMOTE_HELP_BY_ROLE = {
+        administrator:
+            'As Administrator on this Dock Key, use Remote to hand off table control from a phone instead of the OBS machine. ' +
+            'Share the default OBS Dock Owner link with someone who should have elevated remote access — scoring plus Stream and Share, and managing guest links. ' +
+            'Create named guest links for helpers who only need scoring (no names, Stream, or Share). ' +
+            'One device per link; QR and URL stay hidden until Show.',
+        trusted_operator:
+            'As Trusted Operator on this Dock Key, use Remote to run this table from a phone instead of the OBS machine. ' +
+            'Use the default OBS Dock Owner link for someone who should have full remote control (scoring, Stream, Share, and guest-link management). ' +
+            'Create named guest links for helpers who only need scoring — no names, Stream, or Share. ' +
+            'One device per link; QR and URL stay hidden until Show.',
+        operator:
+            'As Operator on this Dock Key, this Remote tab lets you connect from a phone so you do not have to oversee the game from the OBS machine. ' +
+            'Share the default OBS Dock Owner link for elevated remote control (scoring, Stream, and Share). ' +
+            'Operator keys cannot create additional guest links. ' +
+            'One device per link; QR and URL stay hidden until Show.',
+    };
+    const REMOTE_HELP_FALLBACK =
+        'Share guest links for this table. The default OBS Dock Owner link is for elevated remote control (scoring, Stream, Share). ' +
+        'Named guest links are for scorers only — no names, Stream, or Share. ' +
+        'One device per link; QR and URL stay hidden until Show.';
     let refreshTimer = null;
     let selectedToken = '';
     let selectedUrl = '';
@@ -14,9 +41,13 @@
     let cachedLinks = [];
 
     function isRemoteTabAvailable() {
-        return !!(window.cloudRelay &&
-            typeof window.cloudRelay.isConnected === 'function' &&
-            window.cloudRelay.isConnected());
+        if (!(window.cloudRelay && typeof window.cloudRelay.isEnabled === 'function' && window.cloudRelay.isEnabled())) {
+            return false;
+        }
+        if (typeof window.cloudRelay.isUsableForTabs === 'function') {
+            return !!window.cloudRelay.isUsableForTabs();
+        }
+        return !!(typeof window.cloudRelay.isConnected === 'function' && window.cloudRelay.isConnected());
     }
 
     function canManageExtraGuestLinks() {
@@ -24,6 +55,53 @@
             ? window.cloudRelay.getPermissions()
             : null;
         return !!(perms && perms.canCreateGuestLinks);
+    }
+
+    function currentDockRole() {
+        const role = window.cloudRelay && typeof window.cloudRelay.getRole === 'function'
+            ? window.cloudRelay.getRole()
+            : null;
+        return role ? String(role) : '';
+    }
+
+    function updateRemoteSectionTitle() {
+        const el = document.getElementById('cloudRemoteSectionHeader');
+        if (!el) return;
+        const role = currentDockRole();
+        if (REMOTE_TITLE_BY_ROLE[role]) {
+            el.textContent = REMOTE_TITLE_BY_ROLE[role];
+            return;
+        }
+        if (canManageExtraGuestLinks()) {
+            el.textContent = REMOTE_TITLE_BY_ROLE.trusted_operator;
+            return;
+        }
+        if (isRemoteTabAvailable()) {
+            el.textContent = REMOTE_TITLE_BY_ROLE.operator;
+            return;
+        }
+        el.textContent = REMOTE_TITLE_FALLBACK;
+    }
+
+    function updateRemoteHelpCopy() {
+        updateRemoteSectionTitle();
+        const el = document.getElementById('cloudRemoteHelp');
+        if (!el) return;
+        const role = currentDockRole();
+        if (REMOTE_HELP_BY_ROLE[role]) {
+            el.textContent = REMOTE_HELP_BY_ROLE[role];
+            return;
+        }
+        // Connected but role not yet known — still explain Owner vs named guests.
+        if (canManageExtraGuestLinks()) {
+            el.textContent = REMOTE_HELP_BY_ROLE.trusted_operator;
+            return;
+        }
+        if (isRemoteTabAvailable()) {
+            el.textContent = REMOTE_HELP_BY_ROLE.operator;
+            return;
+        }
+        el.textContent = REMOTE_HELP_FALLBACK;
     }
 
     function cloudAuthHeaders(includeJsonContentType) {
@@ -94,8 +172,17 @@
                 selectControlPanelTab('GeneralSettings');
             }
             clearSelection();
+            updateRemoteHelpCopy();
         } else {
-            refreshRemoteTab();
+            updateRemoteHelpCopy();
+            const reconnecting = window.cloudRelay &&
+                typeof window.cloudRelay.isReconnecting === 'function' &&
+                window.cloudRelay.isReconnecting();
+            if (reconnecting) {
+                setStatus('Cloud reconnecting…');
+            } else {
+                refreshRemoteTab();
+            }
         }
     }
 
@@ -259,6 +346,7 @@
     async function refreshRemoteTab(options) {
         const opts = options || {};
         const forceHide = !!opts.forceHide;
+        updateRemoteHelpCopy();
         if (!isRemoteTabAvailable()) return;
         const rid = roomId();
         if (!rid) {
@@ -284,6 +372,7 @@
     function onRemoteTabShown() {
         linkRevealed = false;
         setLinkRevealed(false);
+        updateRemoteHelpCopy();
         refreshRemoteTab({ forceHide: true });
     }
 
@@ -384,6 +473,10 @@
             clearTimeout(refreshTimer);
             refreshTimer = setTimeout(updateRemoteTabAvailability, 50);
         });
+        window.addEventListener('cloudRelayRoleChange', function () {
+            updateRemoteHelpCopy();
+            if (isRemoteTabAvailable()) refreshRemoteTab({ forceHide: false });
+        });
         document.addEventListener('visibilitychange', function () {
             if (document.visibilityState === 'visible' && isRemoteTabVisible()) {
                 hideRemoteDetailsForPrivacy();
@@ -393,6 +486,7 @@
             if (isRemoteTabVisible()) hideRemoteDetailsForPrivacy();
         });
         setLinkRevealed(false);
+        updateRemoteHelpCopy();
         updateRemoteTabAvailability();
     }
 

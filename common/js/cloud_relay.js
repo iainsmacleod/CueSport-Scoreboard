@@ -9,9 +9,14 @@
     let ws = null;
     let reconnectTimer = null;
     let reconnectAttempts = 0;
+    let graceTimer = null;
+    let reconnectGraceUntil = 0;
     const MAX_RECONNECT_ATTEMPTS = 10;
     const INITIAL_RECONNECT_DELAY = 1000;
     const MAX_RECONNECT_DELAY = 60000;
+    /** Soft-UI grace: stay on Stats/Remote and queue outbound work during brief blips. */
+    const GRACE_MS = 10000;
+    const SESSION_QUEUE_CAP = 32;
 
     let isEnabled = false;
     let isConnected = false;
@@ -28,6 +33,10 @@
     let dockPermissions = null;
     /** request_id -> { resolve, reject, timer } for stats over WebSocket */
     const pendingStats = new Map();
+    /** Outbound session messages queued during reconnect grace (FIFO). */
+    let sessionQueue = [];
+    /** Latest state snapshot to publish after rejoin (coalesced). */
+    let pendingStateBase = null;
 
     /** Enable players, score display, and Ball Scoring when mobile/guest first joins. */
     function ensureBallScoringForMobileControl() {
@@ -538,10 +547,15 @@
                 (instantBtn && !instantBtn.classList.contains('noShow'))
             );
             state.monitoringActive = monitoringFromStorage || monitoringFromUi;
-            // Mobile Stream tab: monitoring/clips stay hidden until account owner unlocks replay controls
-            // (or monitoring is already running on the dock).
+            // Mobile Stream tab: monitoring/clips stay hidden until Enable Replay Function
+            // (or monitoring is already running on the dock). Explicit Disable wins over
+            // stale UI heuristics so the unlock section returns after Disable.
             const replayControlsStored = dockStorage('replayControlsEnabled', '');
-            state.replayControlsEnabled = replayControlsStored === 'true' || state.monitoringActive;
+            if (replayControlsStored === 'false') {
+                state.replayControlsEnabled = false;
+            } else {
+                state.replayControlsEnabled = replayControlsStored === 'true' || state.monitoringActive;
+            }
             state.replayPlaybackActive = typeof isReplayPlaybackActive === 'boolean'
                 ? !!isReplayPlaybackActive
                 : /replay\s*active/i.test((document.getElementById('btnMonitorGame') || {}).textContent || '');
@@ -676,7 +690,13 @@
     }
 
     async function sendState(baseState) {
-        if (!isJoined) return false;
+        if (!isJoined) {
+            if (isCloudReconnecting()) {
+                pendingStateBase = baseState || collectDockScoreSnapshot();
+                return true;
+            }
+            return false;
+        }
         const localGen = ++sendStateGeneration;
         const state = await collectExtendedGameState(baseState);
         // Drop superseded publishes when a newer sendState started.
@@ -694,14 +714,84 @@
     }
 
     function sendSession(action, payload) {
-        if (!isJoined) return false;
-        return sendRaw({
+        const msg = {
             type: 'session',
             room_id: getRoomId(),
             action: action,
             payload: payload || {},
             ts: new Date().toISOString(),
-        });
+        };
+        if (isJoined) return sendRaw(msg);
+        if (isCloudReconnecting()) {
+            enqueueSession(msg);
+            return true;
+        }
+        return false;
+    }
+
+    function clearOutboundQueues() {
+        sessionQueue = [];
+        pendingStateBase = null;
+    }
+
+    function enqueueSession(msg) {
+        sessionQueue.push(msg);
+        while (sessionQueue.length > SESSION_QUEUE_CAP) {
+            sessionQueue.shift();
+        }
+    }
+
+    function flushOutboundQueues() {
+        if (!isJoined) return;
+        const sessions = sessionQueue.slice();
+        sessionQueue = [];
+        for (let i = 0; i < sessions.length; i++) {
+            const msg = sessions[i];
+            msg.room_id = getRoomId() || msg.room_id;
+            sendRaw(msg);
+        }
+        if (pendingStateBase) {
+            const base = pendingStateBase;
+            pendingStateBase = null;
+            sendState(base);
+        }
+    }
+
+    function clearGraceTimer() {
+        if (graceTimer) {
+            clearTimeout(graceTimer);
+            graceTimer = null;
+        }
+        reconnectGraceUntil = 0;
+    }
+
+    function beginReconnectGrace() {
+        reconnectGraceUntil = Date.now() + GRACE_MS;
+        if (graceTimer) clearTimeout(graceTimer);
+        graceTimer = setTimeout(function () {
+            graceTimer = null;
+            reconnectGraceUntil = 0;
+            // Grace expired while still disconnected — drop queued work and notify tabs.
+            if (!isJoined) {
+                clearOutboundQueues();
+                updateCloudUI();
+            }
+        }, GRACE_MS);
+    }
+
+    function endReconnectGrace(options) {
+        const dropQueues = !!(options && options.dropQueues);
+        clearGraceTimer();
+        if (dropQueues) clearOutboundQueues();
+    }
+
+    function isCloudReconnecting() {
+        return !!(isEnabled && !isBlockedByServer && !isJoined && reconnectGraceUntil > Date.now());
+    }
+
+    /** Joined, or still within soft-UI reconnect grace. */
+    function isCloudUsableForTabs() {
+        return isCloudConnected() || isCloudReconnecting();
     }
 
     /** Sync score snapshot for cloud publish — avoids awaiting OBS getStreamUrl races. */
@@ -741,7 +831,7 @@
             // Prefer direct cloud publish with sync scores. Routing through
             // streamSharing.sendUpdate() awaits OBS getStreamUrl and often drops
             // monitoring/clip updates behind in-flight score publishes.
-            if (isJoined) {
+            if (isJoined || isCloudReconnecting()) {
                 sendState(collectDockScoreSnapshot());
                 return;
             }
@@ -789,11 +879,13 @@
             ws.onclose = function () {
                 isConnected = false;
                 isJoined = false;
-                // Always refresh toggle/status — otherwise a close that drops the
-                // preceding error frame leaves the dock stuck on "Connected".
-                updateCloudUI();
-                if (isBlockedByServer) return;
+                if (isBlockedByServer) {
+                    endReconnectGrace({ dropQueues: true });
+                    updateCloudUI();
+                    return;
+                }
                 if (isEnabled && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                    beginReconnectGrace();
                     const delay = Math.min(
                         INITIAL_RECONNECT_DELAY * Math.pow(2, reconnectAttempts),
                         MAX_RECONNECT_DELAY
@@ -801,7 +893,11 @@
                     reconnectAttempts++;
                     reconnectTimer = setTimeout(connect, delay);
                     updateCloudUI();
+                    return;
                 }
+                // Reconnect budget exhausted — hard offline for tabs.
+                endReconnectGrace({ dropQueues: true });
+                updateCloudUI();
             };
         } catch (err) {
             console.error('cloudRelay connect error', err);
@@ -840,6 +936,7 @@
     function handleMessage(data) {
         if (data.type === 'joined') {
             isJoined = true;
+            endReconnectGrace({ dropQueues: false });
             if (data.room_id) setStorageItem('roomId', data.room_id);
             dockRole = data.role || null;
             dockPermissions = data.permissions || null;
@@ -847,6 +944,7 @@
             if (window.cloudCommands && typeof window.cloudCommands.initCloudCommands === 'function') {
                 window.cloudCommands.initCloudCommands();
             }
+            flushOutboundQueues();
             updateCloudUI();
             // Push authoritative dock snapshot to room (mobile + DB)
             pushDockStateSoon();
@@ -934,6 +1032,7 @@
             clearTimeout(reconnectTimer);
             reconnectTimer = null;
         }
+        endReconnectGrace({ dropQueues: true });
         if (ws) {
             try {
                 ws.onopen = null;
@@ -973,6 +1072,7 @@
             reconnectTimer = null;
         }
         reconnectAttempts = 0;
+        endReconnectGrace({ dropQueues: true });
         if (ws) {
             try { ws.onclose = null; } catch (_) { /* ignore */ }
             try { ws.onerror = null; } catch (_) { /* ignore */ }
@@ -1047,9 +1147,11 @@
     function updateCloudUI() {
         const statusEl = document.getElementById('cloudRelayStatus');
         const toggle = document.getElementById('cloudRelayToggle');
+        const reconnecting = isCloudReconnecting();
         if (statusEl) {
             if (isBlockedByServer) statusEl.textContent = 'Blocked';
             else if (isCloudConnected()) statusEl.textContent = 'Connected';
+            else if (reconnecting) statusEl.textContent = 'Reconnecting…';
             else if (isEnabled) statusEl.textContent = 'Connecting…';
             else statusEl.textContent = 'Off';
             const roomId = isCloudConnected() ? getRoomId() : '';
@@ -1060,8 +1162,16 @@
             }
         }
         if (toggle) toggle.checked = isEnabled;
-        // Notify listeners (e.g. stats) of cloud connection state change
-        try { window.dispatchEvent(new CustomEvent('cloudRelayStateChange', { detail: { connected: isCloudConnected(), enabled: isEnabled } })); } catch (_) {}
+        try {
+            window.dispatchEvent(new CustomEvent('cloudRelayStateChange', {
+                detail: {
+                    connected: isCloudConnected(),
+                    enabled: isEnabled,
+                    reconnecting: reconnecting,
+                    usable: isCloudUsableForTabs(),
+                },
+            }));
+        } catch (_) { /* ignore */ }
         if (window.streamSharing && typeof window.streamSharing.refreshUi === 'function') {
             window.streamSharing.refreshUi();
         }
@@ -1098,6 +1208,8 @@
         requestStats,
         setEnabled,
         isConnected: isCloudConnected,
+        isUsableForTabs: isCloudUsableForTabs,
+        isReconnecting: isCloudReconnecting,
         isEnabled: isCloudEnabled,
         getLastState,
         setCredentials,

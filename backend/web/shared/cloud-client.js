@@ -16,9 +16,17 @@ export class CloudClient {
       presence: [],
       close: [],
       tables: [],
+      connection: [],
     };
     this.lastState = {};
     this.connected = false;
+    /** Soft-UI grace after an unexpected drop (ms). */
+    this.graceMs = Number.isFinite(options.graceMs) ? options.graceMs : 10000;
+    this.commandQueueCap = Number.isFinite(options.commandQueueCap) ? options.commandQueueCap : 32;
+    this.commandQueue = [];
+    this.reconnectGraceUntil = 0;
+    this._graceTimer = null;
+    this._intentionalClose = false;
   }
 
   wsUrl() {
@@ -37,8 +45,78 @@ export class CloudClient {
     return !!(this.ws && this.ws.readyState === 1 && this.connected);
   }
 
+  isReconnecting() {
+    return !this.isOpen() && this.reconnectGraceUntil > Date.now();
+  }
+
+  /** Open+joined, or still within soft reconnect grace. */
+  isUsable() {
+    return this.isOpen() || this.isReconnecting();
+  }
+
+  _emitConnection() {
+    const detail = {
+      connected: this.isOpen(),
+      reconnecting: this.isReconnecting(),
+      usable: this.isUsable(),
+    };
+    (this.handlers.connection || []).forEach((fn) => {
+      try { fn(detail); } catch (_) { /* ignore */ }
+    });
+  }
+
+  _clearGraceTimer() {
+    if (this._graceTimer) {
+      clearTimeout(this._graceTimer);
+      this._graceTimer = null;
+    }
+    this.reconnectGraceUntil = 0;
+  }
+
+  _beginReconnectGrace() {
+    this.reconnectGraceUntil = Date.now() + this.graceMs;
+    if (this._graceTimer) clearTimeout(this._graceTimer);
+    this._graceTimer = setTimeout(() => {
+      this._graceTimer = null;
+      this.reconnectGraceUntil = 0;
+      if (!this.isOpen()) {
+        this.commandQueue = [];
+        this._emitConnection();
+      }
+    }, this.graceMs);
+  }
+
+  _endReconnectGrace({ dropQueue = false } = {}) {
+    this._clearGraceTimer();
+    if (dropQueue) this.commandQueue = [];
+  }
+
+  _enqueueCommand(action, payload) {
+    this.commandQueue.push({ action, payload: payload || {} });
+    while (this.commandQueue.length > this.commandQueueCap) {
+      this.commandQueue.shift();
+    }
+  }
+
+  _flushCommandQueue() {
+    if (!this.isOpen()) return;
+    const queued = this.commandQueue.slice();
+    this.commandQueue = [];
+    for (const item of queued) {
+      this.ws.send(JSON.stringify({
+        type: 'command',
+        room_id: this.roomId,
+        action: item.action,
+        payload: item.payload || {},
+        source: this.client,
+        ts: new Date().toISOString(),
+      }));
+    }
+  }
+
   connect(options = {}) {
     const timeoutMs = Number.isFinite(options.timeoutMs) ? options.timeoutMs : 10000;
+    this._intentionalClose = false;
     return new Promise((resolve, reject) => {
       let settled = false;
       let timeoutId = null;
@@ -99,6 +177,7 @@ export class CloudClient {
         try { data = JSON.parse(ev.data); } catch { return; }
         if (data.type === 'joined') {
           this.connected = true;
+          this._endReconnectGrace({ dropQueue: false });
           if (data.room_id) this.roomId = data.room_id;
           if (Array.isArray(data.clients)) {
             this.handlers.presence.forEach((fn) => fn(data.clients));
@@ -110,7 +189,9 @@ export class CloudClient {
             this.lastState = data.state;
             this.handlers.state.forEach((fn) => fn(data.state));
           }
+          this._flushCommandQueue();
           this.handlers.joined.forEach((fn) => fn(data));
+          this._emitConnection();
           finish(resolve, data);
         } else if (data.type === 'state') {
           this.lastState = data.state || {};
@@ -132,7 +213,16 @@ export class CloudClient {
       this.ws.onclose = () => {
         const wasConnected = this.connected;
         this.connected = false;
-        this.handlers.close.forEach((fn) => fn({ wasConnected }));
+        const intentional = this._intentionalClose;
+        this._intentionalClose = false;
+        if (intentional) {
+          this._endReconnectGrace({ dropQueue: true });
+        } else if (wasConnected) {
+          this._beginReconnectGrace();
+        }
+        const reconnecting = this.isReconnecting();
+        this.handlers.close.forEach((fn) => fn({ wasConnected, reconnecting }));
+        this._emitConnection();
         if (!wasConnected && !settled) {
           fail('connection_closed', 'Connection closed before login completed.');
         }
@@ -140,20 +230,32 @@ export class CloudClient {
     });
   }
 
+  /**
+   * Send a command now, or queue it during soft reconnect grace.
+   * @returns {boolean} true if sent or queued; false if hard offline
+   */
   sendCommand(action, payload = {}) {
-    if (!this.ws || this.ws.readyState !== 1) return false;
-    this.ws.send(JSON.stringify({
-      type: 'command',
-      room_id: this.roomId,
-      action,
-      payload,
-      source: this.client,
-      ts: new Date().toISOString(),
-    }));
-    return true;
+    if (this.ws && this.ws.readyState === 1 && this.connected) {
+      this.ws.send(JSON.stringify({
+        type: 'command',
+        room_id: this.roomId,
+        action,
+        payload,
+        source: this.client,
+        ts: new Date().toISOString(),
+      }));
+      return true;
+    }
+    if (this.isReconnecting()) {
+      this._enqueueCommand(action, payload);
+      return true;
+    }
+    return false;
   }
 
   disconnect() {
+    this._intentionalClose = true;
+    this._endReconnectGrace({ dropQueue: true });
     if (typeof this._connectFail === 'function') {
       try {
         this._connectFail('connection_closed', 'Connection superseded.');
@@ -169,6 +271,7 @@ export class CloudClient {
     }
     this.ws = null;
     this.connected = false;
+    this._emitConnection();
   }
 }
 

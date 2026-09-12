@@ -67,9 +67,11 @@ header {
 }
 .conn-status.connected { color: #9ece6a; }
 .conn-status.waiting { color: #e0af68; }
+.conn-status.reconnecting { color: #e0af68; }
 .conn-status.disconnected { color: #f7768e; }
 .conn-status.connected .conn-icon-connected,
 .conn-status.waiting .conn-icon-waiting,
+.conn-status.reconnecting .conn-icon-waiting,
 .conn-status.disconnected .conn-icon-disconnected {
   display: block;
 }

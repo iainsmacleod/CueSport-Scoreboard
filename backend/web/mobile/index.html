@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
   <title>CueSport Scoreboard Cloud Control</title>
-  <link rel="stylesheet" href="/web/shared/styles.css?v=8.1.0.26" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.1.0.27" />
 </head>
 <body class="mobile">
   <header>
@@ -237,20 +237,20 @@
             </div>
           </div>
           <div class="stream-section" id="streamReplayUnlockSection">
-            <h3 class="share-links-heading">Replay buffer</h3>
-            <p class="hint">Unlock monitoring and clip controls for this table. Account owner only.</p>
+            <h3 class="share-links-heading">Replay function</h3>
+            <p class="hint">Unlock monitoring, Instant Replay, and clip controls for this table.</p>
             <div class="row clips">
-              <button type="button" class="btn" id="replayControlsEnableBtn" data-cmd="set_replay_controls">Enable Replay Buffer</button>
+              <button type="button" class="btn" id="replayControlsEnableBtn" data-cmd="set_replay_controls">Enable Replay Function</button>
             </div>
           </div>
           <div class="stream-section hidden" id="streamReplaySection">
             <h3 class="share-links-heading">Monitoring and clips</h3>
             <div class="row clips" id="replayControlsDisableRow">
-              <button type="button" class="btn secondary" id="replayControlsDisableBtn" data-cmd="set_replay_controls_off">Disable Replay Buffer</button>
+              <button type="button" class="btn secondary" id="replayControlsDisableBtn" data-cmd="set_replay_controls_off">Disable Replay Function</button>
             </div>
             <div class="row clips" id="replayMonitorRow">
               <button type="button" class="btn monitor-btn" id="monitorBtn" data-cmd="toggle_monitoring">Monitor Game</button>
-              <button type="button" class="btn hidden" id="instantReplayBtn" data-cmd="instant_replay">Instant Replay</button>
+              <button type="button" class="btn" id="instantReplayBtn" data-cmd="instant_replay" disabled title="Start Monitor Game first">Instant Replay</button>
             </div>
             <div class="row clips hidden" id="replayClipsRow">
               <div class="clip-wrap hidden" data-clip-index="0">
@@ -398,6 +398,6 @@
       <div id="poolRespotTargets" class="snooker-foul-targets"></div>
     </div>
   </div>
-  <script type="module" src="/web/mobile/app.js?v=8.0.0.38"></script>
+  <script type="module" src="/web/mobile/app.js?v=8.0.0.40"></script>
 </body>
 </html>
