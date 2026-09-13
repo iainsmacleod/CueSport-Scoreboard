@@ -221,9 +221,129 @@ async function run() {
 
   const dashHtml = await fetch(`${BASE}/dashboard`);
   assert('GET /dashboard HTML', dashHtml.ok);
+  const dashHtmlText = await dashHtml.text();
+  assert(
+    'Dashboard has Google Sign in button',
+    dashHtmlText.includes('id="googleBtn"')
+      && dashHtmlText.includes('Sign in with Google')
+      && (dashHtmlText.includes('id="googleBtnMount"') || dashHtmlText.includes('/web/shared/google/g-logo.svg'))
+  );
+  assert(
+    'Dashboard has a single Google auth button',
+    !dashHtmlText.includes('id="googleSignUpBtn"') && !dashHtmlText.includes('/web/shared/google/signup.svg')
+  );
+  assert(
+    'Dashboard has billing panel markup',
+    dashHtmlText.includes('id="billingPanel"') && dashHtmlText.includes('id="billingAcceptTerms"')
+  );
+
+  const googleLogo = await fetch(`${BASE}/web/shared/google/g-logo.svg`);
+  assert('GET /web/shared/google/g-logo.svg', googleLogo.ok);
+  const googleSignIn = await fetch(`${BASE}/web/shared/google/signin.svg`);
+  assert('GET /web/shared/google/signin.svg', googleSignIn.ok);
+  const googleSignUp = await fetch(`${BASE}/web/shared/google/signup.svg`);
+  assert('GET /web/shared/google/signup.svg', googleSignUp.ok);
+
+  const termsPage = await fetch(`${BASE}/terms`);
+  const termsText = termsPage.ok ? await termsPage.text() : '';
+  assert('GET /terms', termsPage.ok && termsText.includes('Terms of Service'));
+  assert(
+    'Terms discloses AI-assisted development',
+    /Use of AI in creating the product/i.test(termsText)
+      && /artificial intelligence \(AI\) coding assistants/i.test(termsText)
+  );
+  assert('Terms substitutes placeholders', !termsText.includes('{{ENTITY_NAME}}') && !termsText.includes('{{PUBLIC_URL}}'));
+
+  const privacyPage = await fetch(`${BASE}/privacy`);
+  const privacyText = privacyPage.ok ? await privacyPage.text() : '';
+  assert('GET /privacy', privacyPage.ok && privacyText.includes('Privacy Policy'));
+  assert(
+    'Privacy discloses AI development practice',
+    /AI used in building the product/i.test(privacyText) && /AI coding assistants/i.test(privacyText)
+  );
+  assert('Privacy substitutes placeholders', !privacyText.includes('{{ENTITY_NAME}}'));
 
   const config = await fetchJson('/api/config/public');
   assert('GET /api/config/public', config.ok && config.body.allowDevAuth !== undefined);
+  assert(
+    'Public config includes termsUrl',
+    typeof config.body.termsUrl === 'string' && config.body.termsUrl.includes('/terms')
+  );
+  assert(
+    'Public config includes privacyUrl',
+    typeof config.body.privacyUrl === 'string' && config.body.privacyUrl.includes('/privacy')
+  );
+  assert(
+    'Public config includes billingEnabled boolean',
+    typeof config.body.billingEnabled === 'boolean'
+  );
+  assert(
+    'Public config includes supportIssuesUrl',
+    typeof config.body.supportIssuesUrl === 'string' && config.body.supportIssuesUrl.length > 0
+  );
+
+  {
+    const { normalizeTierName, getTierDisplayName, getPaidSelfServeTier, getTiersCatalog, getDefaultTierName } =
+      await import('../src/quotas.js');
+    assert('Tier id: streamer', normalizeTierName('streamer') === 'streamer');
+    assert(
+      'Tier id: tournament_organizer',
+      normalizeTierName('tournament_organizer') === 'tournament_organizer'
+    );
+    assert(
+      'Tier id: league_director',
+      normalizeTierName('league_director') === 'league_director'
+    );
+    assert(
+      'Unknown tier falls back to default',
+      normalizeTierName('not_a_real_tier') === getDefaultTierName()
+    );
+    assert('Tier display: streamer', getTierDisplayName('streamer') === 'Streamer');
+    assert(
+      'Tier display: tournament_organizer',
+      getTierDisplayName('tournament_organizer') === 'Tournament Organizer'
+    );
+    assert(
+      'Tier display: league_director',
+      getTierDisplayName('league_director') === 'League Director'
+    );
+    const paid = getPaidSelfServeTier();
+    assert(
+      'Paid self-serve tiers are three',
+      Array.isArray(paid)
+        && paid.length === 3
+        && paid.includes('streamer')
+        && paid.includes('tournament_organizer')
+        && paid.includes('league_director')
+    );
+    const catalog = getTiersCatalog();
+    assert(
+      'Catalog includes network_organization + selfhost',
+      !!catalog.network_organization && !!catalog.selfhost && !catalog.starter
+    );
+  }
+
+  const plans = await fetchJson('/api/billing/plans');
+  assert('GET /api/billing/plans', plans.ok && Array.isArray(plans.body.plans));
+  assert(
+    'Billing plans include self-serve + contact tiers',
+    plans.body.plans.some((p) => p.id === 'streamer' && p.checkout !== undefined)
+      && plans.body.plans.some((p) => p.id === 'tournament_organizer')
+      && plans.body.plans.some((p) => p.id === 'league_director')
+      && plans.body.plans.some((p) => p.id === 'network_organization' && p.contact === true)
+  );
+  assert(
+    'Billing plans include trialDays',
+    Number.isFinite(plans.body.trialDays) && plans.body.trialDays >= 0
+  );
+  assert(
+    'Billing plans include stripeConfigured boolean',
+    typeof plans.body.stripeConfigured === 'boolean'
+  );
+  assert(
+    'Billing plans include terms/privacy URLs',
+    typeof plans.body.termsUrl === 'string' && typeof plans.body.privacyUrl === 'string'
+  );
 
   // Dev auth
   const devSecret = process.env.DEV_AUTH_SECRET || '';
@@ -262,6 +382,18 @@ async function run() {
     });
     assert('GET /api/me with dev token', me.ok && me.body.account?.email === devAccountEmail);
     assert('GET /api/me includes quota', !!me.body.quota?.limits?.maxApiKeys);
+    assert(
+      'GET /api/me quota uses renamed tier ids',
+      me.body.quota?.tier === 'selfhost'
+        || me.body.quota?.tier === 'streamer'
+        || me.body.quota?.tier === 'tournament_organizer'
+        || me.body.quota?.tier === 'league_director',
+      String(me.body.quota?.tier)
+    );
+    assert(
+      'GET /api/me quota includes tierDisplayName',
+      typeof me.body.quota?.tierDisplayName === 'string' && me.body.quota.tierDisplayName.length > 0
+    );
     assert('GET /api/me includes room_cleanup config', !!me.body.room_cleanup?.grace_ms);
     assert(
       'GET /api/me includes is_platform_admin boolean',
@@ -271,6 +403,30 @@ async function run() {
       'GET /api/me includes trial_ends_at',
       me.body.account && Object.prototype.hasOwnProperty.call(me.body.account, 'trial_ends_at')
     );
+    assert(
+      'GET /api/me includes subscription access flags',
+      typeof me.body.account?.has_subscription_access === 'boolean'
+        && typeof me.body.account?.needs_plan === 'boolean'
+        && typeof me.body.account?.is_trialing === 'boolean'
+    );
+    assert(
+      'GET /api/me includes subscription_tier_display',
+      typeof me.body.account?.subscription_tier_display === 'string'
+    );
+    assert(
+      'GET /api/me includes billing block',
+      me.body.billing
+        && typeof me.body.billing.stripeConfigured === 'boolean'
+        && typeof me.body.billing.termsUrl === 'string'
+        && typeof me.body.billing.privacyUrl === 'string'
+    );
+    // Self-host / allowDevAuth accounts should have access without Stripe.
+    if (config.body.allowDevAuth) {
+      assert(
+        'Dev/self-host account has subscription access',
+        me.body.account.has_subscription_access === true && me.body.account.needs_plan === false
+      );
+    }
     const accountId = me.body.account?.id;
 
     // Free seats/rooms from prior smoke runs so this account is under tier caps.
@@ -544,7 +700,7 @@ async function run() {
       const keyBRes = await fetchJson('/api/api-keys', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${tokenFresh}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ label: `table-b-${Date.now().toString(36)}` }),
@@ -582,9 +738,20 @@ async function run() {
           if (keyBRes.body.id) {
             await fetchJson(`/api/api-keys/${keyBRes.body.id}`, {
               method: 'DELETE',
-              headers: { Authorization: `Bearer ${token}` },
+              headers: { Authorization: `Bearer ${tokenFresh}` },
             });
           }
+          // Self-host maxRooms is 2 — prune rooms from this check so later seat tests have headroom.
+          const meAfterTwoKeys = await fetchJson('/api/me', {
+            headers: { Authorization: `Bearer ${tokenFresh}` },
+          });
+          for (const room of meAfterTwoKeys.body.rooms || []) {
+            await fetchJson(`/api/rooms/${room.id}`, {
+              method: 'DELETE',
+              headers: { Authorization: `Bearer ${tokenFresh}` },
+            });
+          }
+          roomId = null;
         }
       } else {
         assert(
@@ -599,7 +766,7 @@ async function run() {
     let dockJoin;
     try {
       dockJoin = await wsJoin({ client: 'dock', apiKey, instanceId: smokeInstance });
-      assert('WS join dock + api_key', dockJoin.data.room_id === roomId);
+      assert('WS join dock + api_key', !!dockJoin.data.room_id);
       roomId = dockJoin.data.room_id;
     } catch (e) {
       assert('WS join dock + api_key', false, e.message);
@@ -1715,6 +1882,100 @@ async function run() {
         );
       } catch (e) {
         assert('Stats survive room delete', false, e.message);
+      }
+    }
+
+    // --- Billing checkout / portal gates + inactive dock-key gate ---
+    {
+      const checkoutNoTerms = await fetchJson('/api/billing/checkout', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokenFresh}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ tier: 'streamer', acceptedTerms: false }),
+      });
+      // Self-host rejects before terms; managed without Stripe rejects as not configured;
+      // managed with Stripe rejects terms_required.
+      assert(
+        'POST /api/billing/checkout without terms rejected',
+        checkoutNoTerms.status === 400 || checkoutNoTerms.status === 503,
+        `${checkoutNoTerms.status} ${JSON.stringify(checkoutNoTerms.body)}`
+      );
+      if (config.body.allowDevAuth) {
+        assert(
+          'Self-host checkout blocked',
+          checkoutNoTerms.body?.code === 'selfhost_no_checkout'
+            || /self-host/i.test(String(checkoutNoTerms.body?.error || '')),
+          JSON.stringify(checkoutNoTerms.body)
+        );
+      } else if (checkoutNoTerms.status === 400 && checkoutNoTerms.body?.code === 'terms_required') {
+        assert('Managed checkout requires terms acceptance', true);
+      }
+
+      const checkoutBadTier = await fetchJson('/api/billing/checkout', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokenFresh}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ tier: 'network_organization', acceptedTerms: true }),
+      });
+      assert(
+        'Network Organization is not self-serve checkout',
+        checkoutBadTier.status === 400 || checkoutBadTier.status === 503,
+        `${checkoutBadTier.status} ${JSON.stringify(checkoutBadTier.body)}`
+      );
+
+      const portal = await fetchJson('/api/billing/portal', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokenFresh}` },
+      });
+      assert(
+        'POST /api/billing/portal without customer rejected or unavailable',
+        portal.status === 400 || portal.status === 503,
+        `${portal.status} ${JSON.stringify(portal.body)}`
+      );
+
+      const webhookNoSig = await fetchJson('/api/stripe/webhook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'ping' }),
+      });
+      assert(
+        'POST /api/stripe/webhook without valid signature fails',
+        webhookNoSig.status === 400 || webhookNoSig.status === 503,
+        `${webhookNoSig.status}`
+      );
+
+      if (accountId) {
+        const db = new Database(SQLITE_PATH);
+        const before = db.prepare(
+          'SELECT subscription_status, trial_ends_at FROM accounts WHERE id = ?'
+        ).get(accountId);
+        try {
+          db.prepare(
+            `UPDATE accounts SET subscription_status = 'inactive', trial_ends_at = NULL WHERE id = ?`
+          ).run(accountId);
+          const blockedKey = await fetchJson('/api/api-keys', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${tokenFresh}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ label: 'Should Fail Inactive' }),
+          });
+          assert(
+            'Inactive account cannot create OBS Dock Key',
+            blockedKey.status === 403 && blockedKey.body?.code === 'subscription_required',
+            `${blockedKey.status} ${JSON.stringify(blockedKey.body)}`
+          );
+        } finally {
+          db.prepare(
+            `UPDATE accounts SET subscription_status = ?, trial_ends_at = ? WHERE id = ?`
+          ).run(before?.subscription_status || 'active', before?.trial_ends_at ?? null, accountId);
+          db.close();
+        }
       }
     }
 

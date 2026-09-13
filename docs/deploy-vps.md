@@ -196,7 +196,31 @@ Expect non-null `supabaseUrl` and `supabasePublishableKey`.
 | Dock “Dev login — enter secret” instead of Google | Dock can’t see publishable config (wrong server URL or stale dock JS) — refresh dock; check `/api/config/public` |
 | Redirect errors from Supabase | Redirect URL allowlist / `PUBLIC_URL` mismatch |
 
-New Google accounts are created in **SQLite** with `subscription_status=active` by default (no automatic timed trial until Stripe or admin support trials). Product defaults are **not** configured in Supabase.
+New Google accounts on managed cloud (`ALLOW_DEV_AUTH=false`) are created in **SQLite** with `subscription_status=inactive` until Stripe Checkout (30-day card-required trial → `trialing` / `active`). Existing `active` accounts are grandfathered. Product defaults are **not** configured in Supabase.
+
+### Stripe billing (production)
+
+1. Create Stripe Products/Prices for **Streamer**, **Tournament Organizer**, and **League Director**.
+2. Add to `.env` (then recreate the container):
+
+```env
+STRIPE_SECRET_KEY=sk_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PRICE_STREAMER=price_...
+STRIPE_PRICE_TOURNAMENT_ORGANIZER=price_...
+STRIPE_PRICE_LEAGUE_DIRECTOR=price_...
+STRIPE_TRIAL_DAYS=30
+BILLING_CONTACT_URL=mailto:you@example.com
+LEGAL_CONTACT_EMAIL=you@example.com
+LEGAL_ENTITY_NAME=Your legal entity name
+LEGAL_GOVERNING_LAW=Your province/country
+```
+
+3. Stripe Dashboard → Webhooks → `https://cuesports.example.com/api/stripe/webhook`
+4. Enable Customer Portal (cancel at period end; allow switching among the three prices).
+5. Review `/terms` and `/privacy` placeholders with counsel before relying on them commercially.
+
+Tier ids: `streamer`, `tournament_organizer`, `league_director` (plus contact-only `network_organization`). Self-host uses `selfhost`.
 
 ## 7. Verify HTTPS
 
@@ -253,8 +277,8 @@ sqlite3 /opt/cuesport/backend/data/cuesport.db 'PRAGMA wal_checkpoint(TRUNCATE);
 ## What this setup is not
 
 - **Not** `DB_DRIVER=supabase` / remote Postgres (optional later for multi-node)
-- **Not** Stripe billing yet (accounts default to active for soft launch)
 - **Not** multi-region Kubernetes
+- Legal pages are templates — counsel review required before commercial reliance
 
 When one VPS is no longer enough: resize vertically first, then shared Postgres + more app nodes (with sticky WebSockets or shared live state).
 

@@ -139,7 +139,7 @@
         apiKey = keyRes.body.key;
         assert('Create API key', true);
       } else if (keyRes.body?.code === 'api_key_limit') {
-        // Reuse an existing dock key when the starter seat quota is full.
+        // Reuse an existing dock key when the streamer seat quota is full.
         const me = await fetchJson('/api/me', {
           headers: { Authorization: 'Bearer ' + token },
         });

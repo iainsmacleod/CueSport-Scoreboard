@@ -22,7 +22,7 @@ for more information about Salotto please visit https://salotto.app
     <link rel="stylesheet" href="./common/css/control_panel/grey.css?v=8.0.0" />
     <link rel="stylesheet" href="./common/css/control_panel/light.css?v=8.0.0" />
     <link rel="stylesheet" href="./common/css/control_panel/rachni.css?v=8.0.0" />
-    <link rel="stylesheet" href="./common/css/control_panel/required.css?v=8.0.0.44" />
+    <link rel="stylesheet" href="./common/css/control_panel/required.css?v=8.0.0.46" />
     <script>
         //---------------------------------------------------------------------------------------------
         var versionNum = "8.1.0";
@@ -37,7 +37,7 @@ for more information about Salotto please visit https://salotto.app
     <script src="./common/js/player_stats.js?v=8.1.0.8"></script>
     <script src="./common/js/control_panel.js?v=8.0.0.50"></script>
     <script src="./common/js/cloud_commands.js?v=8.0.0.11"></script>
-    <script src="./common/js/cloud_auth.js?v=8.0.0.3"></script>
+    <script src="./common/js/cloud_auth.js?v=8.0.0.4"></script>
     <script src="./common/js/cloud_remote.js?v=8.1.0.9"></script>
     <script src="hotkeys.js?v=8.0.0"></script>
 
@@ -899,8 +899,13 @@ for more information about Salotto please visit https://salotto.app
                                 </p>
                             </div>
                             <div class="form-row">
-                                <div class="field">
-                                    <div class="hover obs28 button" onclick="signInWithGoogle()">Sign in with Google</div>
+                                <div class="field google-auth-buttons">
+                                    <button type="button" class="gsi-btn" onclick="signInWithGoogle()" title="Sign in with Google" aria-label="Sign in with Google">
+                                        <span class="gsi-btn-icon" aria-hidden="true">
+                                            <img src="common/images/google/g-logo.svg" width="20" height="20" alt="" />
+                                        </span>
+                                        <span class="gsi-btn-label">Sign in with Google</span>
+                                    </button>
                                 </div>
                             </div>
                             <div class="form-row">

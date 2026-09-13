@@ -17,8 +17,11 @@ import {
   deleteRoom,
   invalidateAllSessions,
   revokeAllGuestLinks,
+  fetchBillingPlans,
+  startBillingCheckout,
+  openBillingPortal,
   GAME_TYPES,
-} from '../shared/cloud-client.js?v=8.0.0.8';
+} from '../shared/cloud-client.js?v=8.0.0.9';
 import {
   computeDurationSeconds,
   formatDurationSeconds,
@@ -471,33 +474,184 @@ function renderTableCards(rooms) {
   });
 }
 
-function renderQuota(quota) {
+function renderQuota(quota, account = null) {
   lastQuota = quota || null;
   const el = document.getElementById('quotaSummary');
+  const planLine = document.getElementById('accountPlanLine');
   const hint = document.getElementById('apiKeyLimitHint');
   const createBtn = document.getElementById('createKeyBtn');
   if (!quota) {
     if (el) el.textContent = '';
+    if (planLine) planLine.textContent = '';
     if (hint) hint.classList.add('hidden');
     if (createBtn) createBtn.disabled = false;
     return;
   }
-  const { tier, limits, usage } = quota;
+  const { tier, tierDisplayName, limits, usage } = quota;
+  const display = tierDisplayName || tier;
+  const isTrialing = !!(account && account.is_trialing);
+  const needsPlan = !!(account && account.needs_plan);
+  if (planLine) {
+    if (needsPlan) {
+      planLine.innerHTML = 'No active plan — choose a subscription in Settings to create OBS Dock Keys.';
+    } else {
+      planLine.innerHTML = `Plan: ${escapeHtml(display)}${isTrialing ? ' <span class="plan-trial-badge">Trial</span>' : ''}`;
+    }
+  }
   if (el) {
     el.textContent =
-      `Plan: ${tier} · Dock seats (keys) ${usage.apiKeys}/${limits.maxApiKeys} · ` +
+      `Dock seats (keys) ${usage.apiKeys}/${limits.maxApiKeys} · ` +
       `Mobile/guest up to ${limits.maxControlConnectionsPerRoom} per table`;
   }
   const atKeyLimit = usage.apiKeys >= limits.maxApiKeys;
-  if (createBtn) createBtn.disabled = atKeyLimit;
+  const blocked = needsPlan || atKeyLimit;
+  if (createBtn) createBtn.disabled = blocked;
   if (hint) {
-    if (atKeyLimit) {
-      hint.textContent = `Dock key limit reached (${limits.maxApiKeys} on ${tier}). Each key connects one dock — remove an unused key to create another.`;
+    if (needsPlan) {
+      hint.textContent = 'Choose a plan under Settings → Billing to unlock OBS Dock Keys.';
+      hint.classList.remove('hidden');
+    } else if (atKeyLimit) {
+      hint.textContent = `Dock key limit reached (${limits.maxApiKeys} on ${display}). Each key connects one dock — remove an unused key to create another.`;
       hint.classList.remove('hidden');
     } else {
       hint.classList.add('hidden');
     }
   }
+}
+
+let lastAccount = null;
+let lastBillingCatalog = null;
+
+function setBillingNotice(msg) {
+  const el = document.getElementById('billingNotice');
+  if (!el) return;
+  if (!msg) {
+    el.textContent = '';
+    el.classList.add('hidden');
+    return;
+  }
+  el.textContent = msg;
+  el.classList.remove('hidden');
+}
+
+async function startPortal() {
+  try {
+    setBillingNotice('Opening billing portal…');
+    const result = await openBillingPortal(getServerUrl(), getToken());
+    if (result?.url) {
+      window.location.href = result.url;
+      return;
+    }
+    setBillingNotice('Billing portal did not return a URL.');
+  } catch (err) {
+    setBillingNotice(err.message || 'Could not open billing portal');
+  }
+}
+
+async function checkoutTier(tierId) {
+  const accepted = document.getElementById('billingAcceptTerms')?.checked;
+  if (!accepted) {
+    setBillingNotice('Accept the Terms of Service and Privacy Policy before checkout.');
+    return;
+  }
+  try {
+    setBillingNotice('Starting Checkout…');
+    const result = await startBillingCheckout(getServerUrl(), getToken(), tierId, true);
+    if (result?.url) {
+      window.location.href = result.url;
+      return;
+    }
+    setBillingNotice('Checkout did not return a URL.');
+  } catch (err) {
+    setBillingNotice(err.message || 'Checkout failed');
+  }
+}
+
+function renderBillingPanel(account, billingMeta, plansPayload) {
+  const panel = document.getElementById('billingPanel');
+  if (!panel) return;
+  const showBilling = !!(billingMeta?.stripeConfigured || account?.needs_plan || account?.stripe_customer_id);
+  panel.classList.toggle('hidden', !showBilling);
+  if (!showBilling) return;
+
+  lastBillingCatalog = plansPayload || lastBillingCatalog;
+  const statusEl = document.getElementById('billingStatusLine');
+  const grid = document.getElementById('billingPlanPicker');
+  const manageBtn = document.getElementById('manageBillingBtn');
+  const accountManageBtn = document.getElementById('accountManageBillingBtn');
+  const termsLabel = document.getElementById('billingTermsLabel');
+  const display = account?.subscription_tier_display || account?.subscription_tier || '—';
+  const status = account?.subscription_status || 'inactive';
+  const trialBadge = account?.is_trialing ? ' · Trial' : '';
+
+  if (statusEl) {
+    if (account?.needs_plan) {
+      statusEl.textContent = 'Choose a plan to start your 30-day trial (card required). Access begins immediately after Checkout.';
+    } else {
+      statusEl.textContent = `Current: ${display}${trialBadge} (${status}). Manage payment methods and cancellation in the Stripe Customer Portal.`;
+    }
+  }
+
+  const canManage = !!(account?.stripe_customer_id && billingMeta?.stripeConfigured);
+  manageBtn?.classList.toggle('hidden', !canManage);
+  accountManageBtn?.classList.toggle('hidden', !canManage);
+  termsLabel?.classList.toggle('hidden', !billingMeta?.stripeConfigured);
+
+  if (!grid) return;
+  grid.innerHTML = '';
+  const plans = plansPayload?.plans || [];
+  plans.forEach((plan) => {
+    const card = document.createElement('div');
+    card.className = 'billing-plan-card';
+    if (account?.subscription_tier === plan.id && !account?.needs_plan) {
+      card.classList.add('is-current');
+    }
+    const limits = plan.limits || {};
+    const h = document.createElement('h3');
+    h.textContent = plan.displayName || plan.id;
+    const p = document.createElement('p');
+    p.className = 'billing-plan-limits';
+    p.textContent = `${limits.maxApiKeys ?? '—'} dock keys · up to ${limits.maxControlConnectionsPerRoom ?? '—'} mobile/guest per table`;
+    card.appendChild(h);
+    card.appendChild(p);
+    if (plan.contact) {
+      const a = document.createElement('a');
+      a.className = 'btn secondary';
+      a.textContent = 'Contact for pricing';
+      a.href = plan.contactUrl || plansPayload?.contactUrl || 'mailto:';
+      if (a.href.startsWith('http') || a.href.startsWith('mailto:')) {
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+      }
+      card.appendChild(a);
+    } else if (plan.checkout && billingMeta?.stripeConfigured) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn primary';
+      btn.textContent = account?.needs_plan ? 'Start trial' : 'Switch / subscribe';
+      btn.addEventListener('click', () => checkoutTier(plan.id));
+      card.appendChild(btn);
+    } else {
+      const note = document.createElement('p');
+      note.className = 'hint';
+      note.textContent = 'Checkout unavailable on this server.';
+      card.appendChild(note);
+    }
+    grid.appendChild(card);
+  });
+}
+
+async function refreshBillingUi(account, billingMeta) {
+  if (!account) return;
+  let plansPayload = null;
+  try {
+    if (billingMeta?.stripeConfigured || account.needs_plan) {
+      plansPayload = await fetchBillingPlans(getServerUrl(), getToken());
+    }
+  } catch (err) {
+    setBillingNotice(err.message || 'Could not load plans');
+  }
+  renderBillingPanel(account, billingMeta, plansPayload);
 }
 
 function roomCleanupStatus(room) {
@@ -3123,6 +3277,7 @@ async function renderDashboard() {
   if (!token) {
     stopLiveFeed();
     lastTablesFingerprint = '';
+    lastAccount = null;
     setPlatformAdminUi(false);
     show('loginSection', true);
     show('dashboardSection', false);
@@ -3132,11 +3287,13 @@ async function renderDashboard() {
     const me = await fetchMe(getServerUrl(), token);
     show('loginSection', false);
     show('dashboardSection', true);
+    lastAccount = me.account || null;
     const emailEl = document.getElementById('userEmail');
     if (emailEl) emailEl.textContent = me.account.email;
     setPlatformAdminUi(!!me.is_platform_admin);
-    renderQuota(me.quota);
+    renderQuota(me.quota, me.account);
     renderApiKeys(me.api_keys);
+    await refreshBillingUi(me.account, me.billing);
     lastDashboardRooms = me.rooms || [];
     renderTableCards(me.rooms);
     renderDebugRooms(me.rooms);
@@ -3148,6 +3305,7 @@ async function renderDashboard() {
     localStorage.removeItem(TOKEN_KEY);
     statsData = null;
     statsLoaded = false;
+    lastAccount = null;
     setPlatformAdminUi(false);
     setError(err.message);
     show('loginSection', true);
@@ -3760,45 +3918,226 @@ document.addEventListener('keydown', (event) => {
   }
 });
 
-document.getElementById('googleBtn').addEventListener('click', async () => {
-  setDashLoginMode('managed');
+async function startGoogleOAuthRedirect() {
   const config = await fetchPublicConfig(getServerUrl());
   if (config.supabaseUrl && config.supabasePublishableKey) {
     window.location.href = `${config.supabaseUrl}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(window.location.href)}`;
   } else {
-    setError('Google OAuth not configured on this server. Use Self-hosting with your dev auth secret.');
-    showDashLoginSelfHostPane();
+    setError('Google OAuth is not configured on this server.');
   }
+}
+
+function loadScriptOnce(src) {
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[src="${src}"]`);
+    if (existing) {
+      if (existing.dataset.loaded === '1' || window.google?.accounts?.id) {
+        resolve();
+        return;
+      }
+      existing.addEventListener('load', () => resolve(), { once: true });
+      existing.addEventListener('error', () => reject(new Error(`Failed to load ${src}`)), { once: true });
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = src;
+    script.async = true;
+    script.onload = () => {
+      script.dataset.loaded = '1';
+      resolve();
+    };
+    script.onerror = () => reject(new Error(`Failed to load ${src}`));
+    document.head.appendChild(script);
+  });
+}
+
+let dashPublicConfigCache = null;
+let gsiButtonInitialized = false;
+
+async function handleGoogleCredentialResponse(response) {
+  setError('');
+  const config = dashPublicConfigCache || await fetchPublicConfig(getServerUrl());
+  if (!config.supabaseUrl || !config.supabasePublishableKey) {
+    setError('Google sign-in is not configured on this server.');
+    return;
+  }
+  if (!response?.credential) {
+    setError('Google sign-in did not return a credential.');
+    return;
+  }
+  try {
+    const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/+esm');
+    const supabase = createClient(config.supabaseUrl, config.supabasePublishableKey, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    });
+    const { data, error } = await supabase.auth.signInWithIdToken({
+      provider: 'google',
+      token: response.credential,
+    });
+    if (error) throw error;
+    const accessToken = data?.session?.access_token;
+    if (!accessToken) throw new Error('No session returned from Google sign-in');
+    localStorage.removeItem(TOKEN_KEY);
+    stopLiveFeed();
+    localStorage.setItem(TOKEN_KEY, accessToken);
+    localStorage.setItem(SERVER_KEY, getServerUrl());
+    lastTablesFingerprint = '';
+    window.history.replaceState({}, '', window.location.pathname + window.location.search);
+    await renderDashboard();
+  } catch (err) {
+    setError(err?.message || 'Google sign-in failed');
+  }
+}
+
+/**
+ * Official Sign in with Google button via GIS renderButton.
+ * @see https://developers.google.com/identity/gsi/web/guides/display-button
+ * Requires GOOGLE_OAUTH_CLIENT_ID. Falls back to Supabase OAuth redirect otherwise.
+ */
+async function initOfficialGoogleButton(config) {
+  const mount = document.getElementById('googleBtnMount');
+  const fallback = document.getElementById('googleBtn');
+  if (!mount || !fallback) return;
+
+  const canUseGis = !!(config?.googleOAuthClientId && config?.supabaseUrl && config?.supabasePublishableKey);
+  if (!canUseGis) {
+    mount.hidden = true;
+    mount.replaceChildren();
+    fallback.classList.remove('hidden');
+    gsiButtonInitialized = false;
+    return;
+  }
+
+  try {
+    await loadScriptOnce('https://accounts.google.com/gsi/client');
+    if (!window.google?.accounts?.id) {
+      throw new Error('Google Identity Services failed to load');
+    }
+    if (!gsiButtonInitialized) {
+      window.google.accounts.id.initialize({
+        client_id: config.googleOAuthClientId,
+        callback: handleGoogleCredentialResponse,
+        ux_mode: 'popup',
+        auto_select: false,
+        cancel_on_tap_outside: true,
+      });
+      gsiButtonInitialized = true;
+    }
+    mount.hidden = false;
+    mount.replaceChildren();
+    const width = Math.min(320, Math.floor(mount.getBoundingClientRect().width || mount.parentElement?.clientWidth || 320));
+    window.google.accounts.id.renderButton(mount, {
+      type: 'standard',
+      theme: 'outline',
+      size: 'large',
+      text: 'signin_with',
+      shape: 'rectangular',
+      logo_alignment: 'left',
+      width: Math.max(240, width),
+    });
+    fallback.classList.add('hidden');
+  } catch (err) {
+    console.warn('Official Google button unavailable — using redirect fallback', err);
+    mount.hidden = true;
+    fallback.classList.remove('hidden');
+    gsiButtonInitialized = false;
+  }
+}
+
+document.getElementById('googleBtn')?.addEventListener('click', () => {
+  startGoogleOAuthRedirect().catch((err) => setError(err.message || 'Google sign-in failed'));
 });
 
-const DASH_LOGIN_MODE_KEY = 'cuesport_login_mode';
+document.getElementById('manageBillingBtn')?.addEventListener('click', () => {
+  startPortal();
+});
+document.getElementById('accountManageBillingBtn')?.addEventListener('click', () => {
+  startPortal();
+});
 
-function getDashLoginMode() {
-  return localStorage.getItem(DASH_LOGIN_MODE_KEY) === 'selfhost' ? 'selfhost' : 'managed';
+{
+  const params = new URLSearchParams(window.location.search);
+  const billing = params.get('billing');
+  if (billing === 'success') {
+    setBillingNotice('Checkout complete — subscription status updates when Stripe confirms (usually a few seconds).');
+    params.delete('billing');
+    const next = `${window.location.pathname}${params.toString() ? `?${params}` : ''}${window.location.hash || ''}`;
+    window.history.replaceState({}, '', next);
+  } else if (billing === 'cancel') {
+    setBillingNotice('Checkout canceled. You can choose a plan anytime.');
+    params.delete('billing');
+    const next = `${window.location.pathname}${params.toString() ? `?${params}` : ''}${window.location.hash || ''}`;
+    window.history.replaceState({}, '', next);
+  }
 }
 
-function setDashLoginMode(mode) {
-  localStorage.setItem(DASH_LOGIN_MODE_KEY, mode === 'selfhost' ? 'selfhost' : 'managed');
-}
+/** Login UI is driven by /api/config/public — not a user preference cookie. */
+let dashAuthCapabilities = {
+  google: false,
+  selfHost: false,
+  hybrid: false,
+};
 
-function syncDashLoginPaneUI(mode) {
-  const managed = document.getElementById('dashLoginManagedPane');
-  const selfHost = document.getElementById('dashLoginSelfHostPane');
-  const isSelfHost = mode === 'selfhost';
-  if (managed) managed.classList.toggle('hidden', isSelfHost);
-  if (selfHost) selfHost.classList.toggle('hidden', !isSelfHost);
+function applyDashLoginCapabilities(config) {
+  dashPublicConfigCache = config || null;
+  const google = !!(config?.supabaseUrl && config?.supabasePublishableKey);
+  // Dev secret is for self-host / lab only (ALLOW_DEV_AUTH). Official managed sets this false.
+  const selfHost = !!(config?.allowDevAuth && config?.devAuthConfigured);
+  dashAuthCapabilities = { google, selfHost, hybrid: google && selfHost };
+
+  const managedPane = document.getElementById('dashLoginManagedPane');
+  const selfHostPane = document.getElementById('dashLoginSelfHostPane');
+  const unavailable = document.getElementById('dashLoginUnavailable');
+  const selfHostWrap = document.getElementById('dashShowSelfHostWrap');
+  const managedWrap = document.getElementById('dashShowManagedWrap');
+  const introManaged = document.getElementById('dashManagedIntroManaged');
+  const introHybrid = document.getElementById('dashManagedIntroHybrid');
+
+  introManaged?.classList.toggle('hidden', dashAuthCapabilities.hybrid);
+  introHybrid?.classList.toggle('hidden', !dashAuthCapabilities.hybrid);
+  selfHostWrap?.classList.toggle('hidden', !dashAuthCapabilities.hybrid);
+  managedWrap?.classList.toggle('hidden', !dashAuthCapabilities.hybrid);
+
+  if (!google && !selfHost) {
+    managedPane?.classList.add('hidden');
+    selfHostPane?.classList.add('hidden');
+    unavailable?.classList.remove('hidden');
+    return;
+  }
+
+  unavailable?.classList.add('hidden');
+  if (google && !selfHost) {
+    // Official / managed production: Google only — no self-host switch.
+    managedPane?.classList.remove('hidden');
+    selfHostPane?.classList.add('hidden');
+    initOfficialGoogleButton(config);
+    return;
+  }
+  if (!google && selfHost) {
+    // Pure self-host: server secret only.
+    managedPane?.classList.add('hidden');
+    selfHostPane?.classList.remove('hidden');
+    return;
+  }
+  // Hybrid lab: Google primary; optional switch to server secret.
+  managedPane?.classList.remove('hidden');
+  selfHostPane?.classList.add('hidden');
+  initOfficialGoogleButton(config);
 }
 
 function showDashLoginManagedPane() {
-  setDashLoginMode('managed');
+  if (!dashAuthCapabilities.google) return;
   setError('');
-  syncDashLoginPaneUI('managed');
+  document.getElementById('dashLoginManagedPane')?.classList.remove('hidden');
+  document.getElementById('dashLoginSelfHostPane')?.classList.add('hidden');
+  if (dashPublicConfigCache) initOfficialGoogleButton(dashPublicConfigCache);
 }
 
 function showDashLoginSelfHostPane() {
-  setDashLoginMode('selfhost');
+  if (!dashAuthCapabilities.selfHost) return;
   setError('');
-  syncDashLoginPaneUI('selfhost');
+  document.getElementById('dashLoginManagedPane')?.classList.add('hidden');
+  document.getElementById('dashLoginSelfHostPane')?.classList.remove('hidden');
   document.getElementById('devSecret')?.focus();
 }
 
@@ -3810,7 +4149,13 @@ document.getElementById('dashShowManagedLink')?.addEventListener('click', (event
   event.preventDefault();
   showDashLoginManagedPane();
 });
-syncDashLoginPaneUI(getDashLoginMode());
+
+fetchPublicConfig(getServerUrl())
+  .then((config) => applyDashLoginCapabilities(config))
+  .catch(() => {
+    // Keep panes hidden until config loads; show unavailable if request fails.
+    applyDashLoginCapabilities({});
+  });
 
 let liveFeedHiddenAt = 0;
 
@@ -4108,15 +4453,10 @@ setMatchModalActionButtons();
     label: 'Close',
     title: 'Close',
   });
-  setDashActionButtonContent(document.getElementById('googleBtn'), {
-    icon: 'logIn',
-    label: 'Sign In with Google',
-    title: 'Sign In with Google',
-  });
   setDashActionButtonContent(document.getElementById('devLoginBtn'), {
     icon: 'logIn',
-    label: 'Dev Sign In',
-    title: 'Dev Sign In',
+    label: 'Login',
+    title: 'Login',
   });
   setDashActionButtonContent(document.getElementById('clearSavedLoginBtn'), {
     icon: 'trash',
@@ -4127,6 +4467,16 @@ setMatchModalActionButtons();
     icon: 'close',
     label: 'Close',
     title: 'Close',
+  });
+  setDashActionButtonContent(document.getElementById('manageBillingBtn'), {
+    icon: 'edit',
+    label: 'Manage billing',
+    title: 'Open Stripe Customer Portal',
+  });
+  setDashActionButtonContent(document.getElementById('accountManageBillingBtn'), {
+    icon: 'edit',
+    label: 'Manage billing',
+    title: 'Open Stripe Customer Portal',
   });
 }
 

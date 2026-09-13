@@ -4,7 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>CueSport Scoreboard Cloud — Dashboard</title>
-  <link rel="stylesheet" href="/web/shared/styles.css?v=8.1.0.22" />
+  <link rel="icon" type="image/png" href="/web/images/balls/8ball_small.png" />
+  <link rel="apple-touch-icon" href="/web/images/balls/8ball_small.png" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.1.0.29" />
 </head>
 <body>
   <header class="site-header">
@@ -32,19 +34,38 @@
   <main id="app" class="dashboard-main">
     <section id="loginSection" class="panel">
       <h2>Sign In</h2>
-      <p>Manage tables, OBS Dock Keys, and mobile control links.</p>
-      <div id="dashLoginManagedPane" class="dash-login-pane">
+      <p>
+        CueSport Cloud is the managed relay for your OBS scoreboard: remote mobile and guest control,
+        cloud match history, multi-table Dock Keys, and optional public live-stream listing —
+        while the overlay stays in OBS.
+      </p>
+      <div id="dashLoginManagedPane" class="dash-login-pane hidden">
         <div class="dash-login-intro hint">
-          <p>There are two implementation options: managed or self-hosted.</p>
-          <ul>
-            <li>Managed provides a simpler setup with various subscription levels.</li>
-            <li>Self-hosting lets you run CueSport Cloud on your own server.</li>
-          </ul>
-          <p>Sign in with Google to manage your account, create OBS Dock Keys, and open live tables.</p>
+          <p id="dashManagedIntroManaged">
+            Sign in with Google to open your dashboard, choose a plan, create an OBS Dock Key per table,
+            and run live matches from phone or guest links. New accounts start with a free trial after you pick a plan.
+          </p>
+          <div id="dashManagedIntroHybrid" class="hidden">
+            <p>
+              Use Google for the managed service (hosted relay, plans, and dashboard), or switch below to a
+              server secret if you are testing a self-hosted Cloud install.
+            </p>
+          </div>
         </div>
-        <button id="googleBtn" class="btn primary block">Sign In with Google</button>
-        <p class="dash-login-switch">
-          <a href="#" id="dashShowSelfHostLink" class="dash-text-link">Self-hosting</a>
+        <div class="google-auth-buttons">
+          <!-- Official GIS button mount (https://developers.google.com/identity/gsi/web/guides/display-button) -->
+          <div id="googleBtnMount" class="gsi-btn-mount" hidden></div>
+          <!-- Fallback when GOOGLE_OAUTH_CLIENT_ID is not set: Supabase OAuth redirect -->
+          <button type="button" id="googleBtn" class="gsi-btn" title="Sign in with Google" aria-label="Sign in with Google">
+            <span class="gsi-btn-icon" aria-hidden="true">
+              <img src="/web/shared/google/g-logo.svg" width="20" height="20" alt="" />
+            </span>
+            <span class="gsi-btn-label">Sign in with Google</span>
+          </button>
+        </div>
+        <p class="dash-login-google-hint hint">New here? The same button creates your account on first use.</p>
+        <p id="dashShowSelfHostWrap" class="dash-login-switch hidden">
+          <a href="#" id="dashShowSelfHostLink" class="dash-text-link">Use server secret instead (self-host / lab)</a>
         </p>
       </div>
       <div id="dashLoginSelfHostPane" class="dash-login-pane hidden">
@@ -56,12 +77,18 @@
           <input type="password" id="devSecret" placeholder="Dev auth secret" autocomplete="current-password" />
           <button type="button" id="devSecretToggle" class="password-toggle" aria-label="Show secret" title="Show secret" aria-pressed="false"></button>
         </div>
-        <button id="devLoginBtn" class="btn primary block">Dev Sign In</button>
-        <button type="button" id="clearSavedLoginBtn" class="btn block secondary">Clear Saved Login</button>
-        <p class="dash-login-switch">
-          <a href="#" id="dashShowManagedLink" class="dash-text-link">Managed service / Google sign-in?</a>
+        <div class="dash-login-actions">
+          <button id="devLoginBtn" class="btn primary" type="button">Login</button>
+          <button type="button" id="clearSavedLoginBtn" class="btn secondary">Clear Saved Login</button>
+        </div>
+        <p id="dashShowManagedWrap" class="dash-login-switch hidden">
+          <a href="#" id="dashShowManagedLink" class="dash-text-link">Sign in with Google instead</a>
         </p>
       </div>
+      <p id="dashLoginUnavailable" class="hint hidden" role="status">
+        Sign-in is not configured on this server. Set Google (Supabase) keys for managed auth, or enable
+        <code>ALLOW_DEV_AUTH</code> with <code>DEV_AUTH_SECRET</code> for self-host.
+      </p>
       <p id="loginError" class="error hidden" role="alert"></p>
     </section>
 
@@ -182,6 +209,22 @@
       </div>
 
       <div id="tabSettings" class="dash-tab-panel hidden">
+        <div id="billingPanel" class="panel hidden">
+          <h2>Billing &amp; plans</h2>
+          <p id="billingStatusLine" class="hint"></p>
+          <div id="billingPlanPicker" class="billing-plan-grid"></div>
+          <label id="billingTermsLabel" class="billing-terms-check hint">
+            <input type="checkbox" id="billingAcceptTerms" />
+            I agree to the
+            <a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a>
+            and
+            <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+          </label>
+          <div class="row account-session-actions billing-actions">
+            <button type="button" id="manageBillingBtn" class="btn secondary dash-action-btn hidden">Manage billing</button>
+          </div>
+          <p id="billingNotice" class="hint hidden" aria-live="polite"></p>
+        </div>
         <div class="panel">
           <h2>Guest Remote Control Sessions</h2>
           <p class="hint">
@@ -415,8 +458,10 @@
     <div class="dash-modal-card panel dash-confirm-card">
       <h2 id="dashAccountTitle">Account</h2>
       <p id="userEmail" class="account-email"></p>
+      <p id="accountPlanLine" class="hint"></p>
       <p id="quotaSummary" class="hint"></p>
       <div class="stats-toolbar dash-confirm-actions account-session-actions">
+        <button type="button" id="accountManageBillingBtn" class="btn secondary dash-action-btn hidden" title="Manage billing">Manage billing</button>
         <button type="button" id="signOutBtn" class="btn dash-action-btn" title="Sign Out" aria-label="Sign Out">
           <svg class="dash-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
           <span class="dash-action-label">Sign Out</span>
@@ -429,6 +474,6 @@
       </div>
     </div>
   </div>
-  <script type="module" src="/web/dashboard/app.js?v=8.1.0.24"></script>
+  <script type="module" src="/web/dashboard/app.js?v=8.1.0.30"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 /**
  * Cloud access: Stripe subscription active/trialing, or unexpired admin support trial.
- * Paid tiers / product trials are owned by Stripe (future); trial_ends_at is support-only.
+ * Paid tiers / product trials are owned by Stripe; trial_ends_at is support-only.
  */
 
 export function parseTrialEndsAtMs(trialEndsAt) {

@@ -24,8 +24,9 @@ CREATE TABLE IF NOT EXISTS accounts (
   auth_user_id TEXT UNIQUE,
   email TEXT NOT NULL,
   stripe_customer_id TEXT,
-  subscription_status TEXT NOT NULL DEFAULT 'active',
-  subscription_tier TEXT NOT NULL DEFAULT 'starter',
+  subscription_status TEXT NOT NULL DEFAULT 'inactive',
+  subscription_tier TEXT NOT NULL DEFAULT 'streamer',
+  stripe_subscription_id TEXT,
   trial_ends_at TEXT,
   sessions_invalid_after TEXT,
   session_epoch INTEGER NOT NULL DEFAULT 1,
@@ -132,6 +133,9 @@ function ensureAccountColumns(database) {
   }
   if (!cols.has('trial_ends_at')) {
     database.exec('ALTER TABLE accounts ADD COLUMN trial_ends_at TEXT');
+  }
+  if (!cols.has('stripe_subscription_id')) {
+    database.exec('ALTER TABLE accounts ADD COLUMN stripe_subscription_id TEXT');
   }
 }
 
@@ -314,8 +318,13 @@ export function verifyApiKey(key, hash) {
 
 /** Sync helper for default tier (avoid circular import with quotas.js). */
 function defaultTierSync() {
-  const raw = (process.env.TIER_DEFAULT || (config.allowDevAuth ? 'selfhost' : 'starter')).toLowerCase();
-  return raw || 'starter';
+  const raw = (process.env.TIER_DEFAULT || (config.allowDevAuth ? 'selfhost' : 'streamer')).toLowerCase().trim();
+  return raw || 'streamer';
+}
+
+/** Managed cloud: new accounts start inactive until Checkout. Self-host: active. */
+function defaultSubscriptionStatusSync() {
+  return config.allowDevAuth ? 'active' : 'inactive';
 }
 
 /** Dev / self-host / OAuth: ensure account exists (no default room — rooms are created on dock join). */
@@ -325,15 +334,68 @@ export function ensureAccount(email, authUserId = null) {
   if (!account) {
     const id = uuidv4();
     const tier = defaultTierSync();
+    const status = defaultSubscriptionStatusSync();
     database.prepare(
-      `INSERT INTO accounts (id, auth_user_id, email, subscription_tier) VALUES (?, ?, ?, ?)`
-    ).run(id, authUserId, email, tier);
+      `INSERT INTO accounts (id, auth_user_id, email, subscription_tier, subscription_status)
+       VALUES (?, ?, ?, ?, ?)`
+    ).run(id, authUserId, email, tier, status);
     account = database.prepare('SELECT * FROM accounts WHERE id = ?').get(id);
   } else if (authUserId && !account.auth_user_id) {
     database.prepare('UPDATE accounts SET auth_user_id = ? WHERE id = ?').run(authUserId, account.id);
     account = database.prepare('SELECT * FROM accounts WHERE id = ?').get(account.id);
   }
   return { account, room: null };
+}
+
+export function setAccountStripeCustomerId(accountId, customerId) {
+  if (!accountId || !customerId) return getAccountById(accountId);
+  getDb().prepare(
+    `UPDATE accounts SET stripe_customer_id = ? WHERE id = ?`
+  ).run(customerId, accountId);
+  return getAccountById(accountId);
+}
+
+export function findAccountIdByStripeCustomerId(customerId) {
+  if (!customerId) return null;
+  const row = getDb().prepare(
+    `SELECT id FROM accounts WHERE stripe_customer_id = ?`
+  ).get(customerId);
+  return row?.id || null;
+}
+
+/**
+ * Sync Stripe subscription fields onto an account.
+ * Omits undefined fields; null clears stripe_subscription_id / trial only when passed.
+ */
+export function updateAccountSubscription(accountId, {
+  subscriptionStatus,
+  subscriptionTier,
+  stripeCustomerId,
+  stripeSubscriptionId,
+} = {}) {
+  const existing = getAccountById(accountId);
+  if (!existing) return null;
+  const nextStatus = subscriptionStatus != null
+    ? String(subscriptionStatus)
+    : existing.subscription_status;
+  const nextTier = subscriptionTier != null
+    ? String(subscriptionTier)
+    : existing.subscription_tier;
+  const nextCustomer = stripeCustomerId != null
+    ? String(stripeCustomerId)
+    : existing.stripe_customer_id;
+  const nextSubId = stripeSubscriptionId !== undefined
+    ? (stripeSubscriptionId || null)
+    : (existing.stripe_subscription_id || null);
+  getDb().prepare(
+    `UPDATE accounts
+     SET subscription_status = ?,
+         subscription_tier = ?,
+         stripe_customer_id = ?,
+         stripe_subscription_id = ?
+     WHERE id = ?`
+  ).run(nextStatus, nextTier, nextCustomer, nextSubId, accountId);
+  return getAccountById(accountId);
 }
 
 /** Rooms with no room_docks mapping (junk from legacy signup / disabled POST). */

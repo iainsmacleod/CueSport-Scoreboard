@@ -548,7 +548,7 @@ async function handleRoomClientJoin(ws, meta, msg, authenticateJoin) {
 
   if (isControlClient(client)) {
     const owner = sqlite.getAccountById(room.account_id);
-    const max = getMaxControlConnections(owner || { subscription_tier: 'starter' });
+    const max = getMaxControlConnections(owner || { subscription_tier: 'streamer' });
     if (countControlConnections(roomId) >= max) {
       send(ws, {
         type: 'error',

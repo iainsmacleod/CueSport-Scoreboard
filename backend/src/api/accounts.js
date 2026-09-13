@@ -22,6 +22,7 @@ import { config } from '../config.js';
 import {
   assertCanCreateApiKey,
   getAccountQuota,
+  getTierDisplayName,
 } from '../quotas.js';
 import {
   OBS_DOCK_OWNER_GUEST_LABEL,
@@ -32,6 +33,8 @@ import {
   permissionsForAuth,
 } from '../lib/dock-roles.js';
 import { isPlatformAdmin } from '../lib/platform-admin.js';
+import { hasCloudSubscriptionAccess } from '../lib/subscription-access.js';
+import { isStripeConfigured } from '../lib/stripe-billing.js';
 
 function enrichRoom(room) {
   const cleanupMs = getRoomCleanupAfter(room.id);
@@ -97,15 +100,28 @@ export async function registerAccountRoutes(app) {
     const account = auth.account;
     const rooms = sqlite.getRoomsWithLiveState(account.id).map(enrichRoom);
     const keys = sqlite.getApiKeysForAccount(account.id);
+    const hasAccess = hasCloudSubscriptionAccess(account);
+    const status = String(account.subscription_status || '').toLowerCase();
     return {
       account: {
         id: account.id,
         email: account.email,
         subscription_status: account.subscription_status,
         subscription_tier: account.subscription_tier,
+        subscription_tier_display: getTierDisplayName(account.subscription_tier),
         trial_ends_at: account.trial_ends_at || null,
+        stripe_customer_id: account.stripe_customer_id || null,
+        has_subscription_access: hasAccess,
+        needs_plan: !hasAccess && !config.allowDevAuth,
+        is_trialing: status === 'trialing',
       },
       is_platform_admin: isPlatformAdmin(account),
+      billing: {
+        stripeConfigured: isStripeConfigured() && !config.allowDevAuth,
+        plansUrl: '/api/billing/plans',
+        termsUrl: `${config.publicUrl}/terms`,
+        privacyUrl: `${config.publicUrl}/privacy`,
+      },
       rooms,
       api_keys: keys,
       quota: getAccountQuota(account),
@@ -242,6 +258,12 @@ export async function registerAccountRoutes(app) {
     if (!isAccountAdminAuth(auth)) {
       return reply.code(403).send({ error: 'Account sign-in required' });
     }
+    if (!hasCloudSubscriptionAccess(auth.account)) {
+      return reply.code(403).send({
+        error: 'An active subscription or trial is required to create OBS Dock Keys. Choose a plan to continue.',
+        code: 'subscription_required',
+      });
+    }
     const check = assertCanCreateApiKey(auth.account);
     if (!check.ok) {
       return reply.code(403).send({
@@ -370,8 +392,14 @@ export async function registerAccountRoutes(app) {
     publicUrl: config.publicUrl,
     supabaseUrl: config.supabaseUrl || null,
     supabasePublishableKey: config.supabasePublishableKey || null,
+    /** Google Web Client ID for official GIS button (optional; falls back to Supabase OAuth redirect). */
+    googleOAuthClientId: config.googleOAuthClientId || null,
     allowDevAuth: config.allowDevAuth,
     devAuthConfigured: isDevAuthConfigured(),
+    termsUrl: `${config.publicUrl}/terms`,
+    privacyUrl: `${config.publicUrl}/privacy`,
+    supportIssuesUrl: config.supportIssuesUrl,
+    billingEnabled: isStripeConfigured() && !config.allowDevAuth,
   }));
 }
 

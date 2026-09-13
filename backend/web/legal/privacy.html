@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Privacy Policy — {{ENTITY_NAME}}</title>
+  <link rel="icon" type="image/png" href="/web/images/balls/8ball_small.png" />
+  <link rel="stylesheet" href="/web/shared/styles.css" />
+  <style>
+    .legal-main { max-width: 44rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+    .legal-main h1 { font-size: 1.6rem; margin-bottom: 0.35rem; }
+    .legal-main h2 { font-size: 1.15rem; margin-top: 1.75rem; }
+    .legal-main p, .legal-main li { line-height: 1.55; }
+    .legal-meta { opacity: 0.8; font-size: 0.9rem; margin-bottom: 1.5rem; }
+    .legal-notice { border-left: 3px solid #888; padding-left: 0.75rem; margin: 1rem 0; opacity: 0.95; }
+    .legal-nav { margin: 1rem 0 0; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header-inner">
+      <div><h1>{{ENTITY_NAME}}</h1></div>
+      <nav class="site-nav">
+        <a class="btn" href="/dashboard">Dashboard</a>
+        <a class="btn" href="/terms">Terms</a>
+      </nav>
+    </div>
+  </header>
+  <main class="legal-main">
+    <h1>Privacy Policy</h1>
+    <p class="legal-meta">Effective date: {{EFFECTIVE_DATE}} · Operator: {{ENTITY_NAME}}</p>
+
+    <p class="legal-notice">
+      This is a conservative template for the managed CueSport Cloud service.
+      Have counsel review it for {{GOVERNING_LAW}} before commercial reliance.
+    </p>
+
+    <h2>1. Who we are</h2>
+    <p>
+      {{ENTITY_NAME}} operates the managed hosting service at
+      <a href="{{PUBLIC_URL}}">{{PUBLIC_URL}}</a>. Contact for privacy requests:
+      {{LEGAL_CONTACT_EMAIL}}.
+    </p>
+
+    <h2>2. AI used in building the product (not in processing your data by default)</h2>
+    <p>
+      AI coding assistants and related tools were used to help create and maintain the software and
+      this hosted service. That is a development practice. Under normal operation of the managed
+      service, we do <strong>not</strong> send your account, match, or billing data to AI providers
+      for training or automated analysis. If that ever changes in a material way, we will update this
+      Privacy Policy and provide notice as described below. Human operators remain responsible for
+      the service; see also the <a href="/terms">Terms of Service</a> (Use of AI in creating the product).
+    </p>
+
+    <h2>3. What we collect</h2>
+    <ul>
+      <li>Account identity from Google / Supabase Auth (for example email and auth subject id).</li>
+      <li>OBS Dock Keys, usage metadata, rooms/tables, and connection activity needed to run the relay.</li>
+      <li>Match, event, and room data the product stores on the operator&rsquo;s servers.</li>
+      <li>Billing identifiers via Stripe (card data is handled by Stripe; we do not store full card numbers).</li>
+      <li>Optional stream listing metadata you choose to publish.</li>
+    </ul>
+
+    <h2>4. Why we process it</h2>
+    <p>
+      We process this information to provide the hosted service, authenticate users, enforce plan quotas,
+      bill subscriptions, prevent abuse, secure the systems, and comply with law.
+    </p>
+
+    <h2>5. Service providers</h2>
+    <p>
+      Processing may involve Google (sign-in), Supabase Auth (identity), Stripe (payments), and the
+      VPS / hosting provider that runs the application and database. Those providers process data on
+      our behalf or as independent controllers for their own services (for example Google Account login).
+    </p>
+
+    <h2>6. Operator access</h2>
+    <p>
+      As host, the operator may access customer data on the managed service for operations, security,
+      abuse prevention, billing, and legal compliance.
+    </p>
+
+    <h2>7. Retention and deletion</h2>
+    <p>
+      We retain account and operational data for as long as needed to provide the service and meet
+      legitimate operational, billing, and legal needs. To request account deletion or a privacy-related
+      change, contact {{LEGAL_CONTACT_EMAIL}}. Some records may be retained where required by law or
+      for security and dispute resolution.
+    </p>
+
+    <h2>8. Sharing and selling</h2>
+    <p>
+      We do not sell personal data. We share data with service providers as needed to operate the
+      service, or when required by law.
+    </p>
+
+    <h2>9. International transfers</h2>
+    <p>
+      Servers and processors may be located outside your country. Where transfers occur, we rely on
+      appropriate mechanisms available to the service providers and applicable law.
+    </p>
+
+    <h2>10. Your choices</h2>
+    <p>
+      You can disconnect Google sign-in from your side, cancel billing via the Stripe Customer Portal,
+      stop publishing stream listings, and contact us about deletion requests. Product feedback:
+      <a href="{{SUPPORT_ISSUES_URL}}" rel="noopener noreferrer" target="_blank">GitHub Issues</a>.
+    </p>
+
+    <h2>11. Changes</h2>
+    <p>
+      We may update this Privacy Policy. Material changes will be noted via the site or dashboard.
+      Continued use after the effective date constitutes acceptance where permitted by law.
+    </p>
+
+    <p class="legal-nav"><a href="/terms">Terms of Service</a> · <a href="/dashboard">Dashboard</a></p>
+  </main>
+</body>
+</html>

@@ -572,6 +572,48 @@ export async function invalidateAllSessions(serverUrl, token) {
   return res.json();
 }
 
+export async function fetchBillingPlans(serverUrl, token) {
+  const base = (serverUrl || window.location.origin).replace(/\/$/, '');
+  const headers = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(`${base}/api/billing/plans`, { headers });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to load plans');
+  }
+  return res.json();
+}
+
+export async function startBillingCheckout(serverUrl, token, tier, acceptedTerms) {
+  const base = serverUrl.replace(/\/$/, '');
+  const res = await fetch(`${base}/api/billing/checkout`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ tier, acceptedTerms: !!acceptedTerms }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Checkout failed');
+  }
+  return res.json();
+}
+
+export async function openBillingPortal(serverUrl, token) {
+  const base = serverUrl.replace(/\/$/, '');
+  const res = await fetch(`${base}/api/billing/portal`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Billing portal unavailable');
+  }
+  return res.json();
+}
+
 export const GAME_TYPES = [
   { id: 'game1', label: '8-Ball' },
   { id: 'game2', label: '9-Ball' },

@@ -5,22 +5,38 @@ import * as sqlite from './db/sqlite.js';
  *  maxApiKeys = how many docks/tables you can connect (create one key per table)
  *  maxRooms = safety ceiling on room rows (should track keys); not a user-facing meter
  *  maxControlConnectionsPerRoom = mobile + guest connections per table (dock not counted)
+ *
+ *  Paid / managed ids: streamer, tournament_organizer, league_director, network_organization
+ *  Self-host only: selfhost
  */
+export const TIER_DISPLAY_NAMES = {
+  streamer: 'Streamer',
+  tournament_organizer: 'Tournament Organizer',
+  league_director: 'League Director',
+  network_organization: 'Network Organization',
+  selfhost: 'Self-host',
+};
+
 const BUILTIN_TIERS = {
-  starter: {
+  streamer: {
     maxApiKeys: 2,
     maxRooms: 2,
     maxControlConnectionsPerRoom: 5,
   },
-  pro: {
+  tournament_organizer: {
     maxApiKeys: 3,
     maxRooms: 3,
     maxControlConnectionsPerRoom: 5,
   },
-  enterprise: {
+  league_director: {
     maxApiKeys: 10,
     maxRooms: 10,
     maxControlConnectionsPerRoom: 5,
+  },
+  network_organization: {
+    maxApiKeys: 25,
+    maxRooms: 25,
+    maxControlConnectionsPerRoom: 10,
   },
   selfhost: {
     maxApiKeys: 2,
@@ -49,6 +65,10 @@ function parseEnvInt(value, fallback) {
   return Number.isFinite(n) && n >= 0 ? n : fallback;
 }
 
+function canonicalizeTierKey(tier) {
+  return String(tier || '').toLowerCase().trim();
+}
+
 function loadTierCatalog() {
   let tiers = cloneTiers(BUILTIN_TIERS);
 
@@ -57,8 +77,10 @@ function loadTierCatalog() {
       const parsed = JSON.parse(process.env.TIER_LIMITS_JSON);
       for (const [tier, limits] of Object.entries(parsed)) {
         if (!limits || typeof limits !== 'object') continue;
-        const base = tiers[tier] || BUILTIN_TIERS.starter;
-        tiers[tier] = {
+        const id = canonicalizeTierKey(tier);
+        if (!id || !BUILTIN_TIERS[id]) continue;
+        const base = tiers[id] || BUILTIN_TIERS.streamer;
+        tiers[id] = {
           maxApiKeys: parseEnvInt(limits.maxApiKeys, base.maxApiKeys),
           maxRooms: parseEnvInt(limits.maxRooms, base.maxRooms),
           maxControlConnectionsPerRoom: parseEnvInt(
@@ -87,11 +109,10 @@ function loadTierCatalog() {
 
 const tierCatalog = loadTierCatalog();
 const fallbackTier = (() => {
-  const fromEnv = (process.env.TIER_DEFAULT || '').toLowerCase();
+  const fromEnv = canonicalizeTierKey(process.env.TIER_DEFAULT || '');
   if (fromEnv && tierCatalog[fromEnv]) return fromEnv;
-  // Self-host / dev auth defaults to selfhost tier (same caps as starter unless overridden).
   if (process.env.ALLOW_DEV_AUTH !== 'false') return 'selfhost';
-  return 'starter';
+  return 'streamer';
 })();
 
 export function getTiersCatalog() {
@@ -102,9 +123,18 @@ export function getDefaultTierName() {
   return fallbackTier;
 }
 
+export function getTierDisplayName(tier) {
+  const id = normalizeTierName(tier);
+  return TIER_DISPLAY_NAMES[id] || id;
+}
+
 export function normalizeTierName(tier) {
-  const key = String(tier || fallbackTier).toLowerCase();
+  const key = canonicalizeTierKey(tier || fallbackTier);
   return tierCatalog[key] ? key : fallbackTier;
+}
+
+export function getPaidSelfServeTier() {
+  return ['streamer', 'tournament_organizer', 'league_director'];
 }
 
 export function getTierLimits(accountOrTier) {
@@ -126,6 +156,7 @@ export function getAccountQuota(account) {
   const usage = getAccountUsage(account.id);
   return {
     tier: limits.tier,
+    tierDisplayName: getTierDisplayName(limits.tier),
     limits: {
       maxApiKeys: limits.maxApiKeys,
       maxRooms: limits.maxRooms,
@@ -141,7 +172,7 @@ export function assertCanCreateApiKey(account) {
     return {
       ok: false,
       code: 'api_key_limit',
-      message: `OBS Dock Key limit reached (${quota.limits.maxApiKeys} on ${quota.tier} plan). Each key connects one dock — remove an unused key or upgrade your plan.`,
+      message: `OBS Dock Key limit reached (${quota.limits.maxApiKeys} on ${quota.tierDisplayName} plan). Each key connects one dock — remove an unused key or upgrade your plan.`,
       quota,
     };
   }
@@ -154,7 +185,7 @@ export function assertCanCreateRoom(account) {
     return {
       ok: false,
       code: 'room_limit',
-      message: `Table limit reached (${quota.limits.maxRooms} on ${quota.tier} plan). Upgrade for more tables.`,
+      message: `Table limit reached (${quota.limits.maxRooms} on ${quota.tierDisplayName} plan). Upgrade for more tables.`,
       quota,
     };
   }

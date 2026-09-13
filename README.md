@@ -19,6 +19,7 @@ Display player names, race and game info, racks (and balls where needed), logos,
 ## Table of Contents
 
 - [Acknowledgement](#acknowledgement)
+- [AI-assisted development](#ai-assisted-development)
 - [How It Works](#how-it-works)
 - [Screenshots](#screenshots)
 - [Installation](#installation)
@@ -59,6 +60,10 @@ Display player names, race and game info, racks (and balls where needed), logos,
 - https://g4billiards.com | http://www.g4creations.com
 
 This fork focuses on a clearer control panel, stronger OBS integration (WebSocket replay and stream listing), and local player statistics. The original Salotto logo is not bundled; you can upload any logo you like. CueSport uses five custom logo slots: two for players and three for a sponsor slideshow.
+
+## AI-assisted development
+
+Parts of this project (code, docs, and the managed Cloud legal templates) were created and maintained with help from **AI coding assistants**, under human direction and review. That does not change the GPL license, ownership of your local data, or how the optional managed hosting service handles customer data — see `/terms` and `/privacy` on a Cloud deployment for the hosted-service wording.
 
 ---
 
@@ -343,7 +348,7 @@ docker compose up -d --build
 ```
 
 1. Open **http://localhost:3000/dashboard** (or **:4003** with Docker) and **dev sign-in** with your `DEV_AUTH_SECRET` (requires `DEV_AUTH_ACCOUNT_EMAIL` in `.env` too).
-2. Create an **OBS Dock Key** per table (starter plan: 2 seats). Paste each key into that dock’s CueSport Cloud **Connection settings** (⚙) — managed or Self-hosting. Each key may only be connected on one dock at a time. **One Dock Key = one cloud table**; rooms are created automatically when the dock connects (local `?instance=` does not create separate cloud tables).
+2. Create an **OBS Dock Key** per table (Streamer plan: 2 seats). Paste each key into that dock’s CueSport Cloud **Connection settings** (⚙) — managed or Self-hosting. Each key may only be connected on one dock at a time. **One Dock Key = one cloud table**; rooms are created automatically when the dock connects (local `?instance=` does not create separate cloud tables).
 3. Enable the **CueSport Cloud** toggle on the dock.
 4. On your phone, open **http://localhost:3000/m/{room_id}** — if you already signed in on the dashboard in the same browser, tap **Connect**; on a new device, enter the dev secret once (it is saved for next time).
 5. Optional: from mobile **Share**, create a **guest link** (`/g/{token}`) for helpers. Guests can score with the same action balls as the dock for that game (foul, undo, free ball on Snooker, respot on Bank/One Pocket), change game setup (type + options, race, event info), and Restart/End/Call Match, but cannot edit names. Standard guests cannot use Stream/Share; an **OBS Dock Owner** guest link can. Only one device may use a given guest link at once; revoke the link when you want it invalidated.
@@ -356,7 +361,7 @@ See [`backend/README.md`](backend/README.md) for Supabase/Google OAuth productio
 |---|--------|-----------|
 | Auth | Google for account + OBS Dock Key per dock | Dev secret on dashboard; OBS Dock Key + server URL in dock Connection settings → Self-hosting |
 | Backend | `cuesports.macleod.systems` | Your own `backend/` deployment |
-| Cost | Optional paid tier via Stripe (later); platform admins can grant a time-boxed **support trial** | Free (you run the server) |
+| Cost | Optional paid tiers via Stripe Checkout (30-day trial); platform admins can grant a time-boxed **support trial** | Free (you run the server) |
 | Platform admin | `PLATFORM_ADMIN_EMAILS` allowlist → Admin tab + `/api/admin/*` | Usually unused; same env var works if you want it |
 
 ---
@@ -573,9 +578,9 @@ Reads `DEV_AUTH_SECRET` from `backend/.env`. Options: `--skip-api`, `--skip-smok
 
 **CueSport Cloud** (requires `backend` running on port 3000 or 4003):
 
-- API/WebSocket (headless): `cd backend && npm test` (or `npm test -- http://localhost:4003`) — includes guest link create/join, **single-session** rejection, reconnect after close, revoke-all kick, and **Kill / abandon** of in-progress matches (`dockNotified` + `abandon_match` relay when a dock is connected)
+- API/WebSocket (headless): `cd backend && npm test` (or `npm test -- http://localhost:4003`) — includes guest link create/join, **single-session** rejection, reconnect after close, revoke-all kick, **Kill / abandon** of in-progress matches (`dockNotified` + `abandon_match` relay when a dock is connected), **tier catalog** (`streamer` / `tournament_organizer` / `league_director`), **billing plans / checkout gates**, `/terms`+`/privacy` AI disclosure, and subscription inactive dock-key / WS gates
 - Browser relay tests: `http://localhost:8765/tests/cloud_relay_test.html` (`?server=…&dev_secret=…`) — dock/mobile join, command relay, guest allowlist + single-session
-- Control panel **Cloud** suite in smoke tests above (includes guest setup command coverage on the dock); optional live backend checks via `?cloud=http://localhost:4003&dev_secret=…` on the smoke_test URL
+- Control panel **Cloud** suite in smoke tests above (includes Google Sign-in **image** button, guest setup command coverage on the dock); optional live backend checks via `?cloud=http://localhost:4003&dev_secret=…` on the smoke_test URL
 - **Game type scenarios** (stats data): `http://localhost:8765/tests/game_type_scenarios_test.html` — 8/9/10/Bank/One Pocket (B&R, TR, fouls, ≥5 racks) and Snooker (147, golden 167, foul/free-ball frames). Loops shuffle game order and who scores, and mix object-ball pots, fouls, respots, and undos; use `?loops=N`, optional `?seed=…` for reproducibility, and `?autorun=1` for headless runs.
 - Unattended browser suites also accept `?autorun=1` (used by `tests/run-all.mjs`)
 

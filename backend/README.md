@@ -75,15 +75,22 @@ See [`.env.example`](.env.example).
 | `SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_…` — browser OAuth + server `createClient` (not legacy `anon`) |
 | `SUPABASE_SECRET_KEY` | `sb_secret_…` — server-only (not legacy `service_role`; never send to browsers) |
 | `SUPABASE_JWT_SECRET` | JWT verification (or use JWKS) |
+| `GOOGLE_OAUTH_CLIENT_ID` | Google Web Client ID for the [official GIS Sign in with Google button](https://developers.google.com/identity/gsi/web/guides/display-button). Same client as Supabase → Auth → Google. Add `PUBLIC_URL` (and `http://localhost:3000` for local) as Authorized JavaScript origins. If unset, dashboard falls back to Supabase OAuth redirect. |
 | `ALLOW_DEV_AUTH` | Enable secret dev-login when Supabase not configured |
 | `DEV_AUTH_SECRET` | Shared secret for dev login (required when dev auth is on) |
 | `DEV_AUTH_ACCOUNT_EMAIL` | Email for the single self-host account (required when dev auth is on; use your Google address to ease later managed migration) |
 | `PLATFORM_ADMIN_EMAILS` | Comma-separated Google emails allowed to use `/api/admin/*` and the dashboard **Admin** tab (hosted multi-tenant support) |
-| `TIER_DEFAULT` | Default subscription tier name (`starter`, `pro`, `enterprise`, `selfhost`) |
+| `TIER_DEFAULT` | Default subscription tier (`streamer`, `tournament_organizer`, `league_director`, `network_organization`, `selfhost`) |
 | `TIER_LIMITS_JSON` | Optional JSON override of the full tier catalog |
 | `TIER_{TIER}_MAX_API_KEYS` | Per-tier OBS Dock Key (seat) cap |
 | `TIER_{TIER}_MAX_ROOMS` | Safety ceiling on room rows (instance churn); not shown as “tables used” |
 | `TIER_{TIER}_MAX_CONTROL_CONNECTIONS` | Per-tier mobile+guest connections per table |
+| `STRIPE_SECRET_KEY` | Stripe secret key (managed billing; leave empty on self-host) |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret |
+| `STRIPE_PRICE_STREAMER` / `STRIPE_PRICE_TOURNAMENT_ORGANIZER` / `STRIPE_PRICE_LEAGUE_DIRECTOR` | Stripe Price IDs for self-serve tiers |
+| `STRIPE_TRIAL_DAYS` | Checkout trial length (default `30`) |
+| `BILLING_CONTACT_URL` | Contact CTA for Network Organization (e.g. `mailto:…`) |
+| `SUPPORT_ISSUES_URL` / `LEGAL_CONTACT_EMAIL` / `LEGAL_ENTITY_NAME` / `LEGAL_GOVERNING_LAW` | Legal page placeholders (`/terms`, `/privacy`) |
 | `ROOM_CLEANUP_GRACE_MS` | After last dock leaves, wait before deleting the room (default 45m) |
 | `ROOM_IDLE_TTL_MS` | Delete mapped rooms older than this `last_seen_at` (default 14d) |
 | `ROOM_CLEANUP_SWEEPER_MS` | How often the sweeper runs (default 10m) |
@@ -93,9 +100,10 @@ Built-in defaults (all overridable via the env vars above).
 
 | Tier | Dock keys (seats) | Room safety cap | Mobile + guest / table |
 |------|-------------------|-----------------|------------------------|
-| `starter` | 2 | 2 | 5 |
-| `pro` | 3 | 3 | 5 |
-| `enterprise` | 10 | 10 | 5 |
+| `streamer` | 2 | 2 | 5 |
+| `tournament_organizer` | 3 | 3 | 5 |
+| `league_director` | 10 | 10 | 5 |
+| `network_organization` | 25 | 25 | 10 |
 | `selfhost` | 2 | 2 | 5 |
 
 ## Supabase setup (production)
@@ -106,14 +114,26 @@ Built-in defaults (all overridable via the env vars above).
 4. Add redirect URLs: `{PUBLIC_URL}/web/dashboard/`, `{PUBLIC_URL}/auth/callback`.
 5. Set env vars in `.env` (including `PLATFORM_ADMIN_EMAILS` for your ops Google accounts) and deploy.
 
-On first Google sign-in, the server links `auth.users.id` to an `accounts` row. Rooms are created later when an OBS dock connects with a Dock Key.
+On first Google sign-in, the server links `auth.users.id` to an `accounts` row. On managed cloud (`ALLOW_DEV_AUTH=false`), new accounts start **`inactive`** until Stripe Checkout. Existing `active` rows are grandfathered. Rooms are created later when an OBS dock connects with a Dock Key.
+
+### Stripe billing (managed)
+
+1. Create three Stripe Products/Prices (Streamer, Tournament Organizer, League Director).
+2. Set `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and `STRIPE_PRICE_*` in `.env`.
+3. Add webhook endpoint `{PUBLIC_URL}/api/stripe/webhook` for `checkout.session.completed`, `customer.subscription.*`, `invoice.paid`, `invoice.payment_failed`.
+4. Enable Customer Portal (cancel / payment method / switch among the three prices).
+5. Local testing: `stripe listen --forward-to localhost:3000/api/stripe/webhook`.
+
+Checkout uses a **30-day card-required trial** (`STRIPE_TRIAL_DAYS`). Status becomes `trialing`, then `active`. Cancel/manage via Customer Portal. Network Organization is contact-only (`BILLING_CONTACT_URL`).
+
+Legal templates: `/terms` and `/privacy` (replace placeholders; obtain counsel review before commercial reliance).
 
 ### Platform admin + trials
 
 Hosted multi-tenant support is gated by **`PLATFORM_ADMIN_EMAILS`** (not Dock Key roles). Allowlisted users get `is_platform_admin` on `GET /api/me`, an **Admin** tab on the dashboard, and `/api/admin/*` routes (list tenants, read stats, revoke keys, invalidate sessions, grant/end **support trials**).
 
 Access for dock/mobile join allows when **any** of:
-- `subscription_status` is `active` or `trialing` (Stripe product path — Checkout/webhooks are future work), **or**
+- `subscription_status` is `active` or `trialing` (Stripe Checkout + webhooks), **or**
 - `accounts.trial_ends_at` is set and still in the future (**admin support trial** for demos / grace / pre-card).
 
 Paid tiers are **not** edited by the admin UI; product free trials belong on Stripe (`trial_period_days` / `trialing`). Admin only sets `trial_ends_at`.
@@ -128,7 +148,7 @@ Clients send `join` then `event`, `command`, `state`, or `session` messages. See
 
 ## GPL + hosted service
 
-This backend is GPL-licensed alongside the scoreboard. You may run your own instance for free. The author's hosted service at `cuesports.macleod.systems` is an optional managed deployment (uptime, auth, storage).
+This backend is GPL-licensed alongside the scoreboard. You may run your own instance for free. The author's hosted service at `cuesports.macleod.systems` is an optional managed deployment (uptime, auth, storage). The subscription fee covers that managed hosting — not ownership of the GPL software.
 
 ## API
 
@@ -136,7 +156,12 @@ This backend is GPL-licensed alongside the scoreboard. You may run your own inst
 |--------|------|-------------|
 | GET | `/api/config/public` | Client-facing config |
 | POST | `/api/auth/dev-login` | Dev auth (secret → signed token) |
-| GET | `/api/me` | Account, rooms, keys, quota, `is_platform_admin` (Bearer token) |
+| GET | `/api/me` | Account, rooms, keys, quota, billing flags, `is_platform_admin` (Bearer token) |
+| GET | `/api/billing/plans` | Plan catalog (limits + contact tier) |
+| POST | `/api/billing/checkout` | Stripe Checkout session `{ tier, acceptedTerms }` |
+| POST | `/api/billing/portal` | Stripe Customer Portal session |
+| POST | `/api/stripe/webhook` | Stripe webhooks (raw body + signature) |
+| GET | `/terms` / `/privacy` | Hosted Terms + Privacy templates |
 | GET | `/api/admin/accounts` | Platform admin: list tenants (optional `?q=` email filter) |
 | GET | `/api/admin/accounts/:id` | Platform admin: tenant detail + quota |
 | GET | `/api/admin/accounts/:id/stats` | Platform admin: account match stats |
@@ -144,7 +169,7 @@ This backend is GPL-licensed alongside the scoreboard. You may run your own inst
 | DELETE | `/api/admin/accounts/:id/trial` | Platform admin: end support trial |
 | POST | `/api/admin/accounts/:id/invalidate-sessions` | Platform admin: sign out everywhere for tenant |
 | POST | `/api/admin/accounts/:id/api-keys/:keyId/revoke` | Platform admin: revoke dock key |
-| POST | `/api/api-keys` | Create API key (tier-limited) |
+| POST | `/api/api-keys` | Create API key (tier-limited; requires active/trialing access on managed) |
 | GET | `/api/api-keys/:keyId` | View API key plaintext (account owner) |
 | DELETE | `/api/api-keys/:keyId` | Revoke API key (kicks connected dock) |
 | DELETE | `/api/rooms/:roomId` | Delete room/table mapping (keeps match history) |

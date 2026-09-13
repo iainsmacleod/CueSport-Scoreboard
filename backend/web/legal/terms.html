@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Terms of Service — {{ENTITY_NAME}}</title>
+  <link rel="icon" type="image/png" href="/web/images/balls/8ball_small.png" />
+  <link rel="stylesheet" href="/web/shared/styles.css" />
+  <style>
+    .legal-main { max-width: 44rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+    .legal-main h1 { font-size: 1.6rem; margin-bottom: 0.35rem; }
+    .legal-main h2 { font-size: 1.15rem; margin-top: 1.75rem; }
+    .legal-main p, .legal-main li { line-height: 1.55; }
+    .legal-meta { opacity: 0.8; font-size: 0.9rem; margin-bottom: 1.5rem; }
+    .legal-notice { border-left: 3px solid #888; padding-left: 0.75rem; margin: 1rem 0; opacity: 0.95; }
+    .legal-nav { margin: 1rem 0 0; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header-inner">
+      <div><h1>{{ENTITY_NAME}}</h1></div>
+      <nav class="site-nav">
+        <a class="btn" href="/dashboard">Dashboard</a>
+        <a class="btn" href="/privacy">Privacy</a>
+      </nav>
+    </div>
+  </header>
+  <main class="legal-main">
+    <h1>Terms of Service</h1>
+    <p class="legal-meta">Effective date: {{EFFECTIVE_DATE}} · Operator: {{ENTITY_NAME}}</p>
+
+    <p class="legal-notice">
+      These are plain-language template terms for the managed hosting service.
+      They are not a substitute for legal advice. Have counsel review them for your jurisdiction
+      (including {{GOVERNING_LAW}}) before relying on them for commercial billing.
+    </p>
+
+    <h2>1. What you are paying for</h2>
+    <p>
+      The subscription fee is for the <strong>managed CueSport Cloud hosting service</strong> operated at
+      <a href="{{PUBLIC_URL}}">{{PUBLIC_URL}}</a>. As available, that service includes hosted relay and
+      account features (dashboard, WebSocket cloud relay, mobile/guest control paths, match history
+      stored on the operator&rsquo;s servers, and stream listing when you opt in), Google sign-in via the
+      operator&rsquo;s configured auth providers, and plan quotas (for example OBS Dock Keys / connections)
+      for your chosen tier. The operator uses commercially reasonable efforts to keep the service running
+      and to apply updates the operator chooses to ship.
+    </p>
+    <p>
+      The fee is <strong>not</strong> for ownership of the GPL software, a support contract, a guaranteed
+      uptime/SLA, custom development, or liability for your OBS setup, stream, or content.
+    </p>
+
+    <h2>2. Software license vs hosted service</h2>
+    <p>
+      The CueSport Scoreboard software remains available under the GNU GPL for self-hosting.
+      Self-hosters are not managed-service customers under these Terms unless they also use this hosted product.
+      Paying for managed hosting does not transfer ownership of the software.
+    </p>
+
+    <h2>3. Use of AI in creating the product</h2>
+    <p>
+      We are transparent that <strong>artificial intelligence (AI) coding assistants and related tools
+      were used to help design, write, and maintain</strong> parts of this software and the managed
+      hosting service (for example code, documentation, and these legal templates). A human operator
+      directs that work, reviews changes before they are shipped, and remains responsible for the
+      service offered to you.
+    </p>
+    <p>
+      That development practice does <strong>not</strong> mean the managed service itself is an
+      &ldquo;AI product,&rdquo; that outputs are guaranteed error-free, or that your customer data is
+      sent to AI providers as part of normal hosted operation. See the
+      <a href="/privacy">Privacy Policy</a> for what we collect and which service providers process data
+      when you use the hosted service.
+    </p>
+
+    <h2>4. Accounts and acceptable use</h2>
+    <p>
+      You must provide accurate account information and keep your credentials secure.
+      You may not abuse the service, interfere with other users, attempt unauthorized access,
+      or use the service for unlawful content or activity. The operator may suspend or terminate
+      access for abuse, non-payment, or material breach.
+    </p>
+
+    <h2>5. Subscriptions, trials, and billing</h2>
+    <p>
+      Paid plans are billed through Stripe. Self-serve tiers may include a card-required free trial
+      (for example 30 days) as shown at checkout. After a trial, billing continues unless you cancel
+      through the Stripe Customer Portal. Taxes may apply. Plan changes and cancellation are handled
+      in the Customer Portal where available.
+    </p>
+
+    <h2>6. Operator access to hosted data</h2>
+    <p>
+      Because this is a hosted service, the operator may access customer data on the managed systems
+      for operations, security, abuse prevention, billing, and legal compliance. See the
+      <a href="/privacy">Privacy Policy</a> for more detail. Public stream listings only include what
+      you choose to publish.
+    </p>
+
+    <h2>7. Feedback</h2>
+    <p>
+      There is no paid support SLA under these Terms. You may report feedback and bugs via
+      <a href="{{SUPPORT_ISSUES_URL}}" rel="noopener noreferrer" target="_blank">GitHub Issues</a>.
+      Billing or privacy requests: {{LEGAL_CONTACT_EMAIL}}.
+    </p>
+
+    <h2>8. Disclaimer of warranties</h2>
+    <p>
+      The managed service is provided <strong>AS IS</strong> and <strong>AS AVAILABLE</strong>.
+      To the maximum extent permitted by applicable law, the operator disclaims warranties of
+      uninterrupted, error-free, or fit-for-purpose operation.
+    </p>
+
+    <h2>9. Limitation of liability</h2>
+    <p>
+      To the maximum extent permitted by applicable law, the operator is not liable for indirect,
+      incidental, special, consequential, or data-loss damages arising from use of the service.
+      Nothing in these Terms excludes liability that cannot be excluded under applicable law
+      (for example fraud or other non-waivable duties where they apply).
+    </p>
+
+    <h2>10. Changes</h2>
+    <p>
+      The operator may update these Terms or the Privacy Policy. Material changes will be noted
+      via the site or dashboard. Continued use after the effective date of a change constitutes
+      acceptance of the updated terms, subject to applicable law.
+    </p>
+
+    <h2>11. Governing law</h2>
+    <p>
+      These Terms are governed by the laws of {{GOVERNING_LAW}}, without regard to conflict-of-law
+      rules, except where mandatory consumer protections apply. Venue and dispute procedures should
+      be confirmed with counsel before production use.
+    </p>
+
+    <p class="legal-nav"><a href="/privacy">Privacy Policy</a> · <a href="/dashboard">Dashboard</a></p>
+  </main>
+</body>
+</html>

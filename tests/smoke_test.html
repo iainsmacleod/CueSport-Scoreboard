@@ -574,6 +574,13 @@
             assert('Cloud', 'cloudSelfHostPane in DOM', !!cp.document.getElementById('cloudSelfHostPane'));
             assert('Cloud', 'openCloudConnectionModal exposed', typeof cp.openCloudConnectionModal === 'function');
             assert('Cloud', 'cloudManagedApiKeyModal in DOM', !!cp.document.getElementById('cloudManagedApiKeyModal'));
+            assert('Cloud', 'Google Sign in button in managed pane',
+                !!cp.document.querySelector('#cloudManagedPane .gsi-btn')
+                || !!cp.document.querySelector('#cloudManagedPane .google-brand-btn img[alt="Sign in with Google"]'));
+            assert('Cloud', 'Google button uses G logo asset',
+                String(cp.document.querySelector('#cloudManagedPane .gsi-btn-icon img')?.getAttribute('src')
+                    || cp.document.querySelector('#cloudManagedPane img[alt="Sign in with Google"]')?.getAttribute('src')
+                    || '').indexOf('common/images/google/') !== -1);
             assert('Cloud', 'OBS Dock Key label present',
                 (cp.document.querySelector('label[for="cloudApiKeyModal"]')?.textContent || '').indexOf('OBS Dock Key') !== -1);
             assert('Cloud', 'cloudRelayStatus in DOM', !!cp.document.getElementById('cloudRelayStatus'));

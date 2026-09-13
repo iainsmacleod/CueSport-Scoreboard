@@ -8,6 +8,7 @@ import { config } from './config.js';
 import { handleConnection, getConnectionCount, startRoomCleanupSweeper } from './ws/room-hub.js';
 import { registerAccountRoutes } from './api/accounts.js';
 import { registerAdminRoutes } from './api/admin.js';
+import { registerBillingRoutes } from './api/billing.js';
 import { registerEventRoutes } from './api/events.js';
 import { registerQrRoutes } from './api/qr.js';
 import * as sqlite from './db/sqlite.js';
@@ -19,9 +20,12 @@ const app = Fastify({ logger: true });
 
 // Dock/mobile DELETE calls may send Content-Type: application/json with an empty body.
 // Fastify's default JSON parser rejects that as 400; treat empty as {}.
-app.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body, done) => {
+// Keep rawBody for Stripe webhook signature verification.
+app.addContentTypeParser('application/json', { parseAs: 'buffer' }, (req, body, done) => {
   try {
-    const raw = typeof body === 'string' ? body : '';
+    const buf = Buffer.isBuffer(body) ? body : Buffer.from(body || '');
+    req.rawBody = buf;
+    const raw = buf.toString('utf8');
     done(null, raw.trim() ? JSON.parse(raw) : {});
   } catch (err) {
     err.statusCode = 400;
@@ -45,6 +49,24 @@ function sendWebHtml(reply, relativePath) {
   // Always revalidate shell HTML so ?v= cache-busters on scripts/CSS take effect.
   reply.header('Cache-Control', 'no-store');
   reply.type('text/html').send(html);
+}
+
+function renderLegalPage(templateName, extras = {}) {
+  const filePath = path.join(webRoot, 'legal', templateName);
+  if (!fs.existsSync(filePath)) return null;
+  let html = fs.readFileSync(filePath, 'utf8');
+  const replacements = {
+    '{{ENTITY_NAME}}': config.legalEntityName,
+    '{{PUBLIC_URL}}': config.publicUrl,
+    '{{SUPPORT_ISSUES_URL}}': config.supportIssuesUrl,
+    '{{LEGAL_CONTACT_EMAIL}}': config.legalContactEmail || 'Not configured — set LEGAL_CONTACT_EMAIL',
+    '{{GOVERNING_LAW}}': config.legalGoverningLaw,
+    '{{EFFECTIVE_DATE}}': extras.effectiveDate || '2026-09-12',
+  };
+  for (const [token, value] of Object.entries(replacements)) {
+    html = html.split(token).join(String(value));
+  }
+  return html;
 }
 
 // Dock control panel often loads from file:// or a different host than the API.
@@ -109,7 +131,7 @@ const ballImageRoot = resolveBallImageRoot();
 const webBallDir = path.join(webRoot, 'images', 'balls');
 const webBallsInWebRoot = fs.existsSync(path.join(webBallDir, '8ball_small.png'));
 
-if (ballImageRoot) {
+  if (ballImageRoot) {
   await app.register(fastifyStatic, {
     root: ballImageRoot,
     prefix: '/images/balls/',
@@ -135,11 +157,41 @@ if (ballImageRoot) {
   );
 }
 
+function resolveGoogleButtonRoot() {
+  const candidates = [
+    path.join(__dirname, '..', 'web', 'shared', 'google'),
+    path.join(__dirname, '..', 'common', 'images', 'google'),
+    path.join(__dirname, '..', '..', 'common', 'images', 'google'),
+  ];
+  return candidates.find((dir) => fs.existsSync(path.join(dir, 'g-logo.svg')) || fs.existsSync(path.join(dir, 'signin.svg'))) || null;
+}
+
+const googleButtonRoot = resolveGoogleButtonRoot();
+if (googleButtonRoot) {
+  await app.register(fastifyStatic, {
+    root: googleButtonRoot,
+    prefix: '/web/shared/google/',
+    decorateReply: false,
+  });
+}
+
 app.get('/', async (_req, reply) => sendWebHtml(reply, 'public-listing/index.html'));
 app.get('/streams', async (_req, reply) => sendWebHtml(reply, 'public-listing/index.html'));
 app.get('/dashboard', async (_req, reply) => sendWebHtml(reply, 'dashboard/index.html'));
 app.get('/m/:roomId', async (_req, reply) => sendWebHtml(reply, 'mobile/index.html'));
 app.get('/g/:guestToken', async (_req, reply) => sendWebHtml(reply, 'mobile/index.html'));
+app.get('/terms', async (_req, reply) => {
+  const html = renderLegalPage('terms.html');
+  if (!html) return reply.code(404).send({ error: 'Not found' });
+  reply.header('Cache-Control', 'no-store');
+  return reply.type('text/html').send(html);
+});
+app.get('/privacy', async (_req, reply) => {
+  const html = renderLegalPage('privacy.html');
+  if (!html) return reply.code(404).send({ error: 'Not found' });
+  reply.header('Cache-Control', 'no-store');
+  return reply.type('text/html').send(html);
+});
 
 app.get('/health', async () => ({
   ok: true,
@@ -156,6 +208,7 @@ app.get('/ws', { websocket: true }, (socket) => {
 
 await registerAccountRoutes(app);
 await registerAdminRoutes(app);
+await registerBillingRoutes(app);
 await registerEventRoutes(app);
 registerQrRoutes(app);
 

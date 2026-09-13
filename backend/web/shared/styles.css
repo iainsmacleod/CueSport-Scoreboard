@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap");
+
 * { box-sizing: border-box; }
 html {
   /* Keep document scrollable on mobile (avoid clipped stream cards / Watch links). */
@@ -11,7 +13,7 @@ html {
   -webkit-overflow-scrolling: touch;
 }
 body {
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-family: Poppins, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
   margin: 0;
   padding: 0;
   min-height: 100%;
@@ -2528,4 +2530,172 @@ body.controls-locked #reconnectBanner {
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
+}
+
+.google-auth-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  align-items: stretch;
+  margin: 0.75rem 0 0.35rem;
+  max-width: 20rem;
+}
+.gsi-btn-mount {
+  display: flex;
+  justify-content: flex-start;
+  width: 100%;
+  max-width: 20rem;
+  min-height: 40px;
+}
+/* Author display:flex would otherwise override the [hidden] UA rule and leave an empty gap */
+.gsi-btn-mount[hidden] {
+  display: none !important;
+}
+.gsi-btn-mount iframe {
+  margin: 0 !important;
+}
+.dash-login-google-hint {
+  margin: 0 0 0.75rem;
+}
+.dash-login-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: stretch;
+  margin: 0.65rem 0 0.35rem;
+}
+.dash-login-actions .btn {
+  flex: 1 1 10rem;
+  margin: 0;
+  min-width: 0;
+}
+.dash-login-actions .dash-action-btn {
+  justify-content: center;
+}
+/* Google Identity–style button (light theme) — branding guidelines */
+.gsi-btn {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  min-height: 40px;
+  width: 100%;
+  max-width: 20rem;
+  margin: 0;
+  padding: 0 12px 0 12px;
+  border: 1px solid #747775;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #1f1f1f;
+  cursor: pointer;
+  font-family: Poppins, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.15px;
+  line-height: 20px;
+  text-align: center;
+  user-select: none;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+.gsi-btn:hover {
+  background: #f8f9fa;
+  box-shadow: 0 1px 2px rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
+}
+.gsi-btn:active {
+  background: #f1f3f4;
+  box-shadow: none;
+}
+.gsi-btn:focus-visible {
+  outline: 2px solid #7aa2f7;
+  outline-offset: 3px;
+}
+.gsi-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  background: #fff;
+}
+.gsi-btn-icon img {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+.gsi-btn-label {
+  flex: 0 1 auto;
+  white-space: nowrap;
+}
+/* Legacy image-button class still used in older markup / dock fallbacks */
+.google-brand-btn {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  line-height: 0;
+  border-radius: 4px;
+}
+.google-brand-btn:focus-visible {
+  outline: 2px solid #7aa2f7;
+  outline-offset: 3px;
+}
+.google-brand-btn img {
+  display: block;
+  width: min(240px, 100%);
+  height: auto;
+}
+.billing-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11.5rem, 1fr));
+  gap: 0.75rem;
+  margin: 0.75rem 0 1rem;
+}
+.billing-plan-card {
+  border: 1px solid #414868;
+  border-radius: 8px;
+  padding: 0.85rem 0.9rem;
+  background: rgba(26, 27, 38, 0.55);
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  min-width: 0;
+}
+.billing-plan-card h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+.billing-plan-card .billing-plan-limits {
+  margin: 0;
+  font-size: 0.82rem;
+  opacity: 0.88;
+  line-height: 1.35;
+  flex: 1;
+}
+.billing-plan-card.is-current {
+  border-color: #7aa2f7;
+}
+.billing-terms-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  margin: 0 0 0.85rem;
+}
+.billing-terms-check input {
+  margin-top: 0.2rem;
+}
+.plan-trial-badge {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: #3d59a1;
+  color: #c0caf5;
+  vertical-align: middle;
 }
