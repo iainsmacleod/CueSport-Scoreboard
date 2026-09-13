@@ -115,6 +115,10 @@ let isPlatformAdminUser = false;
 let adminAccountsCache = [];
 let adminSelectedId = '';
 let adminSearchTimer = null;
+/** Platform admin: empty = own account; otherwise view that tenant's tables/stats (read-only). */
+let platformViewAccountId = '';
+let platformAccountsForFilter = [];
+let ownDashboardRooms = [];
 
 function show(id, visible) {
   document.getElementById(id).classList.toggle('hidden', !visible);
@@ -466,7 +470,7 @@ function renderTableCards(rooms) {
   container.innerHTML = '';
   const activeRooms = (rooms || []).filter((room) => room.dock_connected);
   if (!activeRooms.length) {
-    container.innerHTML = '<p class="hint">No docks online. Enable CueSport Cloud on an OBS dock — connected tables appear here automatically.</p>';
+    container.innerHTML = '<p class="hint">No docks online. Enable CueSport Scoreboard Cloud on an OBS CueSport Scoreboard dock — connected tables appear here automatically.</p>';
     return;
   }
   activeRooms.forEach((room) => {
@@ -1054,12 +1058,12 @@ async function copyRevealedApiKey(labelEl) {
 function buildApiKeySharePayload(label, key) {
   const server = getServerUrl().replace(/\/$/, '');
   const seat = String(label || 'OBS Dock Key').trim() || 'OBS Dock Key';
-  const subject = `CueSport OBS Dock Key — ${seat}`;
+  const subject = `OBS Dock Key — ${seat}`;
   const text =
-    `CueSport OBS Dock Key — ${seat}\n\n` +
+    `OBS Dock Key — ${seat}\n\n` +
     `Key: ${key}\n` +
     `Server: ${server}\n\n` +
-    'Paste the key into CueSport Cloud settings on the OBS dock (Connection). ' +
+    'Paste the key into CueSport Scoreboard → Cloud Connection settings on the OBS dock. ' +
     'Each dock needs its own key.';
   return { subject, text, seat };
 }
@@ -1346,6 +1350,112 @@ function formatSupportTrial(trialEndsAt) {
   return `${active ? 'Until' : 'Ended'} ${d.toLocaleString()}`;
 }
 
+function isViewingOtherAccount() {
+  return !!(isPlatformAdminUser && platformViewAccountId && lastAccount?.id
+    && platformViewAccountId !== lastAccount.id);
+}
+
+function getPlatformViewAccountLabel() {
+  if (!isViewingOtherAccount()) return '';
+  const hit = platformAccountsForFilter.find((a) => a.id === platformViewAccountId);
+  return hit?.email || platformViewAccountId;
+}
+
+function updatePlatformAccountFilterHint() {
+  const hint = document.getElementById('platformAccountFilterHint');
+  if (!hint) return;
+  if (!isPlatformAdminUser) {
+    hint.textContent = '';
+    return;
+  }
+  if (isViewingOtherAccount()) {
+    hint.textContent = `Viewing ${getPlatformViewAccountLabel()} — tables, matches, and players (read-only). Separate from Dock Key roles and subscription tiers.`;
+    return;
+  }
+  hint.textContent = 'Platform admin: browse another customer’s tables, matches, and players (read-only). Separate from Dock Key roles and subscription tiers.';
+}
+
+async function loadPlatformAccountFilterOptions() {
+  if (!isPlatformAdminUser || !getToken()) return;
+  const data = await adminFetchJson('/api/admin/accounts?limit=200');
+  const accounts = Array.isArray(data.accounts) ? data.accounts : [];
+  platformAccountsForFilter = accounts;
+  const select = document.getElementById('platformAccountFilter');
+  if (!select) return;
+  const ownId = lastAccount?.id || '';
+  const ownEmail = lastAccount?.email || 'My account';
+  const options = [`<option value="">My account (${escapeHtml(ownEmail)})</option>`];
+  accounts
+    .filter((a) => a && a.id && a.id !== ownId)
+    .sort((a, b) => String(a.email || '').localeCompare(String(b.email || '')))
+    .forEach((a) => {
+      options.push(`<option value="${escapeHtml(a.id)}">${escapeHtml(a.email || a.id)}</option>`);
+    });
+  const previous = platformViewAccountId;
+  select.innerHTML = options.join('');
+  if (previous && accounts.some((a) => a.id === previous)) {
+    select.value = previous;
+    platformViewAccountId = previous;
+  } else {
+    select.value = '';
+    platformViewAccountId = '';
+  }
+  updatePlatformAccountFilterHint();
+}
+
+async function applyPlatformAccountFilter(accountId) {
+  platformViewAccountId = String(accountId || '').trim();
+  if (platformViewAccountId && lastAccount?.id && platformViewAccountId === lastAccount.id) {
+    platformViewAccountId = '';
+  }
+  const select = document.getElementById('platformAccountFilter');
+  if (select) select.value = platformViewAccountId;
+  updatePlatformAccountFilterHint();
+  lastTablesFingerprint = '';
+  selectedPlayerKey = '';
+  playerDetailOpponentFilter = '';
+  playerDetailGameFilter = '';
+  playerRenameEditing = false;
+  statsLoaded = false;
+  statsData = null;
+  await refreshTablesForCurrentView();
+  const statsTab = document.getElementById('tabStats');
+  if (statsTab && !statsTab.classList.contains('hidden')) {
+    await loadAccountStats(true);
+  }
+}
+
+async function refreshTablesForCurrentView() {
+  if (!getToken()) return;
+  if (isViewingOtherAccount()) {
+    try {
+      const data = await adminFetchJson(
+        `/api/admin/accounts/${encodeURIComponent(platformViewAccountId)}/tables`
+      );
+      lastDashboardRooms = data.rooms || [];
+      renderTableCards(lastDashboardRooms);
+      renderDebugRooms(ownDashboardRooms);
+    } catch (err) {
+      setError(err.message || 'Failed to load account tables');
+    }
+    return;
+  }
+  lastDashboardRooms = ownDashboardRooms || [];
+  renderTableCards(lastDashboardRooms);
+  renderDebugRooms(lastDashboardRooms);
+}
+
+async function resolvePlayersSearch(query, limit) {
+  if (isViewingOtherAccount()) {
+    const data = await adminFetchJson(
+      `/api/admin/accounts/${encodeURIComponent(platformViewAccountId)}/players?` +
+      new URLSearchParams({ q: query || '', limit: String(limit || 8) }).toString()
+    );
+    return data.players || [];
+  }
+  return fetchPlayers(getServerUrl(), getToken(), query, limit);
+}
+
 function setAdminStatus(msg) {
   const el = document.getElementById('adminStatus');
   if (el) el.textContent = msg || '';
@@ -1355,13 +1465,25 @@ function setPlatformAdminUi(enabled) {
   isPlatformAdminUser = !!enabled;
   const tabBtn = document.getElementById('dashAdminTabBtn');
   if (tabBtn) tabBtn.classList.toggle('hidden', !isPlatformAdminUser);
+  const filterBar = document.getElementById('platformAccountFilterBar');
+  if (filterBar) filterBar.classList.toggle('hidden', !isPlatformAdminUser);
   if (!isPlatformAdminUser) {
+    platformViewAccountId = '';
+    platformAccountsForFilter = [];
     adminSelectedId = '';
     adminAccountsCache = [];
+    const select = document.getElementById('platformAccountFilter');
+    if (select) {
+      select.innerHTML = '<option value="">My account</option>';
+      select.value = '';
+    }
+    updatePlatformAccountFilterHint();
     const detail = document.getElementById('adminDetailPanel');
     if (detail) detail.classList.add('hidden');
     const activeAdmin = document.querySelector('.dash-tab.active[data-tab="admin"]');
     if (activeAdmin) setActiveDashTab('tables');
+  } else {
+    loadPlatformAccountFilterOptions().catch(() => {});
   }
 }
 
@@ -1457,6 +1579,7 @@ async function loadAdminAccountDetail(accountId) {
         <button type="button" class="btn danger dash-action-btn" id="adminEndTrialBtn">End support trial</button>
       </form>
       <div class="admin-detail-actions">
+        <button type="button" class="btn secondary dash-action-btn" id="adminViewAccountDataBtn">View tables &amp; stats</button>
         <button type="button" class="btn secondary dash-action-btn" id="adminInvalidateSessionsBtn">Invalidate sessions</button>
       </div>
       <h3 class="stats-section-title">Dock keys</h3>
@@ -2074,7 +2197,11 @@ function renderAccountStats() {
   } else {
     matchBody.innerHTML = matchList.slice(0, 50).map((m) => matchOverviewRow(m)).join('');
   }
-  if (statusEl) statusEl.textContent = '';
+  if (statusEl) {
+    statusEl.textContent = isViewingOtherAccount()
+      ? `Showing ${getPlatformViewAccountLabel()} (read-only)`
+      : '';
+  }
 }
 
 function matchPairHtml(m) {
@@ -2399,8 +2526,8 @@ function matchOverviewRow(m) {
   const racksToggle = matchRacksToggleButton(m);
   if (racksToggle) actions.push(racksToggle);
   if (inProgress) {
-    actions.push(matchAbandonButton(m.startEventId));
-  } else {
+    if (!isViewingOtherAccount()) actions.push(matchAbandonButton(m.startEventId));
+  } else if (!isViewingOtherAccount()) {
     actions.push(matchEditButton(m.startEventId));
   }
   const main = `
@@ -2522,7 +2649,12 @@ function renderPlayerDetail() {
   }
   if (title) title.textContent = unfilteredName;
   if (rename && document.activeElement !== rename) rename.value = unfilteredName;
+  if (isViewingOtherAccount()) playerRenameEditing = false;
   setPlayerRenameEditing(playerRenameEditing, { focus: false });
+  const renameBtn = document.getElementById('statsPlayerRenameEditBtn');
+  const deleteBtn = document.getElementById('statsPlayerDeleteBtn');
+  renameBtn?.classList.toggle('hidden', isViewingOtherAccount());
+  deleteBtn?.classList.toggle('hidden', isViewingOtherAccount());
   populatePlayerDetailFilters(allMatches);
   if (summary) {
     const cards = [];
@@ -2581,8 +2713,8 @@ function renderPlayerDetail() {
     const racksToggle = matchRacksToggleButton(m);
     if (racksToggle) actions.push(racksToggle);
     if (inProgress) {
-      actions.push(matchAbandonButton(m.startEventId));
-    } else {
+      if (!isViewingOtherAccount()) actions.push(matchAbandonButton(m.startEventId));
+    } else if (!isViewingOtherAccount()) {
       actions.push(matchEditButton(m.startEventId));
     }
     const main = `
@@ -3155,9 +3287,19 @@ async function loadAccountStats(force = false) {
   if (!token) return;
   statsLoading = true;
   const statusEl = document.getElementById('statsStatus');
-  if (statusEl) statusEl.textContent = 'Loading cloud stats…';
+  if (statusEl) {
+    statusEl.textContent = isViewingOtherAccount()
+      ? `Loading stats for ${getPlatformViewAccountLabel()}…`
+      : 'Loading cloud stats…';
+  }
   try {
-    statsData = await fetchAccountStats(getServerUrl(), token);
+    if (isViewingOtherAccount()) {
+      statsData = await adminFetchJson(
+        `/api/admin/accounts/${encodeURIComponent(platformViewAccountId)}/stats`
+      );
+    } else {
+      statsData = await fetchAccountStats(getServerUrl(), token);
+    }
     statsLoaded = true;
     renderAccountStats();
   } catch (err) {
@@ -3173,7 +3315,7 @@ async function loadAccountStats(force = false) {
 
 /** Debounced stats reload when the live tables feed signals match/session changes. */
 function scheduleAccountStatsRefreshFromLiveFeed() {
-  if (!getToken()) return;
+  if (!getToken() || isViewingOtherAccount()) return;
   const statsTab = document.getElementById('tabStats');
   const statsTabVisible = !!(statsTab && !statsTab.classList.contains('hidden'));
   // Keep Recent Matches warm once opened, and always while Stats is visible.
@@ -3246,6 +3388,12 @@ async function connectLiveFeed() {
   dashClient = client;
 
   client.on('tables', (rooms) => {
+    ownDashboardRooms = rooms || [];
+    if (isViewingOtherAccount()) {
+      // Live feed is for the signed-in account; keep Settings connections fresh only.
+      renderDebugRooms(ownDashboardRooms);
+      return;
+    }
     lastDashboardRooms = rooms || [];
     renderTableCards(rooms);
     renderDebugRooms(rooms);
@@ -3294,9 +3442,17 @@ async function renderDashboard() {
     renderQuota(me.quota, me.account);
     renderApiKeys(me.api_keys);
     await refreshBillingUi(me.account, me.billing);
-    lastDashboardRooms = me.rooms || [];
-    renderTableCards(me.rooms);
-    renderDebugRooms(me.rooms);
+    ownDashboardRooms = me.rooms || [];
+    if (isViewingOtherAccount()) {
+      await refreshTablesForCurrentView();
+    } else {
+      lastDashboardRooms = me.rooms || [];
+      renderTableCards(me.rooms);
+      renderDebugRooms(me.rooms);
+    }
+    if (isPlatformAdminUser) {
+      await loadPlatformAccountFilterOptions().catch(() => {});
+    }
     wantLiveFeed = true;
     clearReconnect();
     connectLiveFeed().catch(() => {});
@@ -3378,8 +3534,8 @@ function initStatsPlayerSearch() {
     applyFreeTextFilter();
     try {
       const found = browseAll
-        ? await fetchPlayers(getServerUrl(), getToken(), '', 250)
-        : await fetchPlayers(getServerUrl(), getToken(), query, 8);
+        ? await resolvePlayersSearch('', 250)
+        : await resolvePlayersSearch(query, 8);
       results = found || [];
       activeIndex = -1;
       list.innerHTML = '';
@@ -3475,6 +3631,12 @@ document.getElementById('adminAccountSearch')?.addEventListener('input', () => {
   }, 250);
 });
 
+document.getElementById('platformAccountFilter')?.addEventListener('change', (event) => {
+  applyPlatformAccountFilter(event.target.value || '').catch((err) => {
+    setError(err.message || 'Failed to switch account view');
+  });
+});
+
 document.getElementById('adminAccountsBody')?.addEventListener('click', (event) => {
   const row = event.target.closest('tr[data-admin-account-id]');
   if (!row) return;
@@ -3506,7 +3668,11 @@ document.getElementById('adminDetailBody')?.addEventListener('click', async (eve
   const target = event.target.closest('button');
   if (!target) return;
   try {
-    if (target.id === 'adminEndTrialBtn') {
+    if (target.id === 'adminViewAccountDataBtn') {
+      if (!adminSelectedId) return;
+      await applyPlatformAccountFilter(adminSelectedId);
+      setActiveDashTab('stats');
+    } else if (target.id === 'adminEndTrialBtn') {
       await adminEndTrial();
     } else if (target.id === 'adminInvalidateSessionsBtn') {
       await adminInvalidateSelectedSessions();
@@ -3562,6 +3728,7 @@ document.getElementById('statsPlayerGameFilter')?.addEventListener('change', (ev
   renderPlayerDetail();
 });
 document.getElementById('statsPlayerRenameEditBtn')?.addEventListener('click', () => {
+  if (isViewingOtherAccount()) return;
   const rename = document.getElementById('statsPlayerRenameInput');
   const title = document.getElementById('statsPlayerTitle');
   if (rename && title) rename.value = title.textContent || '';
@@ -3577,6 +3744,7 @@ document.getElementById('statsPlayerRenameCancelBtn')?.addEventListener('click',
 });
 document.getElementById('statsPlayerRenameForm')?.addEventListener('submit', async (event) => {
   event.preventDefault();
+  if (isViewingOtherAccount()) return;
   const form = event.currentTarget;
   if (form?.dataset.busy === '1') return;
   const fromName = statsPlayerDisplayName(selectedPlayerKey);
@@ -3616,6 +3784,7 @@ document.getElementById('statsPlayerRenameForm')?.addEventListener('submit', asy
   }
 });
 document.getElementById('statsPlayerDeleteBtn')?.addEventListener('click', async () => {
+  if (isViewingOtherAccount()) return;
   if (!selectedPlayerKey) return;
   const playerName = statsPlayerDisplayName(selectedPlayerKey);
   const matchCount = playerMatches(selectedPlayerKey).length;
@@ -3656,12 +3825,14 @@ document.getElementById('tabStats')?.addEventListener('click', (event) => {
   const abandonBtn = event.target.closest('[data-abandon-match]');
   if (abandonBtn) {
     event.preventDefault();
+    if (isViewingOtherAccount()) return;
     abandonInProgressMatch(abandonBtn.getAttribute('data-abandon-match'));
     return;
   }
   const editBtn = event.target.closest('[data-edit-match]');
   if (editBtn) {
     event.preventDefault();
+    if (isViewingOtherAccount()) return;
     openMatchModal(editBtn.getAttribute('data-edit-match'));
     return;
   }
@@ -4259,8 +4430,8 @@ function initMatchPlayerAutocompleteForSlot(slot, inputId, listId) {
 
     try {
       const found = browseAll
-        ? await fetchPlayers(getServerUrl(), getToken(), '', 250)
-        : await fetchPlayers(getServerUrl(), getToken(), query, 8);
+        ? await resolvePlayersSearch('', 250)
+        : await resolvePlayersSearch(query, 8);
       results = found || [];
       const queryNorm = normalizeMatchPlayerName(query);
       const exactExists = !!(queryNorm && results.some(

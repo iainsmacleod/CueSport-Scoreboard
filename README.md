@@ -210,7 +210,7 @@ Tabs: **Setup**, **Controls**, **Images**, **Replay/Share**, **Stats**, **Settin
 ### Replay/Share
 
 - OBS WebSocket toggle + **⚙** settings.
-- Stream Promotion toggle + **⚙** (stream URL).
+- Stream Promotion toggle + **⚙** (OBS URL first; manual failover).
 - Replay source names and **Auto-resume Monitoring**.
 
 Details: [OBS WebSocket Setup](#obs-websocket-setup), [Instant Replay](#instant-replay), [Stream Promotion](#stream-promotion).
@@ -296,7 +296,7 @@ Click **Update Sources** after editing names. Names must match OBS **exactly** (
 
 ## CueSport Cloud
 
-Optional **remote mobile control**, **web dashboard**, **guest scorer links**, **match event logging**, and **public stream listing** via the CueSport Cloud backend ([`backend/`](backend/)). Self-host for free (GPL) or use the hosted service at **[https://cuesports.macleod.systems](https://cuesports.macleod.systems)**.
+Optional **remote mobile control**, **web dashboard**, **guest scorer links**, **match event logging**, and **public stream listing** via the CueSport Cloud backend ([`backend/`](backend/)). Self-host for free (GPL) or use the hosted service at **[https://cuesport.macleod.systems](https://cuesport.macleod.systems)**.
 
 The OBS **dock remains the scoring authority**. Mobile and guest clients send commands through the cloud relay; the dock executes them with the same logic as the control panel, then publishes state back to all connected clients.
 
@@ -360,7 +360,7 @@ See [`backend/README.md`](backend/README.md) for Supabase/Google OAuth productio
 | | Hosted | Self-host |
 |---|--------|-----------|
 | Auth | Google for account + OBS Dock Key per dock | Dev secret on dashboard; OBS Dock Key + server URL in dock Connection settings → Self-hosting |
-| Backend | `cuesports.macleod.systems` | Your own `backend/` deployment |
+| Backend | `cuesport.macleod.systems` | Your own `backend/` deployment |
 | Cost | Optional paid tiers via Stripe Checkout (30-day trial); platform admins can grant a time-boxed **support trial** | Free (you run the server) |
 | Platform admin | `PLATFORM_ADMIN_EMAILS` allowlist → Admin tab + `/api/admin/*` | Usually unused; same env var works if you want it |
 
@@ -368,13 +368,13 @@ See [`backend/README.md`](backend/README.md) for Supabase/Google OAuth productio
 
 ## Stream Promotion
 
-Optional listing on **[https://cuesports.macleod.systems](https://cuesports.macleod.systems)** so others can find streams that are currently on air with live match info.
+Optional listing on **[https://cuesport.macleod.systems](https://cuesport.macleod.systems)** so others can find streams that are currently on air with live match info.
 
 ### Setup
 
 1. Connect **OBS WebSocket** (promotion uses it to detect streaming).
-2. In **Replay/Share**, open Stream Promotion **⚙** and set your **Stream URL** (must be `http://` or `https://`, e.g. `https://www.twitch.tv/yourchannel`). You can also let OBS-related auto-detection fill a URL when possible.
-3. Enable the **Stream Promotion** toggle.
+2. In **Replay/Share**, turn on **Promote Live Stream** while OBS is live. CueSport tries to read the public watch URL from OBS first (e.g. Twitch channel). If OBS cannot provide one, open Stream Promotion **⚙** and set a manual **Stream URL** (`http://` or `https://`).
+3. Keep CueSport Cloud connected with an OBS Dock Key so the listing can publish.
 4. **Start streaming in OBS.** Promotion only stays connected while OBS reports an active stream.
 
 ### What is shared

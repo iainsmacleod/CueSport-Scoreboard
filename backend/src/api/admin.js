@@ -7,6 +7,9 @@ import { getAccountStats } from '../stats/account-stats.js';
 import {
   kickAccountAdminClients,
   kickApiKeyDocks,
+  roomHasConnectedDock,
+  getRoomCleanupAfter,
+  resolveRoomApiKeyId,
 } from '../ws/room-hub.js';
 
 const TRIAL_DAYS_MIN = 1;
@@ -34,6 +37,23 @@ function trialEndsIsoFromDays(days) {
   return new Date(ms).toISOString();
 }
 
+function enrichAdminRoom(room) {
+  const cleanupMs = getRoomCleanupAfter(room.id);
+  const apiKeyId = resolveRoomApiKeyId(room.id, room.api_key_id);
+  const apiKey = apiKeyId ? sqlite.getApiKeyById(apiKeyId) : null;
+  const apiKeyLabel = apiKey?.label || room.api_key_label || null;
+  return {
+    ...room,
+    api_key_id: apiKeyId || null,
+    api_key_label: apiKeyLabel,
+    dock_label: apiKeyLabel || (room.dock_label !== 'Main table' && room.dock_label !== 'Default Room'
+      ? room.dock_label
+      : null) || apiKeyLabel || 'Connection',
+    dock_connected: roomHasConnectedDock(room.id),
+    cleanup_after: cleanupMs ? new Date(cleanupMs).toISOString() : null,
+  };
+}
+
 export async function registerAdminRoutes(app) {
   app.get('/api/admin/accounts', async (request, reply) => {
     const auth = await requirePlatformAdmin(request, reply);
@@ -55,6 +75,17 @@ export async function registerAdminRoutes(app) {
     };
   });
 
+  app.get('/api/admin/accounts/:id/tables', async (request, reply) => {
+    const auth = await requirePlatformAdmin(request, reply);
+    if (!auth) return;
+    const account = sqlite.getAccountById(request.params.id);
+    if (!account) return reply.code(404).send({ error: 'Account not found' });
+    return {
+      account: { id: account.id, email: account.email },
+      rooms: sqlite.getRoomsWithLiveState(account.id).map(enrichAdminRoom),
+    };
+  });
+
   app.get('/api/admin/accounts/:id/stats', async (request, reply) => {
     const auth = await requirePlatformAdmin(request, reply);
     if (!auth) return;
@@ -62,6 +93,16 @@ export async function registerAdminRoutes(app) {
     if (!account) return reply.code(404).send({ error: 'Account not found' });
     const limit = request.query.limit || '5000';
     return getAccountStats(account.id, limit);
+  });
+
+  app.get('/api/admin/accounts/:id/players', async (request, reply) => {
+    const auth = await requirePlatformAdmin(request, reply);
+    if (!auth) return;
+    const account = sqlite.getAccountById(request.params.id);
+    if (!account) return reply.code(404).send({ error: 'Account not found' });
+    const q = typeof request.query.q === 'string' ? request.query.q : '';
+    const limit = request.query.limit || '8';
+    return { players: sqlite.searchAccountPlayers(account.id, q, limit) };
   });
 
   app.post('/api/admin/accounts/:id/trial', async (request, reply) => {

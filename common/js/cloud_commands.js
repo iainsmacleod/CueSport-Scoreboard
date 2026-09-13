@@ -287,7 +287,7 @@
             case 'abandon_match': {
                 const message = (payload && payload.message)
                     ? String(payload.message)
-                    : 'This match was killed from CueSport Cloud. The game has been cleared.';
+                    : 'This match was killed from CueSport Scoreboard Cloud. The game has been cleared.';
                 if (typeof window.applyCloudMatchAbandon === 'function') {
                     window.applyCloudMatchAbandon(Object.assign({}, payload || {}, { message: message }));
                 } else if (typeof window.resetCurrentGame === 'function') {

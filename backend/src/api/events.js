@@ -317,7 +317,7 @@ export async function registerEventRoutes(app) {
         dockMatchId,
         cloudSessionId,
         startEventId: pair.start.id,
-        message: 'This match was killed from CueSport Cloud. The game has been cleared.',
+        message: 'This match was killed from CueSport Scoreboard Cloud. The game has been cleared.',
       });
     }
     notifyAccountTables(auth.account.id, { immediate: true });
@@ -430,7 +430,7 @@ export async function registerEventRoutes(app) {
         dockMatchId: abandoned.dockMatchId,
         cloudSessionId: abandoned.cloudSessionId,
         startEventId: abandoned.startEventId,
-        message: 'A player in this match was deleted from CueSport Cloud. The game has been cleared.',
+        message: 'A player in this match was deleted from CueSport Scoreboard Cloud. The game has been cleared.',
       });
     }
     const rosterDeleted = sqlite.deleteAccountPlayerRoster(auth.account.id, playerId);

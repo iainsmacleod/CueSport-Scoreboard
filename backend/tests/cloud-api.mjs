@@ -2061,6 +2061,22 @@ async function run() {
           adminStats.ok && Array.isArray(adminStats.body.players),
           JSON.stringify(adminStats.body)
         );
+        const adminTables = await fetchJson(`/api/admin/accounts/${accountId}/tables`, {
+          headers: { Authorization: `Bearer ${tokenFresh}` },
+        });
+        assert(
+          'Admin GET account tables',
+          adminTables.ok && Array.isArray(adminTables.body.rooms),
+          JSON.stringify(adminTables.body)
+        );
+        const adminPlayers = await fetchJson(`/api/admin/accounts/${accountId}/players?q=&limit=8`, {
+          headers: { Authorization: `Bearer ${tokenFresh}` },
+        });
+        assert(
+          'Admin GET account players',
+          adminPlayers.ok && Array.isArray(adminPlayers.body.players),
+          JSON.stringify(adminPlayers.body)
+        );
         const grant = await fetchJson(`/api/admin/accounts/${accountId}/trial`, {
           method: 'POST',
           headers: {

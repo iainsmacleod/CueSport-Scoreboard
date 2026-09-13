@@ -9,6 +9,6 @@
 #
 # App must listen on 127.0.0.1:3000 (Compose ports: "127.0.0.1:3000:3000").
 
-cuesports.example.com {
+cuesport.example.com {
 	reverse_proxy 127.0.0.1:3000
 }

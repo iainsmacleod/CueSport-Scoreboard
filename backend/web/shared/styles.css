@@ -2557,6 +2557,12 @@ body.controls-locked #reconnectBanner {
 .dash-login-google-hint {
   margin: 0 0 0.75rem;
 }
+.dash-login-legal {
+  margin: 0.35rem 0 0.5rem;
+}
+.dash-login-legal a {
+  color: #7aa2f7;
+}
 .dash-login-actions {
   display: flex;
   flex-wrap: wrap;
@@ -2699,3 +2705,25 @@ body.controls-locked #reconnectBanner {
   color: #c0caf5;
   vertical-align: middle;
 }
+.platform-account-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 1.25rem;
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+}
+.platform-account-filter-label {
+  margin: 0;
+  min-width: min(18rem, 100%);
+}
+.platform-account-filter-label select {
+  display: block;
+  width: 100%;
+  margin-top: 0.35rem;
+}
+.platform-account-filter #platformAccountFilterHint {
+  margin: 0;
+  flex: 1 1 14rem;
+}
+

@@ -227,7 +227,7 @@ app.listen({ port: config.port, host: config.host }, (err) => {
     app.log.error(err);
     process.exit(1);
   }
-  console.log(`CueSport Cloud listening on ${config.publicUrl}`);
+  console.log(`CueSport Scoreboard Cloud listening on ${config.publicUrl}`);
   console.log(`  Dashboard: ${config.publicUrl}/dashboard`);
   console.log(`  WebSocket: ${config.publicUrl.replace(/^http/, 'ws')}/ws`);
 });

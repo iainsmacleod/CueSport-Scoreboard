@@ -419,7 +419,7 @@
                 cp.isRemoteTabAvailable() === false);
             assert('Core', 'Cloud Settings header and blurb',
                 (cp.document.getElementById('cloudRelayLabel')?.textContent || '').trim() ===
-                    'CueSport Scoreboard Cloud Control' &&
+                    'CueSport Scoreboard Cloud' &&
                 (cp.document.getElementById('cloudRelayBlurb')?.textContent || '').trim() ===
                     'Cloud statistics and mobile overlay management.');
             cp.setStorageItem('lastSelectedTab', 'StatsSettings');
@@ -637,7 +637,7 @@
             cp.document.getElementById('p2Name').value = 'CloudKillP2';
             if (typeof cp.applyCloudMatchAbandon === 'function') {
                 cp.applyCloudMatchAbandon({
-                    message: 'Smoke: match killed from CueSport Cloud.',
+                    message: 'Smoke: match killed from CueSport Scoreboard Cloud.',
                 });
             }
             const abandonModal = cp.document.getElementById('cloudAbandonModal');

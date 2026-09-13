@@ -5751,7 +5751,7 @@ window.resetCurrentGame = resetCurrentGame;
 function showCloudAbandonModal(message) {
     const modal = document.getElementById("cloudAbandonModal");
     const msgEl = document.getElementById("cloudAbandonModalMessage");
-    const text = message || "This match was killed from CueSport Cloud. The game has been cleared.";
+    const text = message || "This match was killed from CueSport Scoreboard Cloud. The game has been cleared.";
     if (msgEl) {
         msgEl.textContent = text;
     }
@@ -5796,7 +5796,7 @@ function applyCloudMatchAbandon(options) {
     }
     // No pending match (or id already cleared) — still clear the board; cloud already deleted the row.
     const message = opts.message
-        || "This match was killed from CueSport Cloud. The game has been cleared.";
+        || "This match was killed from CueSport Scoreboard Cloud. The game has been cleared.";
     showCloudAbandonModal(message);
     resetCurrentGame({ fromCloudAbandon: true });
     return true;
@@ -7119,7 +7119,7 @@ function resetAll() {
     }
 }
 function clearAllData() {
-    if (confirm('Are you sure you want to clear ALL locally stored data for CueSports Scoreboard, and reset to defaults?')) {
+    if (confirm('Are you sure you want to clear ALL locally stored data for CueSport Scoreboard, and reset to defaults?')) {
         removeAllData(INSTANCE_ID);
         location.reload(); // Reload the page to start fresh
         // Send refresh message to browser_source before clearing data

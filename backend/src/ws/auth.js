@@ -48,10 +48,10 @@ function sessionsInvalidated(account, jwtIssuedAtSec) {
 function subscriptionRequired(client, account) {
   if (hasCloudSubscriptionAccess(account)) return null;
   if (client === 'mobile' || client === 'mobile_guest') {
-    return { error: 'subscription_required', message: 'Mobile control requires an active CueSport Cloud subscription' };
+    return { error: 'subscription_required', message: 'Mobile control requires an active CueSport Scoreboard Cloud subscription' };
   }
   if (!config.allowDevAuth && client === 'dock') {
-    return { error: 'subscription_required', message: 'Dock relay requires an active CueSport Cloud subscription' };
+    return { error: 'subscription_required', message: 'Dock relay requires an active CueSport Scoreboard Cloud subscription' };
   }
   return null;
 }

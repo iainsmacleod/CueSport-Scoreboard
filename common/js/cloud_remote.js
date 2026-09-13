@@ -351,7 +351,7 @@
         const rid = roomId();
         if (!rid) {
             clearSelection();
-            setStatus('Connect CueSport Cloud to load guest links.');
+            setStatus('Connect CueSport Scoreboard Cloud to load guest links.');
             return;
         }
         try {

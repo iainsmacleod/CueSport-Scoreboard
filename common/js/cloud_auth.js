@@ -5,7 +5,7 @@
  */
 (function () {
     const CONNECTION_MODE_KEY = 'connectionMode';
-    const MANAGED_SERVER_URL = 'https://cuesports.macleod.systems';
+    const MANAGED_SERVER_URL = 'https://cuesport.macleod.systems';
 
     function storageKey(k) {
         const prefix = 'cloudRelay_';
@@ -105,11 +105,11 @@
         window.cloudRelay.updateCloudUI();
         closeCloudConnectionModal();
         if (data.api_key || existingKey) {
-            alert(`Signed in as ${data.account?.email || 'user'}. Enable CueSport Cloud to connect.`);
+            alert(`Signed in as ${data.account?.email || 'user'}. Enable CueSport Scoreboard Cloud to connect.`);
         } else {
             alert(
                 `Signed in as ${data.account?.email || 'user'}. ` +
-                'Create an OBS Dock Key in the dashboard (Account), paste it under Connection settings, then enable CueSport Cloud.'
+                'Create an OBS Dock Key in the dashboard (Account), paste it under Connection settings, then enable CueSport Scoreboard Cloud.'
             );
             openCloudConnectionModal();
             showCloudManagedPane();
@@ -118,7 +118,7 @@
 
     function signOutCloud(options) {
         const silent = !!(options && options.silent);
-        if (!silent && !window.confirm('Clear the OBS Dock Key and sign out of CueSport Cloud on this dock?')) return;
+        if (!silent && !window.confirm('Clear the OBS Dock Key and sign out of CueSport Scoreboard Cloud on this dock?')) return;
         if (window.cloudRelay) {
             window.cloudRelay.setEnabled(false);
             window.cloudRelay.clearSession();
@@ -238,7 +238,7 @@
             }
         } else {
             window.cloudRelay.updateCloudUI();
-            alert('Settings saved. Enable CueSport Cloud to connect — your table room is created automatically from the OBS instance (?instance=).');
+            alert('Settings saved. Enable CueSport Scoreboard Cloud to connect — your table room is created automatically from the OBS instance (?instance=).');
         }
         return true;
     }
@@ -254,7 +254,7 @@
             if (!window.cloudRelay.hasCredentials()) {
                 toggle.checked = false;
                 openCloudConnectionModal();
-                alert('Paste an OBS Dock Key from your dashboard (Account → OBS Dock Keys), then enable CueSport Cloud.');
+                alert('Paste an OBS Dock Key from your dashboard (Account → OBS Dock Keys), then enable CueSport Scoreboard Cloud.');
                 return;
             }
             window.cloudRelay.setEnabled(true);

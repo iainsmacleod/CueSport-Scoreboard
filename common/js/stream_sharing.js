@@ -3,7 +3,7 @@
 /**
  * Stream promotion for CueSport Scoreboard.
  * Listing flags ride on CueSport Cloud join/state — no separate WebSocket.
- * Requires Cloud connected + OBS live + a valid manual stream URL.
+ * Requires Cloud connected + OBS live + a stream URL (OBS auto-detect first, manual failover).
  */
 (function() {
     const STORAGE_PREFIX = 'streamSharing_';
@@ -13,6 +13,8 @@
     let streamingCheckInterval = null;
     let publishGeneration = 0;
     let lastPromotionHeartbeatAt = 0;
+    /** Last URL derived from OBS GetStreamServiceSettings (sync path for cloud listing). */
+    let cachedObsStreamUrl = '';
     const PROMOTION_HEARTBEAT_MS = 45000;
 
     function getStorageItem(key) {
@@ -105,61 +107,98 @@
         return '';
     }
 
-    async function getStreamUrl() {
-        const manualUrl = getManualStreamUrl();
-        if (manualUrl) {
-            return manualUrl;
+    /** Sync effective URL: cached OBS detect first, then saved/manual failover. */
+    function resolveEffectiveStreamUrlSync() {
+        if (cachedObsStreamUrl && isValidStreamUrl(cachedObsStreamUrl)) {
+            return cachedObsStreamUrl;
         }
+        return getManualStreamUrl();
+    }
 
+    /** Derive a public watch URL from OBS stream service settings when possible. */
+    async function detectStreamUrlFromObs() {
         try {
             if (typeof obs === 'undefined' || !obs || typeof isObsReady === 'undefined' || !isObsReady) {
                 return '';
             }
+            const serviceSettings = await obs.call('GetStreamServiceSettings');
+            const serviceType = String(serviceSettings.streamServiceType || '');
+            const settings = serviceSettings.streamServiceSettings || {};
+            const typeLower = serviceType.toLowerCase();
+            let streamUrl = '';
 
-            try {
-                const serviceSettings = await obs.call('GetStreamServiceSettings');
-                const serviceType = serviceSettings.streamServiceType || '';
-                const settings = serviceSettings.streamServiceSettings || {};
-                let streamUrl = '';
-
-                if (serviceType.toLowerCase().includes('twitch')) {
+            if (typeLower.includes('twitch')) {
+                const channel = settings.channel || settings.key || '';
+                const cleanChannel = String(channel).replace(/^@/, '').trim();
+                if (cleanChannel && !cleanChannel.includes('live_') && !cleanChannel.includes(':')) {
+                    streamUrl = `https://www.twitch.tv/${cleanChannel}`;
+                }
+            } else if (typeLower.includes('youtube')) {
+                const channel = settings.channel || settings.channel_id || settings.channelId || '';
+                const cleanChannel = String(channel).replace(/^@/, '').trim();
+                if (cleanChannel) {
+                    streamUrl = cleanChannel.startsWith('UC')
+                        ? `https://www.youtube.com/channel/${cleanChannel}/live`
+                        : `https://www.youtube.com/@${cleanChannel}/live`;
+                } else if (settings.key || settings.stream_key) {
+                    // Stream key alone is not a public watch URL — keep generic live hub as last resort.
+                    streamUrl = 'https://www.youtube.com/live';
+                }
+            } else if (typeLower.includes('facebook')) {
+                streamUrl = 'https://www.facebook.com/live';
+            } else if (typeLower.includes('kick')) {
+                const channel = settings.channel || settings.key || '';
+                const cleanChannel = String(channel).replace(/^@/, '').trim();
+                if (cleanChannel) {
+                    streamUrl = `https://kick.com/${cleanChannel}`;
+                }
+            } else if (typeLower.includes('rtmp') || serviceType.includes('rtmp')) {
+                const server = String(settings.server || '');
+                if (server.includes('twitch.tv')) {
                     const channel = settings.channel || settings.key || '';
-                    const cleanChannel = channel.replace(/^@/, '');
-                    if (cleanChannel) {
+                    const cleanChannel = String(channel).replace(/^@/, '').trim();
+                    if (cleanChannel && !cleanChannel.includes('live_') && !cleanChannel.includes(':')) {
                         streamUrl = `https://www.twitch.tv/${cleanChannel}`;
                     }
-                } else if (serviceType.toLowerCase().includes('youtube')) {
-                    const streamKey = settings.key || settings.stream_key || '';
-                    if (streamKey) {
-                        streamUrl = 'https://www.youtube.com/live';
-                    }
-                } else if (serviceType.toLowerCase().includes('facebook')) {
-                    streamUrl = 'https://www.facebook.com/live';
-                } else if (serviceType.includes('rtmp')) {
-                    const server = settings.server || '';
-                    if (server.includes('twitch.tv')) {
-                        const channel = settings.key || '';
-                        if (channel) {
-                            const cleanChannel = channel.replace(/^@/, '');
-                            streamUrl = `https://www.twitch.tv/${cleanChannel}`;
-                        }
-                    } else if (server.includes('youtube.com') || server.includes('googlevideo.com')) {
-                        streamUrl = 'https://www.youtube.com/live';
+                } else if (server.includes('youtube.com') || server.includes('googlevideo.com')) {
+                    streamUrl = 'https://www.youtube.com/live';
+                } else if (server.includes('kick.com')) {
+                    const channel = settings.channel || settings.key || '';
+                    const cleanChannel = String(channel).replace(/^@/, '').trim();
+                    if (cleanChannel) {
+                        streamUrl = `https://kick.com/${cleanChannel}`;
                     }
                 }
-
-                if (streamUrl && isValidStreamUrl(streamUrl)) {
-                    return streamUrl;
-                }
-                return '';
-            } catch (error) {
-                console.warn('Could not get stream service settings:', error);
-                return '';
             }
+
+            if (streamUrl && isValidStreamUrl(streamUrl)) {
+                return streamUrl;
+            }
+            return '';
         } catch (error) {
-            console.warn('Error getting stream URL:', error);
+            console.warn('Could not get stream service settings:', error);
             return '';
         }
+    }
+
+    async function refreshObsDetectedStreamUrl() {
+        const fromObs = await detectStreamUrlFromObs();
+        cachedObsStreamUrl = fromObs || '';
+        return cachedObsStreamUrl;
+    }
+
+    /** OBS auto-detect first; manual/saved URL only if OBS cannot provide one. */
+    async function getStreamUrl() {
+        try {
+            const fromObs = await refreshObsDetectedStreamUrl();
+            if (fromObs) {
+                return fromObs;
+            }
+        } catch (error) {
+            console.warn('Error getting stream URL from OBS:', error);
+            cachedObsStreamUrl = '';
+        }
+        return getManualStreamUrl();
     }
 
     function invalidatePendingPublishes() {
@@ -288,7 +327,7 @@
     }
 
     function shouldListPromotion() {
-        return !!(isEnabled && isObsStreaming && isCloudReady() && getManualStreamUrl());
+        return !!(isEnabled && isObsStreaming && isCloudReady() && resolveEffectiveStreamUrlSync());
     }
 
     function maybeHeartbeatPromotionListing() {
@@ -311,10 +350,10 @@
 
     function promotionUnavailableReason() {
         if (!isCloudEnabled()) {
-            return 'Enable CueSport Cloud (with an OBS Dock Key) to promote your stream';
+            return 'Enable CueSport Scoreboard Cloud (with an OBS Dock Key) to promote your stream';
         }
         if (!isCloudReady()) {
-            return 'CueSport Cloud must be connected before promoting';
+            return 'CueSport Scoreboard Cloud must be connected before promoting';
         }
         if (!isObsStreaming) {
             return 'OBS must be live streaming to promote your stream';
@@ -375,6 +414,7 @@
     async function checkObsStreamingStatus() {
         try {
             if (typeof obs === 'undefined' || !obs || typeof isObsReady === 'undefined' || !isObsReady) {
+                cachedObsStreamUrl = '';
                 const wasStreaming = isObsStreaming;
                 isObsStreaming = false;
                 if (wasStreaming) {
@@ -391,6 +431,7 @@
                 const status = await obs.call('GetStreamStatus');
                 const wasStreaming = isObsStreaming;
                 isObsStreaming = status.outputActive === true;
+                await refreshObsDetectedStreamUrl();
 
                 if (wasStreaming && !isObsStreaming) {
                     // Confirmed stream end — turn promotion off so the next go-live is opt-in.
@@ -436,7 +477,7 @@
         }
     }
 
-    function toggleStreamPromotion() {
+    async function toggleStreamPromotion() {
         const toggle = document.getElementById('streamPromotionToggle');
         if (!toggle) return;
 
@@ -453,21 +494,21 @@
         if (toggle.checked) {
             if (!isCloudReady()) {
                 toggle.checked = false;
-                alert('CueSport Cloud must be connected before promoting. Enable CueSport Cloud and wait until it is joined.');
+                alert('CueSport Scoreboard Cloud must be connected before promoting. Enable CueSport Scoreboard Cloud and wait until it is joined.');
                 updateStreamPromotionToggle();
-                return;
-            }
-
-            const streamUrl = getManualStreamUrl();
-            if (!streamUrl) {
-                toggle.checked = false;
-                openStreamPromotionSettingsModal();
                 return;
             }
 
             if (!isObsStreaming) {
                 toggle.checked = false;
                 alert('OBS must be streaming to share your game data.');
+                return;
+            }
+
+            const streamUrl = await getStreamUrl();
+            if (!streamUrl) {
+                toggle.checked = false;
+                openStreamPromotionSettingsModal();
                 return;
             }
 
@@ -517,33 +558,43 @@
         }
 
         if (isEnabled) {
-            const streamUrl = getManualStreamUrl();
-            if (!streamUrl) {
-                clearPromotionEnabled();
-                const toggle = document.getElementById('streamPromotionToggle');
-                if (toggle && toggle.checked) {
-                    toggle.checked = false;
-                    openStreamPromotionSettingsModal();
+            getStreamUrl().then((streamUrl) => {
+                if (!streamUrl) {
+                    clearPromotionEnabled();
+                    const toggle = document.getElementById('streamPromotionToggle');
+                    if (toggle && toggle.checked) {
+                        toggle.checked = false;
+                        openStreamPromotionSettingsModal();
+                    }
+                    updateStreamPromotionToggle();
+                    return;
                 }
-            } else {
                 setTimeout(() => {
                     republishPromotionIfActive();
                 }, 500);
                 setTimeout(() => {
                     republishPromotionIfActive();
                 }, 2500);
-            }
+            }).catch(() => {
+                clearPromotionEnabled();
+                updateStreamPromotionToggle();
+            });
         }
     }
 
-    function openStreamPromotionSettingsModal() {
+    async function openStreamPromotionSettingsModal() {
         const modal = document.getElementById('streamPromotionSettingsModal');
         if (!modal) return;
 
         const urlInput = document.getElementById('manualStreamUrlModal');
         if (urlInput) {
             const saved = getStorageItem('manualStreamUrl');
-            urlInput.value = saved || '';
+            if (saved) {
+                urlInput.value = saved;
+            } else {
+                const detected = cachedObsStreamUrl || await detectStreamUrlFromObs();
+                urlInput.value = detected || '';
+            }
         }
 
         modal.style.display = 'block';
@@ -629,8 +680,7 @@
 
         getPromotionListingState: function() {
             const promotionOn = getStorageItem('streamPromotionEnabled') === 'true';
-            const manualUrl = getManualStreamUrl();
-            const streamUrl = isValidStreamUrl(manualUrl) ? manualUrl : '';
+            const streamUrl = resolveEffectiveStreamUrlSync();
             return {
                 listed: promotionOn && isObsStreaming && !!streamUrl,
                 obsStreaming: isObsStreaming,

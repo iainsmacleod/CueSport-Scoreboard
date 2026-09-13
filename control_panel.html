@@ -712,7 +712,7 @@ for more information about Salotto please visit https://salotto.app
             <!-- CueSport Cloud Section -->
             <div class="section-header-with-controls">
                 <span id="cloudRelayLabel">
-                    CueSport Scoreboard Cloud Control
+                    CueSport Scoreboard Cloud
                 </span>
                 <div class="section-controls">
                     <button class="settings-cog-btn" id="cloudSelfHostCog" onclick="openCloudConnectionModal()" title="Connection settings">
@@ -853,11 +853,15 @@ for more information about Salotto please visit https://salotto.app
                         </p>
                         <p class="stats-hint" style="margin: 0 0 0.75rem;">
                             Promoted streams are listed on
-                            <a href="https://cuesports.macleod.systems/streams" target="_blank" rel="noopener noreferrer" class="cp-text-link">cuesports.macleod.systems</a>.
+                            <a href="https://cuesport.macleod.systems/streams" target="_blank" rel="noopener noreferrer" class="cp-text-link">cuesport.macleod.systems</a>.
+                        </p>
+                        <p class="stats-hint" style="margin: 0 0 0.75rem;">
+                            CueSport Scoreboard Cloud tries to read your public stream URL from OBS (Twitch channel, etc.).
+                            If that is unavailable, enter a manual <code>https://</code> watch link below as failover.
                         </p>
                         <div class="form-row">
                             <div class="field">
-                                <label for="manualStreamUrlModal">Stream URL:</label>
+                                <label for="manualStreamUrlModal">Stream URL (manual failover):</label>
                                 <input type="text" id="manualStreamUrlModal" placeholder="Example: https://www.twitch.tv/yourchannel" style="width: 100%;" />
                             </div>
                         </div>
@@ -875,14 +879,14 @@ for more information about Salotto please visit https://salotto.app
             <div id="cloudConnectionModal" class="modal">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h2>CueSport Scoreboard Cloud Control</h2>
+                        <h2>CueSport Scoreboard Cloud</h2>
                         <span class="modal-close" onclick="closeCloudConnectionModal()">&times;</span>
                     </div>
                     <div class="modal-body">
                         <div id="cloudManagedPane">
                             <div class="cloud-connection-intro" style="font-size: 0.9em; opacity: 0.9; margin-bottom: 0.75rem;">
                                 <p style="margin: 0 0 0.65rem;">
-                                    CueSport Scoreboard Cloud Control allows desktop and mobile control of the OBS CueSport Scoreboard overlay, giving you freedom from your streaming machine.
+                                    CueSport Scoreboard Cloud allows desktop and mobile control of the OBS CueSport Scoreboard overlay, giving you freedom from your streaming machine.
                                 </p>
                                 <p style="margin: 0 0 0.35rem;">
                                     There are two implementation options: self-hosted or managed.
@@ -894,7 +898,7 @@ for more information about Salotto please visit https://salotto.app
                                 <p style="margin: 0;">
                                     Sign in to manage your account. From the Settings page retrieve an <strong>OBS Dock Key</strong>, if you haven&rsquo;t already, and paste below.
                                     Alternatively, open sign-up in your browser at
-                                    <a id="cloudManagedPublicUrl" class="cp-text-link" href="https://cuesports.macleod.systems" target="_blank" rel="noopener noreferrer">https://cuesports.macleod.systems</a>
+                                    <a id="cloudManagedPublicUrl" class="cp-text-link" href="https://cuesport.macleod.systems" target="_blank" rel="noopener noreferrer">https://cuesport.macleod.systems</a>
                                     and retrieve the key from Settings.
                                 </p>
                             </div>
@@ -906,6 +910,12 @@ for more information about Salotto please visit https://salotto.app
                                         </span>
                                         <span class="gsi-btn-label">Sign in with Google</span>
                                     </button>
+                                    <p class="stats-hint cloud-login-legal" style="margin: 0.5rem 0 0; font-size: 0.85em;">
+                                        By continuing, you agree to the
+                                        <a class="cp-text-link" href="https://cuesport.macleod.systems/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a>
+                                        and
+                                        <a class="cp-text-link" href="https://cuesport.macleod.systems/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>.
+                                    </p>
                                 </div>
                             </div>
                             <div class="form-row">
@@ -945,7 +955,7 @@ for more information about Salotto please visit https://salotto.app
                     </div>
                     <div class="modal-footer">
                         <div class="modal-footer-buttons">
-                            <button id="cloudConnectionSaveConnectBtn" class="modal-save-btn hover obs28 button" onclick="saveCloudConnectionSettingsAndConnect()" title="Save settings and enable CueSport Cloud">Save &amp; Connect</button>
+                            <button id="cloudConnectionSaveConnectBtn" class="modal-save-btn hover obs28 button" onclick="saveCloudConnectionSettingsAndConnect()" title="Save settings and enable CueSport Scoreboard Cloud">Save &amp; Connect</button>
                             <button id="cloudConnectionSaveBtn" class="modal-save-btn hover obs28 button" onclick="saveCloudConnectionSettings()">Save</button>
                             <button type="button" class="modal-cancel-btn hover obs28 button" onclick="signOutCloud()" title="Remove key and sign out on this dock">Clear key</button>
                             <button class="modal-cancel-btn hover obs28 button" onclick="closeCloudConnectionModal()">Close</button>

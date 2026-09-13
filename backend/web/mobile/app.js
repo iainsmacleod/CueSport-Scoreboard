@@ -97,8 +97,8 @@ function applyGuestUI() {
   const title = document.getElementById('pageTitle');
   if (title) {
     title.textContent = isDockOwnerGuest
-      ? 'CueSport Scoreboard Remote'
-      : 'CueSport Scoreboard Guest Control';
+      ? 'CueSport Scoreboard Cloud Remote'
+      : 'CueSport Scoreboard Cloud Guest Control';
   }
   show('adminPlayersPanel', false);
   if (!isDockOwnerGuest) {
@@ -491,7 +491,7 @@ function wireMobileNav() {
       }
       try {
         await navigator.share({
-          title: 'CueSport guest control link',
+          title: 'CueSport Scoreboard Cloud guest control link',
           url: cachedGuestShareUrl,
         });
       } catch (err) {

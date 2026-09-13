@@ -130,7 +130,7 @@ Legal templates: `/terms` and `/privacy` (replace placeholders; obtain counsel r
 
 ### Platform admin + trials
 
-Hosted multi-tenant support is gated by **`PLATFORM_ADMIN_EMAILS`** (not Dock Key roles). Allowlisted users get `is_platform_admin` on `GET /api/me`, an **Admin** tab on the dashboard, and `/api/admin/*` routes (list tenants, read stats, revoke keys, invalidate sessions, grant/end **support trials**).
+Hosted multi-tenant support is gated by **`PLATFORM_ADMIN_EMAILS`** (not Dock Key roles or subscription tiers). Allowlisted users get `is_platform_admin` on `GET /api/me`, an **Admin** tab, a **View account** filter on Tables/Stats, and `/api/admin/*` routes (list tenants, read tables/stats/players, revoke keys, invalidate sessions, grant/end **support trials**).
 
 Access for dock/mobile join allows when **any** of:
 - `subscription_status` is `active` or `trialing` (Stripe Checkout + webhooks), **or**
@@ -148,7 +148,7 @@ Clients send `join` then `event`, `command`, `state`, or `session` messages. See
 
 ## GPL + hosted service
 
-This backend is GPL-licensed alongside the scoreboard. You may run your own instance for free. The author's hosted service at `cuesports.macleod.systems` is an optional managed deployment (uptime, auth, storage). The subscription fee covers that managed hosting — not ownership of the GPL software.
+This backend is GPL-licensed alongside the scoreboard. You may run your own instance for free. The author's hosted service at `cuesport.macleod.systems` is an optional managed deployment (uptime, auth, storage). The subscription fee covers that managed hosting — not ownership of the GPL software.
 
 ## API
 
@@ -165,6 +165,8 @@ This backend is GPL-licensed alongside the scoreboard. You may run your own inst
 | GET | `/api/admin/accounts` | Platform admin: list tenants (optional `?q=` email filter) |
 | GET | `/api/admin/accounts/:id` | Platform admin: tenant detail + quota |
 | GET | `/api/admin/accounts/:id/stats` | Platform admin: account match stats |
+| GET | `/api/admin/accounts/:id/tables` | Platform admin: live tables for a tenant |
+| GET | `/api/admin/accounts/:id/players` | Platform admin: player search for a tenant |
 | POST | `/api/admin/accounts/:id/trial` | Platform admin: grant/extend support trial `{ days: 1–90 }` |
 | DELETE | `/api/admin/accounts/:id/trial` | Platform admin: end support trial |
 | POST | `/api/admin/accounts/:id/invalidate-sessions` | Platform admin: sign out everywhere for tenant |

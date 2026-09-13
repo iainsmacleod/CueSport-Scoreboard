@@ -152,7 +152,7 @@
     }
 
     function getServerUrl() {
-        return (getStorageItem('serverUrl') || 'https://cuesports.macleod.systems').replace(/\/$/, '');
+        return (getStorageItem('serverUrl') || 'https://cuesport.macleod.systems').replace(/\/$/, '');
     }
 
     function getWsUrl() {
@@ -846,7 +846,7 @@
             return;
         }
         if (isBlockedByServer) {
-            alert(`CueSport Cloud blocked:\n${blockedReason || 'Access denied'}`);
+            alert(`CueSport Scoreboard Cloud blocked:\n${blockedReason || 'Access denied'}`);
             return;
         }
         if (!getRoomId()) {
@@ -911,7 +911,7 @@
     function requestStats(limit) {
         return new Promise(function (resolve, reject) {
             if (!isCloudConnected()) {
-                reject(new Error('Not connected to CueSport Cloud'));
+                reject(new Error('Not connected to CueSport Scoreboard Cloud'));
                 return;
             }
             const requestId = 'stats_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
@@ -1006,7 +1006,7 @@
             console.error('cloudRelay error:', data.code, data.message);
             // unknown_type is often a version skew (e.g. new dock vs old server) — don't alert.
             if (data.code !== 'unknown_type' && typeof alert === 'function') {
-                alert(`CueSport Cloud: ${data.message || data.code}`);
+                alert(`CueSport Scoreboard Cloud: ${data.message || data.code}`);
             }
             return;
         }

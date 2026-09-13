@@ -88,7 +88,7 @@ apt install -y caddy
 Replace `/etc/caddy/Caddyfile` with **only** your domain (remove the default `:80` demo site):
 
 ```caddyfile
-cuesports.example.com {
+cuesport.example.com {
 	reverse_proxy 127.0.0.1:3000
 }
 ```
@@ -106,15 +106,15 @@ At your DNS host, create an **A** record (not a CNAME) for the hostname:
 
 | Type | Host | Value |
 |------|------|--------|
-| A | `cuesports` (or your subdomain) | `YOUR_VPS_IP` |
+| A | `cuesport` (or your subdomain) | `YOUR_VPS_IP` |
 
 Do **not** put an IP in a CNAME. A more-specific A record beats a wildcard `*`.
 
 Check propagation (compare resolvers; caches can disagree for a few minutes):
 
 ```bash
-nslookup cuesports.example.com 1.1.1.1
-nslookup cuesports.example.com 8.8.8.8
+nslookup cuesport.example.com 1.1.1.1
+nslookup cuesport.example.com 8.8.8.8
 ```
 
 If you use Pi-hole, **flush the DNS cache** (not only the network table) after changing records.
@@ -133,7 +133,7 @@ nano .env
 ### Production `.env` essentials
 
 ```env
-PUBLIC_URL=https://cuesports.example.com
+PUBLIC_URL=https://cuesport.example.com
 DB_DRIVER=sqlite
 ALLOW_DEV_AUTH=false
 
@@ -175,15 +175,15 @@ curl -sS http://127.0.0.1:3000/health
 ## 6. Supabase Auth (Google)
 
 1. Enable **Google** under Authentication → Providers.
-2. Site URL: `https://cuesports.example.com`
+2. Site URL: `https://cuesport.example.com`
 3. Redirect allowlist:
-   - `https://cuesports.example.com/dashboard`
-   - `https://cuesports.example.com/web/dashboard/`
-   - `https://cuesports.example.com/auth/callback`
+   - `https://cuesport.example.com/dashboard`
+   - `https://cuesport.example.com/web/dashboard/`
+   - `https://cuesport.example.com/auth/callback`
 4. Confirm public config:
 
 ```bash
-curl -sS https://cuesports.example.com/api/config/public
+curl -sS https://cuesport.example.com/api/config/public
 ```
 
 Expect non-null `supabaseUrl` and `supabasePublishableKey`.
@@ -216,7 +216,7 @@ LEGAL_ENTITY_NAME=Your legal entity name
 LEGAL_GOVERNING_LAW=Your province/country
 ```
 
-3. Stripe Dashboard → Webhooks → `https://cuesports.example.com/api/stripe/webhook`
+3. Stripe Dashboard → Webhooks → `https://cuesport.example.com/api/stripe/webhook`
 4. Enable Customer Portal (cancel at period end; allow switching among the three prices).
 5. Review `/terms` and `/privacy` placeholders with counsel before relying on them commercially.
 
@@ -229,10 +229,10 @@ From your PC:
 ```powershell
 Test-NetConnection YOUR_VPS_IP -Port 80
 Test-NetConnection YOUR_VPS_IP -Port 443
-curl.exe -sS https://cuesports.example.com/health
+curl.exe -sS https://cuesport.example.com/health
 ```
 
-Expect JSON with `"ok":true`. Open `https://cuesports.example.com/dashboard`.
+Expect JSON with `"ok":true`. Open `https://cuesport.example.com/dashboard`.
 
 On the VPS, useful checks:
 
@@ -245,7 +245,7 @@ ufw status verbose   # allow 80/443 if ufw is active
 
 ## 8. OBS dock (managed)
 
-1. Sign in at `https://cuesports.example.com/dashboard` (or Settings after login).
+1. Sign in at `https://cuesport.example.com/dashboard` (or Settings after login).
 2. Create an **OBS Dock Key**.
 3. In the OBS CueSport dock → CueSport Cloud → paste the key → Enable.
 4. Dock “Sign in with Google” opens the hosted dashboard; **Cloud scoring uses the Dock Key**.
@@ -271,7 +271,7 @@ sqlite3 /opt/cuesport/backend/data/cuesport.db 'PRAGMA wal_checkpoint(TRUNCATE);
 # then copy cuesport.db to object storage / another host
 ```
 
-- Uptime monitor: `https://cuesports.example.com/health`
+- Uptime monitor: `https://cuesport.example.com/health`
 - Logs: `docker compose logs -f` and `journalctl -u caddy -f`
 
 ## What this setup is not

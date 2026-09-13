@@ -240,7 +240,7 @@
             tab.classList.toggle('tablinks-disabled', pending);
             tab.setAttribute('aria-disabled', pending ? 'true' : 'false');
             if (pending) {
-                tab.title = 'Stats unlocks when CueSport Cloud finishes connecting';
+                tab.title = 'Stats unlocks when CueSport Scoreboard Cloud finishes connecting';
             } else if (window.cloudRelay &&
                 typeof window.cloudRelay.isReconnecting === 'function' &&
                 window.cloudRelay.isReconnecting()) {
@@ -381,7 +381,7 @@
             apiKey = getCloudStorage('apiKey');
         }
         if (!token && !apiKey) {
-            return { players: [], matches: [], error: 'Not signed in to CueSport Cloud' };
+            return { players: [], matches: [], error: 'Not signed in to CueSport Scoreboard Cloud' };
         }
         const headers = { Accept: 'application/json' };
         if (token) headers['Authorization'] = 'Bearer ' + token;
@@ -410,7 +410,7 @@
             if (msg === 'Failed to fetch') {
                 if (/unknown_type|timed out|timeout/i.test(wsErrMsg)) {
                     msg = 'Cloud server at ' + serverUrl +
-                        ' is missing the stats API (rebuild/redeploy CueSport Cloud, then reload the dock)';
+                        ' is missing the stats API (rebuild/redeploy CueSport Scoreboard Cloud, then reload the dock)';
                 } else {
                     msg = 'Could not reach ' + serverUrl +
                         ' (check Connection settings Server URL, and that the cloud server is running)';
@@ -631,7 +631,7 @@
             apiKey = getCloudStorage('apiKey');
         }
         if (!token && !apiKey) {
-            return { error: 'Not signed in to CueSport Cloud' };
+            return { error: 'Not signed in to CueSport Scoreboard Cloud' };
         }
         const headers = { Accept: 'application/json' };
         if (token) headers['Authorization'] = 'Bearer ' + token;
@@ -6571,7 +6571,7 @@
 
         if (isCloudStatsMode()) {
             if (!matchId) {
-                alert('Adding matches from the dock is not supported while CueSport Cloud is connected. Play a race on a dock to create matches, then edit them here.');
+                alert('Adding matches from the dock is not supported while CueSport Scoreboard Cloud is connected. Play a race on a dock to create matches, then edit them here.');
                 return;
             }
             findCloudMatchById(matchId).then(function (match) {
@@ -7370,7 +7370,7 @@
             if (importBtn) { importBtn.classList.add('disabled'); importBtn.setAttribute('aria-disabled', 'true'); importBtn.style.pointerEvents = 'none'; importBtn.style.opacity = '0.4'; }
             if (exportBtn) { exportBtn.classList.add('disabled'); exportBtn.setAttribute('aria-disabled', 'true'); exportBtn.style.pointerEvents = 'none'; exportBtn.style.opacity = '0.4'; }
             if (clearBtn) { clearBtn.classList.add('disabled'); clearBtn.setAttribute('aria-disabled', 'true'); clearBtn.style.pointerEvents = 'none'; clearBtn.style.opacity = '0.4'; }
-            if (hint) hint.textContent = 'Import, export and clear are disabled while CueSport Cloud is connected. Click a player to edit cloud matches from this dock.';
+            if (hint) hint.textContent = 'Import, export and clear are disabled while CueSport Scoreboard Cloud is connected. Click a player to edit cloud matches from this dock.';
         } else {
             if (importBtn) { importBtn.classList.remove('disabled'); importBtn.removeAttribute('aria-disabled'); importBtn.style.pointerEvents = ''; importBtn.style.opacity = ''; }
             if (exportBtn) { exportBtn.classList.remove('disabled'); exportBtn.removeAttribute('aria-disabled'); exportBtn.style.pointerEvents = ''; exportBtn.style.opacity = ''; }
