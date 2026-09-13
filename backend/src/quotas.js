@@ -1,4 +1,5 @@
 import * as sqlite from './db/sqlite.js';
+import { isPlatformAdmin } from './lib/platform-admin.js';
 
 /** Built-in subscription tier caps — override via TIER_LIMITS_JSON or TIER_{TIER}_MAX_* env.
  *  Option A: 1 OBS Dock Key = 1 table (room) + 1 dock connection (seat).
@@ -151,9 +152,56 @@ export function getAccountUsage(accountId) {
   };
 }
 
+/** @returns {'unrestricted'|string} */
+export function resolveSimulatedPlan(account) {
+  const raw = String(account?.simulated_plan || '').trim().toLowerCase();
+  if (!raw || raw === 'unrestricted' || raw === 'platform_admin') return 'unrestricted';
+  return normalizeTierName(raw);
+}
+
+export function getSimulatedPlanOptions() {
+  return [
+    { id: 'unrestricted', label: 'Unrestricted' },
+    ...Object.keys(tierCatalog).map((id) => ({
+      id,
+      label: getTierDisplayName(id),
+    })),
+  ];
+}
+
 export function getAccountQuota(account) {
-  const limits = getTierLimits(account);
   const usage = getAccountUsage(account.id);
+  if (isPlatformAdmin(account)) {
+    const simulated = resolveSimulatedPlan(account);
+    if (simulated === 'unrestricted') {
+      return {
+        tier: 'platform_admin',
+        tierDisplayName: 'Platform admin (unrestricted)',
+        limits: {
+          maxApiKeys: null,
+          maxRooms: null,
+          maxControlConnectionsPerRoom: null,
+        },
+        usage,
+        platform_admin_unlimited: true,
+        simulated_plan: 'unrestricted',
+      };
+    }
+    const limits = getTierLimits(simulated);
+    return {
+      tier: limits.tier,
+      tierDisplayName: `${getTierDisplayName(limits.tier)} (simulated)`,
+      limits: {
+        maxApiKeys: limits.maxApiKeys,
+        maxRooms: limits.maxRooms,
+        maxControlConnectionsPerRoom: limits.maxControlConnectionsPerRoom,
+      },
+      usage,
+      platform_admin_unlimited: false,
+      simulated_plan: limits.tier,
+    };
+  }
+  const limits = getTierLimits(account);
   return {
     tier: limits.tier,
     tierDisplayName: getTierDisplayName(limits.tier),
@@ -168,6 +216,9 @@ export function getAccountQuota(account) {
 
 export function assertCanCreateApiKey(account) {
   const quota = getAccountQuota(account);
+  if (quota.limits.maxApiKeys == null) {
+    return { ok: true, quota };
+  }
   if (quota.usage.apiKeys >= quota.limits.maxApiKeys) {
     return {
       ok: false,
@@ -181,6 +232,9 @@ export function assertCanCreateApiKey(account) {
 
 export function assertCanCreateRoom(account) {
   const quota = getAccountQuota(account);
+  if (quota.limits.maxRooms == null) {
+    return { ok: true, quota };
+  }
   if (quota.usage.rooms >= quota.limits.maxRooms) {
     return {
       ok: false,
@@ -192,7 +246,13 @@ export function assertCanCreateRoom(account) {
   return { ok: true, quota };
 }
 
+/** Soft ceiling for mobile/guest seats per table. */
 export function getMaxControlConnections(account) {
+  if (isPlatformAdmin(account)) {
+    const simulated = resolveSimulatedPlan(account);
+    if (simulated === 'unrestricted') return 100;
+    return getTierLimits(simulated).maxControlConnectionsPerRoom;
+  }
   return getTierLimits(account).maxControlConnectionsPerRoom;
 }
 

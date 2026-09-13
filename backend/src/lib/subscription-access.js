@@ -1,7 +1,10 @@
 /**
- * Cloud access: Stripe subscription active/trialing, or unexpired admin support trial.
+ * Cloud access: Stripe subscription active/trialing, unexpired admin support trial,
+ * or PLATFORM_ADMIN_EMAILS allowlist (ops — no plan required).
  * Paid tiers / product trials are owned by Stripe; trial_ends_at is support-only.
  */
+
+import { isPlatformAdmin } from './platform-admin.js';
 
 export function parseTrialEndsAtMs(trialEndsAt) {
   if (!trialEndsAt) return null;
@@ -20,6 +23,7 @@ export function isAdminSupportTrialActive(account, nowMs = Date.now()) {
 }
 
 export function hasCloudSubscriptionAccess(account, nowMs = Date.now()) {
+  if (isPlatformAdmin(account)) return true;
   const status = String(account?.subscription_status || '').toLowerCase();
   if (status === 'active' || status === 'trialing') return true;
   return isAdminSupportTrialActive(account, nowMs);

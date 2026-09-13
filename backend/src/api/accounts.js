@@ -22,7 +22,10 @@ import { config } from '../config.js';
 import {
   assertCanCreateApiKey,
   getAccountQuota,
+  getSimulatedPlanOptions,
   getTierDisplayName,
+  resolveSimulatedPlan,
+  getTiersCatalog,
 } from '../quotas.js';
 import {
   OBS_DOCK_OWNER_GUEST_LABEL,
@@ -102,6 +105,8 @@ export async function registerAccountRoutes(app) {
     const keys = sqlite.getApiKeysForAccount(account.id);
     const hasAccess = hasCloudSubscriptionAccess(account);
     const status = String(account.subscription_status || '').toLowerCase();
+    const platformAdmin = isPlatformAdmin(account);
+    const quota = getAccountQuota(account);
     return {
       account: {
         id: account.id,
@@ -114,8 +119,10 @@ export async function registerAccountRoutes(app) {
         has_subscription_access: hasAccess,
         needs_plan: !hasAccess && !config.allowDevAuth,
         is_trialing: status === 'trialing',
+        simulated_plan: platformAdmin ? resolveSimulatedPlan(account) : null,
       },
-      is_platform_admin: isPlatformAdmin(account),
+      is_platform_admin: platformAdmin,
+      simulated_plan_options: platformAdmin ? getSimulatedPlanOptions() : null,
       billing: {
         stripeConfigured: isStripeConfigured() && !config.allowDevAuth,
         plansUrl: '/api/billing/plans',
@@ -124,11 +131,43 @@ export async function registerAccountRoutes(app) {
       },
       rooms,
       api_keys: keys,
-      quota: getAccountQuota(account),
+      quota,
       room_cleanup: {
         grace_ms: config.roomCleanupGraceMs,
         idle_ttl_ms: config.roomIdleTtlMs,
         sweeper_ms: config.roomCleanupSweeperMs,
+      },
+    };
+  });
+
+  app.patch('/api/me/simulated-plan', async (request, reply) => {
+    const auth = await resolveAuthFromRequest(request);
+    if (!auth?.account) return reply.code(401).send({ error: 'Unauthorized' });
+    if (!isAccountAdminAuth(auth)) {
+      return reply.code(403).send({ error: 'Account sign-in required' });
+    }
+    if (!isPlatformAdmin(auth.account)) {
+      return reply.code(403).send({ error: 'Platform admin required' });
+    }
+    const requested = String(request.body?.tier ?? request.body?.simulated_plan ?? '').trim().toLowerCase();
+    if (!requested || requested === 'unrestricted' || requested === 'platform_admin') {
+      sqlite.setAccountSimulatedPlan(auth.account.id, null);
+    } else {
+      const catalog = getTiersCatalog();
+      if (!catalog[requested]) {
+        return reply.code(400).send({ error: 'Unknown tier' });
+      }
+      sqlite.setAccountSimulatedPlan(auth.account.id, requested);
+    }
+    const account = sqlite.getAccountById(auth.account.id);
+    return {
+      ok: true,
+      simulated_plan: resolveSimulatedPlan(account),
+      quota: getAccountQuota(account),
+      account: {
+        id: account.id,
+        email: account.email,
+        simulated_plan: resolveSimulatedPlan(account),
       },
     };
   });

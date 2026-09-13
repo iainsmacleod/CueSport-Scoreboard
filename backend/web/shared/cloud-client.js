@@ -328,6 +328,21 @@ export async function fetchMe(serverUrl, token) {
   return res.json();
 }
 
+export async function setSimulatedPlan(serverUrl, token, tier) {
+  const base = serverUrl.replace(/\/$/, '');
+  const res = await fetch(`${base}/api/me/simulated-plan`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ tier }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || 'Failed to update simulated plan');
+  return body;
+}
+
 export async function fetchAccountStats(serverUrl, token) {
   const base = serverUrl.replace(/\/$/, '');
   const res = await fetch(`${base}/api/stats`, {

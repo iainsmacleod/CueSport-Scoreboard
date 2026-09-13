@@ -2746,4 +2746,14 @@ body.controls-locked #reconnectBanner {
   margin: 0;
   flex: 1 1 14rem;
 }
+.simulated-plan-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0.5rem 0 0.75rem;
+  max-width: 22rem;
+}
+.simulated-plan-filter select {
+  width: 100%;
+}
 

@@ -6,7 +6,7 @@
   <title>CueSport Scoreboard Cloud — Dashboard</title>
   <link rel="icon" type="image/png" href="/web/images/balls/8ball_small.png" />
   <link rel="apple-touch-icon" href="/web/images/balls/8ball_small.png" />
-  <link rel="stylesheet" href="/web/shared/styles.css?v=8.1.0.31" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.1.0.33" />
 </head>
 <body>
   <header class="site-header">
@@ -103,8 +103,8 @@
         <label class="stats-filter platform-account-filter-label">
           View account
           <select id="platformAccountFilter" aria-label="Filter tables and stats by account">
+            <option value="__all__" selected>All accounts</option>
             <option value="">My account</option>
-            <option value="__all__">All accounts</option>
           </select>
         </label>
         <p id="platformAccountFilterHint" class="hint">
@@ -265,6 +265,15 @@
             <strong>Share</strong> — copy and send the key to another manager of an OBS instance.<br />
             <strong>Edit</strong> — change the seat name/label and role (Administrator, Trusted Operator, or Operator).<br />
             <strong>Remove</strong> — frees the seat and disconnects any dock using it. Create a new key to replace a leaked one.
+          </p>
+          <label id="simulatedPlanWrapSettings" class="stats-filter simulated-plan-filter hidden">
+            Simulated plan
+            <select id="simulatedPlanSelectSettings" aria-label="Platform admin simulated plan">
+              <option value="unrestricted">Unrestricted</option>
+            </select>
+          </label>
+          <p class="hint simulated-plan-hint hidden" id="simulatedPlanHint">
+            Platform admin only: simulate a paid plan&rsquo;s dock-key limits, or leave Unrestricted.
           </p>
           <button id="createKeyBtn" class="btn dash-action-btn" type="button" title="Create Dock Key" aria-label="Create Dock Key">Create Dock Key</button>
           <p id="apiKeyLimitHint" class="hint hidden"></p>
@@ -482,6 +491,12 @@
       <h2 id="dashAccountTitle">Account</h2>
       <p id="userEmail" class="account-email"></p>
       <p id="accountPlanLine" class="hint"></p>
+      <label id="simulatedPlanWrap" class="stats-filter simulated-plan-filter hidden">
+        Simulated plan
+        <select id="simulatedPlanSelect" aria-label="Platform admin simulated plan">
+          <option value="unrestricted">Unrestricted</option>
+        </select>
+      </label>
       <p id="quotaSummary" class="hint"></p>
       <div class="stats-toolbar dash-confirm-actions account-session-actions">
         <button type="button" id="accountManageBillingBtn" class="btn secondary dash-action-btn hidden" title="Manage billing">Manage billing</button>
@@ -497,6 +512,6 @@
       </div>
     </div>
   </div>
-  <script type="module" src="/web/dashboard/app.js?v=8.1.0.32"></script>
+  <script type="module" src="/web/dashboard/app.js?v=8.1.0.36"></script>
 </body>
 </html>

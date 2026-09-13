@@ -130,7 +130,7 @@ Legal templates: `/terms` and `/privacy` (replace placeholders; obtain counsel r
 
 ### Platform admin + trials
 
-Hosted multi-tenant support is gated by **`PLATFORM_ADMIN_EMAILS`** (not Dock Key roles or subscription tiers). Allowlisted users get `is_platform_admin` on `GET /api/me`, an **Admin** tab, a **View account** filter on Tables/Stats (**My account**, **All accounts**, or one tenant), and `/api/admin/*` routes (list tenants, read tables/stats/players, revoke keys, invalidate sessions, grant/end **support trials**).
+Hosted multi-tenant support is gated by **`PLATFORM_ADMIN_EMAILS`** (not Dock Key roles or subscription tiers). Allowlisted users get `is_platform_admin` on `GET /api/me`, an **Admin** tab, a **View account** filter on Tables/Stats (**My account**, **All accounts**, or one tenant), and `/api/admin/*` routes (list tenants, read tables/stats/players, revoke keys, invalidate sessions, grant/end **support trials**). Platform admins bypass subscription/trial gates on their own account and can pick a **Simulated plan** (default **Unrestricted**, or simulate any catalog tier’s dock-key/table limits via `PATCH /api/me/simulated-plan`).
 
 Access for dock/mobile join allows when **any** of:
 - `subscription_status` is `active` or `trialing` (Stripe Checkout + webhooks), **or**
@@ -156,7 +156,8 @@ This backend is GPL-licensed alongside the scoreboard. You may run your own inst
 |--------|------|-------------|
 | GET | `/api/config/public` | Client-facing config |
 | POST | `/api/auth/dev-login` | Dev auth (secret → signed token) |
-| GET | `/api/me` | Account, rooms, keys, quota, billing flags, `is_platform_admin` (Bearer token) |
+| GET | `/api/me` | Account, rooms, keys, quota, billing flags, `is_platform_admin`, simulated plan (Bearer token) |
+| PATCH | `/api/me/simulated-plan` | Platform admin: `{ tier: "unrestricted" \| "<catalog_tier>" }` for plan-limit simulation |
 | GET | `/api/billing/plans` | Plan catalog (limits + contact tier) |
 | POST | `/api/billing/checkout` | Stripe Checkout session `{ tier, acceptedTerms }` |
 | POST | `/api/billing/portal` | Stripe Customer Portal session |

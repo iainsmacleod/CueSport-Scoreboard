@@ -137,6 +137,12 @@ function ensureAccountColumns(database) {
   if (!cols.has('stripe_subscription_id')) {
     database.exec('ALTER TABLE accounts ADD COLUMN stripe_subscription_id TEXT');
   }
+  if (cols.has('ops_quota_tier') && !cols.has('simulated_plan')) {
+    database.exec('ALTER TABLE accounts RENAME COLUMN ops_quota_tier TO simulated_plan');
+  } else if (!cols.has('simulated_plan')) {
+    // Platform admin: null/unrestricted = no caps; otherwise a catalog tier id for testing.
+    database.exec('ALTER TABLE accounts ADD COLUMN simulated_plan TEXT');
+  }
 }
 
 function ensureApiKeyColumns(database) {
@@ -698,6 +704,21 @@ export function setAccountTrialEndsAt(accountId, trialEndsAt) {
   getDb().prepare(
     `UPDATE accounts SET trial_ends_at = ? WHERE id = ?`
   ).run(trialEndsAt || null, accountId);
+  return getAccountById(accountId);
+}
+
+/**
+ * Platform-admin simulated plan (quota testing).
+ * Store null / 'unrestricted' for unlimited; otherwise a catalog tier id.
+ */
+export function setAccountSimulatedPlan(accountId, tier) {
+  const existing = getAccountById(accountId);
+  if (!existing) return null;
+  const raw = String(tier || '').trim().toLowerCase();
+  const value = !raw || raw === 'unrestricted' || raw === 'platform_admin' ? null : raw;
+  getDb().prepare(
+    `UPDATE accounts SET simulated_plan = ? WHERE id = ?`
+  ).run(value, accountId);
   return getAccountById(accountId);
 }
 

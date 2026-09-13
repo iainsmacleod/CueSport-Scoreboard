@@ -381,13 +381,19 @@ async function run() {
       headers: { Authorization: `Bearer ${token}` },
     });
     assert('GET /api/me with dev token', me.ok && me.body.account?.email === devAccountEmail);
-    assert('GET /api/me includes quota', !!me.body.quota?.limits?.maxApiKeys);
+    assert(
+      'GET /api/me includes quota',
+      me.body.quota?.limits
+        && (me.body.quota.limits.maxApiKeys != null || me.body.quota.platform_admin_unlimited === true)
+    );
     assert(
       'GET /api/me quota uses renamed tier ids',
       me.body.quota?.tier === 'selfhost'
         || me.body.quota?.tier === 'streamer'
         || me.body.quota?.tier === 'tournament_organizer'
-        || me.body.quota?.tier === 'league_director',
+        || me.body.quota?.tier === 'league_director'
+        || me.body.quota?.tier === 'platform_admin'
+        || me.body.quota?.tier === 'network_organization',
       String(me.body.quota?.tier)
     );
     assert(
@@ -1965,11 +1971,28 @@ async function run() {
             },
             body: JSON.stringify({ label: 'Should Fail Inactive' }),
           });
-          assert(
-            'Inactive account cannot create OBS Dock Key',
-            blockedKey.status === 403 && blockedKey.body?.code === 'subscription_required',
-            `${blockedKey.status} ${JSON.stringify(blockedKey.body)}`
-          );
+          const meGate = await fetchJson('/api/me', {
+            headers: { Authorization: `Bearer ${tokenFresh}` },
+          });
+          if (meGate.body?.is_platform_admin) {
+            assert(
+              'Platform admin can create Dock Key while inactive',
+              blockedKey.ok && !!blockedKey.body?.key,
+              `${blockedKey.status} ${JSON.stringify(blockedKey.body)}`
+            );
+            if (blockedKey.body?.id) {
+              await fetchJson(`/api/api-keys/${encodeURIComponent(blockedKey.body.id)}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${tokenFresh}` },
+              }).catch(() => {});
+            }
+          } else {
+            assert(
+              'Inactive account cannot create OBS Dock Key',
+              blockedKey.status === 403 && blockedKey.body?.code === 'subscription_required',
+              `${blockedKey.status} ${JSON.stringify(blockedKey.body)}`
+            );
+          }
         } finally {
           db.prepare(
             `UPDATE accounts SET subscription_status = ?, trial_ends_at = ? WHERE id = ?`
@@ -1994,6 +2017,29 @@ async function run() {
         'Access gate: inactive blocked',
         !hasCloudSubscriptionAccess({ subscription_status: 'inactive', trial_ends_at: null })
       );
+      {
+        const { config } = await import('../src/config.js');
+        const adminEmail = config.platformAdminEmails[0];
+        if (adminEmail) {
+          assert(
+            'Access gate: platform admin bypasses inactive',
+            hasCloudSubscriptionAccess({
+              subscription_status: 'inactive',
+              trial_ends_at: null,
+              email: adminEmail,
+            })
+          );
+        } else {
+          assert(
+            'Access gate: unknown email stays blocked when inactive',
+            !hasCloudSubscriptionAccess({
+              subscription_status: 'inactive',
+              trial_ends_at: null,
+              email: 'not-an-admin@example.com',
+            })
+          );
+        }
+      }
       const future = new Date(Date.now() + 86400000).toISOString();
       const past = new Date(Date.now() - 86400000).toISOString();
       assert(
@@ -2044,6 +2090,15 @@ async function run() {
           headers: { Authorization: `Bearer ${tokenFresh}` },
         });
         assert('Non-admin GET /api/admin/players 403', deniedAllPlayers.status === 403);
+        const deniedSimPlan = await fetchJson('/api/me/simulated-plan', {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${tokenFresh}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ tier: 'streamer' }),
+        });
+        assert('Non-admin PATCH simulated-plan 403', deniedSimPlan.status === 403);
       } else {
         const listed = await fetchJson('/api/admin/accounts', {
           headers: { Authorization: `Bearer ${tokenFresh}` },
@@ -2117,6 +2172,47 @@ async function run() {
           allPlayers.ok && Array.isArray(allPlayers.body.players),
           JSON.stringify(allPlayers.body)
         );
+        const simDefault = await fetchJson('/api/me', {
+          headers: { Authorization: `Bearer ${tokenFresh}` },
+        });
+        assert(
+          'Admin me includes simulated_plan unrestricted by default',
+          simDefault.ok
+            && simDefault.body.account?.simulated_plan === 'unrestricted'
+            && simDefault.body.quota?.platform_admin_unlimited === true
+            && Array.isArray(simDefault.body.simulated_plan_options),
+          JSON.stringify(simDefault.body.account)
+        );
+        const simStreamer = await fetchJson('/api/me/simulated-plan', {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${tokenFresh}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ tier: 'streamer' }),
+        });
+        assert(
+          'Admin PATCH simulated-plan to streamer',
+          simStreamer.ok
+            && simStreamer.body.simulated_plan === 'streamer'
+            && simStreamer.body.quota?.platform_admin_unlimited === false
+            && simStreamer.body.quota?.limits?.maxApiKeys != null,
+          JSON.stringify(simStreamer.body)
+        );
+        const simReset = await fetchJson('/api/me/simulated-plan', {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${tokenFresh}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ tier: 'unrestricted' }),
+        });
+        assert(
+          'Admin PATCH simulated-plan back to unrestricted',
+          simReset.ok && simReset.body.simulated_plan === 'unrestricted'
+            && simReset.body.quota?.platform_admin_unlimited === true,
+          JSON.stringify(simReset.body)
+        );
         const grant = await fetchJson(`/api/admin/accounts/${accountId}/trial`, {
           method: 'POST',
           headers: {
@@ -2167,19 +2263,37 @@ async function run() {
           const before = db.prepare(
             'SELECT subscription_status, trial_ends_at FROM accounts WHERE id = ?'
           ).get(accountId);
+          const meGateWs = await fetchJson('/api/me', {
+            headers: { Authorization: `Bearer ${tokenFresh}` },
+          });
+          const platformAdminWs = !!meGateWs.body?.is_platform_admin;
           try {
             db.prepare(
               `UPDATE accounts SET subscription_status = 'inactive', trial_ends_at = NULL WHERE id = ?`
             ).run(accountId);
             try {
-              await wsJoin({ roomId: gateRoomId, client: 'mobile', accessToken: tokenFresh });
-              assert('Inactive blocks mobile join', false, 'should have failed');
+              const inactiveJoin = await wsJoin({
+                roomId: gateRoomId,
+                client: 'mobile',
+                accessToken: tokenFresh,
+              });
+              if (platformAdminWs) {
+                assert('Platform admin mobile join while inactive', !!inactiveJoin.data?.room_id);
+                inactiveJoin.ws.close();
+                await sleep(80);
+              } else {
+                assert('Inactive blocks mobile join', false, 'should have failed');
+              }
             } catch (e) {
-              assert(
-                'Inactive blocks mobile join',
-                e.code === 'subscription_required' || /subscription/i.test(e.message),
-                e.message
-              );
+              if (platformAdminWs) {
+                assert('Platform admin mobile join while inactive', false, e.message);
+              } else {
+                assert(
+                  'Inactive blocks mobile join',
+                  e.code === 'subscription_required' || /subscription/i.test(e.message),
+                  e.message
+                );
+              }
             }
 
             const trialIso = new Date(Date.now() + 2 * 86400000).toISOString();
@@ -2204,14 +2318,28 @@ async function run() {
               `UPDATE accounts SET trial_ends_at = ? WHERE id = ?`
             ).run(expiredIso, accountId);
             try {
-              await wsJoin({ roomId: gateRoomId, client: 'mobile', accessToken: tokenFresh });
-              assert('Expired support trial blocks mobile', false, 'should have failed');
+              const expiredJoin = await wsJoin({
+                roomId: gateRoomId,
+                client: 'mobile',
+                accessToken: tokenFresh,
+              });
+              if (platformAdminWs) {
+                assert('Platform admin mobile join with expired trial', !!expiredJoin.data?.room_id);
+                expiredJoin.ws.close();
+                await sleep(80);
+              } else {
+                assert('Expired support trial blocks mobile', false, 'should have failed');
+              }
             } catch (e) {
-              assert(
-                'Expired support trial blocks mobile',
-                e.code === 'subscription_required' || /subscription/i.test(e.message),
-                e.message
-              );
+              if (platformAdminWs) {
+                assert('Platform admin mobile join with expired trial', false, e.message);
+              } else {
+                assert(
+                  'Expired support trial blocks mobile',
+                  e.code === 'subscription_required' || /subscription/i.test(e.message),
+                  e.message
+                );
+              }
             }
 
             db.prepare(

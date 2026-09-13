@@ -20,8 +20,9 @@ import {
   fetchBillingPlans,
   startBillingCheckout,
   openBillingPortal,
+  setSimulatedPlan,
   GAME_TYPES,
-} from '../shared/cloud-client.js?v=8.0.0.9';
+} from '../shared/cloud-client.js?v=8.0.0.11';
 import {
   computeDurationSeconds,
   formatDurationSeconds,
@@ -520,23 +521,36 @@ function renderQuota(quota, account = null) {
   const display = tierDisplayName || tier;
   const isTrialing = !!(account && account.is_trialing);
   const needsPlan = !!(account && account.needs_plan);
+  const platformUnlimited = !!(quota.platform_admin_unlimited || (isPlatformAdminUser && limits.maxApiKeys == null));
   if (planLine) {
-    if (needsPlan) {
+    if (isPlatformAdminUser) {
+      planLine.textContent = platformUnlimited
+        ? 'Platform admin — unrestricted quotas (no plan required)'
+        : `Platform admin — simulating ${display.replace(/\s*\(simulated\)\s*$/i, '')} limits`;
+    } else if (needsPlan) {
       planLine.innerHTML = 'No active plan — choose a subscription in Settings to create OBS Dock Keys.';
     } else {
       planLine.innerHTML = `Plan: ${escapeHtml(display)}${isTrialing ? ' <span class="plan-trial-badge">Trial</span>' : ''}`;
     }
   }
   if (el) {
-    el.textContent =
-      `Dock seats (keys) ${usage.apiKeys}/${limits.maxApiKeys} · ` +
-      `Mobile/guest up to ${limits.maxControlConnectionsPerRoom} per table`;
+    if (platformUnlimited || limits.maxApiKeys == null) {
+      el.textContent = `Dock seats (keys) ${usage.apiKeys} · Mobile/guest unrestricted per table`;
+    } else {
+      el.textContent =
+        `Dock seats (keys) ${usage.apiKeys}/${limits.maxApiKeys} · ` +
+        `Mobile/guest up to ${limits.maxControlConnectionsPerRoom} per table`;
+    }
   }
-  const atKeyLimit = usage.apiKeys >= limits.maxApiKeys;
-  const blocked = needsPlan || atKeyLimit;
+  const atKeyLimit = !platformUnlimited
+    && limits.maxApiKeys != null
+    && usage.apiKeys >= limits.maxApiKeys;
+  const blocked = (!isPlatformAdminUser && needsPlan) || atKeyLimit;
   if (createBtn) createBtn.disabled = blocked;
   if (hint) {
-    if (needsPlan) {
+    if (isPlatformAdminUser && !atKeyLimit) {
+      hint.classList.add('hidden');
+    } else if (needsPlan && !isPlatformAdminUser) {
       hint.textContent = 'Choose a plan under Settings → Billing to unlock OBS Dock Keys.';
       hint.classList.remove('hidden');
     } else if (atKeyLimit) {
@@ -545,6 +559,68 @@ function renderQuota(quota, account = null) {
     } else {
       hint.classList.add('hidden');
     }
+  }
+}
+
+function syncSimulatedPlanSelect(me) {
+  const wraps = [
+    document.getElementById('simulatedPlanWrap'),
+    document.getElementById('simulatedPlanWrapSettings'),
+  ].filter(Boolean);
+  const selects = [
+    document.getElementById('simulatedPlanSelect'),
+    document.getElementById('simulatedPlanSelectSettings'),
+  ].filter(Boolean);
+  const isAdmin = !!(me?.is_platform_admin || isPlatformAdminUser);
+  wraps.forEach((el) => el.classList.toggle('hidden', !isAdmin));
+  document.getElementById('simulatedPlanHint')?.classList.toggle('hidden', !isAdmin);
+  if (!isAdmin) return;
+  const options = Array.isArray(me?.simulated_plan_options) && me.simulated_plan_options.length
+    ? me.simulated_plan_options
+    : [
+      { id: 'unrestricted', label: 'Unrestricted' },
+      { id: 'streamer', label: 'Streamer' },
+      { id: 'tournament_organizer', label: 'Tournament Organizer' },
+      { id: 'league_director', label: 'League Director' },
+      { id: 'network_organization', label: 'Network Organization' },
+      { id: 'selfhost', label: 'Self-host' },
+    ];
+  const selected = me?.account?.simulated_plan
+    || me?.quota?.simulated_plan
+    || 'unrestricted';
+  selects.forEach((select) => {
+    select.innerHTML = options.map((opt) =>
+      `<option value="${escapeHtml(opt.id)}">${escapeHtml(opt.label)}</option>`
+    ).join('');
+    select.value = options.some((o) => o.id === selected) ? selected : 'unrestricted';
+  });
+}
+
+async function onSimulatedPlanChange(event) {
+  const select = event?.target;
+  if (!select || !isPlatformAdminUser) return;
+  const tier = select.value || 'unrestricted';
+  try {
+    const result = await setSimulatedPlan(getServerUrl(), getToken(), tier);
+    if (lastAccount) {
+      lastAccount.simulated_plan = result.simulated_plan || tier;
+    }
+    if (result.quota) renderQuota(result.quota, lastAccount);
+    syncSimulatedPlanSelect({
+      is_platform_admin: true,
+      account: { simulated_plan: result.simulated_plan || tier },
+      quota: result.quota,
+      simulated_plan_options: null,
+    });
+    const me = await fetchMe(getServerUrl(), getToken()).catch(() => null);
+    if (me) {
+      lastAccount = { ...lastAccount, ...(me.account || {}) };
+      if (me.quota) renderQuota(me.quota, lastAccount);
+      syncSimulatedPlanSelect(me);
+    }
+  } catch (err) {
+    setError(err.message || 'Could not update simulated plan');
+    await renderDashboard();
   }
 }
 
@@ -1420,8 +1496,8 @@ async function loadPlatformAccountFilterOptions() {
   const ownId = lastAccount?.id || '';
   const ownEmail = lastAccount?.email || 'My account';
   const options = [
-    `<option value="">My account (${escapeHtml(ownEmail)})</option>`,
     `<option value="${PLATFORM_VIEW_ALL}">All accounts</option>`,
+    `<option value="">My account (${escapeHtml(ownEmail)})</option>`,
   ];
   accounts
     .filter((a) => a && a.id && a.id !== ownId)
@@ -1434,12 +1510,15 @@ async function loadPlatformAccountFilterOptions() {
   if (previous === PLATFORM_VIEW_ALL) {
     select.value = PLATFORM_VIEW_ALL;
     platformViewAccountId = PLATFORM_VIEW_ALL;
+  } else if (previous === '') {
+    select.value = '';
+    platformViewAccountId = '';
   } else if (previous && accounts.some((a) => a.id === previous)) {
     select.value = previous;
     platformViewAccountId = previous;
   } else {
-    select.value = '';
-    platformViewAccountId = '';
+    select.value = PLATFORM_VIEW_ALL;
+    platformViewAccountId = PLATFORM_VIEW_ALL;
   }
   updatePlatformAccountFilterHint();
 }
@@ -1521,6 +1600,7 @@ function setAdminStatus(msg) {
 }
 
 function setPlatformAdminUi(enabled) {
+  const wasAdmin = isPlatformAdminUser;
   isPlatformAdminUser = !!enabled;
   const tabBtn = document.getElementById('dashAdminTabBtn');
   if (tabBtn) tabBtn.classList.toggle('hidden', !isPlatformAdminUser);
@@ -1533,15 +1613,19 @@ function setPlatformAdminUi(enabled) {
     adminAccountsCache = [];
     const select = document.getElementById('platformAccountFilter');
     if (select) {
-      select.innerHTML = '<option value="">My account</option>';
-      select.value = '';
+      select.innerHTML =
+        `<option value="${PLATFORM_VIEW_ALL}">All accounts</option>` +
+        '<option value="">My account</option>';
+      select.value = PLATFORM_VIEW_ALL;
     }
     updatePlatformAccountFilterHint();
+    syncSimulatedPlanSelect({ is_platform_admin: false });
     const detail = document.getElementById('adminDetailPanel');
     if (detail) detail.classList.add('hidden');
     const activeAdmin = document.querySelector('.dash-tab.active[data-tab="admin"]');
     if (activeAdmin) setActiveDashTab('tables');
   } else {
+    if (!wasAdmin) platformViewAccountId = PLATFORM_VIEW_ALL;
     loadPlatformAccountFilterOptions().catch(() => {});
   }
 }
@@ -3503,6 +3587,7 @@ async function renderDashboard() {
     if (emailEl) emailEl.textContent = me.account.email;
     setPlatformAdminUi(!!me.is_platform_admin);
     renderQuota(me.quota, me.account);
+    syncSimulatedPlanSelect(me);
     renderApiKeys(me.api_keys);
     await refreshBillingUi(me.account, me.billing);
     ownDashboardRooms = me.rooms || [];
@@ -4035,6 +4120,8 @@ document.getElementById('clearSavedLoginBtn')?.addEventListener('click', () => {
 document.getElementById('createKeyBtn').addEventListener('click', () => {
   openDockKeyModal({ mode: 'create' });
 });
+document.getElementById('simulatedPlanSelect')?.addEventListener('change', onSimulatedPlanChange);
+document.getElementById('simulatedPlanSelectSettings')?.addEventListener('change', onSimulatedPlanChange);
 document.getElementById('dashCreateKeyCancelBtn')?.addEventListener('click', () => closeDockKeyModal());
 document.getElementById('dashCreateKeySubmitBtn')?.addEventListener('click', () => submitDockKeyModal());
 document.getElementById('dashCreateKeyRole')?.addEventListener('change', (event) => {
