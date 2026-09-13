@@ -787,6 +787,14 @@ ul { padding-left: 1.2rem; }
   gap: 0.5rem;
   flex-wrap: wrap;
 }
+/* Home already has Dashboard + Browse Live Streams in the hero — don't duplicate in the header. */
+body.landing-home .site-nav {
+  display: none;
+}
+/* On /streams you're already viewing the list — keep only Sign In / Dashboard. */
+body.streams-page .site-nav-streams {
+  display: none;
+}
 .site-nav .btn,
 .hero-actions .btn {
   display: inline-flex;
@@ -1171,6 +1179,14 @@ a.table-card:focus-visible {
   opacity: 0.7;
 }
 .table-status.online { color: #9ece6a; opacity: 1; }
+.table-account-email,
+.stats-account-email {
+  margin: 0.1rem 0 0;
+  font-size: 0.78rem;
+  font-weight: 500;
+  opacity: 0.75;
+  word-break: break-word;
+}
 .table-players { margin: 0.15rem 0; font-weight: 600; }
 .table-score { margin: 0; font-size: 1.15rem; font-weight: 700; }
 .table-score-current {
@@ -2369,6 +2385,10 @@ body.controls-locked #reconnectBanner {
   padding: 1.25rem 1rem;
   background: rgba(0, 0, 0, 0.55);
   overflow: auto;
+}
+/* Confirm must stack above account/share modals (same base z-index, earlier in DOM). */
+#dashConfirmModal {
+  z-index: 50;
 }
 .dash-modal.is-busy {
   cursor: wait;

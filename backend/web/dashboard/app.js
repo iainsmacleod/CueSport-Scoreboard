@@ -115,8 +115,10 @@ let isPlatformAdminUser = false;
 let adminAccountsCache = [];
 let adminSelectedId = '';
 let adminSearchTimer = null;
-/** Platform admin: empty = own account; otherwise view that tenant's tables/stats (read-only). */
+/** Platform admin: empty = own account; `__all__` = every tenant; otherwise one tenant (read-only). */
 let platformViewAccountId = '';
+/** Sentinel for platform-admin cross-tenant Tables/Stats view. */
+const PLATFORM_VIEW_ALL = '__all__';
 let platformAccountsForFilter = [];
 let ownDashboardRooms = [];
 
@@ -405,8 +407,29 @@ function getToken() {
   return localStorage.getItem(TOKEN_KEY) || '';
 }
 
-function goToMainPage() {
-  window.location.href = '/';
+/** Clear local dashboard session and show the login screen (stay on /dashboard). */
+function localSignOut({ clearServer = false } = {}) {
+  localStorage.removeItem(TOKEN_KEY);
+  if (clearServer) localStorage.removeItem(SERVER_KEY);
+  wantLiveFeed = false;
+  stopLiveFeed();
+  lastTablesFingerprint = '';
+  lastAccount = null;
+  lastDashboardRooms = [];
+  ownDashboardRooms = [];
+  statsData = null;
+  statsLoaded = false;
+  setPlatformAdminUi(false);
+  setError('');
+  closeDashAccountModal();
+  try {
+    window.google?.accounts?.id?.disableAutoSelect?.();
+  } catch (_) { /* ignore */ }
+  show('loginSection', true);
+  show('dashboardSection', false);
+  if (dashPublicConfigCache) {
+    initOfficialGoogleButton(dashPublicConfigCache).catch(() => {});
+  }
 }
 
 function gameTypeLabel(id) {
@@ -437,12 +460,14 @@ function formatTableCard(room, serverUrl) {
 
   const connectionName = String(room.api_key_label || room.dock_label || '').trim()
     || 'OBS Dock Connected';
+  const accountEmail = String(room.account_email || room.accountEmail || '').trim();
 
   const card = document.createElement('a');
   card.className = 'table-card panel';
   card.href = controlUrl;
   card.innerHTML = `
     <p class="table-status online">${escapeHtml(connectionName)}</p>
+    ${accountEmail ? `<p class="table-account-email">${escapeHtml(accountEmail)}</p>` : ''}
     <h3>${matchTitle}</h3>
     <p class="table-players">${p1} vs ${p2}</p>
     ${scoreHtml}
@@ -1350,13 +1375,19 @@ function formatSupportTrial(trialEndsAt) {
   return `${active ? 'Until' : 'Ended'} ${d.toLocaleString()}`;
 }
 
+function isViewingAllAccounts() {
+  return !!(isPlatformAdminUser && platformViewAccountId === PLATFORM_VIEW_ALL);
+}
+
 function isViewingOtherAccount() {
-  return !!(isPlatformAdminUser && platformViewAccountId && lastAccount?.id
-    && platformViewAccountId !== lastAccount.id);
+  if (!isPlatformAdminUser || !platformViewAccountId) return false;
+  if (platformViewAccountId === PLATFORM_VIEW_ALL) return true;
+  return !!(lastAccount?.id && platformViewAccountId !== lastAccount.id);
 }
 
 function getPlatformViewAccountLabel() {
   if (!isViewingOtherAccount()) return '';
+  if (isViewingAllAccounts()) return 'All accounts';
   const hit = platformAccountsForFilter.find((a) => a.id === platformViewAccountId);
   return hit?.email || platformViewAccountId;
 }
@@ -1368,11 +1399,15 @@ function updatePlatformAccountFilterHint() {
     hint.textContent = '';
     return;
   }
+  if (isViewingAllAccounts()) {
+    hint.textContent = 'Viewing All accounts — live tables, matches, and players across tenants (read-only). Separate from Dock Key roles and subscription tiers.';
+    return;
+  }
   if (isViewingOtherAccount()) {
     hint.textContent = `Viewing ${getPlatformViewAccountLabel()} — tables, matches, and players (read-only). Separate from Dock Key roles and subscription tiers.`;
     return;
   }
-  hint.textContent = 'Platform admin: browse another customer’s tables, matches, and players (read-only). Separate from Dock Key roles and subscription tiers.';
+  hint.textContent = 'Platform admin: browse one customer or All accounts (tables, matches, players — read-only). Separate from Dock Key roles and subscription tiers.';
 }
 
 async function loadPlatformAccountFilterOptions() {
@@ -1384,7 +1419,10 @@ async function loadPlatformAccountFilterOptions() {
   if (!select) return;
   const ownId = lastAccount?.id || '';
   const ownEmail = lastAccount?.email || 'My account';
-  const options = [`<option value="">My account (${escapeHtml(ownEmail)})</option>`];
+  const options = [
+    `<option value="">My account (${escapeHtml(ownEmail)})</option>`,
+    `<option value="${PLATFORM_VIEW_ALL}">All accounts</option>`,
+  ];
   accounts
     .filter((a) => a && a.id && a.id !== ownId)
     .sort((a, b) => String(a.email || '').localeCompare(String(b.email || '')))
@@ -1393,7 +1431,10 @@ async function loadPlatformAccountFilterOptions() {
     });
   const previous = platformViewAccountId;
   select.innerHTML = options.join('');
-  if (previous && accounts.some((a) => a.id === previous)) {
+  if (previous === PLATFORM_VIEW_ALL) {
+    select.value = PLATFORM_VIEW_ALL;
+    platformViewAccountId = PLATFORM_VIEW_ALL;
+  } else if (previous && accounts.some((a) => a.id === previous)) {
     select.value = previous;
     platformViewAccountId = previous;
   } else {
@@ -1427,6 +1468,17 @@ async function applyPlatformAccountFilter(accountId) {
 
 async function refreshTablesForCurrentView() {
   if (!getToken()) return;
+  if (isViewingAllAccounts()) {
+    try {
+      const data = await adminFetchJson('/api/admin/tables?limit=200');
+      lastDashboardRooms = data.rooms || [];
+      renderTableCards(lastDashboardRooms);
+      renderDebugRooms(ownDashboardRooms);
+    } catch (err) {
+      setError(err.message || 'Failed to load all-account tables');
+    }
+    return;
+  }
   if (isViewingOtherAccount()) {
     try {
       const data = await adminFetchJson(
@@ -1446,6 +1498,13 @@ async function refreshTablesForCurrentView() {
 }
 
 async function resolvePlayersSearch(query, limit) {
+  if (isViewingAllAccounts()) {
+    const data = await adminFetchJson(
+      `/api/admin/players?` +
+      new URLSearchParams({ q: query || '', limit: String(limit || 8) }).toString()
+    );
+    return data.players || [];
+  }
   if (isViewingOtherAccount()) {
     const data = await adminFetchJson(
       `/api/admin/accounts/${encodeURIComponent(platformViewAccountId)}/players?` +
@@ -2182,7 +2241,7 @@ function renderAccountStats() {
     boardBody.innerHTML = pageInfo.items.map((p, index) => `
       <tr class="stats-row-clickable" data-player-id="${escapeHtml(p.id)}">
         <td class="stats-pos">${pageInfo.startIndex + index + 1}</td>
-        <td>${escapeHtml(p.name)}</td>
+        <td>${escapeHtml(p.name)}${p.accountEmail ? `<div class="stats-account-email">${escapeHtml(p.accountEmail)}</div>` : ''}</td>
         <td>${formatMatchRecord(p.gamesWon, p.gamesDrawn, p.gamesLost)}</td>
         <td>${playerWinPct(p)}%</td>
         <td>${p.racksWon}/${p.racksLost}</td>
@@ -2532,7 +2591,7 @@ function matchOverviewRow(m) {
   }
   const main = `
     <tr class="${inProgress ? 'stats-match-in-progress' : ''}">
-      <td class="stats-match-when">${matchDateCellHtml(m.completedAt || m.startedAt, matchDateOptions(m, inProgress))}</td>
+      <td class="stats-match-when">${matchDateCellHtml(m.completedAt || m.startedAt, matchDateOptions(m, inProgress))}${m.accountEmail ? `<div class="stats-account-email">${escapeHtml(m.accountEmail)}</div>` : ''}</td>
       <td class="stats-match-event">${formatMatchEventCellHtml(m)}</td>
       <td class="stats-match-pair-cell">${matchPairHtml(m)}</td>
       <td class="stats-match-score">${scoreCellHtml(m)}</td>
@@ -2647,7 +2706,11 @@ function renderPlayerDetail() {
     renderAccountStats();
     return;
   }
-  if (title) title.textContent = unfilteredName;
+  if (title) {
+    title.textContent = unfilteredName;
+    const email = String(player?.accountEmail || '').trim();
+    title.title = email ? `${unfilteredName} · ${email}` : unfilteredName;
+  }
   if (rename && document.activeElement !== rename) rename.value = unfilteredName;
   if (isViewingOtherAccount()) playerRenameEditing = false;
   setPlayerRenameEditing(playerRenameEditing, { focus: false });
@@ -2719,7 +2782,7 @@ function renderPlayerDetail() {
     }
     const main = `
       <tr class="${inProgress ? 'stats-match-in-progress' : ''}">
-        <td class="stats-match-when">${matchDateCellHtml(m.completedAt || m.startedAt, matchDateOptions(m, inProgress))}</td>
+        <td class="stats-match-when">${matchDateCellHtml(m.completedAt || m.startedAt, matchDateOptions(m, inProgress))}${m.accountEmail ? `<div class="stats-account-email">${escapeHtml(m.accountEmail)}</div>` : ''}</td>
         <td class="stats-match-pair-cell">${matchPairHtml(m)}</td>
         <td>${formatMatchGameCellHtml(m)}</td>
         <td class="stats-match-score">${scoreCellHtml(m, {
@@ -3293,7 +3356,9 @@ async function loadAccountStats(force = false) {
       : 'Loading cloud stats…';
   }
   try {
-    if (isViewingOtherAccount()) {
+    if (isViewingAllAccounts()) {
+      statsData = await adminFetchJson('/api/admin/stats?accountLimit=200&limitPerAccount=2000');
+    } else if (isViewingOtherAccount()) {
       statsData = await adminFetchJson(
         `/api/admin/accounts/${encodeURIComponent(platformViewAccountId)}/stats`
       );
@@ -3401,9 +3466,7 @@ async function connectLiveFeed() {
   });
   client.on('error', (e) => {
     if (e.code === 'invalid_token' || e.code === 'room_forbidden' || e.code === 'session_revoked') {
-      localStorage.removeItem(TOKEN_KEY);
-      stopLiveFeed();
-      goToMainPage();
+      localSignOut();
     }
   });
   client.on('close', () => {
@@ -3469,7 +3532,13 @@ async function renderDashboard() {
   }
 }
 
-function formatPlayerPreview(lastSeenAt) {
+function formatPlayerPreview(playerOrLastSeen) {
+  if (playerOrLastSeen && typeof playerOrLastSeen === 'object') {
+    const email = String(playerOrLastSeen.accountEmail || '').trim();
+    const seen = formatPlayerPreview(playerOrLastSeen.last_seen_at || playerOrLastSeen.lastPlayedAt);
+    return email ? `${email} · ${seen}` : seen;
+  }
+  const lastSeenAt = playerOrLastSeen;
   if (!lastSeenAt) return 'Saved player';
   const local = formatLocalDate(lastSeenAt);
   if (!local || local === '—') return 'Saved player';
@@ -3557,7 +3626,7 @@ function initStatsPlayerSearch() {
         item.className = 'autocomplete-item';
         item.dataset.index = String(index);
         item.innerHTML = `<span class="autocomplete-name">${escapeHtml(player.name)}</span>`
-          + `<span class="autocomplete-preview">${escapeHtml(formatPlayerPreview(player.last_seen_at))}</span>`;
+          + `<span class="autocomplete-preview">${escapeHtml(formatPlayerPreview(player))}</span>`;
         item.addEventListener('mousedown', (e) => {
           e.preventDefault();
           openPlayerFromSearch(player);
@@ -3924,15 +3993,7 @@ async function submitDevLogin() {
 }
 
 function clearSavedDashboardLogin() {
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(SERVER_KEY);
-  stopLiveFeed();
-  lastTablesFingerprint = '';
-  statsData = null;
-  statsLoaded = false;
-  setError('');
-  show('loginSection', true);
-  show('dashboardSection', false);
+  localSignOut({ clearServer: true });
   const secretEl = document.getElementById('devSecret');
   if (secretEl) secretEl.value = '';
 }
@@ -3987,20 +4048,19 @@ document.getElementById('dashCreateKeyLabel')?.addEventListener('keydown', (even
 });
 
 document.getElementById('signOutBtn')?.addEventListener('click', async () => {
+  // Close account modal first — confirm shares the same stacking context and would open underneath.
+  closeDashAccountModal();
   const ok = await confirmDashAction({
     title: 'Sign Out',
     message: 'Sign out of this dashboard on this device?',
     confirmLabel: 'Sign Out',
   });
   if (!ok) return;
-  closeDashAccountModal();
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(SERVER_KEY);
-  stopLiveFeed();
-  goToMainPage();
+  localSignOut({ clearServer: true });
 });
 
 document.getElementById('invalidateSessionsBtn')?.addEventListener('click', async () => {
+  closeDashAccountModal();
   const ok = await confirmDashAction({
     title: 'Sign Out Everywhere',
     message:
@@ -4017,10 +4077,7 @@ document.getElementById('invalidateSessionsBtn')?.addEventListener('click', asyn
     setError(err.message);
     return;
   }
-  closeDashAccountModal();
-  localStorage.removeItem(TOKEN_KEY);
-  stopLiveFeed();
-  goToMainPage();
+  localSignOut();
 });
 
 document.getElementById('revokeAllGuestsBtn')?.addEventListener('click', async () => {
@@ -4069,23 +4126,24 @@ document.getElementById('dashShareKeyModal')?.addEventListener('click', (event) 
   if (event.target && event.target.id === 'dashShareKeyModal') closeDashShareKeyModal();
 });
 document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape') return;
+  // Prefer the top-most dialog (confirm stacks above account/share).
+  const confirmModal = document.getElementById('dashConfirmModal');
+  if (confirmModal && !confirmModal.classList.contains('hidden')) {
+    event.preventDefault();
+    closeDashConfirm(false);
+    return;
+  }
   const accountModal = document.getElementById('dashAccountModal');
-  if (accountModal && !accountModal.classList.contains('hidden') && event.key === 'Escape') {
+  if (accountModal && !accountModal.classList.contains('hidden')) {
     event.preventDefault();
     closeDashAccountModal();
     return;
   }
   const shareModal = document.getElementById('dashShareKeyModal');
-  if (shareModal && !shareModal.classList.contains('hidden') && event.key === 'Escape') {
+  if (shareModal && !shareModal.classList.contains('hidden')) {
     event.preventDefault();
     closeDashShareKeyModal();
-    return;
-  }
-  const modal = document.getElementById('dashConfirmModal');
-  if (!modal || modal.classList.contains('hidden')) return;
-  if (event.key === 'Escape') {
-    event.preventDefault();
-    closeDashConfirm(false);
   }
 });
 

@@ -3,7 +3,7 @@ import { resolveAuthFromRequest } from './accounts.js';
 import { isAccountAdminAuth } from '../lib/dock-roles.js';
 import { isPlatformAdmin } from '../lib/platform-admin.js';
 import { getAccountQuota } from '../quotas.js';
-import { getAccountStats } from '../stats/account-stats.js';
+import { getAccountStats, getAllAccountsStats } from '../stats/account-stats.js';
 import {
   kickAccountAdminClients,
   kickApiKeyDocks,
@@ -73,6 +73,63 @@ export async function registerAdminRoutes(app) {
       account: detail,
       quota: account ? getAccountQuota(account) : null,
     };
+  });
+
+  app.get('/api/admin/tables', async (request, reply) => {
+    const auth = await requirePlatformAdmin(request, reply);
+    if (!auth) return;
+    const limit = request.query.limit || '200';
+    const accounts = sqlite.listAccountsForAdmin({ limit });
+    const rooms = [];
+    for (const account of accounts) {
+      if (!account?.id) continue;
+      for (const room of sqlite.getRoomsWithLiveState(account.id).map(enrichAdminRoom)) {
+        rooms.push({
+          ...room,
+          account_id: account.id,
+          account_email: account.email || account.id,
+        });
+      }
+    }
+    return { rooms, account_count: accounts.length };
+  });
+
+  app.get('/api/admin/stats', async (request, reply) => {
+    const auth = await requirePlatformAdmin(request, reply);
+    if (!auth) return;
+    const accountLimit = request.query.accountLimit || request.query.limit || '200';
+    const limitPerAccount = request.query.limitPerAccount || '2000';
+    return getAllAccountsStats({
+      accountLimit: Number(accountLimit) || 200,
+      limitPerAccount: Number(limitPerAccount) || 2000,
+    });
+  });
+
+  app.get('/api/admin/players', async (request, reply) => {
+    const auth = await requirePlatformAdmin(request, reply);
+    if (!auth) return;
+    const q = typeof request.query.q === 'string' ? request.query.q : '';
+    const max = Math.min(Math.max(parseInt(request.query.limit, 10) || 8, 1), 250);
+    const accounts = sqlite.listAccountsForAdmin({ limit: 200 });
+    const players = [];
+    for (const account of accounts) {
+      if (!account?.id || players.length >= max) break;
+      const remaining = max - players.length;
+      const rows = sqlite.searchAccountPlayers(account.id, q, remaining);
+      for (const row of rows) {
+        if (players.length >= max) break;
+        const localId = String(row?.id || '').trim();
+        if (!localId) continue;
+        players.push({
+          ...row,
+          id: `${account.id}:${localId}`,
+          localPlayerId: localId,
+          accountId: account.id,
+          accountEmail: account.email || account.id,
+        });
+      }
+    }
+    return { players, account_count: accounts.length };
   });
 
   app.get('/api/admin/accounts/:id/tables', async (request, reply) => {

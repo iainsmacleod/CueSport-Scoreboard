@@ -338,3 +338,77 @@ export function getAccountStats(accountId, limit = 5000) {
   }
   return stats;
 }
+
+/**
+ * Platform admin: merge stats across tenants.
+ * Player ids are namespaced as `${accountId}:${playerId}` to avoid collisions.
+ */
+export function getAllAccountsStats({ accountLimit = 200, limitPerAccount = 2000 } = {}) {
+  const accounts = sqlite.listAccountsForAdmin({ limit: accountLimit });
+  const playerMap = new Map();
+  const matches = [];
+  const tables = new Map();
+
+  for (const account of accounts) {
+    const accountId = String(account?.id || '').trim();
+    if (!accountId) continue;
+    const email = String(account.email || accountId).trim();
+    const stats = getAccountStats(accountId, limitPerAccount);
+
+    for (const player of stats.players || []) {
+      const localId = String(player?.id || '').trim();
+      if (!localId) continue;
+      const id = `${accountId}:${localId}`;
+      playerMap.set(id, {
+        ...player,
+        id,
+        localPlayerId: localId,
+        accountId,
+        accountEmail: email,
+      });
+    }
+
+    for (const match of stats.matches || []) {
+      if (!match) continue;
+      const ns = (pid) => {
+        const local = String(pid || '').trim();
+        return local ? `${accountId}:${local}` : null;
+      };
+      matches.push({
+        ...match,
+        player1Id: ns(match.player1Id),
+        player2Id: ns(match.player2Id),
+        accountId,
+        accountEmail: email,
+      });
+      if (match.roomId) {
+        tables.set(`${accountId}:${match.roomId}`, {
+          roomId: match.roomId,
+          label: match.tableLabel || match.roomId,
+          accountId,
+          accountEmail: email,
+        });
+      }
+    }
+  }
+
+  matches.sort((a, b) =>
+    String(b.completedAt || b.startedAt || '').localeCompare(String(a.completedAt || a.startedAt || ''))
+  );
+  const players = sortStatsPlayers(Array.from(playerMap.values()));
+  return {
+    summary: {
+      matches: matches.filter((m) => m.status === 'completed').length,
+      players: players.length,
+      tables: tables.size,
+      accounts: accounts.length,
+    },
+    players,
+    matches,
+    tables: Array.from(tables.values()).sort((a, b) => {
+      const emailCmp = String(a.accountEmail || '').localeCompare(String(b.accountEmail || ''));
+      if (emailCmp) return emailCmp;
+      return String(a.label || '').localeCompare(String(b.label || ''));
+    }),
+  };
+}

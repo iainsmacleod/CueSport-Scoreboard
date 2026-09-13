@@ -6,7 +6,7 @@
   <title>CueSport Scoreboard Cloud — Dashboard</title>
   <link rel="icon" type="image/png" href="/web/images/balls/8ball_small.png" />
   <link rel="apple-touch-icon" href="/web/images/balls/8ball_small.png" />
-  <link rel="stylesheet" href="/web/shared/styles.css?v=8.1.0.29" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.1.0.31" />
 </head>
 <body>
   <header class="site-header">
@@ -104,10 +104,11 @@
           View account
           <select id="platformAccountFilter" aria-label="Filter tables and stats by account">
             <option value="">My account</option>
+            <option value="__all__">All accounts</option>
           </select>
         </label>
         <p id="platformAccountFilterHint" class="hint">
-          Platform admin: browse another customer&rsquo;s tables, matches, and players (read-only).
+          Platform admin: browse one customer or <strong>All accounts</strong> (tables, matches, players — read-only).
           Separate from Dock Key roles and subscription tiers.
         </p>
       </div>
@@ -290,7 +291,7 @@
           <p class="hint">
             Host-level support tools for customer accounts (not Dock Key &ldquo;Administrator&rdquo; seats, and not subscription tiers).
             Paid tiers and product trials are owned by Stripe; use <strong>Support trial</strong> only for demos, grace periods, or pre-card unlocks.
-            Use <strong>View account</strong> above Tables / Stats to inspect a customer&rsquo;s live tables, matches, and players.
+            Use <strong>View account</strong> above Tables / Stats to inspect one customer or <strong>All accounts</strong> (live tables, matches, and players).
           </p>
           <label class="stats-filter admin-search">
             Search by email
@@ -496,6 +497,6 @@
       </div>
     </div>
   </div>
-  <script type="module" src="/web/dashboard/app.js?v=8.1.0.30"></script>
+  <script type="module" src="/web/dashboard/app.js?v=8.1.0.32"></script>
 </body>
 </html>

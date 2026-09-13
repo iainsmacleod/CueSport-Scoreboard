@@ -130,7 +130,7 @@ Legal templates: `/terms` and `/privacy` (replace placeholders; obtain counsel r
 
 ### Platform admin + trials
 
-Hosted multi-tenant support is gated by **`PLATFORM_ADMIN_EMAILS`** (not Dock Key roles or subscription tiers). Allowlisted users get `is_platform_admin` on `GET /api/me`, an **Admin** tab, a **View account** filter on Tables/Stats, and `/api/admin/*` routes (list tenants, read tables/stats/players, revoke keys, invalidate sessions, grant/end **support trials**).
+Hosted multi-tenant support is gated by **`PLATFORM_ADMIN_EMAILS`** (not Dock Key roles or subscription tiers). Allowlisted users get `is_platform_admin` on `GET /api/me`, an **Admin** tab, a **View account** filter on Tables/Stats (**My account**, **All accounts**, or one tenant), and `/api/admin/*` routes (list tenants, read tables/stats/players, revoke keys, invalidate sessions, grant/end **support trials**).
 
 Access for dock/mobile join allows when **any** of:
 - `subscription_status` is `active` or `trialing` (Stripe Checkout + webhooks), **or**
@@ -164,6 +164,9 @@ This backend is GPL-licensed alongside the scoreboard. You may run your own inst
 | GET | `/terms` / `/privacy` | Hosted Terms + Privacy templates |
 | GET | `/api/admin/accounts` | Platform admin: list tenants (optional `?q=` email filter) |
 | GET | `/api/admin/accounts/:id` | Platform admin: tenant detail + quota |
+| GET | `/api/admin/tables` | Platform admin: live tables across tenants (`account_email` on each room) |
+| GET | `/api/admin/stats` | Platform admin: merged match stats across tenants (namespaced player ids) |
+| GET | `/api/admin/players` | Platform admin: player search across tenants |
 | GET | `/api/admin/accounts/:id/stats` | Platform admin: account match stats |
 | GET | `/api/admin/accounts/:id/tables` | Platform admin: live tables for a tenant |
 | GET | `/api/admin/accounts/:id/players` | Platform admin: player search for a tenant |

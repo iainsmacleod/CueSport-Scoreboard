@@ -2032,6 +2032,18 @@ async function run() {
           body: JSON.stringify({ days: 7 }),
         });
         assert('Non-admin POST trial 403', deniedTrial.status === 403);
+        const deniedAllTables = await fetchJson('/api/admin/tables', {
+          headers: { Authorization: `Bearer ${tokenFresh}` },
+        });
+        assert('Non-admin GET /api/admin/tables 403', deniedAllTables.status === 403);
+        const deniedAllStats = await fetchJson('/api/admin/stats', {
+          headers: { Authorization: `Bearer ${tokenFresh}` },
+        });
+        assert('Non-admin GET /api/admin/stats 403', deniedAllStats.status === 403);
+        const deniedAllPlayers = await fetchJson('/api/admin/players?q=&limit=8', {
+          headers: { Authorization: `Bearer ${tokenFresh}` },
+        });
+        assert('Non-admin GET /api/admin/players 403', deniedAllPlayers.status === 403);
       } else {
         const listed = await fetchJson('/api/admin/accounts', {
           headers: { Authorization: `Bearer ${tokenFresh}` },
@@ -2076,6 +2088,34 @@ async function run() {
           'Admin GET account players',
           adminPlayers.ok && Array.isArray(adminPlayers.body.players),
           JSON.stringify(adminPlayers.body)
+        );
+        const allTables = await fetchJson('/api/admin/tables?limit=200', {
+          headers: { Authorization: `Bearer ${tokenFresh}` },
+        });
+        assert(
+          'Admin GET all tables',
+          allTables.ok && Array.isArray(allTables.body.rooms),
+          JSON.stringify(allTables.body)
+        );
+        const allStats = await fetchJson('/api/admin/stats?accountLimit=50&limitPerAccount=500', {
+          headers: { Authorization: `Bearer ${tokenFresh}` },
+        });
+        assert(
+          'Admin GET all stats',
+          allStats.ok
+            && Array.isArray(allStats.body.players)
+            && Array.isArray(allStats.body.matches)
+            && allStats.body.summary
+            && typeof allStats.body.summary.accounts === 'number',
+          JSON.stringify(allStats.body)
+        );
+        const allPlayers = await fetchJson('/api/admin/players?q=&limit=8', {
+          headers: { Authorization: `Bearer ${tokenFresh}` },
+        });
+        assert(
+          'Admin GET all players',
+          allPlayers.ok && Array.isArray(allPlayers.body.players),
+          JSON.stringify(allPlayers.body)
         );
         const grant = await fetchJson(`/api/admin/accounts/${accountId}/trial`, {
           method: 'POST',
