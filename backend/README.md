@@ -34,6 +34,8 @@ docker compose up -d --build
 - **WebSocket:** ws://localhost:4003/ws
 - **Data:** persisted in `backend/data/` (SQLite)
 
+**Production VPS** (Caddy + HTTPS + Supabase Google Auth + SQLite): see **[VPS deployment](../docs/deploy-vps.md)**.
+
 Web UI and ball images are **baked into the Docker image** at build time. Only `./data` is mounted by default.
 
 **Local live reload** (optional): copy `docker-compose.override.example.yml` to `docker-compose.override.yml` to mount `backend/web` and `common/images` from your repo. Do **not** use those mounts on a production server unless the full repo paths exist on the host — an empty mount hides the image files and causes `ENOENT` on `/m/...`.

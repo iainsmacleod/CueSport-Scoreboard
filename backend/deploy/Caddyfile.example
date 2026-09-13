@@ -1,0 +1,14 @@
+# Example Caddyfile for CueSport Cloud on a VPS
+#
+# Install on the host (not inside the app container).
+# Replace the hostname with your PUBLIC_URL host.
+# Remove any default :80 { file_server } demo site from /etc/caddy/Caddyfile.
+#
+#   caddy validate --config /etc/caddy/Caddyfile
+#   systemctl reload caddy
+#
+# App must listen on 127.0.0.1:3000 (Compose ports: "127.0.0.1:3000:3000").
+
+cuesports.example.com {
+	reverse_proxy 127.0.0.1:3000
+}

@@ -169,6 +169,14 @@
         }
     }
 
+    function syncManagedPublicUrlLink() {
+        const el = document.getElementById('cloudManagedPublicUrl');
+        if (!el) return;
+        const url = MANAGED_SERVER_URL.replace(/\/$/, '');
+        el.href = url;
+        el.textContent = url;
+    }
+
     function openCloudConnectionModal() {
         const modal = document.getElementById('cloudConnectionModal');
         if (!modal) return;
@@ -178,6 +186,7 @@
         if (serverUrl) serverUrl.value = getStored('serverUrl') || 'http://localhost:3000';
         if (apiKey) apiKey.value = getStored('apiKey');
         if (managedKey) managedKey.value = getStored('apiKey');
+        syncManagedPublicUrlLink();
         const mode = getConnectionMode();
         syncConnectionPaneUI(mode);
         modal.style.display = 'block';
