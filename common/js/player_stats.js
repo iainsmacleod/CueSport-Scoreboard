@@ -4519,18 +4519,58 @@
             await putMatch(m);
         }
 
-        if (getPlayerIdFromInput('1') === playerId) {
-            const input = document.getElementById('p1Name');
-            if (input) {
-                input.value = displayName;
-            }
+        // Keep live dock slots + pending match on the same player id (avoid recreating by old name).
+        syncActiveMatchPlayerRename(playerId, displayName);
+    }
+
+    /**
+     * If the renamed player is currently P1/P2, update inputs + activeMatchSession
+     * so the next score does not treat them as a new/different player.
+     */
+    function syncActiveMatchPlayerRename(playerId, displayName) {
+        const id = String(playerId || '').trim();
+        const name = truncateName(displayName);
+        if (!id || !name) {
+            return false;
         }
-        if (getPlayerIdFromInput('2') === playerId) {
-            const input = document.getElementById('p2Name');
-            if (input) {
-                input.value = displayName;
+        let changed = false;
+        const bindSlot = function (slot) {
+            const inputId = slot === '1' ? 'p1Name' : 'p2Name';
+            const input = document.getElementById(inputId);
+            const boundId = getPlayerIdFromInput(slot);
+            const sessionId = slot === '1' ? activeMatchSession.player1Id : activeMatchSession.player2Id;
+            const matchesBound = boundId && String(boundId) === id;
+            const matchesSession = sessionId && String(sessionId) === id;
+            if (!matchesBound && !matchesSession) {
+                return;
             }
+            if (input && input.value !== name) {
+                input.value = name;
+            }
+            setPlayerIdOnInput(slot, id);
+            if (slot === '1') {
+                activeMatchSession.player1Id = id;
+                activeMatchSession.player1Name = name;
+                if (activeMatchSession.pendingMatch) {
+                    activeMatchSession.pendingMatch.player1Id = id;
+                    activeMatchSession.pendingMatch.player1Name = name;
+                }
+            } else {
+                activeMatchSession.player2Id = id;
+                activeMatchSession.player2Name = name;
+                if (activeMatchSession.pendingMatch) {
+                    activeMatchSession.pendingMatch.player2Id = id;
+                    activeMatchSession.pendingMatch.player2Name = name;
+                }
+            }
+            changed = true;
+        };
+        bindSlot('1');
+        bindSlot('2');
+        if (changed) {
+            voidPersistPendingSession();
         }
+        return changed;
     }
 
     async function deletePlayer(playerId) {
@@ -7245,6 +7285,11 @@
                     body: { id: playerId, to: newName }
                 });
                 invalidateCloudStatsCache();
+                // Cloud rename must still refresh live dock names for this player id.
+                syncActiveMatchPlayerRename(playerId, newName);
+                if (typeof postNames === 'function') {
+                    postNames();
+                }
             } else {
                 await updatePlayerName(playerId, newName);
                 if (typeof postNames === 'function') {
@@ -8165,6 +8210,8 @@
         recomputeAllPlayerStats: recomputeAllPlayerStats,
         updatePlayerName: updatePlayerName,
         deletePlayer: deletePlayer,
+        /** Test / debug: live match binding (also updated on rename when player is active). */
+        get activeMatchSession() { return activeMatchSession; },
         exportData: exportData,
         importData: importData,
         clearAllStats: clearAllStats,

@@ -895,6 +895,27 @@
             const renamed = await cp.PlayerStats.getPlayer(player.id);
             assert('PlayerStats API', 'Rename player', renamed.name.indexOf('Renamed') !== -1);
 
+            // Renaming an active dock player must update the live name field + session.
+            const activeRenameName = (tag + '_ActiveRen').substring(0, 20);
+            const activePlayer = await cp.PlayerStats.ensurePlayer(activeRenameName);
+            const p1BeforeRename = cp.document.getElementById('p1Name');
+            p1BeforeRename.value = activeRenameName;
+            p1BeforeRename.setAttribute('data-player-id', activePlayer.id);
+            cp.PlayerStats.activeMatchSession.player1Id = activePlayer.id;
+            cp.PlayerStats.activeMatchSession.player1Name = activeRenameName;
+            cp.PlayerStats.activeMatchSession.matchId = 'smoke-rename-active';
+            const renamedActive = (tag + '_ActNew').substring(0, 20);
+            await cp.PlayerStats.updatePlayerName(activePlayer.id, renamedActive);
+            assert('PlayerStats API', 'Rename updates active P1 input',
+                p1BeforeRename.value === renamedActive,
+                p1BeforeRename.value);
+            assert('PlayerStats API', 'Rename updates active session name',
+                cp.PlayerStats.activeMatchSession.player1Name === renamedActive,
+                cp.PlayerStats.activeMatchSession.player1Name);
+            assert('PlayerStats API', 'Rename keeps active player id bound',
+                p1BeforeRename.getAttribute('data-player-id') === activePlayer.id &&
+                cp.PlayerStats.activeMatchSession.player1Id === activePlayer.id);
+
             const searchHits = await cp.PlayerStats.searchPlayers(tag, 5);
             assert('PlayerStats API', 'Search players', searchHits.some(function (p) { return p.id === player.id; }),
                 searchHits.length + ' hit(s)');
