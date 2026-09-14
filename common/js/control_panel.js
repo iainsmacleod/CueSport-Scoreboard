@@ -4790,8 +4790,8 @@ function countFadedObjectBalls() {
  * While Ball Set Toggle + Ball Scoring are on (8-Ball / Custom) and the table is Open,
  * assign Chosen Ball for the Active Player from a potted object ball.
  * 8-Ball open-table rule:
- *   - same player continues → assign on their 2nd object pot (first may be off the break)
- *   - active player changes → assign on that player's 1st object pot
+ *   - breaker on their break visit → assign on their 2nd object pot (first may be off the break)
+ *   - after a player change, including a dry break → assign on that player's 1st object pot
  * Custom still assigns on the first object ball.
  * Stored P1-centric: if P2 pots a group, P1 is set to the opposite group.
  */
@@ -4839,9 +4839,18 @@ function maybeAssignBallSetFromPot(ballId) {
         }
         setStorageItem("ballSetOpenLastPotSlot", active);
         setStorageItem("ballSetOpenSamePlayerPots", String(samePlayerPots));
-        // Same shooter: wait for 2nd pot. After a player change: assign on 1st pot.
         const playerChanged = lastPotSlot !== "" && lastPotSlot !== active;
-        if (!playerChanged && samePlayerPots < 2) {
+        const breaker = getRackBreakerSlot();
+        // Only the breaker's continuing break visit waits for a 2nd object pot.
+        // Dry break → other player: their first object pot nominates the group.
+        const onBreakVisit = !!breaker
+            && active === breaker
+            && (lastPotSlot === "" || lastPotSlot === breaker);
+        if (onBreakVisit && samePlayerPots < 2) {
+            return;
+        }
+        // No breaker recorded yet: keep historical open-table delay for the first shooter.
+        if (!breaker && !playerChanged && samePlayerPots < 2) {
             return;
         }
     }

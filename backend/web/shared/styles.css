@@ -701,11 +701,16 @@ ul { padding-left: 1.2rem; }
 }
 #playerSlotP1Btn .slot-ball,
 #playerSlotP2Btn .slot-ball {
-  width: 1.35rem;
-  height: 1.35rem;
-  flex: 0 0 auto;
+  width: 1rem;
+  height: 1rem;
+  max-width: 1rem;
+  max-height: 1rem;
+  flex: 0 0 1rem;
+  display: block;
   border-radius: 50%;
   object-fit: contain;
+  /* Avoid intrinsic PNG size growing the button before/while loading. */
+  line-height: 0;
 }
 #playerSlotP1Btn.rack-breaker-last-winner .slot-name,
 #playerSlotP2Btn.rack-breaker-last-winner .slot-name,
@@ -1462,6 +1467,23 @@ body.controls-locked #reconnectBanner {
 }
 .reconnect-banner .btn {
   margin: 0;
+}
+.view-only-banner {
+  margin: 0 0 0.85rem;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(122, 162, 247, 0.45);
+  background: rgba(122, 162, 247, 0.12);
+  text-align: center;
+  font-size: 0.92rem;
+}
+body.view-only #viewControl {
+  opacity: 0.9;
+}
+body.view-only.controls-locked #viewControl {
+  opacity: 0.7;
+  pointer-events: none;
+  user-select: none;
 }
 .share-panel h2 { margin-top: 0; text-align: center; }
 .share-limitations { text-align: center; margin-bottom: 1rem; }

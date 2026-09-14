@@ -10,6 +10,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import WebSocket from 'ws';
 import Database from 'better-sqlite3';
+import bcrypt from 'bcryptjs';
 import { pairSessionEvents } from '../src/stats/account-stats.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -2276,6 +2277,84 @@ async function run() {
           allPlayers.ok && Array.isArray(allPlayers.body.players),
           JSON.stringify(allPlayers.body)
         );
+
+        // Platform admin may spectate another tenant's table (view-only, no seat quota).
+        {
+          const foreignAccountId = crypto.randomUUID();
+          const foreignEmail = `tenant-view-${Date.now()}@example.com`;
+          const foreignKeyId = crypto.randomUUID();
+          const foreignKeyPlain = `cssb_fk_${crypto.randomBytes(12).toString('hex')}`;
+          const foreignKeyHash = bcrypt.hashSync(foreignKeyPlain, 10);
+          const seedDb = new Database(SQLITE_PATH);
+          try {
+            seedDb.prepare(
+              `INSERT INTO accounts (id, email, subscription_tier, subscription_status)
+               VALUES (?, ?, 'streamer', 'active')`
+            ).run(foreignAccountId, foreignEmail);
+            seedDb.prepare(
+              `INSERT INTO api_keys (id, account_id, key_hash, key_plaintext, label, role)
+               VALUES (?, ?, ?, ?, 'Foreign Table', 'trusted_operator')`
+            ).run(foreignKeyId, foreignAccountId, foreignKeyHash, foreignKeyPlain);
+          } finally {
+            seedDb.close();
+          }
+          let foreignRoomId = null;
+          let foreignDock = null;
+          try {
+            foreignDock = await wsJoin({
+              client: 'dock',
+              apiKey: foreignKeyPlain,
+              instanceId: 'foreign-view',
+            });
+            foreignRoomId = foreignDock.data.room_id;
+            assert('Foreign tenant dock joined', !!foreignRoomId);
+          } catch (e) {
+            assert('Foreign tenant dock joined', false, e.message);
+          }
+          if (foreignRoomId) {
+            try {
+              const adminView = await wsJoin({
+                roomId: foreignRoomId,
+                client: 'mobile',
+                accessToken: tokenFresh,
+              });
+              assert(
+                'Platform admin joins foreign room view-only',
+                adminView.data.view_only === true
+                  && adminView.data.permissions?.canControlGame === false
+                  && adminView.data.permissions?.viewOnly === true,
+                JSON.stringify({
+                  view_only: adminView.data.view_only,
+                  permissions: adminView.data.permissions,
+                })
+              );
+              const cmdPromise = waitForWsMessage(
+                adminView.ws,
+                (m) => m.type === 'error' && m.code === 'view_only',
+                3000
+              );
+              adminView.ws.send(JSON.stringify({
+                type: 'command',
+                action: 'score_add',
+                payload: { player: 1 },
+              }));
+              try {
+                await cmdPromise;
+                assert('Platform admin foreign view rejects commands', true);
+              } catch (e) {
+                assert('Platform admin foreign view rejects commands', false, e.message);
+              }
+              adminView.ws.close();
+              await sleep(80);
+            } catch (e) {
+              assert('Platform admin joins foreign room view-only', false, e.message);
+            }
+          }
+          if (foreignDock) {
+            try { foreignDock.ws.close(); } catch (_) { /* ignore */ }
+          }
+        }
+
         const simDefault = await fetchJson('/api/me', {
           headers: { Authorization: `Bearer ${tokenFresh}` },
         });

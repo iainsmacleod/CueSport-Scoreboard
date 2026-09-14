@@ -355,10 +355,22 @@ function countControlConnections(roomId, excludeWs = null) {
   let n = 0;
   for (const conn of getRoomClients(roomId)) {
     if (!isControlClient(conn.client)) continue;
+    // Platform admin spectators do not consume the tenant's mobile seat quota.
+    if (conn.platformAdminView) continue;
     if (excludeWs && conn.ws === excludeWs) continue;
     if (conn.ws.readyState === 1) n += 1;
   }
   return n;
+}
+
+function rejectViewOnly(ws, meta) {
+  if (!meta?.platformAdminView) return false;
+  send(ws, {
+    type: 'error',
+    code: 'view_only',
+    message: 'Platform admin table view is read-only — game control is disabled',
+  });
+  return true;
 }
 
 function resolveRoomIdForJoin(msg, auth, client) {
@@ -516,6 +528,9 @@ async function handleRoomClientJoin(ws, meta, msg, authenticateJoin) {
     if (auth.role) {
       meta.role = auth.role;
     }
+    if (auth.platformAdminView) {
+      meta.platformAdminView = true;
+    }
 
     roomId = resolveRoomIdForJoin(msg, auth, client);
     if (roomId && typeof roomId === 'object' && roomId.error) {
@@ -543,12 +558,19 @@ async function handleRoomClientJoin(ws, meta, msg, authenticateJoin) {
     send(ws, { type: 'error', code: 'room_not_found', message: 'Room not found' });
     return;
   }
-  if (accountId && room.account_id !== accountId) {
-    send(ws, { type: 'error', code: 'room_forbidden', message: 'No access to this room' });
-    return;
+  const foreignRoom = !!(accountId && room.account_id && room.account_id !== accountId);
+  if (foreignRoom) {
+    // Only platform-admin mobile (flagged in authenticateJoin) may spectate foreign rooms.
+    if (!(client === 'mobile' && meta.platformAdminView)) {
+      send(ws, { type: 'error', code: 'room_forbidden', message: 'No access to this room' });
+      return;
+    }
+    meta.platformAdminView = true;
+  } else {
+    meta.platformAdminView = false;
   }
 
-  if (isControlClient(client)) {
+  if (isControlClient(client) && !meta.platformAdminView) {
     const owner = sqlite.getAccountById(room.account_id);
     const max = getMaxControlConnections(owner || { subscription_tier: 'streamer' });
     if (countControlConnections(roomId) >= max) {
@@ -580,9 +602,16 @@ async function handleRoomClientJoin(ws, meta, msg, authenticateJoin) {
     sourceId: meta.sourceId,
     guestToken: meta.guestToken || null,
     apiKeyId: meta.apiKeyId || null,
+    platformAdminView: !!meta.platformAdminView,
   });
 
   const { state, sessionId } = sqlite.getRoomSessionState(roomId);
+  const basePermissions = permissionsForAuth({
+    account: { id: accountId || room.account_id },
+    authMethod: meta.authMethod || (meta.apiKeyId ? 'api_key' : (meta.guestToken ? 'guest' : 'jwt')),
+    keyId: meta.apiKeyId || null,
+    role: meta.role || null,
+  });
 
   send(ws, {
     type: 'joined',
@@ -592,12 +621,13 @@ async function handleRoomClientJoin(ws, meta, msg, authenticateJoin) {
     session_id: sessionId,
     state,
     role: meta.role || null,
-    permissions: permissionsForAuth({
-      account: { id: accountId || room.account_id },
-      authMethod: meta.authMethod || (meta.apiKeyId ? 'api_key' : (meta.guestToken ? 'guest' : 'jwt')),
-      keyId: meta.apiKeyId || null,
-      role: meta.role || null,
-    }),
+    view_only: !!meta.platformAdminView,
+    permissions: {
+      ...basePermissions,
+      // Foreign-account platform admin: watch live state only — no game control.
+      canControlGame: !meta.platformAdminView,
+      viewOnly: !!meta.platformAdminView,
+    },
     ...(client === 'dock' && meta.apiKeyId ? { api_key_id: meta.apiKeyId } : {}),
     ...(meta.guestToken ? {
       is_dock_owner: !!meta.isDockOwnerGuest,
@@ -648,6 +678,7 @@ function persistEvent(meta, eventType, payload, sourceClient, sessionIdOverride)
 
 function handleEvent(ws, meta, msg) {
   if (!requireJoined(ws, meta)) return;
+  if (rejectViewOnly(ws, meta)) return;
   const payload = msg.payload || {};
   const envelope = {
     type: 'event',
@@ -669,6 +700,7 @@ const ACCOUNT_OWNER_COMMANDS = new Set([
 
 function handleCommand(ws, meta, msg) {
   if (!requireJoined(ws, meta)) return;
+  if (rejectViewOnly(ws, meta)) return;
   const isDockOwnerGuest = !!(meta.guestToken && meta.isDockOwnerGuest);
   if (meta.client === 'mobile_guest' && !isDockOwnerGuest && !GUEST_ALLOWED_COMMANDS.has(msg.action)) {
     send(ws, { type: 'error', code: 'guest_forbidden', message: 'Not available on guest scorer links' });
@@ -704,6 +736,7 @@ function handleCommand(ws, meta, msg) {
 
 function handleState(ws, meta, msg) {
   if (!requireJoined(ws, meta)) return;
+  if (rejectViewOnly(ws, meta)) return;
   const state = msg.state || {};
   sqlite.setRoomSessionState(meta.roomId, sqlite.getRoomSessionState(meta.roomId).sessionId, state);
   const listed = state.streamPromotionListed === true &&
@@ -733,6 +766,7 @@ function handleState(ws, meta, msg) {
 
 function handleSession(ws, meta, msg) {
   if (!requireJoined(ws, meta)) return;
+  if (rejectViewOnly(ws, meta)) return;
   const action = msg.action;
   let sessionId = sqlite.getRoomSessionState(meta.roomId).sessionId;
   const payload = msg.payload || {};

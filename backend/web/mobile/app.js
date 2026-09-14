@@ -37,6 +37,8 @@ let bootConnectStarted = false;
 let guestToken = '';
 let isGuestMode = false;
 let isDockOwnerGuest = false;
+/** Platform admin spectating another account's table — live view, no game control. */
+let isViewOnly = false;
 /** @type {'control' | 'setup' | 'replay' | 'share'} */
 let activeView = 'control';
 /** Only auto-open Setup once per connection when names still look like defaults. */
@@ -120,6 +122,35 @@ function applyGuestUI() {
   }
 }
 
+function applyViewOnlyUI() {
+  const title = document.getElementById('pageTitle');
+  const banner = document.getElementById('viewOnlyBanner');
+  if (banner) {
+    banner.classList.toggle('hidden', !isViewOnly);
+    banner.textContent = isViewOnly
+      ? 'Platform admin view — live score only. Game controls are disabled.'
+      : '';
+  }
+  document.body.classList.toggle('view-only', isViewOnly);
+  if (!isViewOnly) {
+    if (title && !isGuestMode) title.textContent = 'CueSport Scoreboard Cloud';
+    document.getElementById('navSetupBtn')?.classList.remove('hidden');
+    return;
+  }
+  if (title) title.textContent = 'CueSport Scoreboard Cloud — View Only';
+  // Spectators: Control tab only (watch live board); hide setup/replay/share.
+  show('viewSetup', false);
+  show('viewReplay', false);
+  show('viewShare', false);
+  show('adminPlayersPanel', false);
+  document.querySelectorAll('.admin-only').forEach((el) => el.classList.add('hidden'));
+  document.getElementById('navSetupBtn')?.classList.add('hidden');
+  document.getElementById('navReplayBtn')?.classList.add('hidden');
+  document.getElementById('navShareBtn')?.classList.add('hidden');
+  setActiveView('control');
+  updateControlsLock();
+}
+
 function showMobileNav(visible) {
   const nav = document.getElementById('mobileBottomNav');
   if (!nav) return;
@@ -132,6 +163,7 @@ function isReplayEnabled(state = lastState) {
 }
 
 function syncReplayNavVisibility(state = lastState) {
+  if (isViewOnly) return;
   if (isGuestMode && !isDockOwnerGuest) return;
   const enabled = isReplayEnabled(state);
   const replayBtn = document.getElementById('navReplayBtn');
@@ -147,13 +179,14 @@ function setActiveView(view) {
   if (view !== 'control' && view !== 'setup' && view !== 'replay' && view !== 'share') {
     view = 'control';
   }
+  if (isViewOnly) view = 'control';
   if (isGuestMode && !isDockOwnerGuest && (view === 'replay' || view === 'share')) view = 'control';
   if (view === 'replay' && !isReplayEnabled()) view = 'control';
   activeView = view;
   show('viewControl', view === 'control');
-  show('viewSetup', view === 'setup');
-  show('viewReplay', view === 'replay' && canUseAdminTabs() && isReplayEnabled());
-  show('viewShare', view === 'share' && canUseAdminTabs());
+  show('viewSetup', view === 'setup' && !isViewOnly);
+  show('viewReplay', view === 'replay' && canUseAdminTabs() && isReplayEnabled() && !isViewOnly);
+  show('viewShare', view === 'share' && canUseAdminTabs() && !isViewOnly);
 
   const controlBtn = document.getElementById('navControlBtn');
   if (controlBtn) {
@@ -162,23 +195,24 @@ function setActiveView(view) {
   }
   const setupBtn = document.getElementById('navSetupBtn');
   if (setupBtn) {
+    setupBtn.classList.toggle('hidden', isViewOnly);
     setupBtn.classList.toggle('active', view === 'setup');
     setupBtn.setAttribute('aria-current', view === 'setup' ? 'page' : 'false');
   }
   const replayBtn = document.getElementById('navReplayBtn');
   if (replayBtn) {
-    replayBtn.classList.toggle('hidden', !canUseAdminTabs() || !isReplayEnabled());
+    replayBtn.classList.toggle('hidden', isViewOnly || !canUseAdminTabs() || !isReplayEnabled());
     replayBtn.classList.toggle('active', view === 'replay');
     replayBtn.setAttribute('aria-current', view === 'replay' ? 'page' : 'false');
   }
   const shareBtn = document.getElementById('navShareBtn');
   if (shareBtn) {
-    shareBtn.classList.toggle('hidden', !canUseAdminTabs());
+    shareBtn.classList.toggle('hidden', isViewOnly || !canUseAdminTabs());
     shareBtn.classList.toggle('active', view === 'share');
     shareBtn.setAttribute('aria-current', view === 'share' ? 'page' : 'false');
   }
 
-  if (view === 'share') {
+  if (view === 'share' && !isViewOnly) {
     hideGuestShareDetails();
     ensureGuestShareLink({ refreshList: true, forceHide: true })
       .catch((err) => setError(err.message || 'Failed to create guest link'));
@@ -615,8 +649,10 @@ function ensureConnection(options = {}) {
 }
 
 /** Controls require a live cloud socket AND a dock in the room.
- *  During soft reconnect grace, allow queuing when the dock was recently present. */
+ *  During soft reconnect grace, allow queuing when the dock was recently present.
+ *  Platform admin foreign-table view is always locked. */
 function controlsEnabled() {
+  if (isViewOnly) return false;
   if (connectionIsOpen() && dockPresent) return true;
   if (connectionIsReconnecting() && softDockPresent) return true;
   return false;
@@ -2141,6 +2177,7 @@ function syncSaveIcons() {
 }
 
 function controlLockMessage() {
+  if (isViewOnly) return 'Platform admin view — game controls are disabled';
   if (connectionIsReconnecting()) return 'Cloud reconnecting — commands will queue briefly';
   if (!connectionIsOpen()) return 'Not connected to cloud — controls are paused';
   if (!dockPresent) return 'Waiting for dock — controls are paused';
@@ -2670,6 +2707,8 @@ function wireReplayClearButtons() {
 
 async function connectGuestSession({ quiet, isCurrent }) {
   isDockOwnerGuest = false;
+  isViewOnly = false;
+  applyViewOnlyUI();
   applyGuestUI();
   if (client) {
     try { client.disconnect(); } catch (_) { /* ignore */ }
@@ -2760,6 +2799,9 @@ async function connectAuthenticatedSession({ quiet, isCurrent }) {
     return;
   }
 
+  isViewOnly = false;
+  applyViewOnlyUI();
+
   let token = localStorage.getItem(TOKEN_KEY);
   const secretEl = document.getElementById('devSecret');
   const secret = secretEl ? secretEl.value.trim() : '';
@@ -2826,14 +2868,18 @@ async function connectAuthenticatedSession({ quiet, isCurrent }) {
   try {
     const joined = await client.connect();
     if (!isCurrent()) return;
+    isViewOnly = !!(joined.view_only || joined.permissions?.viewOnly);
     showControl();
+    if (isViewOnly) applyViewOnlyUI();
     dockPresent = (joined.clients || []).includes('dock');
     if (joined.state && Object.keys(joined.state).length) {
       applyState(joined.state);
-    } else if (!quiet) {
+    } else if (!quiet && !isViewOnly) {
       // No dock state yet — start on Setup so names/game info can be prepared.
       setActiveView('setup');
       initialViewChosen = false;
+    } else if (!quiet && isViewOnly) {
+      setActiveView('control');
     }
     setConnectionStatus(dockPresent ? 'connected' : 'waiting');
     reconnectAttempt = 0;

@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { config } from '../config.js';
 import { isDevAuthConfigured, resolveDevAccountFromToken } from '../dev-auth.js';
 import { hasCloudSubscriptionAccess } from '../lib/subscription-access.js';
+import { isPlatformAdmin } from '../lib/platform-admin.js';
 import * as sqlite from '../db/sqlite.js';
 
 let supabase = null;
@@ -57,8 +58,22 @@ function subscriptionRequired(client, account) {
 }
 
 /**
+ * Room ownership gate for JWT/dev joins.
+ * Platform admins may open another account's mobile table as view-only (no game control).
+ */
+function resolveRoomAccess(account, roomId, client) {
+  if (!roomId || sqlite.roomBelongsToAccount(roomId, account.id)) {
+    return { ok: true, platformAdminView: false };
+  }
+  if (client === 'mobile' && isPlatformAdmin(account)) {
+    return { ok: true, platformAdminView: true };
+  }
+  return { error: 'room_forbidden', message: 'No access to this room' };
+}
+
+/**
  * Resolve account from API key or JWT access token.
- * Returns { account, authMethod: 'api_key'|'jwt'|'dev' }
+ * Returns { account, authMethod: 'api_key'|'jwt'|'dev', platformAdminView? }
  */
 export async function authenticateJoin({ apiKey, accessToken, roomId, client }) {
   if (apiKey) {
@@ -83,12 +98,15 @@ export async function authenticateJoin({ apiKey, accessToken, roomId, client }) 
       if (!account) {
         return { error: 'invalid_token', message: 'Invalid or expired dev token — sign in again' };
       }
-      if (roomId && !sqlite.roomBelongsToAccount(roomId, account.id)) {
-        return { error: 'room_forbidden', message: 'No access to this room' };
-      }
+      const roomAccess = resolveRoomAccess(account, roomId, client);
+      if (roomAccess.error) return roomAccess;
       const subErr = subscriptionRequired(client, account);
       if (subErr) return subErr;
-      return { account, authMethod: 'dev' };
+      return {
+        account,
+        authMethod: 'dev',
+        platformAdminView: !!roomAccess.platformAdminView,
+      };
     }
 
     let payload = null;
@@ -114,12 +132,15 @@ export async function authenticateJoin({ apiKey, accessToken, roomId, client }) 
       return { error: 'invalid_token', message: 'Session revoked — sign in again' };
     }
 
-    if (roomId && !sqlite.roomBelongsToAccount(roomId, account.id)) {
-      return { error: 'room_forbidden', message: 'No access to this room' };
-    }
+    const roomAccess = resolveRoomAccess(account, roomId, client);
+    if (roomAccess.error) return roomAccess;
     const subErr = subscriptionRequired(client, account);
     if (subErr) return subErr;
-    return { account, authMethod: 'jwt' };
+    return {
+      account,
+      authMethod: 'jwt',
+      platformAdminView: !!roomAccess.platformAdminView,
+    };
   }
 
   if (config.allowDevAuth) {
