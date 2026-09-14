@@ -324,9 +324,13 @@ export function mergeRosterPlayersIntoStats(stats, rosterRows) {
   return stats;
 }
 
-/** Account stats for HTTP and WebSocket dock clients. */
-export function getAccountStats(accountId, limit = 5000) {
-  sqlite.syncAccountPlayersFromMatchEvents(accountId);
+/**
+ * Account stats for HTTP and WebSocket dock clients.
+ * @param {{ syncRoster?: boolean }} [options] — when false, skip syncAccountPlayersFromMatchEvents
+ *   (bulk All-accounts path); still merges existing roster via listAccountPlayers.
+ */
+export function getAccountStats(accountId, limit = 5000, { syncRoster = true } = {}) {
+  if (syncRoster) sqlite.syncAccountPlayersFromMatchEvents(accountId);
   const events = sqlite.getAccountSessionEvents(accountId, limit);
   const stats = summarizeAccountStats(events);
   mergeRosterPlayersIntoStats(stats, sqlite.listAccountPlayers(accountId));
@@ -340,10 +344,50 @@ export function getAccountStats(accountId, limit = 5000) {
 }
 
 /**
+ * Platform admin: namespace player ids as `${accountId}:${playerId}` so cross-tenant
+ * Stats mutations can resolve the owning account.
+ */
+export function namespaceAccountStats(stats, accountId, accountEmail = null) {
+  const aid = String(accountId || '').trim();
+  if (!stats || !aid) return stats;
+  const email = String(accountEmail || '').trim() || null;
+  const ns = (pid) => {
+    const local = String(pid || '').trim();
+    return local ? `${aid}:${local}` : null;
+  };
+  const players = (stats.players || []).map((player) => {
+    const localId = String(player?.id || '').trim();
+    if (!localId) return player;
+    return {
+      ...player,
+      id: ns(localId),
+      localPlayerId: localId,
+      accountId: aid,
+      accountEmail: email,
+    };
+  });
+  const matches = (stats.matches || []).map((match) => {
+    if (!match) return match;
+    return {
+      ...match,
+      player1Id: ns(match.player1Id),
+      player2Id: ns(match.player2Id),
+      accountId: aid,
+      accountEmail: email,
+    };
+  });
+  return {
+    ...stats,
+    players,
+    matches,
+  };
+}
+
+/**
  * Platform admin: merge stats across tenants.
  * Player ids are namespaced as `${accountId}:${playerId}` to avoid collisions.
  */
-export function getAllAccountsStats({ accountLimit = 200, limitPerAccount = 2000 } = {}) {
+export function getAllAccountsStats({ accountLimit = 200, limitPerAccount = 500 } = {}) {
   const accounts = sqlite.listAccountsForAdmin({ limit: accountLimit });
   const playerMap = new Map();
   const matches = [];
@@ -353,34 +397,22 @@ export function getAllAccountsStats({ accountLimit = 200, limitPerAccount = 2000
     const accountId = String(account?.id || '').trim();
     if (!accountId) continue;
     const email = String(account.email || accountId).trim();
-    const stats = getAccountStats(accountId, limitPerAccount);
+    // Skip per-tenant roster sync — bulk path is ops overview; single-tenant still syncs.
+    const stats = namespaceAccountStats(
+      getAccountStats(accountId, limitPerAccount, { syncRoster: false }),
+      accountId,
+      email
+    );
 
     for (const player of stats.players || []) {
-      const localId = String(player?.id || '').trim();
-      if (!localId) continue;
-      const id = `${accountId}:${localId}`;
-      playerMap.set(id, {
-        ...player,
-        id,
-        localPlayerId: localId,
-        accountId,
-        accountEmail: email,
-      });
+      const id = String(player?.id || '').trim();
+      if (!id) continue;
+      playerMap.set(id, player);
     }
 
     for (const match of stats.matches || []) {
       if (!match) continue;
-      const ns = (pid) => {
-        const local = String(pid || '').trim();
-        return local ? `${accountId}:${local}` : null;
-      };
-      matches.push({
-        ...match,
-        player1Id: ns(match.player1Id),
-        player2Id: ns(match.player2Id),
-        accountId,
-        accountEmail: email,
-      });
+      matches.push(match);
       if (match.roomId) {
         tables.set(`${accountId}:${match.roomId}`, {
           roomId: match.roomId,

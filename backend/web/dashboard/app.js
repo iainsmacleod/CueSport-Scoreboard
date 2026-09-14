@@ -99,6 +99,8 @@ let playerDetailGameFilter = '';
 
 /** Leaderboard: sort full dataset, then paginate (page UI appears when needed). */
 const LEADERBOARD_PAGE_SIZE = 50;
+/** Recent Matches: same page size; sort (via recentMatches) then paginate. */
+const MATCHES_PAGE_SIZE = 50;
 const LEADERBOARD_SORT_DEFAULTS = {
   name: 'asc',
   matches: 'desc',
@@ -109,13 +111,14 @@ const LEADERBOARD_SORT_DEFAULTS = {
 let leaderboardSortKey = 'matches';
 let leaderboardSortDir = 'desc';
 let leaderboardPage = 1;
+let matchesPage = 1;
 /** Expanded rack/frame breakdowns in match lists (collapsed by default). */
 const expandedMatchRacks = new Set();
 let isPlatformAdminUser = false;
 let adminAccountsCache = [];
 let adminSelectedId = '';
 let adminSearchTimer = null;
-/** Platform admin: empty = own account; `__all__` = every tenant; otherwise one tenant (read-only). */
+/** Platform admin: empty = own account; `__all__` = every tenant; otherwise one tenant. */
 let platformViewAccountId = '';
 /** Sentinel for platform-admin cross-tenant Tables/Stats view. */
 const PLATFORM_VIEW_ALL = '__all__';
@@ -1317,7 +1320,8 @@ function setActiveDashTab(which) {
     playerDetailOpponentFilter = '';
     playerDetailGameFilter = '';
     playerRenameEditing = false;
-    loadAccountStats(true);
+    // Use cache when warm; filter changes / mutations still force reload.
+    loadAccountStats(false);
   }
   if (which === 'admin') {
     loadAdminAccounts();
@@ -1369,6 +1373,49 @@ function isViewingOtherAccount() {
   return !!(lastAccount?.id && platformViewAccountId !== lastAccount.id);
 }
 
+function resolveForeignAccountEmail(entity = null) {
+  if (!isViewingOtherAccount()) return '';
+  const email = String(entity?.accountEmail || '').trim()
+    || (isViewingAllAccounts() ? '' : getPlatformViewAccountLabel());
+  if (!email || email === 'All accounts') return '';
+  if (lastAccount?.email && email.toLowerCase() === String(lastAccount.email).toLowerCase()) {
+    return '';
+  }
+  return email;
+}
+
+function withForeignAccountWarning(message, entity = null) {
+  const email = resolveForeignAccountEmail(entity);
+  if (!email) return message;
+  return (
+    `${message}\n\n` +
+    `Warning: this data belongs to another account (${email}), not yours.`
+  );
+}
+
+/**
+ * Confirm a destructive or cross-tenant stats change.
+ * Deletes always confirm; foreign-account edits also confirm with an ownership warning.
+ */
+async function confirmStatsMutation({
+  title,
+  message,
+  confirmLabel,
+  danger = false,
+  entity = null,
+  requireConfirm = true,
+} = {}) {
+  const foreignEmail = resolveForeignAccountEmail(entity);
+  const needsConfirm = requireConfirm || !!foreignEmail;
+  if (!needsConfirm) return true;
+  return confirmDashAction({
+    title: foreignEmail ? `${title} (other account)` : title,
+    message: withForeignAccountWarning(message, entity),
+    confirmLabel,
+    danger,
+  });
+}
+
 function getPlatformViewAccountLabel() {
   if (!isViewingOtherAccount()) return '';
   if (isViewingAllAccounts()) return 'All accounts';
@@ -1385,15 +1432,15 @@ function updatePlatformAccountFilterHint() {
   }
   if (isViewingAllAccounts()) {
     hint.textContent =
-      'Viewing All accounts — tables refresh every few seconds while this tab is open (read-only). Separate from Dock Key roles and subscription tiers.';
+      'Viewing All accounts — tables refresh every few seconds while this tab is open. You can edit or delete stats with confirmation (extra warning for other accounts). Separate from Dock Key roles and subscription tiers.';
     return;
   }
   if (isViewingOtherAccount()) {
     hint.textContent =
-      `Viewing ${getPlatformViewAccountLabel()} — tables refresh every few seconds while this tab is open (read-only). Separate from Dock Key roles and subscription tiers.`;
+      `Viewing ${getPlatformViewAccountLabel()} — tables refresh every few seconds. Edits/deletes require confirmation and warn that this is not your account. Separate from Dock Key roles and subscription tiers.`;
     return;
   }
-  hint.textContent = 'Platform admin: browse one customer or All accounts (tables, matches, players — read-only). Separate from Dock Key roles and subscription tiers.';
+  hint.textContent = 'Platform admin: browse one customer or All accounts. Separate from Dock Key roles and subscription tiers.';
 }
 
 async function loadPlatformAccountFilterOptions() {
@@ -1448,6 +1495,8 @@ async function applyPlatformAccountFilter(accountId) {
   playerRenameEditing = false;
   statsLoaded = false;
   statsData = null;
+  leaderboardPage = 1;
+  matchesPage = 1;
   await refreshTablesForCurrentView();
   syncPlatformTablesPolling();
   const statsTab = document.getElementById('tabStats');
@@ -1967,6 +2016,11 @@ function setLeaderboardPage(page) {
   renderAccountStats();
 }
 
+function setMatchesPage(page) {
+  matchesPage = Math.max(1, Number(page) || 1);
+  renderAccountStats();
+}
+
 /** Split leaderboard headers onto two lines for narrower columns. */
 function leaderboardHeaderLines(label) {
   const raw = String(label || '').trim();
@@ -2023,6 +2077,25 @@ function renderLeaderboardPager(pageInfo) {
     <button type="button" class="btn dash-action-btn" data-leaderboard-page="${pageInfo.page - 1}" ${pageInfo.page <= 1 ? 'disabled' : ''}>${dashActionIcon('chevronLeft')}<span class="dash-action-label">Previous</span></button>
     <span>Page ${pageInfo.page} / ${pageInfo.totalPages}</span>
     <button type="button" class="btn dash-action-btn" data-leaderboard-page="${pageInfo.page + 1}" ${pageInfo.page >= pageInfo.totalPages ? 'disabled' : ''}>${dashActionIcon('chevronRight')}<span class="dash-action-label">Next</span></button>
+  `;
+}
+
+function renderMatchesPager(pageInfo) {
+  const pager = document.getElementById('statsMatchesPager');
+  if (!pager) return;
+  if (!pageInfo || pageInfo.total <= pageInfo.pageSize) {
+    pager.classList.add('hidden');
+    pager.innerHTML = '';
+    return;
+  }
+  pager.classList.remove('hidden');
+  const from = pageInfo.startIndex + 1;
+  const to = Math.min(pageInfo.startIndex + pageInfo.items.length, pageInfo.total);
+  pager.innerHTML = `
+    <span class="stats-pager-label">Showing ${from}–${to} of ${pageInfo.total}</span>
+    <button type="button" class="btn dash-action-btn" data-matches-page="${pageInfo.page - 1}" ${pageInfo.page <= 1 ? 'disabled' : ''}>${dashActionIcon('chevronLeft')}<span class="dash-action-label">Previous</span></button>
+    <span>Page ${pageInfo.page} / ${pageInfo.totalPages}</span>
+    <button type="button" class="btn dash-action-btn" data-matches-page="${pageInfo.page + 1}" ${pageInfo.page >= pageInfo.totalPages ? 'disabled' : ''}>${dashActionIcon('chevronRight')}<span class="dash-action-label">Next</span></button>
   `;
 }
 
@@ -2291,6 +2364,7 @@ function renderAccountStats() {
     matchBody.innerHTML = '<tr><td colspan="5" class="dash-stats-empty">No stats loaded.</td></tr>';
     updateLeaderboardSortHeaders();
     renderLeaderboardPager(null);
+    renderMatchesPager(null);
     return;
   }
 
@@ -2337,14 +2411,19 @@ function renderAccountStats() {
 
   if (!matchList.length) {
     matchBody.innerHTML = '<tr><td colspan="5" class="dash-stats-empty">No match history yet.</td></tr>';
+    renderMatchesPager(null);
   } else {
-    matchBody.innerHTML = matchList.slice(0, 50).map((m) => matchOverviewRow(m)).join('');
+    // recentMatches() already sorts (live first, then by date desc); paginate that order.
+    const matchPageInfo = paginateItems(matchList, matchesPage, MATCHES_PAGE_SIZE);
+    matchesPage = matchPageInfo.page;
+    matchBody.innerHTML = matchPageInfo.items.map((m) => matchOverviewRow(m)).join('');
+    renderMatchesPager(matchPageInfo);
   }
   if (statusEl) {
     statusEl.textContent = isViewingOtherAccount()
-      ? `Showing ${getPlatformViewAccountLabel()} (read-only)`
+      ? `Showing ${getPlatformViewAccountLabel()}`
       : '';
-  }
+}
 }
 
 function matchPairHtml(m) {
@@ -2576,8 +2655,13 @@ function isMatchRacksExpanded(startEventId) {
 function toggleMatchRacksExpanded(startEventId) {
   const id = String(startEventId || '');
   if (!id) return;
-  if (expandedMatchRacks.has(id)) expandedMatchRacks.delete(id);
-  else expandedMatchRacks.add(id);
+  if (expandedMatchRacks.has(id)) {
+    expandedMatchRacks.delete(id);
+  } else {
+    // Only one match racks row expanded at a time.
+    expandedMatchRacks.clear();
+    expandedMatchRacks.add(id);
+  }
   if (selectedPlayerKey) renderPlayerDetail();
   else renderAccountStats();
 }
@@ -2669,8 +2753,8 @@ function matchOverviewRow(m) {
   const racksToggle = matchRacksToggleButton(m);
   if (racksToggle) actions.push(racksToggle);
   if (inProgress) {
-    if (!isViewingOtherAccount()) actions.push(matchAbandonButton(m.startEventId));
-  } else if (!isViewingOtherAccount()) {
+    actions.push(matchAbandonButton(m.startEventId));
+  } else {
     actions.push(matchEditButton(m.startEventId));
   }
   const main = `
@@ -2796,12 +2880,11 @@ function renderPlayerDetail() {
     title.title = email ? `${unfilteredName} · ${email}` : unfilteredName;
   }
   if (rename && document.activeElement !== rename) rename.value = unfilteredName;
-  if (isViewingOtherAccount()) playerRenameEditing = false;
   setPlayerRenameEditing(playerRenameEditing, { focus: false });
   const renameBtn = document.getElementById('statsPlayerRenameEditBtn');
   const deleteBtn = document.getElementById('statsPlayerDeleteBtn');
-  renameBtn?.classList.toggle('hidden', isViewingOtherAccount());
-  deleteBtn?.classList.toggle('hidden', isViewingOtherAccount());
+  renameBtn?.classList.remove('hidden');
+  deleteBtn?.classList.remove('hidden');
   populatePlayerDetailFilters(allMatches);
   if (summary) {
     const cards = [];
@@ -2860,8 +2943,8 @@ function renderPlayerDetail() {
     const racksToggle = matchRacksToggleButton(m);
     if (racksToggle) actions.push(racksToggle);
     if (inProgress) {
-      if (!isViewingOtherAccount()) actions.push(matchAbandonButton(m.startEventId));
-    } else if (!isViewingOtherAccount()) {
+      actions.push(matchAbandonButton(m.startEventId));
+    } else {
       actions.push(matchEditButton(m.startEventId));
     }
     const main = `
@@ -3356,6 +3439,19 @@ async function saveMatchModal(event) {
   }
   setDashMatchModalBusy(true, 'save');
   try {
+    const match = findMatchByStartId(startEventId);
+    const ok = await confirmStatsMutation({
+      title: 'Save Match',
+      message: 'Save changes to this match?',
+      confirmLabel: 'Save',
+      danger: false,
+      entity: match,
+      requireConfirm: false, // own-account edits save directly; foreign still confirms
+    });
+    if (!ok) {
+      setDashMatchModalBusy(false);
+      return;
+    }
     const body = {
       player1Name: p1,
       player2Name: p2,
@@ -3394,7 +3490,15 @@ async function abandonInProgressMatch(startEventId) {
   const confirmMsg = dockOnline
     ? 'Kill this unfinished match? It will be removed from cloud stats and the live dock will clear the game (no winner recorded).'
     : 'Kill this unfinished match? It will be removed from cloud stats (no winner recorded). No live dock is connected — if a dock still has this match open, clear it there.';
-  if (!window.confirm(confirmMsg)) return;
+  const ok = await confirmStatsMutation({
+    title: 'Kill Match',
+    message: confirmMsg,
+    confirmLabel: 'Kill Match',
+    danger: true,
+    entity: match,
+    requireConfirm: true,
+  });
+  if (!ok) return;
   try {
     setError('');
     await deleteAccountMatch(getServerUrl(), getToken(), id);
@@ -3408,7 +3512,16 @@ async function deleteMatchFromModal() {
   if (matchModalBusy) return;
   const startEventId = document.getElementById('statsMatchEventId')?.value;
   if (!startEventId) return;
-  if (!window.confirm('Delete this match from cloud stats? This cannot be undone.')) return;
+  const match = findMatchByStartId(startEventId);
+  const ok = await confirmStatsMutation({
+    title: 'Delete Match',
+    message: 'Delete this match from cloud stats? This cannot be undone.',
+    confirmLabel: 'Delete Match',
+    danger: true,
+    entity: match,
+    requireConfirm: true,
+  });
+  if (!ok) return;
   setDashMatchModalBusy(true, 'delete');
   try {
     await deleteAccountMatch(getServerUrl(), getToken(), startEventId);
@@ -3441,7 +3554,7 @@ async function loadAccountStats(force = false) {
   }
   try {
     if (isViewingAllAccounts()) {
-      statsData = await adminFetchJson('/api/admin/stats?accountLimit=200&limitPerAccount=2000');
+      statsData = await adminFetchJson('/api/admin/stats?accountLimit=200&limitPerAccount=500');
     } else if (isViewingOtherAccount()) {
       statsData = await adminFetchJson(
         `/api/admin/accounts/${encodeURIComponent(platformViewAccountId)}/stats`
@@ -3675,6 +3788,7 @@ function initStatsPlayerSearch() {
   const applyFreeTextFilter = () => {
     selectedPlayerKey = '';
     leaderboardPage = 1;
+    matchesPage = 1;
     if (statsData) renderAccountStats();
   };
 
@@ -3868,6 +3982,14 @@ document.getElementById('statsPanelLeaderboard')?.addEventListener('click', (eve
   setLeaderboardSort(th.getAttribute('data-sort-key'));
 });
 
+document.getElementById('statsPanelMatches')?.addEventListener('click', (event) => {
+  const pageBtn = event.target.closest('[data-matches-page]');
+  if (pageBtn && !pageBtn.disabled) {
+    event.preventDefault();
+    setMatchesPage(pageBtn.getAttribute('data-matches-page'));
+  }
+});
+
 document.getElementById('statsPlayerBackBtn')?.addEventListener('click', () => {
   selectedPlayerKey = '';
   playerDetailOpponentFilter = '';
@@ -3884,7 +4006,6 @@ document.getElementById('statsPlayerGameFilter')?.addEventListener('change', (ev
   renderPlayerDetail();
 });
 document.getElementById('statsPlayerRenameEditBtn')?.addEventListener('click', () => {
-  if (isViewingOtherAccount()) return;
   const rename = document.getElementById('statsPlayerRenameInput');
   const title = document.getElementById('statsPlayerTitle');
   if (rename && title) rename.value = title.textContent || '';
@@ -3900,12 +4021,20 @@ document.getElementById('statsPlayerRenameCancelBtn')?.addEventListener('click',
 });
 document.getElementById('statsPlayerRenameForm')?.addEventListener('submit', async (event) => {
   event.preventDefault();
-  if (isViewingOtherAccount()) return;
   const form = event.currentTarget;
   if (form?.dataset.busy === '1') return;
   const fromName = statsPlayerDisplayName(selectedPlayerKey);
   const toName = document.getElementById('statsPlayerRenameInput')?.value.trim();
   if (!fromName || !toName) return;
+  const player = findStatsPlayer(selectedPlayerKey);
+  const ok = await confirmStatsMutation({
+    title: 'Rename Player',
+    message: `Rename “${fromName}” to “${toName}” in cloud stats?`,
+    confirmLabel: 'Rename',
+    entity: player,
+    requireConfirm: false,
+  });
+  if (!ok) return;
   const input = document.getElementById('statsPlayerRenameInput');
   const saveBtn = form.querySelector('button[type="submit"]');
   const cancelBtn = document.getElementById('statsPlayerRenameCancelBtn');
@@ -3940,25 +4069,29 @@ document.getElementById('statsPlayerRenameForm')?.addEventListener('submit', asy
   }
 });
 document.getElementById('statsPlayerDeleteBtn')?.addEventListener('click', async () => {
-  if (isViewingOtherAccount()) return;
   if (!selectedPlayerKey) return;
   const playerName = statsPlayerDisplayName(selectedPlayerKey);
+  const player = findStatsPlayer(selectedPlayerKey);
   const matchCount = playerMatches(selectedPlayerKey).length;
   const matchLabel = matchCount === 1 ? '1 match' : `${matchCount} matches`;
-  const ok = await confirmDashAction({
+  const ok = await confirmStatsMutation({
     title: 'Delete Player',
     message:
       `Delete “${playerName}” and ${matchLabel} from cloud stats?\n\n` +
       'This cannot be undone. The player is removed from the account roster and every match involving them is deleted.',
     confirmLabel: 'Delete Player',
     danger: true,
+    entity: player,
+    requireConfirm: true,
   });
   if (!ok) return;
-  const ok2 = await confirmDashAction({
+  const ok2 = await confirmStatsMutation({
     title: 'Confirm Delete',
     message: `Are you absolutely sure you want to permanently delete “${playerName}”?`,
     confirmLabel: 'Delete Permanently',
     danger: true,
+    entity: player,
+    requireConfirm: true,
   });
   if (!ok2) return;
   try {
@@ -3981,14 +4114,12 @@ document.getElementById('tabStats')?.addEventListener('click', (event) => {
   const abandonBtn = event.target.closest('[data-abandon-match]');
   if (abandonBtn) {
     event.preventDefault();
-    if (isViewingOtherAccount()) return;
     abandonInProgressMatch(abandonBtn.getAttribute('data-abandon-match'));
     return;
   }
   const editBtn = event.target.closest('[data-edit-match]');
   if (editBtn) {
     event.preventDefault();
-    if (isViewingOtherAccount()) return;
     openMatchModal(editBtn.getAttribute('data-edit-match'));
     return;
   }

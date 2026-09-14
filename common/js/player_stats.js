@@ -6027,6 +6027,8 @@
         if (expandedMatchRacks.has(id)) {
             expandedMatchRacks.delete(id);
         } else {
+            // Only one match racks row expanded at a time (dock + modal).
+            expandedMatchRacks.clear();
             expandedMatchRacks.add(id);
         }
         const body = document.querySelector('#statsModal .stats-modal-body');

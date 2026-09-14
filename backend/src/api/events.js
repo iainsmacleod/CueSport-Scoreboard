@@ -6,9 +6,74 @@ import {
   normalizePlayerDisplayName,
 } from '../lib/scoreboard-helpers.js';
 import { broadcastRoomCommand, notifyAccountTables, getConnectedDockPromotedStreams } from '../ws/room-hub.js';
-import { canMutateMatch, permissionsForAuth } from '../lib/dock-roles.js';
+import { canMutateMatch, isAccountAdminAuth, permissionsForAuth } from '../lib/dock-roles.js';
+import { isPlatformAdmin } from '../lib/platform-admin.js';
 
 const GAME_TYPE_IDS = new Set(['game1', 'game2', 'game3', 'game4', 'game5', 'game6', 'game7', 'game8']);
+
+function isPlatformAdminOperator(auth) {
+  return !!(isAccountAdminAuth(auth) && isPlatformAdmin(auth?.account));
+}
+
+/** Parse `accountId:playerId` used in platform-admin All / other-account Stats. */
+function parseNamespacedPlayerId(raw) {
+  const s = String(raw || '').trim();
+  const idx = s.indexOf(':');
+  if (idx <= 0 || idx >= s.length - 1) {
+    return { accountId: null, playerId: s };
+  }
+  return {
+    accountId: s.slice(0, idx),
+    playerId: s.slice(idx + 1),
+  };
+}
+
+function findPairByStartId(accountId, startEventId) {
+  const events = sqlite.getAccountSessionEvents(accountId, 10000);
+  return pairSessionEvents(events).find((pair) => pair.start && pair.start.id === startEventId) || null;
+}
+
+function assertEventAccount(event, accountId) {
+  return !!(event && event.account_id === accountId);
+}
+
+/**
+ * Resolve match for mutation. Platform admins may target another account's start event.
+ * @returns {{ pair: object, accountId: string } | null}
+ */
+function resolveMatchMutationTarget(auth, startEventId) {
+  if (!auth?.account?.id || !startEventId) return null;
+  const ownPair = findPairByStartId(auth.account.id, startEventId);
+  if (ownPair?.start && assertEventAccount(ownPair.start, auth.account.id)) {
+    return { pair: ownPair, accountId: auth.account.id };
+  }
+  if (!isPlatformAdminOperator(auth)) return null;
+  const start = sqlite.getMatchEventById(startEventId);
+  if (!start || start.event_type !== 'session:start' || !start.account_id) return null;
+  const pair = findPairByStartId(start.account_id, startEventId);
+  if (!pair?.start) return null;
+  return { pair, accountId: start.account_id };
+}
+
+/**
+ * Resolve player for rename/delete. Accepts namespaced ids for platform admins.
+ * @returns {{ accountId: string, playerId: string, existing: object } | null}
+ */
+function resolvePlayerMutationTarget(auth, rawPlayerId) {
+  if (!auth?.account?.id || !rawPlayerId) return null;
+  const parsed = parseNamespacedPlayerId(rawPlayerId);
+  if (parsed.accountId) {
+    if (!isPlatformAdminOperator(auth)) return null;
+    const existing = sqlite.getAccountPlayer(parsed.accountId, parsed.playerId);
+    if (!existing) return null;
+    return { accountId: parsed.accountId, playerId: parsed.playerId, existing };
+  }
+  const existing = sqlite.getAccountPlayer(auth.account.id, parsed.playerId);
+  if (existing) {
+    return { accountId: auth.account.id, playerId: parsed.playerId, existing };
+  }
+  return null;
+}
 
 /** B&R / TR apply to 8/9/10-Ball, Bank, and One Pocket only (not Straight or Snooker). */
 function supportsBreakAndTableRun(gameType) {
@@ -140,15 +205,6 @@ function aggregateExtrasFromRacks(racks, gameType) {
   return extras;
 }
 
-function findPairByStartId(accountId, startEventId) {
-  const events = sqlite.getAccountSessionEvents(accountId, 10000);
-  return pairSessionEvents(events).find((pair) => pair.start && pair.start.id === startEventId) || null;
-}
-
-function assertEventAccount(event, accountId) {
-  return !!(event && event.account_id === accountId);
-}
-
 export async function registerEventRoutes(app) {
   app.get('/api/rooms/:roomId/events', async (request, reply) => {
     const auth = await resolveAuthFromRequest(request);
@@ -172,10 +228,11 @@ export async function registerEventRoutes(app) {
     const auth = await resolveAuthFromRequest(request);
     if (!auth?.account) return reply.code(401).send({ error: 'Unauthorized' });
     const { startEventId } = request.params;
-    const pair = findPairByStartId(auth.account.id, startEventId);
-    if (!pair?.start || !assertEventAccount(pair.start, auth.account.id)) {
+    const target = resolveMatchMutationTarget(auth, startEventId);
+    if (!target?.pair?.start) {
       return reply.code(404).send({ error: 'Match not found' });
     }
+    const { pair, accountId } = target;
     if (!canMutateMatch(auth, pair.start.api_key_id)) {
       return reply.code(403).send({ error: 'Forbidden' });
     }
@@ -193,8 +250,13 @@ export async function registerEventRoutes(app) {
     const prevStart = pair.start.payload || {};
     let player1Id = String(body.player1Id || prevStart.player1Id || '').trim() || null;
     let player2Id = String(body.player2Id || prevStart.player2Id || '').trim() || null;
-    player1Id = sqlite.upsertAccountPlayer(auth.account.id, player1Name, player1Id);
-    player2Id = sqlite.upsertAccountPlayer(auth.account.id, player2Name, player2Id);
+    // Drop account namespace from All-accounts / other-account Stats ids.
+    const p1Parsed = parseNamespacedPlayerId(player1Id || '');
+    const p2Parsed = parseNamespacedPlayerId(player2Id || '');
+    if (p1Parsed.accountId) player1Id = p1Parsed.playerId;
+    if (p2Parsed.accountId) player2Id = p2Parsed.playerId;
+    player1Id = sqlite.upsertAccountPlayer(accountId, player1Name, player1Id);
+    player2Id = sqlite.upsertAccountPlayer(accountId, player2Name, player2Id);
     if (!player1Id || !player2Id) {
       return reply.code(400).send({ error: 'Could not resolve players' });
     }
@@ -289,10 +351,11 @@ export async function registerEventRoutes(app) {
     const auth = await resolveAuthFromRequest(request);
     if (!auth?.account) return reply.code(401).send({ error: 'Unauthorized' });
     const { startEventId } = request.params;
-    const pair = findPairByStartId(auth.account.id, startEventId);
-    if (!pair?.start || !assertEventAccount(pair.start, auth.account.id)) {
+    const target = resolveMatchMutationTarget(auth, startEventId);
+    if (!target?.pair?.start) {
       return reply.code(404).send({ error: 'Match not found' });
     }
+    const { pair, accountId } = target;
     if (!canMutateMatch(auth, pair.start.api_key_id)) {
       return reply.code(403).send({ error: 'Forbidden' });
     }
@@ -320,9 +383,9 @@ export async function registerEventRoutes(app) {
         message: 'This match was killed from CueSport Scoreboard Cloud. The game has been cleared.',
       });
     }
-    notifyAccountTables(auth.account.id, { immediate: true });
+    notifyAccountTables(accountId, { immediate: true });
 
-    return { ok: true, deleted, abandoned, dockNotified };
+    return { ok: true, deleted, abandoned, dockNotified, account_id: accountId };
   });
 
   app.patch('/api/stats/players', async (request, reply) => {
@@ -331,23 +394,24 @@ export async function registerEventRoutes(app) {
     if (!permissionsForAuth(auth).canManagePlayers) {
       return reply.code(403).send({ error: 'Forbidden' });
     }
-    const playerId = String(request.body?.id || request.body?.playerId || '').trim();
+    const rawPlayerId = String(request.body?.id || request.body?.playerId || '').trim();
     const toName = normalizePlayerDisplayName(request.body?.to || request.body?.name);
-    if (!playerId || !toName) {
+    if (!rawPlayerId || !toName) {
       return reply.code(400).send({ error: 'player id and to name are required' });
     }
-    const existing = sqlite.getAccountPlayer(auth.account.id, playerId);
-    if (!existing) {
+    const target = resolvePlayerMutationTarget(auth, rawPlayerId);
+    if (!target) {
       return reply.code(404).send({ error: 'Player not found' });
     }
+    const { accountId, playerId, existing } = target;
     if (existing.name === toName) {
-      return { ok: true, updated: 0, id: playerId, name: toName };
+      return { ok: true, updated: 0, id: rawPlayerId, name: toName, account_id: accountId };
     }
-    const events = sqlite.getAccountSessionEvents(auth.account.id, 10000);
+    const events = sqlite.getAccountSessionEvents(accountId, 10000);
     let updated = 0;
     for (const ev of events) {
       if (ev.event_type !== 'session:start') continue;
-      if (ev.account_id !== auth.account.id) continue;
+      if (ev.account_id !== accountId) continue;
       const payload = { ...(ev.payload || {}) };
       let changed = false;
       if (payload.player1Id === playerId || (!payload.player1Id && namesEqual(payload.player1, existing.name))) {
@@ -365,8 +429,8 @@ export async function registerEventRoutes(app) {
         updated += 1;
       }
     }
-    sqlite.renameAccountPlayerRoster(auth.account.id, playerId, toName);
-    return { ok: true, updated, id: playerId, name: toName };
+    sqlite.renameAccountPlayerRoster(accountId, playerId, toName);
+    return { ok: true, updated, id: rawPlayerId, name: toName, account_id: accountId };
   });
 
   /**
@@ -379,16 +443,17 @@ export async function registerEventRoutes(app) {
     if (!permissionsForAuth(auth).canManagePlayers) {
       return reply.code(403).send({ error: 'Forbidden' });
     }
-    const playerId = String(request.params.playerId || '').trim();
-    if (!playerId) {
+    const rawPlayerId = String(request.params.playerId || '').trim();
+    if (!rawPlayerId) {
       return reply.code(400).send({ error: 'player id is required' });
     }
-    const existing = sqlite.getAccountPlayer(auth.account.id, playerId);
-    if (!existing) {
+    const target = resolvePlayerMutationTarget(auth, rawPlayerId);
+    if (!target) {
       return reply.code(404).send({ error: 'Player not found' });
     }
+    const { accountId, playerId, existing } = target;
 
-    const events = sqlite.getAccountSessionEvents(auth.account.id, 10000);
+    const events = sqlite.getAccountSessionEvents(accountId, 10000);
     const pairs = pairSessionEvents(events);
     const eventIds = [];
     const abandonedRooms = [];
@@ -433,16 +498,17 @@ export async function registerEventRoutes(app) {
         message: 'A player in this match was deleted from CueSport Scoreboard Cloud. The game has been cleared.',
       });
     }
-    const rosterDeleted = sqlite.deleteAccountPlayerRoster(auth.account.id, playerId);
-    notifyAccountTables(auth.account.id, { immediate: true });
+    const rosterDeleted = sqlite.deleteAccountPlayerRoster(accountId, playerId);
+    notifyAccountTables(accountId, { immediate: true });
 
     return {
       ok: true,
-      id: playerId,
+      id: rawPlayerId,
       name: existing.name,
       deletedMatches,
       deletedEvents,
       rosterDeleted,
+      account_id: accountId,
     };
   });
 

@@ -3,7 +3,7 @@ import { resolveAuthFromRequest } from './accounts.js';
 import { isAccountAdminAuth } from '../lib/dock-roles.js';
 import { isPlatformAdmin } from '../lib/platform-admin.js';
 import { getAccountQuota } from '../quotas.js';
-import { getAccountStats, getAllAccountsStats } from '../stats/account-stats.js';
+import { getAccountStats, getAllAccountsStats, namespaceAccountStats } from '../stats/account-stats.js';
 import {
   kickAccountAdminClients,
   revokeApiKeySeat,
@@ -110,10 +110,10 @@ export async function registerAdminRoutes(app) {
     const auth = await requirePlatformAdmin(request, reply);
     if (!auth) return;
     const accountLimit = request.query.accountLimit || request.query.limit || '200';
-    const limitPerAccount = request.query.limitPerAccount || '2000';
+    const limitPerAccount = request.query.limitPerAccount || '500';
     return getAllAccountsStats({
       accountLimit: Number(accountLimit) || 200,
-      limitPerAccount: Number(limitPerAccount) || 2000,
+      limitPerAccount: Number(limitPerAccount) || 500,
     });
   });
 
@@ -161,7 +161,7 @@ export async function registerAdminRoutes(app) {
     const account = sqlite.getAccountById(request.params.id);
     if (!account) return reply.code(404).send({ error: 'Account not found' });
     const limit = request.query.limit || '5000';
-    return getAccountStats(account.id, limit);
+    return namespaceAccountStats(getAccountStats(account.id, limit), account.id, account.email);
   });
 
   app.get('/api/admin/accounts/:id/players', async (request, reply) => {
@@ -171,7 +171,19 @@ export async function registerAdminRoutes(app) {
     if (!account) return reply.code(404).send({ error: 'Account not found' });
     const q = typeof request.query.q === 'string' ? request.query.q : '';
     const limit = request.query.limit || '8';
-    return { players: sqlite.searchAccountPlayers(account.id, q, limit) };
+    return {
+      players: sqlite.searchAccountPlayers(account.id, q, limit).map((row) => {
+        const localId = String(row?.id || '').trim();
+        if (!localId) return row;
+        return {
+          ...row,
+          id: `${account.id}:${localId}`,
+          localPlayerId: localId,
+          accountId: account.id,
+          accountEmail: account.email || account.id,
+        };
+      }),
+    };
   });
 
   app.post('/api/admin/accounts/:id/trial', async (request, reply) => {

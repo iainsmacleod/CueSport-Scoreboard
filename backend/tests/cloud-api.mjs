@@ -2255,6 +2255,19 @@ async function run() {
             && typeof allStats.body.summary.accounts === 'number',
           JSON.stringify(allStats.body)
         );
+        // Default bulk limitPerAccount is 500 (no query override); syncRoster skipped server-side.
+        const allStatsDefault = await fetchJson('/api/admin/stats?accountLimit=50', {
+          headers: { Authorization: `Bearer ${tokenFresh}` },
+        });
+        assert(
+          'Admin GET all stats default limit',
+          allStatsDefault.ok
+            && Array.isArray(allStatsDefault.body.players)
+            && Array.isArray(allStatsDefault.body.matches)
+            && allStatsDefault.body.summary
+            && typeof allStatsDefault.body.summary.accounts === 'number',
+          JSON.stringify(allStatsDefault.body)
+        );
         const allPlayers = await fetchJson('/api/admin/players?q=&limit=8', {
           headers: { Authorization: `Bearer ${tokenFresh}` },
         });
@@ -2344,6 +2357,74 @@ async function run() {
           headers: { Authorization: `Bearer ${tokenFresh}` },
         });
         assert('Admin end support trial', endTrial.ok && endTrial.body.trial_ends_at == null);
+
+        const otherStartId = crypto.randomUUID();
+        const otherEndId = crypto.randomUUID();
+        const otherPlayerId = crypto.randomUUID();
+        {
+          const db = new Database(SQLITE_PATH);
+          try {
+            db.prepare(
+              `INSERT INTO account_players (id, account_id, name, name_normalized)
+               VALUES (?, ?, 'Other P1', 'other p1')`
+            ).run(otherPlayerId, grantTargetId);
+            db.prepare(
+              `INSERT INTO match_events (id, account_id, session_id, event_type, payload, source_client)
+               VALUES (?, ?, ?, 'session:start', ?, 'test')`
+            ).run(
+              otherStartId,
+              grantTargetId,
+              crypto.randomUUID(),
+              JSON.stringify({
+                player1: 'Other P1',
+                player2: 'Other P2',
+                player1Id: otherPlayerId,
+                player2Id: crypto.randomUUID(),
+                gameType: 'game1',
+              })
+            );
+            db.prepare(
+              `INSERT INTO match_events (id, account_id, session_id, event_type, payload, source_client)
+               VALUES (?, ?, (SELECT session_id FROM match_events WHERE id = ?), 'session:end', ?, 'test')`
+            ).run(
+              otherEndId,
+              grantTargetId,
+              otherStartId,
+              JSON.stringify({ winnerSlot: '1', scores: { p1: 1, p2: 0 } })
+            );
+          } finally {
+            db.close();
+          }
+        }
+        const otherStats = await fetchJson(`/api/admin/accounts/${grantTargetId}/stats`, {
+          headers: { Authorization: `Bearer ${tokenFresh}` },
+        });
+        assert(
+          'Admin account stats namespaces player ids',
+          (otherStats.body.players || []).some((p) => p.id === `${grantTargetId}:${otherPlayerId}`),
+          JSON.stringify(otherStats.body.players)
+        );
+        const delOther = await fetchJson(`/api/stats/matches/${otherStartId}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${tokenFresh}` },
+        });
+        assert(
+          'Platform admin can delete other account match',
+          delOther.ok && delOther.body.account_id === grantTargetId,
+          JSON.stringify(delOther.body)
+        );
+        const delOtherPlayer = await fetchJson(
+          `/api/stats/players/${encodeURIComponent(`${grantTargetId}:${otherPlayerId}`)}`,
+          {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${tokenFresh}` },
+          }
+        );
+        assert(
+          'Platform admin can delete other account player',
+          delOtherPlayer.ok && delOtherPlayer.body.account_id === grantTargetId,
+          JSON.stringify(delOtherPlayer.body)
+        );
       }
 
       // WS subscription gate: inactive + support trial / trialing (mutate SQLite, restore after)
