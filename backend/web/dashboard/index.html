@@ -6,7 +6,7 @@
   <title>CueSport Scoreboard Cloud — Dashboard</title>
   <link rel="icon" type="image/png" href="/web/images/balls/8ball_small.png" />
   <link rel="apple-touch-icon" href="/web/images/balls/8ball_small.png" />
-  <link rel="stylesheet" href="/web/shared/styles.css?v=8.1.0.33" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.1.0.34" />
 </head>
 <body>
   <header class="site-header">
@@ -33,7 +33,7 @@
   </header>
   <main id="app" class="dashboard-main">
     <section id="loginSection" class="panel">
-      <h2>Sign In</h2>
+      <h2 id="loginSectionTitle">Sign In</h2>
       <p>
         CueSport Scoreboard Cloud is the managed relay for your OBS CueSport Scoreboard: remote mobile and guest control,
         cloud match history, multi-table Dock Keys, and optional public live-stream listing —
@@ -78,9 +78,9 @@
         <div class="dash-login-intro hint">
           <p>Sign in with your server&rsquo;s dev auth secret. Open this dashboard from your self-hosted Cloud URL.</p>
         </div>
-        <label for="devSecret">Dev auth secret</label>
+        <label for="devSecret">Dev Auth Secret</label>
         <div class="password-field">
-          <input type="password" id="devSecret" placeholder="Dev auth secret" autocomplete="current-password" />
+          <input type="password" id="devSecret" placeholder="Dev Auth Secret" autocomplete="current-password" />
           <button type="button" id="devSecretToggle" class="password-toggle" aria-label="Show secret" title="Show secret" aria-pressed="false"></button>
         </div>
         <div class="dash-login-actions">
@@ -512,6 +512,6 @@
       </div>
     </div>
   </div>
-  <script type="module" src="/web/dashboard/app.js?v=8.1.0.36"></script>
+  <script type="module" src="/web/dashboard/app.js?v=8.1.0.39"></script>
 </body>
 </html>

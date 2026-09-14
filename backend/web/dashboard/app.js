@@ -13,7 +13,6 @@ import {
   fetchApiKey,
   revokeApiKey,
   patchApiKey,
-  renameApiKey,
   deleteRoom,
   invalidateAllSessions,
   revokeAllGuestLinks,
@@ -808,21 +807,6 @@ function renderDebugRooms(rooms) {
     titleEl.className = 'debug-room-title';
     titleEl.textContent = title;
     titleRow.appendChild(titleEl);
-
-    const canRename = !!room.api_key_id;
-    if (canRename) {
-      const editBtn = document.createElement('button');
-      editBtn.type = 'button';
-      editBtn.className = 'stats-player-edit-btn debug-room-rename-btn';
-      editBtn.title = 'Rename dock (who you shared this key with)';
-      editBtn.setAttribute('aria-label', 'Rename dock');
-      editBtn.innerHTML =
-        '<svg class="stats-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>';
-      editBtn.addEventListener('click', () => {
-        startDebugRoomRename(room, titleRow, title);
-      });
-      titleRow.appendChild(editBtn);
-    }
     meta.appendChild(titleRow);
 
     const details = document.createElement('div');
@@ -875,118 +859,6 @@ function renderDebugRooms(rooms) {
     li.appendChild(meta);
     li.appendChild(actions);
     list.appendChild(li);
-  });
-}
-
-function startDebugRoomRename(room, titleRow, currentTitle) {
-  if (!room?.api_key_id || !titleRow) return;
-  const form = document.createElement('form');
-  form.className = 'debug-room-rename-inline';
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.maxLength = 40;
-  input.autocomplete = 'off';
-  input.setAttribute('aria-label', 'Dock name');
-  input.value = currentTitle;
-  const saveBtn = document.createElement('button');
-  saveBtn.type = 'submit';
-  saveBtn.className = 'btn save';
-  setDashActionButtonContent(saveBtn, {
-    icon: 'save',
-    label: 'Save',
-    title: 'Save dock name',
-  });
-  const cancelBtn = document.createElement('button');
-  cancelBtn.type = 'button';
-  cancelBtn.className = 'btn cancel debug-room-rename-cancel';
-  setDashActionButtonContent(cancelBtn, {
-    icon: 'cancel',
-    label: 'Cancel',
-    title: 'Cancel rename',
-  });
-  form.appendChild(input);
-  form.appendChild(saveBtn);
-  form.appendChild(cancelBtn);
-  titleRow.replaceWith(form);
-  input.focus();
-  input.select();
-
-  const restoreTitle = () => {
-    setError('');
-    const nextRow = document.createElement('div');
-    nextRow.className = 'debug-room-title-row';
-    const titleEl = document.createElement('strong');
-    titleEl.className = 'debug-room-title';
-    titleEl.textContent = currentTitle;
-    const editBtn = document.createElement('button');
-    editBtn.type = 'button';
-    editBtn.className = 'stats-player-edit-btn debug-room-rename-btn';
-    editBtn.title = 'Rename dock (who you shared this key with)';
-    editBtn.setAttribute('aria-label', 'Rename dock');
-    editBtn.innerHTML =
-      '<svg class="stats-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>';
-    editBtn.addEventListener('click', () => {
-      startDebugRoomRename(room, nextRow, currentTitle);
-    });
-    nextRow.appendChild(titleEl);
-    nextRow.appendChild(editBtn);
-    form.replaceWith(nextRow);
-  };
-
-  cancelBtn.addEventListener('click', (event) => {
-    event.preventDefault();
-    restoreTitle();
-  });
-
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const next = String(input.value || '').trim();
-    if (!next) {
-      setError('Enter a name for this dock.');
-      return;
-    }
-    if (next === currentTitle) {
-      restoreTitle();
-      return;
-    }
-    try {
-      setError('');
-      saveBtn.disabled = true;
-      cancelBtn.disabled = true;
-      input.disabled = true;
-      setDashActionButtonContent(saveBtn, {
-        icon: 'save',
-        label: 'Saving…',
-        title: 'Saving dock name',
-      });
-      form.classList.add('is-busy');
-      form.setAttribute('aria-busy', 'true');
-      const result = await renameApiKey(getServerUrl(), getToken(), room.api_key_id, next);
-      if (result.api_keys) renderApiKeys(result.api_keys);
-      if (result.rooms) {
-        renderDebugRooms(result.rooms);
-        renderTableCards(result.rooms);
-      } else {
-        await renderDashboard();
-      }
-      const notice = document.getElementById('debugRoomsNotice');
-      if (notice) {
-        notice.textContent = `Renamed to “${result.label || next}”.`;
-        notice.classList.remove('hidden');
-      }
-    } catch (err) {
-      setError(err.message);
-      saveBtn.disabled = false;
-      cancelBtn.disabled = false;
-      input.disabled = false;
-      setDashActionButtonContent(saveBtn, {
-        icon: 'save',
-        label: 'Save',
-        title: 'Save dock name',
-      });
-      form.classList.remove('is-busy');
-      form.removeAttribute('aria-busy');
-    }
   });
 }
 
@@ -1369,12 +1241,24 @@ function renderApiKeys(keys) {
         setError('');
         const result = await revokeApiKey(getServerUrl(), getToken(), k.id);
         if (result.quota) renderQuota(result.quota);
+        if (Array.isArray(result.api_keys)) renderApiKeys(result.api_keys);
+        if (Array.isArray(result.rooms)) {
+          ownDashboardRooms = result.rooms;
+          if (!isViewingOtherAccount()) {
+            lastDashboardRooms = result.rooms;
+            renderTableCards(result.rooms);
+            renderDebugRooms(result.rooms);
+          } else {
+            renderDebugRooms(result.rooms);
+          }
+        }
         const kicked = Number(result.kicked) || 0;
         const notice = document.getElementById('keyRevokeNotice');
         if (notice) {
-          notice.textContent = kicked > 0
-            ? `Key removed — disconnected ${kicked} dock connection(s).`
-            : 'Key removed.';
+          const parts = ['Key removed'];
+          if (kicked > 0) parts.push(`disconnected ${kicked} dock connection(s)`);
+          if (result.room_deleted) parts.push('table removed from dashboard');
+          notice.textContent = `${parts[0]}${parts.length > 1 ? ` — ${parts.slice(1).join('; ')}` : ''}.`;
           notice.classList.remove('hidden');
         }
         await renderDashboard();
@@ -4394,6 +4278,13 @@ let dashAuthCapabilities = {
   hybrid: false,
 };
 
+function setDashLoginTitle(mode) {
+  const title = document.getElementById('loginSectionTitle');
+  if (!title) return;
+  // Managed Google auth creates accounts on first sign-in; self-host is sign-in only.
+  title.textContent = mode === 'managed' ? 'Sign In/Sign Up' : 'Sign In';
+}
+
 function applyDashLoginCapabilities(config) {
   dashPublicConfigCache = config || null;
   const google = !!(config?.supabaseUrl && config?.supabasePublishableKey);
@@ -4418,6 +4309,7 @@ function applyDashLoginCapabilities(config) {
     managedPane?.classList.add('hidden');
     selfHostPane?.classList.add('hidden');
     unavailable?.classList.remove('hidden');
+    setDashLoginTitle('selfhost');
     return;
   }
 
@@ -4426,6 +4318,7 @@ function applyDashLoginCapabilities(config) {
     // Official / managed production: Google only — no self-host switch.
     managedPane?.classList.remove('hidden');
     selfHostPane?.classList.add('hidden');
+    setDashLoginTitle('managed');
     initOfficialGoogleButton(config);
     return;
   }
@@ -4433,11 +4326,13 @@ function applyDashLoginCapabilities(config) {
     // Pure self-host: server secret only.
     managedPane?.classList.add('hidden');
     selfHostPane?.classList.remove('hidden');
+    setDashLoginTitle('selfhost');
     return;
   }
   // Hybrid lab: Google primary; optional switch to server secret.
   managedPane?.classList.remove('hidden');
   selfHostPane?.classList.add('hidden');
+  setDashLoginTitle('managed');
   initOfficialGoogleButton(config);
 }
 
@@ -4446,6 +4341,7 @@ function showDashLoginManagedPane() {
   setError('');
   document.getElementById('dashLoginManagedPane')?.classList.remove('hidden');
   document.getElementById('dashLoginSelfHostPane')?.classList.add('hidden');
+  setDashLoginTitle('managed');
   if (dashPublicConfigCache) initOfficialGoogleButton(dashPublicConfigCache);
 }
 
@@ -4454,6 +4350,7 @@ function showDashLoginSelfHostPane() {
   setError('');
   document.getElementById('dashLoginManagedPane')?.classList.add('hidden');
   document.getElementById('dashLoginSelfHostPane')?.classList.remove('hidden');
+  setDashLoginTitle('selfhost');
   document.getElementById('devSecret')?.focus();
 }
 

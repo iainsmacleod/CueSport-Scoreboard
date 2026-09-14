@@ -6,7 +6,7 @@ import { getAccountQuota } from '../quotas.js';
 import { getAccountStats, getAllAccountsStats } from '../stats/account-stats.js';
 import {
   kickAccountAdminClients,
-  kickApiKeyDocks,
+  revokeApiKeySeat,
   roomHasConnectedDock,
   getRoomCleanupAfter,
   resolveRoomApiKeyId,
@@ -220,10 +220,11 @@ export async function registerAdminRoutes(app) {
     if (!account) return reply.code(404).send({ error: 'Account not found' });
     const ok = sqlite.revokeApiKey(keyId, accountId);
     if (!ok) return reply.code(404).send({ error: 'API key not found' });
-    const kicked = kickApiKeyDocks(keyId);
+    const { kicked, roomDeleted } = revokeApiKeySeat(keyId);
     return {
       ok: true,
       kicked,
+      room_deleted: roomDeleted,
       account: sqlite.getAccountAdminDetail(accountId),
     };
   });

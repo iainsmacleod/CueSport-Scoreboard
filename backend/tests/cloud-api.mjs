@@ -551,6 +551,24 @@ async function run() {
       } catch (e) {
         assert('Dock join creates room', false, e.message);
       }
+      // Stale room UUID from another/deleted table must not block Dock Key join.
+      try {
+        const stale = await wsJoin({
+          client: 'dock',
+          apiKey,
+          instanceId: smokeInstance,
+          roomId: '00000000-0000-4000-8000-000000000099',
+        });
+        assert(
+          'Dock join ignores stale room_id',
+          !!stale.data?.room_id && stale.data.room_id === roomId,
+          JSON.stringify(stale.data)
+        );
+        stale.ws.close();
+        await sleep(150);
+      } catch (e) {
+        assert('Dock join ignores stale room_id', false, e.message);
+      }
     }
 
     // Remove regenerate path — seat id stays stable; compromise = Remove then Create
@@ -626,6 +644,55 @@ async function run() {
       } catch (e) {
         assert('Dock reconnect same instance reuses room', false, e.message);
       }
+    }
+
+    // Removing a Dock Key must kick the live dock and delete its table immediately.
+    try {
+      const tempKeyRes = await fetchJson('/api/api-keys', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ label: 'revoke-kick-temp' }),
+      });
+      assert('POST temp key for revoke kick', tempKeyRes.ok && !!tempKeyRes.body.key, JSON.stringify(tempKeyRes.body));
+      const tempKey = tempKeyRes.body.key;
+      const tempKeyId = tempKeyRes.body.id;
+      const tempDock = await wsJoin({
+        client: 'dock',
+        apiKey: tempKey,
+        instanceId: `revoke-kick-${Date.now()}`,
+      });
+      const tempRoomId = tempDock.data.room_id;
+      assert('Temp dock creates room', !!tempRoomId);
+      const kickP = waitForWsErrorThenClose(tempDock.ws);
+      const revoked = await fetchJson(`/api/api-keys/${tempKeyId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      assert('DELETE api-key kicks dock', revoked.ok && Number(revoked.body.kicked) >= 1, JSON.stringify(revoked.body));
+      assert('DELETE api-key deletes room', revoked.body.room_deleted === true, JSON.stringify(revoked.body));
+      assert(
+        'DELETE response drops key and room',
+        !(revoked.body.api_keys || []).some((k) => k.id === tempKeyId)
+          && !(revoked.body.rooms || []).some((r) => r.id === tempRoomId),
+        JSON.stringify({ keys: revoked.body.api_keys, rooms: revoked.body.rooms })
+      );
+      const kick = await kickP;
+      assert(
+        'Live dock receives revoke/close',
+        kick.code === 'api_key_revoked' || kick.code === 'room_deleted' || kick.code === 'closed',
+        JSON.stringify(kick)
+      );
+      const meAfterRevoke = await fetchJson('/api/me', { headers: { Authorization: `Bearer ${token}` } });
+      assert(
+        'Revoked key and room gone from /api/me',
+        !(meAfterRevoke.body.api_keys || []).some((k) => k.id === tempKeyId)
+          && !(meAfterRevoke.body.rooms || []).some((r) => r.id === tempRoomId)
+      );
+    } catch (e) {
+      assert('Remove Dock Key kicks connection and deletes table', false, e.message);
     }
 
     if (!roomId) {

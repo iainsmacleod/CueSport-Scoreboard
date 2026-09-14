@@ -226,6 +226,8 @@
             window.cloudRelay.setCredentials({
                 serverUrl: MANAGED_SERVER_URL,
                 apiKey: apiKey,
+                accessToken: '',
+                roomId: '',
             });
         }
         closeCloudConnectionModal();

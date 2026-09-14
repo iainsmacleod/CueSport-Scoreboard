@@ -12,7 +12,7 @@ import {
   kickGuestToken,
   kickAccountAdminClients,
   kickAccountGuestClients,
-  kickApiKeyDocks,
+  revokeApiKeySeat,
   notifyApiKeyRoleChange,
   performDeleteRoom,
   getRoomCleanupAfter,
@@ -408,8 +408,15 @@ export async function registerAccountRoutes(app) {
     const { keyId } = request.params;
     const ok = sqlite.revokeApiKey(keyId, auth.account.id);
     if (!ok) return reply.code(404).send({ error: 'API key not found' });
-    const kicked = kickApiKeyDocks(keyId);
-    return { ok: true, kicked, quota: getAccountQuota(auth.account) };
+    const { kicked, roomDeleted } = revokeApiKeySeat(keyId);
+    return {
+      ok: true,
+      kicked,
+      room_deleted: roomDeleted,
+      quota: getAccountQuota(auth.account),
+      api_keys: sqlite.getApiKeysForAccount(auth.account.id),
+      rooms: sqlite.getRoomsWithLiveState(auth.account.id).map(enrichRoom),
+    };
   });
 
   app.post('/api/sessions/invalidate-all', async (request, reply) => {

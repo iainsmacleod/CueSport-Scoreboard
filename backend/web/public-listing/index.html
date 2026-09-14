@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>CueSport Scoreboard Cloud</title>
   <link rel="icon" type="image/png" href="/web/images/balls/8ball_small.png" />
-  <link rel="stylesheet" href="/web/shared/styles.css?v=8.1.0.30" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.1.0.34" />
 </head>
 <body>
   <header class="site-header">
@@ -35,7 +35,7 @@
       <h2>Score From Anywhere</h2>
       <p>
         Connect your OBS CueSport Scoreboard dock to CueSport Scoreboard Cloud, then control matches from your phone —
-        or share a guest scorer link. Each OBS <code>?instance=</code> table gets its own room automatically.
+        or share a guest scorer link.
       </p>
       <div class="hero-actions">
         <a id="heroAuthBtn" class="btn primary" href="/dashboard">
@@ -60,13 +60,14 @@
       </article>
       <article class="panel">
         <h3>Multi-Table</h3>
-        <p>Run multiple OBS docks with different <code>instance</code> IDs — each registers as its own table in your account.</p>
+        <p>Run multiple OBS docks — each Dock Key registers as its own table in your account.</p>
       </article>
     </section>
   </main>
   <script type="module">
-    // /streams prioritizes the live list; home keeps marketing below Live Now.
-    if (/\/streams\/?$/.test(location.pathname)) {
+    // /streams shows the live list; home is marketing only (streams via Browse CTA).
+    const isStreamsPage = /\/streams\/?$/.test(location.pathname);
+    if (isStreamsPage) {
       document.body.classList.add('streams-page');
       document.title = 'Live Streams — CueSport Scoreboard Cloud';
     } else {
@@ -78,7 +79,6 @@
       const dashIcon = '<svg class="site-nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>';
       const signInIcon = '<svg class="site-nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>';
       const navLabel = signedIn ? 'Dashboard' : 'Sign In';
-      const heroLabel = signedIn ? 'Open Dashboard' : 'Sign In';
       const btn = document.getElementById('authNavBtn');
       if (btn) {
         btn.innerHTML = `${signedIn ? dashIcon : signInIcon}${navLabel}`;
@@ -87,7 +87,8 @@
       }
       const hero = document.getElementById('heroAuthBtn');
       if (hero) {
-        hero.innerHTML = `${signedIn ? dashIcon : signInIcon}${heroLabel}`;
+        const heroLabel = 'Open Dashboard';
+        hero.innerHTML = `${dashIcon}${heroLabel}`;
         hero.setAttribute('aria-label', heroLabel);
         hero.title = heroLabel;
       }
@@ -147,8 +148,10 @@
       }
     }
     syncAuthNav();
-    loadStreams();
-    setInterval(loadStreams, 15000);
+    if (isStreamsPage) {
+      loadStreams();
+      setInterval(loadStreams, 15000);
+    }
   </script>
 </body>
 </html>

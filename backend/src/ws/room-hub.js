@@ -485,7 +485,9 @@ async function handleRoomClientJoin(ws, meta, msg, authenticateJoin) {
     const auth = await authenticateJoin({
       apiKey: msg.api_key,
       accessToken: msg.access_token,
-      roomId,
+      // Dock tables are owned by the OBS Dock Key. Ignore any stale client room_id
+      // so a previous UUID cannot block join under a new key.
+      roomId: client === 'dock' && msg.api_key ? null : roomId,
       client,
     });
 
@@ -931,6 +933,21 @@ export function kickApiKeyDocks(keyId) {
   }
   docksByApiKeyId.delete(key);
   return n;
+}
+
+/**
+ * After an API key is revoked in SQLite: disconnect docks using it and delete
+ * the mapped table so dashboards drop the seat immediately (not after grace).
+ */
+export function revokeApiKeySeat(keyId) {
+  if (!keyId) return { kicked: 0, roomDeleted: false, roomId: null };
+  const roomId = sqlite.getRoomIdForApiKey(keyId);
+  const kicked = kickApiKeyDocks(keyId);
+  let roomDeleted = false;
+  if (roomId) {
+    roomDeleted = performDeleteRoom(roomId).ok;
+  }
+  return { kicked, roomDeleted, roomId: roomDeleted ? roomId : null };
 }
 
 /**

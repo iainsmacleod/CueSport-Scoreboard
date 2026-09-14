@@ -791,6 +791,10 @@ ul { padding-left: 1.2rem; }
 body.landing-home .site-nav {
   display: none;
 }
+/* Home: marketing first — streams live on /streams via Browse Live Streams. */
+body.landing-home .live-now-panel {
+  display: none;
+}
 /* On /streams you're already viewing the list — keep only Sign In / Dashboard. */
 body.streams-page .site-nav-streams {
   display: none;
@@ -1633,18 +1637,6 @@ body.controls-locked #reconnectBanner {
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
-}
-.debug-room-rename-inline {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem;
-  width: 100%;
-}
-.debug-room-rename-inline input {
-  flex: 1 1 10rem;
-  min-width: 8rem;
-  max-width: 20rem;
 }
 .dash-share-key-actions {
   flex-wrap: wrap;

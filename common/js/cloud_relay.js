@@ -235,16 +235,14 @@
 
     function sendJoin() {
         const roomId = getRoomId();
+        const apiKey = getApiKey();
+        const token = getAccessToken();
         const msg = {
             type: 'join',
             client: getClientType(),
             // Cloud room identity is the OBS Dock Key; instance_id is local metadata only.
             instance_id: getInstanceKey(),
         };
-        if (roomId) msg.room_id = roomId;
-        const token = getAccessToken();
-        const apiKey = getApiKey();
-        // Docks must use an OBS Dock Key for seats (hosted + self-host).
         if (getClientType() === 'dock') {
             if (!apiKey) {
                 console.warn('cloudRelay: dock requires api_key (OBS Dock Key)');
@@ -252,10 +250,13 @@
             }
             msg.api_key = apiKey;
             if (token) msg.access_token = token;
+            // Room is assigned from the Dock Key on the server; do not send a cached UUID.
         } else if (token) {
             msg.access_token = token;
+            if (roomId) msg.room_id = roomId;
         } else if (apiKey) {
             msg.api_key = apiKey;
+            if (roomId) msg.room_id = roomId;
         } else {
             console.warn('cloudRelay: no access_token or api_key');
             return false;
@@ -1118,9 +1119,16 @@
      */
     function setCredentials({ serverUrl, roomId, accessToken, apiKey }) {
         if (serverUrl != null) setStorageItem('serverUrl', serverUrl);
-        if (roomId != null) setStorageItem('roomId', roomId);
         if (accessToken != null) setStorageItem('accessToken', accessToken);
-        if (apiKey != null) setStorageItem('apiKey', apiKey);
+        if (apiKey != null) {
+            const prevKey = getStorageItem('apiKey') || '';
+            setStorageItem('apiKey', apiKey);
+            // New Dock Key → drop cached room so join is resolved from the key.
+            if (roomId === undefined && String(apiKey) !== String(prevKey)) {
+                setStorageItem('roomId', '');
+            }
+        }
+        if (roomId != null) setStorageItem('roomId', roomId);
         clearBlockedState();
         reconnectAttempts = 0;
         const wasEnabled = isEnabled;
