@@ -128,26 +128,21 @@ function applyViewOnlyUI() {
   if (banner) {
     banner.classList.toggle('hidden', !isViewOnly);
     banner.textContent = isViewOnly
-      ? 'Platform admin view — live score only. Game controls are disabled.'
+      ? 'Platform admin view — browse tabs freely; game controls are disabled.'
       : '';
   }
   document.body.classList.toggle('view-only', isViewOnly);
   if (!isViewOnly) {
     if (title && !isGuestMode) title.textContent = 'CueSport Scoreboard Cloud';
-    document.getElementById('navSetupBtn')?.classList.remove('hidden');
     return;
   }
   if (title) title.textContent = 'CueSport Scoreboard Cloud — View Only';
-  // Spectators: Control tab only (watch live board); hide setup/replay/share.
-  show('viewSetup', false);
-  show('viewReplay', false);
-  show('viewShare', false);
+  // Keep Dashboard + Setup + Stream; hide Share (guest-link management).
   show('adminPlayersPanel', false);
-  document.querySelectorAll('.admin-only').forEach((el) => el.classList.add('hidden'));
-  document.getElementById('navSetupBtn')?.classList.add('hidden');
-  document.getElementById('navReplayBtn')?.classList.add('hidden');
+  document.getElementById('dashboardLink')?.classList.remove('hidden');
+  document.getElementById('navSetupBtn')?.classList.remove('hidden');
   document.getElementById('navShareBtn')?.classList.add('hidden');
-  setActiveView('control');
+  syncReplayNavVisibility();
   updateControlsLock();
 }
 
@@ -163,12 +158,13 @@ function isReplayEnabled(state = lastState) {
 }
 
 function syncReplayNavVisibility(state = lastState) {
-  if (isViewOnly) return;
-  if (isGuestMode && !isDockOwnerGuest) return;
+  if (isGuestMode && !isDockOwnerGuest && !isViewOnly) return;
   const enabled = isReplayEnabled(state);
   const replayBtn = document.getElementById('navReplayBtn');
   if (replayBtn) {
-    replayBtn.classList.toggle('hidden', !enabled);
+    // View-only platform admin can open Stream when the dock has replay enabled.
+    const showReplay = enabled && (isViewOnly || canUseAdminTabs());
+    replayBtn.classList.toggle('hidden', !showReplay);
   }
   if (!enabled && activeView === 'replay') {
     setActiveView('control');
@@ -179,13 +175,16 @@ function setActiveView(view) {
   if (view !== 'control' && view !== 'setup' && view !== 'replay' && view !== 'share') {
     view = 'control';
   }
-  if (isViewOnly) view = 'control';
-  if (isGuestMode && !isDockOwnerGuest && (view === 'replay' || view === 'share')) view = 'control';
+  // View-only: allow Control / Setup / Stream; block Share mutations.
+  if (isViewOnly && view === 'share') view = 'control';
+  if (isGuestMode && !isDockOwnerGuest && !isViewOnly && (view === 'replay' || view === 'share')) {
+    view = 'control';
+  }
   if (view === 'replay' && !isReplayEnabled()) view = 'control';
   activeView = view;
   show('viewControl', view === 'control');
-  show('viewSetup', view === 'setup' && !isViewOnly);
-  show('viewReplay', view === 'replay' && canUseAdminTabs() && isReplayEnabled() && !isViewOnly);
+  show('viewSetup', view === 'setup');
+  show('viewReplay', view === 'replay' && (isViewOnly || canUseAdminTabs()) && isReplayEnabled());
   show('viewShare', view === 'share' && canUseAdminTabs() && !isViewOnly);
 
   const controlBtn = document.getElementById('navControlBtn');
@@ -195,13 +194,14 @@ function setActiveView(view) {
   }
   const setupBtn = document.getElementById('navSetupBtn');
   if (setupBtn) {
-    setupBtn.classList.toggle('hidden', isViewOnly);
+    setupBtn.classList.toggle('hidden', false);
     setupBtn.classList.toggle('active', view === 'setup');
     setupBtn.setAttribute('aria-current', view === 'setup' ? 'page' : 'false');
   }
   const replayBtn = document.getElementById('navReplayBtn');
   if (replayBtn) {
-    replayBtn.classList.toggle('hidden', isViewOnly || !canUseAdminTabs() || !isReplayEnabled());
+    const showReplay = (isViewOnly || canUseAdminTabs()) && isReplayEnabled();
+    replayBtn.classList.toggle('hidden', !showReplay);
     replayBtn.classList.toggle('active', view === 'replay');
     replayBtn.setAttribute('aria-current', view === 'replay' ? 'page' : 'false');
   }
