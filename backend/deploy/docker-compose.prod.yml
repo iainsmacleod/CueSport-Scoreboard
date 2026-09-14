@@ -1,0 +1,10 @@
+# Production VPS overlay — use with the VPS update script:
+#   docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml up -d --build
+#
+# Publishes the app only on loopback so host Caddy can reverse_proxy 127.0.0.1:3000.
+# Do not use this overlay for local docker-compose on a workstation (keeps 4003:3000).
+
+services:
+  cuesport-cloud:
+    ports: !override
+      - "127.0.0.1:3000:3000"

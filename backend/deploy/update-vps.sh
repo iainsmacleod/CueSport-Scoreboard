@@ -18,6 +18,7 @@ BACKEND_DIR="${APP_DIR}/backend"
 DATA_DIR="${BACKEND_DIR}/data"
 ENV_FILE="${BACKEND_DIR}/.env"
 ENV_BACKUP="${HOME}/cuesport.env"
+PROD_COMPOSE="${BACKEND_DIR}/deploy/docker-compose.prod.yml"
 
 BRANCH="${1:-${BRANCH:-}}"
 if [[ -z "${BRANCH}" ]]; then
@@ -70,10 +71,40 @@ if [[ ! -f docker-compose.yml ]]; then
   exit 1
 fi
 
+COMPOSE_ARGS=(-f docker-compose.yml)
+if [[ -f "${PROD_COMPOSE}" ]]; then
+  echo "==> Using production port overlay (127.0.0.1:3000 for Caddy)"
+  COMPOSE_ARGS+=(-f deploy/docker-compose.prod.yml)
+else
+  echo "WARN: missing deploy/docker-compose.prod.yml — repo compose may bind :4003, not :3000" >&2
+fi
+# Optional host-specific overrides that survive git reset (untracked file).
+if [[ -f docker-compose.override.yml ]]; then
+  echo "==> Also applying local docker-compose.override.yml"
+  COMPOSE_ARGS+=(-f docker-compose.override.yml)
+fi
+
 echo "==> Building and recreating containers (data volume preserved)…"
-docker compose up -d --build --force-recreate
+docker compose "${COMPOSE_ARGS[@]}" up -d --build --force-recreate
+
+echo "==> Waiting for health…"
+ok=0
+for _ in $(seq 1 30); do
+  if curl -fsS http://127.0.0.1:3000/health >/dev/null 2>&1; then
+    ok=1
+    break
+  fi
+  sleep 1
+done
 
 echo "==> Done."
 echo "    SQLite data: ${DATA_DIR}"
-echo "    Health:      curl -fsS http://127.0.0.1:3000/health || true"
-docker compose ps
+if [[ "${ok}" -eq 1 ]]; then
+  echo "    Health:      OK (http://127.0.0.1:3000/health)"
+else
+  echo "    Health:      NOT OK on :3000 — check logs / port binding (502 from Caddy usually means this)." >&2
+  echo "    Diagnose:    docker compose ${COMPOSE_ARGS[*]} ps" >&2
+  echo "                 docker compose ${COMPOSE_ARGS[*]} logs --tail=80" >&2
+  echo "                 ss -tlnp | grep -E ':3000|:4003'" >&2
+fi
+docker compose "${COMPOSE_ARGS[@]}" ps

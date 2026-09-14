@@ -150,12 +150,14 @@ Google Client ID/Secret live in the **Supabase** dashboard, not in this file.
 
 ### Bind the app to localhost only
 
-In `docker-compose.yml`, publish the app only on the host loopback so Caddy is the public entry:
+The VPS update script applies `deploy/docker-compose.prod.yml`, which publishes:
 
 ```yaml
 ports:
   - "127.0.0.1:3000:3000"
 ```
+
+That matches host Caddy (`reverse_proxy 127.0.0.1:3000`). The base `docker-compose.yml` still uses `4003:3000` for local/dev — do not rely on that alone on the VPS or you will get **HTTP 502**.
 
 Keep inside the container:
 
@@ -164,13 +166,16 @@ PORT=3000
 HOST=0.0.0.0
 ```
 
-Do **not** deploy `docker-compose.override.yml` (dev mounts) on the VPS.
+Do **not** deploy `docker-compose.override.example.yml` mounts on the VPS.
 
 ```bash
-docker compose up -d --build
-docker compose ps
+cd /opt/cuesport/backend
+docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml ps
 curl -sS http://127.0.0.1:3000/health
 ```
+
+If you see **502** after an update: the app is probably only on `:4003` while Caddy still targets `:3000`. Re-run with the prod overlay (or `update-vps.sh`), then confirm `ss -tlnp | grep 3000`.
 
 ## 6. Supabase Auth (Google)
 
@@ -273,8 +278,8 @@ cd /opt/cuesport
 git fetch origin
 git checkout -B stripe-integration origin/stripe-integration
 git reset --hard origin/stripe-integration
-cd backend
-docker compose up -d --build --force-recreate
+cd /opt/cuesport/backend
+docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml up -d --build --force-recreate
 ```
 
 Optional: keep a copy of production env at `~/cuesport.env`. The script refreshes that backup from `backend/.env` when present, and restores it if `.env` is missing after a clone.
