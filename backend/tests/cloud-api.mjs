@@ -2179,6 +2179,12 @@ async function run() {
           'Admin list includes self',
           (listed.body.accounts || []).some((a) => a.id === accountId)
         );
+        const selfRow = (listed.body.accounts || []).find((a) => a.id === accountId);
+        assert(
+          'Admin list marks self as platform admin',
+          selfRow?.is_platform_admin === true,
+          JSON.stringify(selfRow)
+        );
         const detail = await fetchJson(`/api/admin/accounts/${accountId}`, {
           headers: { Authorization: `Bearer ${tokenFresh}` },
         });
@@ -2186,6 +2192,24 @@ async function run() {
           'Admin GET account detail',
           detail.ok && detail.body.account?.id === accountId && detail.body.quota?.limits,
           JSON.stringify(detail.body)
+        );
+        assert(
+          'Admin detail marks self as platform admin',
+          detail.body.account?.is_platform_admin === true
+        );
+        const selfTrialBlocked = await fetchJson(`/api/admin/accounts/${accountId}/trial`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${tokenFresh}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ days: 7 }),
+        });
+        assert(
+          'Admin cannot grant support trial on self',
+          selfTrialBlocked.status === 403
+            && selfTrialBlocked.body.code === 'admin_self_mutation_forbidden',
+          JSON.stringify(selfTrialBlocked.body)
         );
         const adminStats = await fetchJson(`/api/admin/accounts/${accountId}/stats`, {
           headers: { Authorization: `Bearer ${tokenFresh}` },
@@ -2280,7 +2304,20 @@ async function run() {
             && simReset.body.quota?.platform_admin_unlimited === true,
           JSON.stringify(simReset.body)
         );
-        const grant = await fetchJson(`/api/admin/accounts/${accountId}/trial`, {
+        const grantTargetId = crypto.randomUUID();
+        const grantTargetEmail = `admin-trial-target-${Date.now()}@example.com`;
+        {
+          const db = new Database(SQLITE_PATH);
+          try {
+            db.prepare(
+              `INSERT INTO accounts (id, email, subscription_tier, subscription_status)
+               VALUES (?, ?, 'streamer', 'inactive')`
+            ).run(grantTargetId, grantTargetEmail);
+          } finally {
+            db.close();
+          }
+        }
+        const grant = await fetchJson(`/api/admin/accounts/${grantTargetId}/trial`, {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${tokenFresh}`,
@@ -2293,7 +2330,7 @@ async function run() {
           grant.ok && !!grant.body.trial_ends_at,
           JSON.stringify(grant.body)
         );
-        const badDays = await fetchJson(`/api/admin/accounts/${accountId}/trial`, {
+        const badDays = await fetchJson(`/api/admin/accounts/${grantTargetId}/trial`, {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${tokenFresh}`,
@@ -2302,7 +2339,7 @@ async function run() {
           body: JSON.stringify({ days: 999 }),
         });
         assert('Admin trial days clamped 400', badDays.status === 400);
-        const endTrial = await fetchJson(`/api/admin/accounts/${accountId}/trial`, {
+        const endTrial = await fetchJson(`/api/admin/accounts/${grantTargetId}/trial`, {
           method: 'DELETE',
           headers: { Authorization: `Bearer ${tokenFresh}` },
         });

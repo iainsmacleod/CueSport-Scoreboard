@@ -121,6 +121,10 @@ let platformViewAccountId = '';
 const PLATFORM_VIEW_ALL = '__all__';
 let platformAccountsForFilter = [];
 let ownDashboardRooms = [];
+/** Near-live poll for platform-admin All accounts / other-tenant Tables view. */
+const PLATFORM_TABLES_POLL_MS = 8000;
+let platformTablesPollTimer = null;
+let platformTablesPollInFlight = false;
 
 function show(id, visible) {
   document.getElementById(id).classList.toggle('hidden', !visible);
@@ -413,6 +417,7 @@ function localSignOut({ clearServer = false } = {}) {
   if (clearServer) localStorage.removeItem(SERVER_KEY);
   wantLiveFeed = false;
   stopLiveFeed();
+  stopPlatformTablesPolling();
   lastTablesFingerprint = '';
   lastAccount = null;
   lastDashboardRooms = [];
@@ -479,6 +484,8 @@ function tablesFingerprint(rooms) {
   const active = (rooms || []).filter((room) => room.dock_connected);
   return JSON.stringify(active.map((room) => ({
     id: room.id,
+    account_id: room.account_id || room.accountId || null,
+    account_email: room.account_email || room.accountEmail || null,
     instance_key: room.instance_key || null,
     dock_label: room.dock_label || null,
     api_key_label: room.api_key_label || null,
@@ -1277,6 +1284,21 @@ function renderApiKeys(keys) {
   });
 }
 
+function getActiveDashTab() {
+  const active = document.querySelector('.dash-tab.active');
+  const tab = active?.dataset?.tab || 'tables';
+  if (tab === 'account') return 'settings';
+  return tab;
+}
+
+function updatePlatformAccountFilterVisibility(which = getActiveDashTab()) {
+  const filterBar = document.getElementById('platformAccountFilterBar');
+  if (!filterBar) return;
+  const tab = which === 'account' ? 'settings' : which;
+  const showFilter = isPlatformAdminUser && (tab === 'tables' || tab === 'stats');
+  filterBar.classList.toggle('hidden', !showFilter);
+}
+
 function setActiveDashTab(which) {
   if (which === 'admin' && !isPlatformAdminUser) {
     which = 'tables';
@@ -1288,6 +1310,8 @@ function setActiveDashTab(which) {
   show('tabStats', which === 'stats');
   show('tabSettings', which === 'settings' || which === 'account');
   show('tabAdmin', which === 'admin');
+  updatePlatformAccountFilterVisibility(which);
+  syncPlatformTablesPolling();
   if (which === 'stats') {
     selectedPlayerKey = '';
     playerDetailOpponentFilter = '';
@@ -1360,11 +1384,13 @@ function updatePlatformAccountFilterHint() {
     return;
   }
   if (isViewingAllAccounts()) {
-    hint.textContent = 'Viewing All accounts — live tables, matches, and players across tenants (read-only). Separate from Dock Key roles and subscription tiers.';
+    hint.textContent =
+      'Viewing All accounts — tables refresh every few seconds while this tab is open (read-only). Separate from Dock Key roles and subscription tiers.';
     return;
   }
   if (isViewingOtherAccount()) {
-    hint.textContent = `Viewing ${getPlatformViewAccountLabel()} — tables, matches, and players (read-only). Separate from Dock Key roles and subscription tiers.`;
+    hint.textContent =
+      `Viewing ${getPlatformViewAccountLabel()} — tables refresh every few seconds while this tab is open (read-only). Separate from Dock Key roles and subscription tiers.`;
     return;
   }
   hint.textContent = 'Platform admin: browse one customer or All accounts (tables, matches, players — read-only). Separate from Dock Key roles and subscription tiers.';
@@ -1423,13 +1449,49 @@ async function applyPlatformAccountFilter(accountId) {
   statsLoaded = false;
   statsData = null;
   await refreshTablesForCurrentView();
+  syncPlatformTablesPolling();
   const statsTab = document.getElementById('tabStats');
   if (statsTab && !statsTab.classList.contains('hidden')) {
     await loadAccountStats(true);
   }
 }
 
-async function refreshTablesForCurrentView() {
+function needsPlatformTablesPolling() {
+  if (!getToken() || !isPlatformAdminUser || document.hidden) return false;
+  if (!isViewingOtherAccount()) return false;
+  return getActiveDashTab() === 'tables';
+}
+
+function stopPlatformTablesPolling() {
+  if (platformTablesPollTimer) {
+    clearInterval(platformTablesPollTimer);
+    platformTablesPollTimer = null;
+  }
+  platformTablesPollInFlight = false;
+}
+
+function syncPlatformTablesPolling() {
+  if (!needsPlatformTablesPolling()) {
+    stopPlatformTablesPolling();
+    return;
+  }
+  if (platformTablesPollTimer) return;
+  platformTablesPollTimer = setInterval(() => {
+    if (!needsPlatformTablesPolling()) {
+      stopPlatformTablesPolling();
+      return;
+    }
+    if (platformTablesPollInFlight) return;
+    platformTablesPollInFlight = true;
+    refreshTablesForCurrentView({ silent: true })
+      .catch(() => { /* ignore background poll errors */ })
+      .finally(() => {
+        platformTablesPollInFlight = false;
+      });
+  }, PLATFORM_TABLES_POLL_MS);
+}
+
+async function refreshTablesForCurrentView({ silent = false } = {}) {
   if (!getToken()) return;
   if (isViewingAllAccounts()) {
     try {
@@ -1438,7 +1500,7 @@ async function refreshTablesForCurrentView() {
       renderTableCards(lastDashboardRooms);
       renderDebugRooms(ownDashboardRooms);
     } catch (err) {
-      setError(err.message || 'Failed to load all-account tables');
+      if (!silent) setError(err.message || 'Failed to load all-account tables');
     }
     return;
   }
@@ -1451,7 +1513,7 @@ async function refreshTablesForCurrentView() {
       renderTableCards(lastDashboardRooms);
       renderDebugRooms(ownDashboardRooms);
     } catch (err) {
-      setError(err.message || 'Failed to load account tables');
+      if (!silent) setError(err.message || 'Failed to load account tables');
     }
     return;
   }
@@ -1488,8 +1550,7 @@ function setPlatformAdminUi(enabled) {
   isPlatformAdminUser = !!enabled;
   const tabBtn = document.getElementById('dashAdminTabBtn');
   if (tabBtn) tabBtn.classList.toggle('hidden', !isPlatformAdminUser);
-  const filterBar = document.getElementById('platformAccountFilterBar');
-  if (filterBar) filterBar.classList.toggle('hidden', !isPlatformAdminUser);
+  updatePlatformAccountFilterVisibility();
   if (!isPlatformAdminUser) {
     platformViewAccountId = '';
     platformAccountsForFilter = [];
@@ -1512,6 +1573,7 @@ function setPlatformAdminUi(enabled) {
     if (!wasAdmin) platformViewAccountId = PLATFORM_VIEW_ALL;
     loadPlatformAccountFilterOptions().catch(() => {});
   }
+  syncPlatformTablesPolling();
 }
 
 async function loadAdminAccounts() {
@@ -1538,6 +1600,15 @@ async function loadAdminAccounts() {
   }
 }
 
+function isOwnAdminAccount(accountId) {
+  return !!(lastAccount?.id && accountId && lastAccount.id === accountId);
+}
+
+function adminTierLabel(account) {
+  if (account?.is_platform_admin) return 'Platform admin';
+  return account?.subscription_tier || '—';
+}
+
 function renderAdminAccountsTable() {
   const body = document.getElementById('adminAccountsBody');
   if (!body) return;
@@ -1545,17 +1616,22 @@ function renderAdminAccountsTable() {
     body.innerHTML = '<tr><td colspan="7">No accounts</td></tr>';
     return;
   }
-  body.innerHTML = adminAccountsCache.map((a) => `
-    <tr data-admin-account-id="${escapeHtml(a.id)}" class="${a.id === adminSelectedId ? 'admin-row-selected' : ''}" tabindex="0">
-      <td>${escapeHtml(a.email)}</td>
+  body.innerHTML = adminAccountsCache.map((a) => {
+    const classes = [];
+    if (a.id === adminSelectedId) classes.push('admin-row-selected');
+    if (isOwnAdminAccount(a.id)) classes.push('admin-row-self');
+    return `
+    <tr data-admin-account-id="${escapeHtml(a.id)}" class="${classes.join(' ')}" tabindex="0">
+      <td>${escapeHtml(a.email)}${isOwnAdminAccount(a.id) ? ' <span class="admin-self-badge">You</span>' : ''}</td>
       <td>${escapeHtml(a.subscription_status || '—')}</td>
-      <td>${escapeHtml(a.subscription_tier || '—')}</td>
+      <td>${escapeHtml(adminTierLabel(a))}</td>
       <td>${escapeHtml(formatSupportTrial(a.trial_ends_at))}</td>
       <td>${Number(a.api_key_count) || 0}</td>
       <td>${Number(a.room_count) || 0}</td>
       <td>${escapeHtml(a.last_activity_at ? formatLocalDate(a.last_activity_at) : '—')}</td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 }
 
 function closeAdminDetail() {
@@ -1583,18 +1659,13 @@ async function loadAdminAccountDetail(accountId) {
     const rooms = account.rooms || [];
     const keys = account.api_keys || [];
     const summary = stats?.summary || {};
-    body.innerHTML = `
-      <div class="admin-detail-meta">
-        <div><strong>Status:</strong> ${escapeHtml(account.subscription_status || '—')}</div>
-        <div><strong>Tier:</strong> ${escapeHtml(account.subscription_tier || '—')}</div>
-        <div><strong>Support trial:</strong> ${escapeHtml(formatSupportTrial(account.trial_ends_at))}</div>
-        <div><strong>Created:</strong> ${escapeHtml(account.created_at ? formatLocalDate(account.created_at) : '—')}</div>
-        <div><strong>Quota:</strong> ${
-          quota?.limits
-            ? `${quota.usage?.apiKeys ?? 0}/${quota.limits.maxApiKeys} keys · ${quota.usage?.rooms ?? 0}/${quota.limits.maxRooms} rooms`
-            : '—'
-        }</div>
-      </div>
+    const isSelf = isOwnAdminAccount(account.id);
+    const selfNote = isSelf
+      ? `<p class="hint admin-self-note">This is your platform admin account. Support actions are disabled here — manage keys and sessions in Settings.</p>`
+      : '';
+    const trialBlock = isSelf
+      ? ''
+      : `
       <h3 class="stats-section-title">Support trial</h3>
       <p class="hint">Time-boxed access override. Does not set a paid tier — Stripe owns product trials and billing.</p>
       <form class="admin-trial-form" id="adminGrantTrialForm">
@@ -1604,19 +1675,43 @@ async function loadAdminAccountDetail(accountId) {
         </label>
         <button type="submit" class="btn save dash-action-btn">Grant / extend</button>
         <button type="button" class="btn danger dash-action-btn" id="adminEndTrialBtn">End support trial</button>
-      </form>
+      </form>`;
+    const invalidateBtn = isSelf
+      ? ''
+      : '<button type="button" class="btn secondary dash-action-btn" id="adminInvalidateSessionsBtn">Invalidate sessions</button>';
+    const keyRows = keys.length
+      ? keys.map((k) => `
+          <li>
+            <span>${escapeHtml(k.label || k.id)} · ${escapeHtml(k.role || '')}</span>
+            ${isSelf ? '' : `<button type="button" class="btn danger dash-action-btn" data-admin-revoke-key="${escapeHtml(k.id)}">Revoke</button>`}
+          </li>
+        `).join('')
+      : '<li class="hint">No active keys</li>';
+    body.innerHTML = `
+      ${selfNote}
+      <div class="admin-detail-meta">
+        <div><strong>Status:</strong> ${escapeHtml(account.subscription_status || '—')}</div>
+        <div><strong>Tier:</strong> ${escapeHtml(adminTierLabel(account))}${
+          account.is_platform_admin && account.subscription_tier
+            ? ` <span class="hint">(billing field: ${escapeHtml(account.subscription_tier)})</span>`
+            : ''
+        }</div>
+        <div><strong>Support trial:</strong> ${escapeHtml(formatSupportTrial(account.trial_ends_at))}</div>
+        <div><strong>Created:</strong> ${escapeHtml(account.created_at ? formatLocalDate(account.created_at) : '—')}</div>
+        <div><strong>Quota:</strong> ${
+          quota?.limits
+            ? `${quota.usage?.apiKeys ?? 0}/${quota.limits.maxApiKeys == null ? '∞' : quota.limits.maxApiKeys} keys · ${quota.usage?.rooms ?? 0}/${quota.limits.maxRooms == null ? '∞' : quota.limits.maxRooms} rooms`
+            : '—'
+        }</div>
+      </div>
+      ${trialBlock}
       <div class="admin-detail-actions">
         <button type="button" class="btn secondary dash-action-btn" id="adminViewAccountDataBtn">View tables &amp; stats</button>
-        <button type="button" class="btn secondary dash-action-btn" id="adminInvalidateSessionsBtn">Invalidate sessions</button>
+        ${invalidateBtn}
       </div>
       <h3 class="stats-section-title">Dock keys</h3>
       <ul class="admin-key-list">
-        ${keys.length ? keys.map((k) => `
-          <li>
-            <span>${escapeHtml(k.label || k.id)} · ${escapeHtml(k.role || '')}</span>
-            <button type="button" class="btn danger dash-action-btn" data-admin-revoke-key="${escapeHtml(k.id)}">Revoke</button>
-          </li>
-        `).join('') : '<li class="hint">No active keys</li>'}
+        ${keyRows}
       </ul>
       <h3 class="stats-section-title">Rooms</h3>
       <ul class="admin-room-list">
@@ -1640,7 +1735,7 @@ async function loadAdminAccountDetail(accountId) {
 }
 
 async function adminGrantTrial(days) {
-  if (!adminSelectedId) return;
+  if (!adminSelectedId || isOwnAdminAccount(adminSelectedId)) return;
   await adminFetchJson(`/api/admin/accounts/${encodeURIComponent(adminSelectedId)}/trial`, {
     method: 'POST',
     body: JSON.stringify({ days }),
@@ -1649,7 +1744,7 @@ async function adminGrantTrial(days) {
 }
 
 async function adminEndTrial() {
-  if (!adminSelectedId) return;
+  if (!adminSelectedId || isOwnAdminAccount(adminSelectedId)) return;
   const ok = await confirmDashAction({
     title: 'End support trial',
     message: 'Clear the support trial for this account? Access falls back to Stripe subscription status.',
@@ -1664,7 +1759,7 @@ async function adminEndTrial() {
 }
 
 async function adminInvalidateSelectedSessions() {
-  if (!adminSelectedId) return;
+  if (!adminSelectedId || isOwnAdminAccount(adminSelectedId)) return;
   const ok = await confirmDashAction({
     title: 'Invalidate sessions',
     message: 'Sign this account out everywhere (dashboard and account mobile sessions)?',
@@ -1679,7 +1774,7 @@ async function adminInvalidateSelectedSessions() {
 }
 
 async function adminRevokeKey(keyId) {
-  if (!adminSelectedId || !keyId) return;
+  if (!adminSelectedId || !keyId || isOwnAdminAccount(adminSelectedId)) return;
   const ok = await confirmDashAction({
     title: 'Revoke dock key',
     message: 'Revoke this dock key and disconnect any dock using it?',
@@ -2042,7 +2137,7 @@ function isMatchInProgress(match) {
 
 function statsFromMatches(matches) {
   const playerMap = new Map();
-  function touch(id, name) {
+  function touch(id, name, meta = {}) {
     const display = String(name || '').trim();
     const key = String(id || '').trim() || display.toLowerCase();
     if (!key) return null;
@@ -2062,15 +2157,25 @@ function statsFromMatches(matches) {
         ballsPotted: 0,
         fouls: 0,
         lastPlayedAt: null,
+        accountId: meta.accountId || null,
+        accountEmail: meta.accountEmail || null,
       });
-    } else if (display) {
-      playerMap.get(key).name = display;
+    } else {
+      const existing = playerMap.get(key);
+      if (display) existing.name = display;
+      // Preserve All-accounts owner labels when rebuilding from matches.
+      if (!existing.accountEmail && meta.accountEmail) existing.accountEmail = meta.accountEmail;
+      if (!existing.accountId && meta.accountId) existing.accountId = meta.accountId;
     }
     return playerMap.get(key);
   }
   for (const match of matches) {
-    const p1 = touch(match.player1Id, match.player1Name);
-    const p2 = touch(match.player2Id, match.player2Name);
+    const meta = {
+      accountId: match.accountId || null,
+      accountEmail: match.accountEmail || null,
+    };
+    const p1 = touch(match.player1Id, match.player1Name, meta);
+    const p2 = touch(match.player2Id, match.player2Name, meta);
     if (!p1 || !p2) continue;
 
     if (match.scores && match.gameType !== 'game4') {
@@ -2126,7 +2231,18 @@ function applyStatsFilters(data) {
   }
   const filtered = statsFromMatches(matches);
   // Keep zero-stat roster players visible (and searchable by name).
-  const seen = new Set((filtered.players || []).map((p) => String(p.id)));
+  // Also restore account owner labels dropped when rebuilding from matches.
+  const byServerId = new Map((data.players || []).map((p) => [String(p?.id || ''), p]));
+  const seen = new Set();
+  for (const p of filtered.players || []) {
+    const id = String(p?.id || '').trim();
+    if (!id) continue;
+    seen.add(id);
+    const src = byServerId.get(id);
+    if (!src) continue;
+    if (!p.accountEmail && src.accountEmail) p.accountEmail = src.accountEmail;
+    if (!p.accountId && src.accountId) p.accountId = src.accountId;
+  }
   for (const p of data.players || []) {
     const id = String(p?.id || '').trim();
     if (!id || seen.has(id)) continue;
@@ -3371,6 +3487,7 @@ function stopLiveFeed() {
   wantLiveFeed = false;
   clearReconnect();
   reconnectAttempt = 0;
+  stopPlatformTablesPolling();
   if (dashClient) {
     try { dashClient.disconnect(); } catch (_) { /* ignore */ }
     dashClient = null;
@@ -3488,6 +3605,7 @@ async function renderDashboard() {
     wantLiveFeed = true;
     clearReconnect();
     connectLiveFeed().catch(() => {});
+    syncPlatformTablesPolling();
   } catch (err) {
     stopLiveFeed();
     localStorage.removeItem(TOKEN_KEY);
@@ -4375,12 +4493,17 @@ let liveFeedHiddenAt = 0;
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     liveFeedHiddenAt = Date.now();
+    stopPlatformTablesPolling();
     return;
   }
   const awayMs = liveFeedHiddenAt ? Date.now() - liveFeedHiddenAt : 0;
   liveFeedHiddenAt = 0;
   // After ~15s away, sockets are often dead without onclose — force a fresh join.
   ensureLiveFeed({ force: awayMs >= 15000 });
+  if (needsPlatformTablesPolling()) {
+    refreshTablesForCurrentView({ silent: true }).catch(() => {});
+  }
+  syncPlatformTablesPolling();
 });
 
 window.addEventListener('pageshow', (ev) => {

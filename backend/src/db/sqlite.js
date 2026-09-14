@@ -13,6 +13,7 @@ import {
   OBS_DOCK_OWNER_GUEST_LABEL,
   normalizeDockKeyRole,
 } from '../lib/dock-roles.js';
+import { isPlatformAdmin } from '../lib/platform-admin.js';
 
 function normalizePlayerName(name) {
   return normalizePlayerNameKey(name);
@@ -647,7 +648,7 @@ export function listAccountsForAdmin({ q = '', limit = 100 } = {}) {
 }
 
 function mapAdminAccountRow(row) {
-  return {
+  const account = {
     id: row.id,
     email: row.email,
     created_at: row.created_at,
@@ -661,6 +662,10 @@ function mapAdminAccountRow(row) {
     room_count: Number(row.room_count) || 0,
     guest_link_count: Number(row.guest_link_count) || 0,
     last_activity_at: row.last_dock_seen_at || null,
+  };
+  return {
+    ...account,
+    is_platform_admin: isPlatformAdmin(account),
   };
 }
 

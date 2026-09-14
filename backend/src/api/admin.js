@@ -37,6 +37,18 @@ function trialEndsIsoFromDays(days) {
   return new Date(ms).toISOString();
 }
 
+/** Block support mutations against the signed-in platform admin's own account. */
+function rejectSelfAccountAdminMutation(auth, accountId, reply) {
+  if (auth?.account?.id && accountId && auth.account.id === accountId) {
+    reply.code(403).send({
+      error: 'Cannot modify your own platform admin account from Admin. Use Settings instead.',
+      code: 'admin_self_mutation_forbidden',
+    });
+    return true;
+  }
+  return false;
+}
+
 function enrichAdminRoom(room) {
   const cleanupMs = getRoomCleanupAfter(room.id);
   const apiKeyId = resolveRoomApiKeyId(room.id, room.api_key_id);
@@ -167,6 +179,7 @@ export async function registerAdminRoutes(app) {
     if (!auth) return;
     const account = sqlite.getAccountById(request.params.id);
     if (!account) return reply.code(404).send({ error: 'Account not found' });
+    if (rejectSelfAccountAdminMutation(auth, account.id, reply)) return;
     const daysRaw = Number(request.body?.days);
     if (!Number.isFinite(daysRaw)) {
       return reply.code(400).send({ error: `days must be an integer from ${TRIAL_DAYS_MIN} to ${TRIAL_DAYS_MAX}` });
@@ -189,6 +202,7 @@ export async function registerAdminRoutes(app) {
     if (!auth) return;
     const account = sqlite.getAccountById(request.params.id);
     if (!account) return reply.code(404).send({ error: 'Account not found' });
+    if (rejectSelfAccountAdminMutation(auth, account.id, reply)) return;
     sqlite.setAccountTrialEndsAt(account.id, null);
     return {
       ok: true,
@@ -202,6 +216,7 @@ export async function registerAdminRoutes(app) {
     if (!auth) return;
     const account = sqlite.getAccountById(request.params.id);
     if (!account) return reply.code(404).send({ error: 'Account not found' });
+    if (rejectSelfAccountAdminMutation(auth, account.id, reply)) return;
     const updated = sqlite.invalidateAllSessions(account.id);
     const kicked = kickAccountAdminClients(account.id);
     return {
@@ -218,6 +233,7 @@ export async function registerAdminRoutes(app) {
     const { id: accountId, keyId } = request.params;
     const account = sqlite.getAccountById(accountId);
     if (!account) return reply.code(404).send({ error: 'Account not found' });
+    if (rejectSelfAccountAdminMutation(auth, account.id, reply)) return;
     const ok = sqlite.revokeApiKey(keyId, accountId);
     if (!ok) return reply.code(404).send({ error: 'API key not found' });
     const { kicked, roomDeleted } = revokeApiKeySeat(keyId);
