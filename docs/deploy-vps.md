@@ -252,14 +252,34 @@ ufw status verbose   # allow 80/443 if ufw is active
 
 Refresh the dock after updating local scoreboard files so it picks up script/config changes.
 
-## 9. Updates
+## 9. Updates / branch switches
+
+**Do not** wipe `/opt/cuesport` on every deploy — that deletes `backend/data/` (accounts, Dock Keys, stats).
+
+Use the helper script (preserves SQLite + `.env`, then rebuilds Compose):
+
+```bash
+# Interactive branch prompt (default: stripe-integration)
+sudo bash /opt/cuesport/backend/deploy/update-vps.sh
+
+# Or pass a branch
+sudo bash /opt/cuesport/backend/deploy/update-vps.sh main
+```
+
+Equivalent manual steps:
 
 ```bash
 cd /opt/cuesport
-git pull
+git fetch origin
+git checkout -B stripe-integration origin/stripe-integration
+git reset --hard origin/stripe-integration
 cd backend
-docker compose up -d --build
+docker compose up -d --build --force-recreate
 ```
+
+Optional: keep a copy of production env at `~/cuesport.env`. The script refreshes that backup from `backend/.env` when present, and restores it if `.env` is missing after a clone.
+
+**First install only** (empty `/opt/cuesport`): clone once, create `.env`, then `docker compose up -d --build`. For disaster recovery, back up `backend/data/` and `.env` before wiping the tree, then restore both after clone.
 
 ## 10. Backups and ops
 
