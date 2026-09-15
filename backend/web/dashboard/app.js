@@ -700,7 +700,7 @@ function renderBillingPanel(account, billingMeta, plansPayload) {
 
   if (statusEl) {
     if (account?.needs_plan) {
-      statusEl.textContent = 'Choose a plan to start your 30-day trial (card required). Access begins immediately after Checkout.';
+      statusEl.textContent = 'Choose a plan to start your 14-day trial (card required). Access begins immediately after Checkout.';
     } else {
       statusEl.textContent = `Current: ${display}${trialBadge} (${status}). Manage payment methods and cancellation in the Stripe Customer Portal.`;
     }

@@ -1,4 +1,4 @@
-# CueSport Cloud Backend
+# CueSport Scoreboard Cloud Backend
 
 Self-hostable cloud relay for [CueSport Scoreboard](../README.md): room-based WebSocket hub, Google OAuth (via Supabase), mobile remote control, match event logging, and public stream listing.
 
@@ -52,7 +52,7 @@ docker build -f backend/Dockerfile -t cuesport-cloud:latest .
 
 ### Hosted (Google sign-in)
 
-1. Enable **CueSport Cloud** in the control panel Replay/Share tab.
+1. Enable **CueSport Scoreboard Cloud** in the control panel Replay/Share tab.
 2. Click **Sign in with Google** (or use dev login on local backend).
 3. Toggle cloud relay on.
 
@@ -88,7 +88,7 @@ See [`.env.example`](.env.example).
 | `STRIPE_SECRET_KEY` | Stripe secret key (managed billing; leave empty on self-host) |
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret |
 | `STRIPE_PRICE_STREAMER` / `STRIPE_PRICE_TOURNAMENT_ORGANIZER` / `STRIPE_PRICE_LEAGUE_DIRECTOR` | Stripe Price IDs for self-serve tiers |
-| `STRIPE_TRIAL_DAYS` | Checkout trial length (default `30`) |
+| `STRIPE_TRIAL_DAYS` | Checkout trial length (default `14`) |
 | `BILLING_CONTACT_URL` | Contact CTA for Network Organization (e.g. `mailto:…`) |
 | `SUPPORT_ISSUES_URL` / `LEGAL_CONTACT_EMAIL` / `LEGAL_ENTITY_NAME` / `LEGAL_GOVERNING_LAW` | Legal page placeholders (`/terms`, `/privacy`) |
 | `ROOM_CLEANUP_GRACE_MS` | After last dock leaves, wait before deleting the room (default 45m) |
@@ -130,7 +130,7 @@ On first Google sign-in, the server links `auth.users.id` to an `accounts` row. 
 5. Enable Customer Portal (cancel / payment method / switch among the three self-serve prices).
 6. Local testing: `stripe listen --forward-to localhost:3000/api/stripe/webhook`.
 
-Checkout uses a **30-day card-required trial** (`STRIPE_TRIAL_DAYS`). Status becomes `trialing`, then `active`. Cancel/manage via Customer Portal.
+Checkout uses a **14-day card-required trial** (`STRIPE_TRIAL_DAYS`). Status becomes `trialing`, then `active`. Cancel/manage via Customer Portal.
 
 Legal templates: `/terms` and `/privacy` (replace placeholders; obtain counsel review before commercial reliance).
 
@@ -148,7 +148,7 @@ Paid tiers are **not** edited by the admin UI; product free trials belong on Str
 
 ## WebSocket protocol
 
-Clients send `join` then `event`, `command`, `state`, or `session` messages. See the [CueSport Cloud plan](../docs/) or root README for full schema.
+Clients send `join` then `event`, `command`, `state`, or `session` messages. See the [CueSport Scoreboard Cloud plan](../docs/) or root README for full schema.
 
 **Guest links** (`join` with `guest_token`): reusable until revoked, but only **one live WebSocket per token**. A second concurrent join receives `guest_link_in_use`. Guests may score with the same action balls as the dock for that game (`pool_foul` / `snooker_foul` / `undo`; free ball via `snooker_ball` on Snooker; `respot_ball` on Bank / One Pocket), change game setup (`set_game_type`, ball variant / early-game / golden ball / point-based, race, event info), and match controls (`reset_scores` / `end_match` / `call_match_early`); names and replay stay forbidden.
 

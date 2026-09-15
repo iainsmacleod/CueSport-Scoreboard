@@ -25,6 +25,6 @@ Output files:
 |------|---------|
 | `01-control-panel-setup.png` | Setup tab |
 | `02-control-panel-controls.png` | Controls tab (ball scoring) |
-| `03-control-panel-cloud.png` | Replay/Share + CueSport Cloud |
+| `03-control-panel-cloud.png` | Replay/Share + CueSport Scoreboard Cloud |
 | `04-cloud-dashboard.png` | Cloud dashboard (Tables) |
 | `05-cloud-mobile-control.png` | Mobile remote control |

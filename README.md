@@ -36,7 +36,7 @@ Display player names, race and game info, racks (and balls where needed), logos,
   - [Settings](#settings)
 - [OBS WebSocket Setup](#obs-websocket-setup)
 - [Instant Replay](#instant-replay)
-- [CueSport Cloud](#cuesport-cloud)
+- [CueSport Scoreboard Cloud](#cuesport-scoreboard-cloud)
   - [Plans & products (hosted)](#plans--products-hosted)
 - [Stream Promotion](#stream-promotion)
 - [Player Statistics](#player-statistics)
@@ -85,7 +85,7 @@ CueSport Scoreboard is two HTML pages that talk to each other (and optionally to
 4. For **instant replay** and **stream promotion**, the dock also connects to **OBS WebSocket**.
 5. **Player statistics** are stored separately in **IndexedDB** (`cuesport_stats`) so match history survives clearing scoreboard settings.
 
-You do not need a public server for the scoreboard itself. Local files or a tiny local HTTP server are enough. **CueSport Cloud** (optional) adds remote mobile control, a web dashboard, and guest scorer links via the [`backend/`](backend/) relay — see [CueSport Cloud](#cuesport-cloud). Stream promotion is optional and only sends match metadata (not video or audio) when you enable it.
+You do not need a public server for the scoreboard itself. Local files or a tiny local HTTP server are enough. **CueSport Scoreboard Cloud** (optional) adds remote mobile control, a web dashboard, and guest scorer links via the [`backend/`](backend/) relay — see [CueSport Scoreboard Cloud](#cuesport-scoreboard-cloud). Stream promotion is optional and only sends match metadata (not video or audio) when you enable it.
 
 ---
 
@@ -101,19 +101,19 @@ You do not need a public server for the scoreboard itself. Local files or a tiny
 
 ![Control panel — Controls tab with ball scoring](docs/readme/images/02-control-panel-controls.png)
 
-**Replay/Share** — OBS WebSocket, **CueSport Cloud** relay, and stream promotion.
+**Replay/Share** — OBS WebSocket, **CueSport Scoreboard Cloud** relay, and stream promotion.
 
-![Control panel — Replay/Share tab with CueSport Cloud](docs/readme/images/03-control-panel-cloud.png)
+![Control panel — Replay/Share tab with CueSport Scoreboard Cloud](docs/readme/images/03-control-panel-cloud.png)
 
-### CueSport Cloud (optional)
+### CueSport Scoreboard Cloud (optional)
 
 **Dashboard** — live tables when an OBS dock is connected (WebSocket push, no polling).
 
-![CueSport Cloud dashboard — Tables tab](docs/readme/images/04-cloud-dashboard.png)
+![CueSport Scoreboard Cloud dashboard — Tables tab](docs/readme/images/04-cloud-dashboard.png)
 
 **Mobile control** — phone/tablet remote at `/m/{room_id}`; guests use `/g/{token}` (score with game-type action balls + game setup + Restart/End/Call Match; one device per link). Standard guests have no names / Stream / Share. An **OBS Dock Owner** guest link is elevated (Stream + Share + owner commands).
 
-![CueSport Cloud mobile control](docs/readme/images/05-cloud-mobile-control.png)
+![CueSport Scoreboard Cloud mobile control](docs/readme/images/05-cloud-mobile-control.png)
 
 Regenerate these images anytime: [`docs/readme/README.md`](docs/readme/README.md).
 
@@ -229,7 +229,7 @@ Details: [OBS WebSocket Setup](#obs-websocket-setup), [Instant Replay](#instant-
 
 ## OBS WebSocket Setup
 
-WebSocket is required for **instant replay** and for **stream promotion** (so the dock can tell whether OBS is streaming). **Promote Live Stream** also requires **CueSport Cloud** connected with an OBS Dock Key — listing flags are published via Cloud `state` (no separate stream WebSocket).
+WebSocket is required for **instant replay** and for **stream promotion** (so the dock can tell whether OBS is streaming). **Promote Live Stream** also requires **CueSport Scoreboard Cloud** connected with an OBS Dock Key — listing flags are published via Cloud `state` (no separate stream WebSocket).
 
 ### Enable the server in OBS
 
@@ -295,9 +295,9 @@ Click **Update Sources** after editing names. Names must match OBS **exactly** (
 
 ---
 
-## CueSport Cloud
+## CueSport Scoreboard Cloud
 
-Optional **remote mobile control**, **web dashboard**, **guest scorer links**, **match event logging**, and **public stream listing** via the CueSport Cloud backend ([`backend/`](backend/)). Self-host for free (GPL) or use the hosted service at **[https://cuesport.macleod.systems](https://cuesport.macleod.systems)**.
+Optional **remote mobile control**, **web dashboard**, **guest scorer links**, **match event logging**, and **public stream listing** via the CueSport Scoreboard Cloud backend ([`backend/`](backend/)). Self-host for free (GPL) or use the hosted service at **[https://cuesport.macleod.systems](https://cuesport.macleod.systems)**.
 
 The OBS **dock remains the scoring authority**. Mobile and guest clients send commands through the cloud relay; the dock executes them with the same logic as the control panel, then publishes state back to all connected clients.
 
@@ -327,7 +327,7 @@ The OBS **dock remains the scoring authority**. Mobile and guest clients send co
 - **Tables = Dock Keys** — each **OBS Dock Key** is one table seat. Cloud rooms are keyed by Dock Key (`api_key_id`), not by the dock’s local `?instance=` query (instance still isolates localStorage / BroadcastChannel on that machine). Two keys with the same instance create two rooms; one key is one table.
 - **Mobile join** — the first mobile/guest control client can auto-enable both players, Show Scores, and Ball Scoring on the dock when those were off (scoring prerequisites for remote control).
 - **Event Info** — optional dock Event Information text is stored on cloud matches and shown in the dashboard Event column (preferred over room/table labels for match context)
-- **Google sign-in** (hosted account) **plus an OBS Dock Key** for each table seat (same seat model as self-host) via CueSport Cloud **Connection settings** (⚙) in Replay/Share
+- **Google sign-in** (hosted account) **plus an OBS Dock Key** for each table seat (same seat model as self-host) via CueSport Scoreboard Cloud **Connection settings** (⚙) in Replay/Share
 - **Account → Rooms (debug)** — list all persisted rooms (online/offline) and manually delete a room without wiping match history
 
 ### Quick start (self-host)
@@ -349,8 +349,8 @@ docker compose up -d --build
 ```
 
 1. Open **http://localhost:3000/dashboard** (or **:4003** with Docker) and **dev sign-in** with your `DEV_AUTH_SECRET` (requires `DEV_AUTH_ACCOUNT_EMAIL` in `.env` too).
-2. Create an **OBS Dock Key** per table (**Streamer**: 2 seats by default — see [Plans & products](#plans--products-hosted)). Paste each key into that dock’s CueSport Cloud **Connection settings** (⚙) — managed or Self-hosting. Each key may only be connected on one dock at a time. **One Dock Key = one cloud table**; rooms are created automatically when the dock connects (local `?instance=` does not create separate cloud tables).
-3. Enable the **CueSport Cloud** toggle on the dock.
+2. Create an **OBS Dock Key** per table (**Streamer**: 2 seats by default — see [Plans & products](#plans--products-hosted)). Paste each key into that dock’s CueSport Scoreboard Cloud **Connection settings** (⚙) — managed or Self-hosting. Each key may only be connected on one dock at a time. **One Dock Key = one cloud table**; rooms are created automatically when the dock connects (local `?instance=` does not create separate cloud tables).
+3. Enable the **CueSport Scoreboard Cloud** toggle on the dock.
 4. On your phone, open **http://localhost:3000/m/{room_id}** — if you already signed in on the dashboard in the same browser, tap **Connect**; on a new device, enter the dev secret once (it is saved for next time).
 5. Optional: from mobile **Share**, create a **guest link** (`/g/{token}`) for helpers. Guests can score with the same action balls as the dock for that game (foul, undo, free ball on Snooker, respot on Bank/One Pocket), change game setup (type + options, race, event info), and Restart/End/Call Match, but cannot edit names. Standard guests cannot use Stream/Share; an **OBS Dock Owner** guest link can. Only one device may use a given guest link at once; revoke the link when you want it invalidated.
 
@@ -376,7 +376,7 @@ Use these **product names** in Stripe (and in the dashboard billing UI). Interna
 2. Put the Price IDs in `.env` as `STRIPE_PRICE_STREAMER`, `STRIPE_PRICE_TOURNAMENT_ORGANIZER`, `STRIPE_PRICE_LEAGUE_DIRECTOR`.
 3. Webhook: `{PUBLIC_URL}/api/stripe/webhook` — `checkout.session.completed`, `customer.subscription.*`, `invoice.paid`, `invoice.payment_failed`.
 4. Customer Portal: cancel at period end; allow switching among those three prices.
-5. Checkout uses a **30-day card-required trial** (`STRIPE_TRIAL_DAYS`, default 30) → account `trialing`, then `active`.
+5. Checkout uses a **14-day card-required trial** (`STRIPE_TRIAL_DAYS`, default 14) → account `trialing`, then `active`.
 6. New Google accounts start `inactive` until Checkout (or an admin **support trial**).
 
 Caps are overridable via `TIER_{TIER}_MAX_*` or `TIER_LIMITS_JSON` — see [`backend/.env.example`](backend/.env.example).
@@ -387,7 +387,7 @@ Caps are overridable via `TIER_{TIER}_MAX_*` or `TIER_LIMITS_JSON` — see [`bac
 |---|--------|-----------|
 | Auth | Google for account + OBS Dock Key per dock | Dev secret on dashboard; OBS Dock Key + server URL in dock Connection settings → Self-hosting |
 | Backend | `cuesport.macleod.systems` | Your own `backend/` deployment |
-| Cost | **Streamer** / **Tournament Organizer** / **League Director** via Stripe Checkout (30-day trial); **Network Organization** by contact; platform admins can grant a time-boxed **support trial** | Free (you run the server; default **Self-host** caps = Streamer) |
+| Cost | **Streamer** / **Tournament Organizer** / **League Director** via Stripe Checkout (14-day trial); **Network Organization** by contact; platform admins can grant a time-boxed **support trial** | Free (you run the server; default **Self-host** caps = Streamer) |
 | Platform admin | `PLATFORM_ADMIN_EMAILS` allowlist → Admin tab + `/api/admin/*` | Usually unused; same env var works if you want it |
 
 ---
@@ -400,7 +400,7 @@ Optional listing on **[https://cuesport.macleod.systems](https://cuesport.macleo
 
 1. Connect **OBS WebSocket** (promotion uses it to detect streaming).
 2. In **Replay/Share**, turn on **Promote Live Stream** while OBS is live. CueSport tries to read the public watch URL from OBS first (e.g. Twitch channel). If OBS cannot provide one, open Stream Promotion **⚙** and set a manual **Stream URL** (`http://` or `https://`).
-3. Keep CueSport Cloud connected with an OBS Dock Key so the listing can publish.
+3. Keep CueSport Scoreboard Cloud connected with an OBS Dock Key so the listing can publish.
 4. **Start streaming in OBS.** Promotion only stays connected while OBS reports an active stream.
 
 ### What is shared
@@ -589,7 +589,7 @@ From the project root:
 python -m http.server 8765
 ```
 
-Open `http://localhost:8765/tests/smoke_test.html` and click **Run all tests**. Coverage includes core wiring and version; Setup (**Game Selection** / **Event Information**, player details, game-variant option integrity); dock **zoom** and **tab** persistence; Stats tab restore; **Manual Adjustments** layout (chosen ball placement, player-tracking block visibility); Show Scores / Ball Scoring preference handling; **Stats Overlay gated on Ball Scoring**; Stats tab (Player Stats, Import / Export / Clear, per-game overlay visibility toggles); **OverlayVisibility** (stats toggles through initial build, broadcast rebuild, and Snooker live publish); overlay mode toggles and payload sync; stats APIs and match history; live H2H / in-progress match editing; **Breaking Player?** / **Active Player** (all game types with Ball Scoring on, section hidden when off, race-complete lock, player switching, International Red/Yellow auto-assign); Snooker (frames/points, Golden Ball, fouls, Free Ball, undo stack, scoring lock, overlay Display Balls rules); Ball Scoring rack wins (8/9/10-ball including **Break & Run** / **Table Run** rack flags and career totals, **Win on Break B&R with Ball Set off / stale group awarding the breaker not the opponent**, Straight 14.1 re-rack, Bank/One Pocket); **Call Match Early** modal copy; replay clip delete note; **CueSport Cloud** dock modules (credentials, mobile scoring prerequisites, guest setup command handlers, **Kill / `abandon_match`** clear + Setup tab + in-page modal); **Clear Game** / `resetCurrentGame` returning to Setup; and related UI labels.
+Open `http://localhost:8765/tests/smoke_test.html` and click **Run all tests**. Coverage includes core wiring and version; Setup (**Game Selection** / **Event Information**, player details, game-variant option integrity); dock **zoom** and **tab** persistence; Stats tab restore; **Manual Adjustments** layout (chosen ball placement, player-tracking block visibility); Show Scores / Ball Scoring preference handling; **Stats Overlay gated on Ball Scoring**; Stats tab (Player Stats, Import / Export / Clear, per-game overlay visibility toggles); **OverlayVisibility** (stats toggles through initial build, broadcast rebuild, and Snooker live publish); overlay mode toggles and payload sync; stats APIs and match history; live H2H / in-progress match editing; **Breaking Player?** / **Active Player** (all game types with Ball Scoring on, section hidden when off, race-complete lock, player switching, International Red/Yellow auto-assign); Snooker (frames/points, Golden Ball, fouls, Free Ball, undo stack, scoring lock, overlay Display Balls rules); Ball Scoring rack wins (8/9/10-ball including **Break & Run** / **Table Run** rack flags and career totals, **Win on Break B&R with Ball Set off / stale group awarding the breaker not the opponent**, Straight 14.1 re-rack, Bank/One Pocket); **Call Match Early** modal copy; replay clip delete note; **CueSport Scoreboard Cloud** dock modules (credentials, mobile scoring prerequisites, guest setup command handlers, **Kill / `abandon_match`** clear + Setup tab + in-page modal); **Clear Game** / `resetCurrentGame` returning to Setup; and related UI labels.
 
 **Run everything** (API + smoke + cloud relay) with Cloud already up:
 
@@ -602,7 +602,7 @@ node run-all.mjs     # or: .\run-all.ps1
 
 Reads `DEV_AUTH_SECRET` from `backend/.env`. Options: `--skip-api`, `--skip-smoke`, `--skip-relay`, `--headed`, `--dev-secret=…`.
 
-**CueSport Cloud** (requires `backend` running on port 3000 or 4003):
+**CueSport Scoreboard Cloud** (requires `backend` running on port 3000 or 4003):
 
 - API/WebSocket (headless): `cd backend && npm test` (or `npm test -- http://localhost:4003`) — includes guest link create/join, **single-session** rejection, reconnect after close, revoke-all kick, **Kill / abandon** of in-progress matches (`dockNotified` + `abandon_match` relay when a dock is connected), **tier catalog** (`streamer` / `tournament_organizer` / `league_director`), **billing plans / checkout gates**, `/terms`+`/privacy` AI disclosure, and subscription inactive dock-key / WS gates
 - Browser relay tests: `http://localhost:8765/tests/cloud_relay_test.html` (`?server=…&dev_secret=…`) — dock/mobile join, command relay, guest allowlist + single-session

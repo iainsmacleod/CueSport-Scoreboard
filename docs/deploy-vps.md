@@ -1,6 +1,6 @@
-# CueSport Cloud — VPS deployment
+# CueSport Scoreboard Cloud — VPS deployment
 
-Guide for hosting the managed CueSport Cloud backend on a single Linux VPS with **Docker Compose**, **Caddy** (HTTPS), **SQLite** (app data), and **Supabase Auth** (Google sign-in).
+Guide for hosting the managed CueSport Scoreboard Cloud backend on a single Linux VPS with **Docker Compose**, **Caddy** (HTTPS), **SQLite** (app data), and **Supabase Auth** (Google sign-in).
 
 This is the recommended soft-launch / early SaaS layout. App data stays on the VPS; Supabase is identity only (not your product database).
 
@@ -16,7 +16,7 @@ Users / OBS / Mobile
   Caddy (:80 / :443)     ← Let’s Encrypt certs
         │
         ▼
-  127.0.0.1:3000         ← Docker (CueSport Cloud)
+  127.0.0.1:3000         ← Docker (CueSport Scoreboard Cloud)
         │
         ├── SQLite volume (accounts, keys, rooms, events)
         └── Supabase Auth (verify Google JWTs)
@@ -119,7 +119,7 @@ nslookup cuesport.example.com 8.8.8.8
 
 If you use Pi-hole, **flush the DNS cache** (not only the network table) after changing records.
 
-## 5. Deploy CueSport Cloud
+## 5. Deploy CueSport Scoreboard Cloud
 
 ```bash
 mkdir -p /opt/cuesport
@@ -201,7 +201,7 @@ Expect non-null `supabaseUrl` and `supabasePublishableKey`.
 | Dock “Dev login — enter secret” instead of Google | Dock can’t see publishable config (wrong server URL or stale dock JS) — refresh dock; check `/api/config/public` |
 | Redirect errors from Supabase | Redirect URL allowlist / `PUBLIC_URL` mismatch |
 
-New Google accounts on managed cloud (`ALLOW_DEV_AUTH=false`) are created in **SQLite** with `subscription_status=inactive` until Stripe Checkout (30-day card-required trial → `trialing` / `active`). Existing `active` accounts are grandfathered. Product defaults are **not** configured in Supabase.
+New Google accounts on managed cloud (`ALLOW_DEV_AUTH=false`) are created in **SQLite** with `subscription_status=inactive` until Stripe Checkout (14-day card-required trial → `trialing` / `active`). Existing `active` accounts are grandfathered. Product defaults are **not** configured in Supabase.
 
 ### Stripe billing (production)
 
@@ -214,7 +214,7 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 STRIPE_PRICE_STREAMER=price_...
 STRIPE_PRICE_TOURNAMENT_ORGANIZER=price_...
 STRIPE_PRICE_LEAGUE_DIRECTOR=price_...
-STRIPE_TRIAL_DAYS=30
+STRIPE_TRIAL_DAYS=14
 BILLING_CONTACT_URL=mailto:you@example.com
 LEGAL_CONTACT_EMAIL=you@example.com
 LEGAL_ENTITY_NAME=Your legal entity name
@@ -252,7 +252,7 @@ ufw status verbose   # allow 80/443 if ufw is active
 
 1. Sign in at `https://cuesport.example.com/dashboard` (or Settings after login).
 2. Create an **OBS Dock Key**.
-3. In the OBS CueSport dock → CueSport Cloud → paste the key → Enable.
+3. In the OBS CueSport dock → CueSport Scoreboard Cloud → paste the key → Enable.
 4. Dock “Sign in with Google” opens the hosted dashboard; **Cloud scoring uses the Dock Key**.
 
 Refresh the dock after updating local scoreboard files so it picks up script/config changes.

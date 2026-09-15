@@ -53,7 +53,7 @@ export const config = {
   stripePriceStreamer: process.env.STRIPE_PRICE_STREAMER || '',
   stripePriceTournamentOrganizer: process.env.STRIPE_PRICE_TOURNAMENT_ORGANIZER || '',
   stripePriceLeagueDirector: process.env.STRIPE_PRICE_LEAGUE_DIRECTOR || '',
-  stripeTrialDays: Math.max(0, parseInt(process.env.STRIPE_TRIAL_DAYS || '30', 10) || 30),
+  stripeTrialDays: Math.max(0, parseInt(process.env.STRIPE_TRIAL_DAYS || '14', 10) || 14),
   billingContactUrl: process.env.BILLING_CONTACT_URL || '',
   supportIssuesUrl: process.env.SUPPORT_ISSUES_URL
     || 'https://github.com/iainsmacleod/CueSport-Scoreboard/issues',
