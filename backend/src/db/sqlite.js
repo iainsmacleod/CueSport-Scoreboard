@@ -588,6 +588,19 @@ export function revokeApiKey(keyId, accountId) {
   return result.changes > 0;
 }
 
+/** Revoke every active Dock Key for an account. Returns revoked key ids. */
+export function revokeAllApiKeysForAccount(accountId) {
+  const keys = getDb().prepare(
+    `SELECT id FROM api_keys WHERE account_id = ? AND revoked_at IS NULL`
+  ).all(accountId);
+  if (!keys.length) return [];
+  getDb().prepare(
+    `UPDATE api_keys SET revoked_at = datetime('now')
+     WHERE account_id = ? AND revoked_at IS NULL`
+  ).run(accountId);
+  return keys.map((k) => k.id);
+}
+
 export function listGuestTokensForAccount(accountId) {
   return getDb().prepare(
     `SELECT g.token, g.room_id, g.label, g.created_at, r.label AS room_label

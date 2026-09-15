@@ -1821,7 +1821,7 @@ async function loadAdminAccountDetail(accountId) {
       ? ''
       : `
       <h3 class="stats-section-title">Complimentary access</h3>
-      <p class="hint">Outside Stripe — no credit card, not billed. Grants Cloud access until the end date. Does not create a subscription.</p>
+      <p class="hint">Outside Stripe — no credit card, not billed. Grants Cloud access until the end date. Does not create a subscription. Revoking without an active Stripe plan also revokes all Dock Keys.</p>
       <form class="admin-trial-form" id="adminGrantTrialForm">
         <label>
           Tier
@@ -1916,7 +1916,7 @@ async function adminEndTrial() {
   if (!adminSelectedId || isOwnAdminAccount(adminSelectedId)) return;
   const ok = await confirmDashAction({
     title: 'Revoke complimentary access',
-    message: 'Clear complimentary access for this account? Access falls back to Stripe subscription status (or inactive if they have no plan).',
+    message: 'Clear complimentary access for this account? If they have no active Stripe subscription, all Dock Keys will be revoked and connected docks disconnected. Access falls back to Stripe status otherwise.',
     confirmLabel: 'Revoke access',
     danger: true,
   });

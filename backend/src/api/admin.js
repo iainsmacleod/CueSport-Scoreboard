@@ -11,6 +11,7 @@ import {
   getRoomCleanupAfter,
   resolveRoomApiKeyId,
 } from '../ws/room-hub.js';
+import { hasCloudSubscriptionAccess } from '../lib/subscription-access.js';
 
 const TRIAL_DAYS_MIN = 1;
 const TRIAL_DAYS_MAX = 90;
@@ -229,10 +230,22 @@ export async function registerAdminRoutes(app) {
     const account = sqlite.getAccountById(request.params.id);
     if (!account) return reply.code(404).send({ error: 'Account not found' });
     if (rejectSelfAccountAdminMutation(auth, account.id, reply)) return;
-    sqlite.clearAccountComplimentaryAccess(account.id);
+    const updated = sqlite.clearAccountComplimentaryAccess(account.id);
+    let revokedKeyIds = [];
+    let seatsKicked = 0;
+    // No Stripe (or other) access left → revoke Dock Keys and disconnect seats.
+    if (!hasCloudSubscriptionAccess(updated)) {
+      revokedKeyIds = sqlite.revokeAllApiKeysForAccount(account.id);
+      for (const keyId of revokedKeyIds) {
+        const { kicked } = revokeApiKeySeat(keyId);
+        seatsKicked += kicked;
+      }
+    }
     return {
       ok: true,
       trial_ends_at: null,
+      keys_revoked: revokedKeyIds.length,
+      seats_kicked: seatsKicked,
       account: sqlite.getAccountAdminDetail(account.id),
     };
   });

@@ -180,7 +180,7 @@ This backend is GPL-licensed alongside the scoreboard. You may run your own inst
 | GET | `/api/admin/accounts/:id/tables` | Platform admin: live tables for a tenant |
 | GET | `/api/admin/accounts/:id/players` | Platform admin: player search for a tenant |
 | POST | `/api/admin/accounts/:id/trial` | Platform admin: give complimentary access `{ days: 1–90, tier }` |
-| DELETE | `/api/admin/accounts/:id/trial` | Platform admin: revoke complimentary access |
+| DELETE | `/api/admin/accounts/:id/trial` | Platform admin: revoke complimentary access (also revokes Dock Keys if no Stripe access remains) |
 | POST | `/api/admin/accounts/:id/invalidate-sessions` | Platform admin: sign out everywhere for tenant |
 | POST | `/api/admin/accounts/:id/api-keys/:keyId/revoke` | Platform admin: revoke dock key |
 | POST | `/api/api-keys` | Create API key (tier-limited; requires active/trialing access on managed) |
