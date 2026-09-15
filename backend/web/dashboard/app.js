@@ -841,11 +841,14 @@ function renderBillingPanel(account, billingMeta, plansPayload) {
       const a = document.createElement('a');
       a.className = 'btn secondary';
       a.textContent = 'Contact for pricing';
-      a.href = plan.contactUrl || plansPayload?.contactUrl || 'mailto:';
-      if (a.href.startsWith('http') || a.href.startsWith('mailto:')) {
-        a.target = '_blank';
-        a.rel = 'noopener noreferrer';
+      let contactHref = String(plan.contactUrl || plansPayload?.contactUrl || '').trim();
+      if (contactHref.startsWith('http://') || contactHref.startsWith('https://')) {
+        contactHref = '';
       }
+      if (contactHref && !contactHref.startsWith('mailto:') && contactHref.includes('@')) {
+        contactHref = `mailto:${contactHref}`;
+      }
+      a.href = contactHref.startsWith('mailto:') ? contactHref : 'mailto:';
       card.appendChild(a);
     } else if (plan.checkout && billingMeta?.stripeConfigured) {
       const btn = document.createElement('button');

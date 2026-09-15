@@ -53,7 +53,20 @@ export const config = {
   stripePriceStreamer: process.env.STRIPE_PRICE_STREAMER || '',
   stripePriceTournamentOrganizer: process.env.STRIPE_PRICE_TOURNAMENT_ORGANIZER || '',
   stripePriceLeagueDirector: process.env.STRIPE_PRICE_LEAGUE_DIRECTOR || '',
-  billingContactUrl: process.env.BILLING_CONTACT_URL || '',
+  /**
+   * Network Organization “Contact for pricing” href.
+   * Prefer mailto: — falls back to LEGAL_CONTACT_EMAIL when unset.
+   */
+  billingContactUrl: (() => {
+    const raw = String(process.env.BILLING_CONTACT_URL || '').trim();
+    if (raw.startsWith('mailto:')) return raw;
+    if (raw.includes('@') && !/^[a-z]+:\/\//i.test(raw)) return `mailto:${raw}`;
+    // Do not use http(s) site URLs for pricing contact unless explicitly intended —
+    // empty/missing → legal contact email.
+    if (raw && !/^https?:\/\//i.test(raw)) return raw;
+    const email = String(process.env.LEGAL_CONTACT_EMAIL || '').trim();
+    return email ? `mailto:${email}` : '';
+  })(),
   supportIssuesUrl: process.env.SUPPORT_ISSUES_URL
     || 'https://github.com/iainsmacleod/CueSport-Scoreboard/issues',
   legalContactEmail: process.env.LEGAL_CONTACT_EMAIL || '',
