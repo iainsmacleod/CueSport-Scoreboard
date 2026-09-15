@@ -228,7 +228,7 @@ LEGAL_GOVERNING_LAW=Province of Ontario, Canada
 
 3. Stripe Dashboard → Webhooks → `https://cuesport.example.com/api/stripe/webhook`  
    Events: `checkout.session.completed`, `customer.subscription.created/updated/deleted`, `invoice.paid`, `invoice.payment_failed`.
-4. Enable **Stripe Tax** (optional; Checkout `automatic_tax` may need a later code change) and **Customer Portal** (cancel at period end; allow switching among the three prices; CueSport branding).
+4. Enable **Stripe Tax** in the Dashboard (registrations / origin as advised by your accountant). Checkout already sends `automatic_tax`, required billing address, and **tax ID collection** so business customers can enter a VAT/GST/business tax ID. Also enable **Customer Portal** (cancel at period end; allow switching among the three prices; CueSport branding).
 5. Review `/terms` and `/privacy` placeholders with counsel before relying on them commercially.
 6. Smoke test (Test mode): Streamer Checkout with `4242…` → `trialing` → Portal; TO Checkout → `active` immediately.
 

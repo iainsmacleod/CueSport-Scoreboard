@@ -377,8 +377,9 @@ Use these **product names** in Stripe (and in the dashboard billing UI). Interna
 3. Put the Price IDs in `.env` as `STRIPE_PRICE_STREAMER`, `STRIPE_PRICE_TOURNAMENT_ORGANIZER`, `STRIPE_PRICE_LEAGUE_DIRECTOR`.
 4. Webhook: `{PUBLIC_URL}/api/stripe/webhook` — `checkout.session.completed`, `customer.subscription.*`, `invoice.paid`, `invoice.payment_failed`.
 5. Customer Portal: cancel at period end; allow switching among those three prices.
-6. Streamer Checkout → card-required free trial from metadata → auto paid Streamer; TO/League charge immediately.
-7. New Google accounts start `inactive` until Checkout (or admin **Complimentary access**).
+6. Enable Stripe Tax in the Dashboard (Checkout already requests automatic tax + tax ID collection).
+7. Streamer Checkout → card-required free trial from metadata → auto paid Streamer; TO/League charge immediately.
+8. New Google accounts start `inactive` until Checkout (or admin **Complimentary access**).
 
 Caps are overridable via `TIER_{TIER}_MAX_*` or `TIER_LIMITS_JSON` — see [`backend/.env.example`](backend/.env.example).
 

@@ -126,10 +126,10 @@ On first Google sign-in, the server links `auth.users.id` to an `accounts` row. 
 2. **Network Organization** is not a Checkout product — use `BILLING_CONTACT_URL` for sales contact.
 3. Set `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and the three `STRIPE_PRICE_*` values in `.env` (no trial env var — trial comes from Streamer Product metadata).
 4. Add webhook endpoint `{PUBLIC_URL}/api/stripe/webhook` for `checkout.session.completed`, `customer.subscription.*`, `invoice.paid`, `invoice.payment_failed`.
-5. Enable Customer Portal (cancel / payment method / switch among the three self-serve prices).
+5. Enable **Stripe Tax** in the Dashboard, then Customer Portal (cancel / payment method / switch among the three self-serve prices).
 6. Local testing: `stripe listen --forward-to localhost:3000/api/stripe/webhook`.
 
-**Streamer** Checkout applies a card-required free trial from Product metadata, then auto-converts to paid Streamer. **Tournament Organizer** / **League Director** charge immediately. Amounts are fetched from Stripe for the dashboard (never hardcoded). Cancel/manage via Customer Portal.
+**Streamer** Checkout applies a card-required free trial from Product metadata, then auto-converts to paid Streamer. **Tournament Organizer** / **League Director** charge immediately. Amounts are fetched from Stripe for the dashboard (never hardcoded). Checkout collects billing address, runs **Stripe Tax** (`automatic_tax`), and offers **tax ID collection** for business customers. Cancel/manage via Customer Portal.
 
 Legal templates: `/terms` and `/privacy` (replace placeholders; obtain counsel review before commercial reliance).
 

@@ -157,6 +157,14 @@ export async function registerBillingRoutes(app) {
         tier,
       },
       allow_promotion_codes: true,
+      // Stripe Tax: address required; B2B customers can enter a tax ID at Checkout.
+      billing_address_collection: 'required',
+      customer_update: {
+        address: 'auto',
+        name: 'auto',
+      },
+      automatic_tax: { enabled: true },
+      tax_id_collection: { enabled: true },
     });
 
     return { url: session.url, id: session.id };
