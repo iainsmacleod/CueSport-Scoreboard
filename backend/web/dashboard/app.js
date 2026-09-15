@@ -591,7 +591,7 @@ function buildAccountPlanLineHtml(account, quota) {
   }
 
   if (account?.needs_plan) {
-    return 'Inactive — choose a plan to unlock Cloud';
+    return 'Inactive — choose a plan under <a href="#settings" class="dash-text-link dash-settings-link">Settings</a> to unlock Cloud';
   }
 
   return `Plan: ${escapeHtml(display)}`;
@@ -635,7 +635,7 @@ function renderQuota(quota, account = null) {
     if (isPlatformAdminUser && !atKeyLimit) {
       hint.classList.add('hidden');
     } else if (needsPlan && !isPlatformAdminUser) {
-      hint.textContent = 'Choose a plan under Settings → Billing to unlock OBS Dock Keys.';
+      hint.innerHTML = 'Choose a plan under <a href="#settings" class="dash-text-link dash-settings-link">Settings</a> to unlock OBS Dock Keys.';
       hint.classList.remove('hidden');
     } else if (atKeyLimit) {
       hint.textContent = `Dock key limit reached (${limits.maxApiKeys} on ${display}). Each key connects one dock — remove an unused key to create another.`;
@@ -4454,6 +4454,15 @@ document.getElementById('dashAccountMenuBtn')?.addEventListener('click', () => {
 document.getElementById('dashAccountCloseBtn')?.addEventListener('click', () => closeDashAccountModal());
 document.getElementById('dashAccountModal')?.addEventListener('click', (event) => {
   if (event.target && event.target.id === 'dashAccountModal') closeDashAccountModal();
+});
+
+document.addEventListener('click', (event) => {
+  const link = event.target?.closest?.('a.dash-settings-link');
+  if (!link) return;
+  event.preventDefault();
+  closeDashAccountModal();
+  setActiveDashTab('settings');
+  document.getElementById('billingPanel')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
 });
 
 document.getElementById('dashConfirmOkBtn')?.addEventListener('click', () => closeDashConfirm(true));

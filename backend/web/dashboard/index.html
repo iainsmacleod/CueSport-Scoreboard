@@ -6,7 +6,7 @@
   <title>CueSport Scoreboard Cloud — Dashboard</title>
   <link rel="icon" type="image/png" href="/web/images/balls/8ball_small.png" />
   <link rel="apple-touch-icon" href="/web/images/balls/8ball_small.png" />
-  <link rel="stylesheet" href="/web/shared/styles.css?v=8.2.0.3" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.2.0.4" />
 </head>
 <body>
   <header class="site-header">
@@ -234,13 +234,17 @@
           <h2>Billing &amp; plans</h2>
           <p id="billingStatusLine" class="hint"></p>
           <div id="billingPlanPicker" class="billing-plan-grid"></div>
-          <label id="billingTermsLabel" class="billing-terms-check hint">
-            <input type="checkbox" id="billingAcceptTerms" />
-            I agree to the
-            <a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a>
-            and
-            <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
-          </label>
+          <div class="billing-terms-row">
+            <label id="billingTermsLabel" class="billing-terms-check hint">
+              <input type="checkbox" id="billingAcceptTerms" />
+              <span>
+                I agree to the
+                <a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a>
+                and
+                <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+              </span>
+            </label>
+          </div>
           <div class="row account-session-actions billing-actions">
             <button type="button" id="manageBillingBtn" class="btn secondary dash-action-btn hidden">Manage billing</button>
           </div>

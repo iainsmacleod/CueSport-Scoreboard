@@ -100,7 +100,7 @@ export async function registerBillingRoutes(app) {
     }
     if (config.allowDevAuth) {
       return reply.code(400).send({
-        error: 'Billing is for the managed cloud service. Self-host accounts do not use Stripe Checkout.',
+        error: 'Stripe Checkout is disabled while ALLOW_DEV_AUTH=true. Set ALLOW_DEV_AUTH=false on the managed cloud server, recreate the container, and sign in with Google.',
         code: 'selfhost_no_checkout',
       });
     }
@@ -144,28 +144,38 @@ export async function registerBillingRoutes(app) {
       subscriptionData.trial_period_days = trialDays;
     }
 
-    const session = await stripe.checkout.sessions.create({
-      mode: 'subscription',
-      customer: customerId,
-      client_reference_id: auth.account.id,
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-      line_items: [{ price: priceId, quantity: 1 }],
-      subscription_data: subscriptionData,
-      metadata: {
-        account_id: auth.account.id,
-        tier,
-      },
-      allow_promotion_codes: true,
-      // Stripe Tax: address required; B2B customers can enter a tax ID at Checkout.
-      billing_address_collection: 'required',
-      customer_update: {
-        address: 'auto',
-        name: 'auto',
-      },
-      automatic_tax: { enabled: true },
-      tax_id_collection: { enabled: true },
-    });
+    let session;
+    try {
+      session = await stripe.checkout.sessions.create({
+        mode: 'subscription',
+        customer: customerId,
+        client_reference_id: auth.account.id,
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+        line_items: [{ price: priceId, quantity: 1 }],
+        subscription_data: subscriptionData,
+        metadata: {
+          account_id: auth.account.id,
+          tier,
+        },
+        allow_promotion_codes: true,
+        // Stripe Tax: address required; B2B customers can enter a tax ID at Checkout.
+        billing_address_collection: 'required',
+        customer_update: {
+          address: 'auto',
+          name: 'auto',
+        },
+        automatic_tax: { enabled: true },
+        tax_id_collection: { enabled: true },
+      });
+    } catch (err) {
+      const stripeMsg = err?.raw?.message || err?.message || 'Checkout session failed';
+      request.log.warn({ err, tier, priceId }, 'Stripe Checkout session create failed');
+      return reply.code(400).send({
+        error: stripeMsg,
+        code: err?.code || 'stripe_checkout_failed',
+      });
+    }
 
     return { url: session.url, id: session.id };
   });
