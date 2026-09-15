@@ -134,6 +134,9 @@ function basePlanRow(id, limits) {
 export function buildPlansCatalog() {
   const catalog = getTiersCatalog();
   const selfServe = getPaidSelfServeTier().map((id) => basePlanRow(id, catalog[id] || {}));
+  if (!config.billingShowNetworkOrganization) {
+    return selfServe;
+  }
   const network = catalog.network_organization || {};
   return [
     ...selfServe,

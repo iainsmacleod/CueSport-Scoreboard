@@ -53,6 +53,8 @@ export const config = {
   stripePriceStreamer: process.env.STRIPE_PRICE_STREAMER || '',
   stripePriceTournamentOrganizer: process.env.STRIPE_PRICE_TOURNAMENT_ORGANIZER || '',
   stripePriceLeagueDirector: process.env.STRIPE_PRICE_LEAGUE_DIRECTOR || '',
+  /** When true, show Network Organization on /api/billing/plans (contact-for-pricing card). Default off. */
+  billingShowNetworkOrganization: process.env.BILLING_SHOW_NETWORK_ORGANIZATION === 'true',
   /**
    * Network Organization “Contact for pricing” href.
    * Prefer mailto: — falls back to LEGAL_CONTACT_EMAIL when unset.

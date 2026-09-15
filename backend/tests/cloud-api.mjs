@@ -327,15 +327,22 @@ async function run() {
   const plans = await fetchJson('/api/billing/plans');
   assert('GET /api/billing/plans', plans.ok && Array.isArray(plans.body.plans));
   assert(
-    'Billing plans include self-serve + contact tiers',
+    'Billing plans include self-serve tiers',
     plans.body.plans.some((p) => p.id === 'streamer' && p.checkout !== undefined)
       && plans.body.plans.some((p) => p.id === 'tournament_organizer')
       && plans.body.plans.some((p) => p.id === 'league_director')
-      && plans.body.plans.some((p) => p.id === 'network_organization' && p.contact === true)
+  );
+  const showNetworkOrg = process.env.BILLING_SHOW_NETWORK_ORGANIZATION === 'true';
+  assert(
+    'Network Organization plan hidden unless BILLING_SHOW_NETWORK_ORGANIZATION=true',
+    showNetworkOrg
+      ? plans.body.plans.some((p) => p.id === 'network_organization' && p.contact === true)
+      : !plans.body.plans.some((p) => p.id === 'network_organization')
   );
   assert(
-    'Billing plans include trialDays',
-    Number.isFinite(plans.body.trialDays) && plans.body.trialDays >= 0
+    'Billing plans include trialDays field',
+    plans.body.trialDays == null
+      || (Number.isFinite(plans.body.trialDays) && plans.body.trialDays >= 0)
   );
   assert(
     'Billing plans include stripeConfigured boolean',

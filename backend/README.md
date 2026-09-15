@@ -123,7 +123,7 @@ On first Google sign-in, the server links `auth.users.id` to an `accounts` row. 
    - **Streamer** → Price ID → `STRIPE_PRICE_STREAMER` — set Product metadata `trial_period_days=14`
    - **Tournament Organizer** → Price ID → `STRIPE_PRICE_TOURNAMENT_ORGANIZER` — no trial metadata
    - **League Director** → Price ID → `STRIPE_PRICE_LEAGUE_DIRECTOR` — no trial metadata
-2. **Network Organization** is not a Checkout product — use `BILLING_CONTACT_URL` for sales contact.
+2. **Network Organization** is not a Checkout product — hidden from billing plans by default. Set `BILLING_SHOW_NETWORK_ORGANIZATION=true` and `BILLING_CONTACT_URL` when you are ready to show the contact card.
 3. Set `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and the three `STRIPE_PRICE_*` values in `.env` (no trial env var — trial comes from Streamer Product metadata).
 4. Add webhook endpoint `{PUBLIC_URL}/api/stripe/webhook` for `checkout.session.completed`, `customer.subscription.*`, `invoice.paid`, `invoice.payment_failed`.
 5. Enable **Stripe Tax** in the Dashboard, then Customer Portal (cancel / payment method / switch among the three self-serve prices).
