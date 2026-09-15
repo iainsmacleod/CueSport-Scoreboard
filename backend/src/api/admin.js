@@ -1,8 +1,8 @@
-import * as sqlite from '../db/sqlite.js';
+﻿import * as sqlite from '../db/sqlite.js';
 import { resolveAuthFromRequest } from './accounts.js';
 import { isAccountAdminAuth } from '../lib/dock-roles.js';
 import { isPlatformAdmin } from '../lib/platform-admin.js';
-import { getAccountQuota, getPaidSelfServeTiers, normalizeTierName } from '../quotas.js';
+import { getAccountQuota, getPaidSelfServeTier, normalizeTierName } from '../quotas.js';
 import { getAccountStats, getAllAccountsStats, namespaceAccountStats } from '../stats/account-stats.js';
 import {
   kickAccountAdminClients,
@@ -200,7 +200,7 @@ export async function registerAdminRoutes(app) {
     if (days < TRIAL_DAYS_MIN || days > TRIAL_DAYS_MAX) {
       return reply.code(400).send({ error: `days must be an integer from ${TRIAL_DAYS_MIN} to ${TRIAL_DAYS_MAX}` });
     }
-    const allowedTiers = new Set(getPaidSelfServeTiers());
+    const allowedTiers = new Set(getPaidSelfServeTier());
     const tierRaw = request.body?.tier != null
       ? String(request.body.tier).trim().toLowerCase()
       : 'streamer';
