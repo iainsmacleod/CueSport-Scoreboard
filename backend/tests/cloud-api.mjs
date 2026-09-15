@@ -345,6 +345,14 @@ async function run() {
       || (Number.isFinite(plans.body.trialDays) && plans.body.trialDays >= 0)
   );
   assert(
+    'Billing plans include trialEligible boolean',
+    typeof plans.body.trialEligible === 'boolean'
+  );
+  assert(
+    'Billing plans include trialConfigured boolean',
+    typeof plans.body.trialConfigured === 'boolean'
+  );
+  assert(
     'Billing plans include stripeConfigured boolean',
     typeof plans.body.stripeConfigured === 'boolean'
   );

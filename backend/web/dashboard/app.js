@@ -197,9 +197,11 @@ function confirmDashAction({
   if (msgEl) msgEl.textContent = message;
   const label = confirmLabel || 'Confirm';
   let okIcon = 'check';
-  if (/remove|delete|revoke/i.test(label)) okIcon = 'trash';
+  if (/revoke access/i.test(label)) okIcon = 'stopSign';
+  else if (/remove|delete|revoke/i.test(label)) okIcon = 'trash';
   else if (/kick/i.test(label)) okIcon = 'kick';
   else if (/sign out/i.test(label)) okIcon = 'logOut';
+  else if (/complimentary|gift/i.test(label)) okIcon = 'gift';
   setDashActionButtonContent(okBtn, {
     icon: okIcon,
     label,
@@ -772,7 +774,10 @@ function renderBillingPanel(account, billingMeta, plansPayload) {
   const display = account?.subscription_tier_display || account?.subscription_tier || '—';
   const status = account?.subscription_status || 'inactive';
   const streamerPlan = (plansPayload?.plans || []).find((p) => p.id === 'streamer');
-  const streamerTrialDays = streamerPlan?.trialDays ?? plansPayload?.trialDays ?? null;
+  const trialEligible = plansPayload?.trialEligible !== false;
+  const streamerTrialDays = trialEligible
+    ? (streamerPlan?.trialDays ?? plansPayload?.trialDays ?? null)
+    : null;
   const streamerPrice = formatMoneyFromStripe(streamerPlan?.unitAmount, streamerPlan?.currency, streamerPlan?.interval);
 
   if (statusEl) {
@@ -780,13 +785,22 @@ function renderBillingPanel(account, billingMeta, plansPayload) {
       const until = formatBillingDate(account.trial_ends_at) || formatComplimentaryUntil(account.trial_ends_at);
       statusEl.textContent = `Complimentary access until ${until} (${display}) — no card, not billed. You can still subscribe via Stripe below.`;
     } else if (account?.needs_plan) {
-      const trialBit = streamerTrialDays != null
-        ? `Streamer includes a ${streamerTrialDays}-day free trial (card required at Checkout; cancel before it ends to avoid charges).`
-        : 'Streamer may include a free trial when configured in Stripe (card required at Checkout).';
-      const thenBit = streamerPrice
-        ? ` After the trial you are charged ${streamerPrice} automatically unless you cancel.`
-        : ' After the trial you are charged the Streamer monthly price automatically unless you cancel.';
-      statusEl.textContent = `Your account has no Cloud access until you choose a plan. ${trialBit}${thenBit} Tournament Organizer and League Director bill monthly immediately (no free trial).`;
+      let planBit;
+      if (streamerTrialDays != null) {
+        const thenBit = streamerPrice
+          ? ` After the trial you are charged ${streamerPrice} automatically unless you cancel.`
+          : ' After the trial you are charged the Streamer monthly price automatically unless you cancel.';
+        planBit = `Streamer includes a ${streamerTrialDays}-day free trial (card required at Checkout; cancel before it ends to avoid charges).${thenBit}`;
+      } else if (plansPayload?.trialConfigured && plansPayload?.trialEligible === false) {
+        planBit = streamerPrice
+          ? `Streamer bills ${streamerPrice} immediately (free trial already used on this email).`
+          : 'Streamer has no free trial left on this email — subscribe to continue.';
+      } else if (streamerPrice) {
+        planBit = `Streamer bills ${streamerPrice}.`;
+      } else {
+        planBit = 'Choose Streamer or another plan to continue.';
+      }
+      statusEl.textContent = `Your account has no Cloud access until you choose a plan. ${planBit} Tournament Organizer and League Director bill monthly immediately (no free trial).`;
     } else if (account?.is_trialing) {
       const summary = account.billing_summary;
       const ends = formatBillingDate(summary?.trialEnd || summary?.currentPeriodEnd);
@@ -1027,6 +1041,12 @@ function dashActionIcon(kind) {
   }
   if (kind === 'trash') {
     return `<svg ${common}><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>`;
+  }
+  if (kind === 'gift') {
+    return `<svg ${common}><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>`;
+  }
+  if (kind === 'stopSign') {
+    return `<svg ${common}><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/><line x1="8" y1="12" x2="16" y2="12"/></svg>`;
   }
   if (kind === 'save') {
     return `<svg ${common}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>`;
@@ -1901,6 +1921,19 @@ async function loadAdminAccountDetail(accountId) {
         tierSelect.value = t;
       }
     }
+    setDashActionButtonContent(
+      document.getElementById('adminGrantTrialForm')?.querySelector('button[type="submit"]'),
+      {
+        icon: 'gift',
+        label: 'Give complimentary access',
+        title: 'Give complimentary access',
+      }
+    );
+    setDashActionButtonContent(document.getElementById('adminEndTrialBtn'), {
+      icon: 'stopSign',
+      label: 'Revoke complimentary access',
+      title: 'Revoke complimentary access',
+    });
   } catch (err) {
     body.innerHTML = `<p class="error">${escapeHtml(err.message || 'Failed to load account')}</p>`;
   }

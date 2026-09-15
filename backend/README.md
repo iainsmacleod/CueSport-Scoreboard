@@ -129,7 +129,7 @@ On first Google sign-in, the server links `auth.users.id` to an `accounts` row. 
 5. Enable **Stripe Tax** in the Dashboard, then Customer Portal (cancel / payment method / switch among the three self-serve prices).
 6. Local testing: `stripe listen --forward-to localhost:3000/api/stripe/webhook`.
 
-**Streamer** Checkout applies a card-required free trial from Product metadata, then auto-converts to paid Streamer. **Tournament Organizer** / **League Director** charge immediately. Amounts are fetched from Stripe for the dashboard (never hardcoded). Checkout collects billing address, runs **Stripe Tax** (`automatic_tax`), and offers **tax ID collection** for business customers. Cancel/manage via Customer Portal.
+**Streamer** Checkout applies a card-required free trial from Product metadata, then auto-converts to paid Streamer — **one trial per Stripe customer / email** (repeat Streamer checkouts bill immediately if that customer already had any subscription). **Tournament Organizer** / **League Director** charge immediately. Amounts are fetched from Stripe for the dashboard (never hardcoded). Checkout collects billing address, runs **Stripe Tax** (`automatic_tax`), and offers **tax ID collection** for business customers. Cancel/manage via Customer Portal.
 
 Legal templates: `/terms` and `/privacy` (replace placeholders; obtain counsel review before commercial reliance).
 
@@ -165,7 +165,7 @@ This backend is GPL-licensed alongside the scoreboard. You may run your own inst
 | POST | `/api/auth/dev-login` | Dev auth (secret → signed token) |
 | GET | `/api/me` | Account, rooms, keys, quota, billing flags, `is_platform_admin`, simulated plan (Bearer token) |
 | PATCH | `/api/me/simulated-plan` | Platform admin: `{ tier: "unrestricted" \| "<catalog_tier>" }` for plan-limit simulation |
-| GET | `/api/billing/plans` | Plan catalog (limits + Stripe amounts/trial days + contact tier) |
+| GET | `/api/billing/plans` | Plan catalog (limits + Stripe amounts/trial days + `trialEligible` / `trialConfigured`) |
 | GET | `/api/billing/summary` | Complimentary flag + live Stripe subscription summary |
 | POST | `/api/billing/checkout` | Stripe Checkout session `{ tier, acceptedTerms }` |
 | POST | `/api/billing/portal` | Stripe Customer Portal session |

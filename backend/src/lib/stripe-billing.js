@@ -112,6 +112,27 @@ export async function trialDaysForTier(tier) {
   return details?.trialDays ?? null;
 }
 
+/**
+ * True if this Stripe customer already has any subscription (including canceled).
+ * Used to allow only one free trial per email / customer.
+ */
+export async function customerHasPriorSubscription(customerId) {
+  if (!customerId) return false;
+  const stripe = getStripe();
+  if (!stripe) return false;
+  try {
+    const list = await stripe.subscriptions.list({
+      customer: customerId,
+      status: 'all',
+      limit: 1,
+    });
+    return (list?.data?.length || 0) > 0;
+  } catch {
+    // Fail closed for trials: if we cannot verify history, do not grant another trial.
+    return true;
+  }
+}
+
 function basePlanRow(id, limits) {
   return {
     id,

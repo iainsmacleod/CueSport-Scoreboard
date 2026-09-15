@@ -4,6 +4,7 @@ import { getAccountQuota } from '../quotas.js';
 import { isAccountAdminAuth } from '../lib/dock-roles.js';
 import {
   buildPlansCatalogFromStripe,
+  customerHasPriorSubscription,
   getStripe,
   getSubscriptionBillingSummary,
   isStripeConfigured,
@@ -64,13 +65,32 @@ function syncAccountFromSubscription(accountId, subscription) {
 }
 
 export async function registerBillingRoutes(app) {
-  app.get('/api/billing/plans', async () => {
+  app.get('/api/billing/plans', async (request) => {
     const plans = await buildPlansCatalogFromStripe();
     const streamer = plans.find((p) => p.id === 'streamer');
+    const catalogTrialDays = streamer?.trialDays ?? null;
+
+    let trialEligible = catalogTrialDays != null;
+    const auth = await resolveAccountAuth(request);
+    if (auth?.account && isAccountAdminAuth(auth) && catalogTrialDays != null) {
+      const customerId = auth.account.stripe_customer_id;
+      if (customerId && await customerHasPriorSubscription(customerId)) {
+        trialEligible = false;
+      }
+    }
+
+    const plansForCaller = trialEligible
+      ? plans
+      : plans.map((plan) => (plan.id === 'streamer' ? { ...plan, trialDays: null } : plan));
+
     return {
-      plans,
-      /** Streamer trial days from Stripe Product metadata (null if none). */
-      trialDays: streamer?.trialDays ?? null,
+      plans: plansForCaller,
+      /** Streamer trial days offered to this caller (null if none or already used). */
+      trialDays: trialEligible ? catalogTrialDays : null,
+      /** False when this Stripe customer already had a subscription (one trial per email). */
+      trialEligible,
+      /** True when Streamer Product metadata defines a trial (regardless of caller eligibility). */
+      trialConfigured: catalogTrialDays != null,
       stripeConfigured: isStripeConfigured(),
       contactUrl: config.billingContactUrl || null,
       termsUrl: `${config.publicUrl}/terms`,
@@ -132,7 +152,11 @@ export async function registerBillingRoutes(app) {
     const customerId = await ensureStripeCustomer(auth.account);
     const successUrl = `${config.publicUrl}/dashboard?billing=success`;
     const cancelUrl = `${config.publicUrl}/dashboard?billing=cancel`;
-    const trialDays = await trialDaysForTier(tier);
+    const catalogTrialDays = await trialDaysForTier(tier);
+    const priorSub = catalogTrialDays != null
+      ? await customerHasPriorSubscription(customerId)
+      : false;
+    const trialDays = catalogTrialDays != null && !priorSub ? catalogTrialDays : null;
 
     const subscriptionData = {
       metadata: {
