@@ -25,19 +25,22 @@
 #   {PUBLIC_URL}/auth/callback
 #
 # Stripe billing (managed cloud — leave empty for self-host):
-#   STRIPE_SECRET_KEY=sk_...
+#   STRIPE_SECRET_KEY=sk_test_...          # Test first; sk_live_... for production
 #   STRIPE_WEBHOOK_SECRET=whsec_...
-#   STRIPE_PRICE_STREAMER=price_...
-#   STRIPE_PRICE_TOURNAMENT_ORGANIZER=price_...
-#   STRIPE_PRICE_LEAGUE_DIRECTOR=price_...
+#   STRIPE_PRICE_STREAMER=price_...          # monthly USD (e.g. $12) — Product metadata trial_period_days=14
+#   STRIPE_PRICE_TOURNAMENT_ORGANIZER=price_...  # monthly USD (e.g. $20) — no trial metadata
+#   STRIPE_PRICE_LEAGUE_DIRECTOR=price_...   # monthly USD (e.g. $30) — no trial metadata
 #   BILLING_CONTACT_URL=mailto:you@example.com
-# Trial days: set Product metadata trial_period_days on Streamer only (not an env var).
+# Also in Dashboard: Customer Portal + Stripe Tax (Checkout uses automatic_tax + tax ID collection).
 # Webhook: {PUBLIC_URL}/api/stripe/webhook
+#   Events: checkout.session.completed, customer.subscription.created/updated/deleted,
+#           invoice.paid, invoice.payment_failed
+# Local: stripe listen --forward-to localhost:4003/api/stripe/webhook
 #
 # Legal / support (Terms + Privacy at /terms and /privacy):
 #   SUPPORT_ISSUES_URL=https://github.com/iainsmacleod/CueSport-Scoreboard/issues
 #   LEGAL_CONTACT_EMAIL=you@example.com
-#   LEGAL_ENTITY_NAME=CueSport Scoreboard Cloud
+#   LEGAL_ENTITY_NAME=MacLeod Systems Consulting, LLC
 #   LEGAL_GOVERNING_LAW=Province of Ontario, Canada
 #
 # Tier quotas (optional — defaults apply when unset):
