@@ -223,7 +223,7 @@ STRIPE_PRICE_LEAGUE_DIRECTOR=price_...
 BILLING_CONTACT_URL=mailto:you@example.com
 LEGAL_CONTACT_EMAIL=you@example.com
 LEGAL_ENTITY_NAME=MacLeod Systems Consulting, LLC
-LEGAL_GOVERNING_LAW=Province of Ontario, Canada
+LEGAL_GOVERNING_LAW=Commonwealth of Pennsylvania, USA
 ```
 
 3. Stripe Dashboard → Webhooks → `https://cuesport.example.com/api/stripe/webhook`  

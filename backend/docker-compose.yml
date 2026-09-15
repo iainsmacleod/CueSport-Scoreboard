@@ -41,7 +41,7 @@
 #   SUPPORT_ISSUES_URL=https://github.com/iainsmacleod/CueSport-Scoreboard/issues
 #   LEGAL_CONTACT_EMAIL=you@example.com
 #   LEGAL_ENTITY_NAME=MacLeod Systems Consulting, LLC
-#   LEGAL_GOVERNING_LAW=Province of Ontario, Canada
+#   LEGAL_GOVERNING_LAW=Commonwealth of Pennsylvania, USA
 #
 # Tier quotas (optional overrides — Compose defaults match built-ins in quotas.js):
 #   TIER_DEFAULT=                 # empty → selfhost if ALLOW_DEV_AUTH, else streamer

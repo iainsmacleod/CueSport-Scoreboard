@@ -2765,26 +2765,32 @@ body.controls-locked #mobileBottomNav {
 .billing-terms-row {
   display: block;
   width: 100%;
-  margin: 0 0 1rem;
+  margin: 0.25rem 0 1rem;
   clear: both;
 }
 .billing-terms-check {
   display: flex;
+  flex-direction: row;
   align-items: flex-start;
-  gap: 0.5rem;
+  gap: 0.55rem;
   width: 100%;
-  max-width: 100%;
+  max-width: 40rem;
   margin: 0;
   box-sizing: border-box;
 }
 .billing-terms-check > span {
-  flex: 1;
-  min-width: 0;
+  flex: 1 1 auto;
+  min-width: 12rem;
   line-height: 1.45;
 }
-.billing-terms-check input {
-  margin-top: 0.2rem;
-  flex-shrink: 0;
+/* Override global `input { width: 100% }` so the checkbox does not eat the row */
+.billing-terms-check input[type="checkbox"] {
+  width: auto;
+  min-width: 1.1rem;
+  height: auto;
+  margin: 0.2rem 0 0;
+  flex: 0 0 auto;
+  align-self: flex-start;
 }
 .plan-trial-badge {
   display: inline-block;
