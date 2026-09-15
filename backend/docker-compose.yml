@@ -43,14 +43,17 @@
 #   LEGAL_ENTITY_NAME=MacLeod Systems Consulting, LLC
 #   LEGAL_GOVERNING_LAW=Province of Ontario, Canada
 #
-# Tier quotas (optional — defaults apply when unset):
-#   TIER_DEFAULT=selfhost          # with ALLOW_DEV_AUTH; else streamer
+# Tier quotas (optional overrides — Compose defaults match built-ins in quotas.js):
+#   TIER_DEFAULT=                 # empty → selfhost if ALLOW_DEV_AUTH, else streamer
 #   TIER_STREAMER_MAX_API_KEYS=2
 #   TIER_STREAMER_MAX_ROOMS=2
 #   TIER_STREAMER_MAX_CONTROL_CONNECTIONS=5
-#   TIER_LIMITS_JSON={...}         # full catalog override
-# See .env.example for built-in tier caps (streamer / tournament_organizer /
-# league_director / network_organization / selfhost) and full Stripe notes.
+#   TIER_TOURNAMENT_ORGANIZER_MAX_*=5/5/5
+#   TIER_LEAGUE_DIRECTOR_MAX_*=10/10/5
+#   TIER_NETWORK_ORGANIZATION_MAX_*=25/25/10
+#   TIER_SELFHOST_MAX_*=2/2/5
+#   TIER_LIMITS_JSON={...}         # full catalog override (optional)
+# See .env.example for notes.
 #
 # Local live-reload of web assets: copy docker-compose.override.example.yml
 # to docker-compose.override.yml (do not use those mounts in production).
@@ -98,12 +101,29 @@ services:
       LEGAL_CONTACT_EMAIL: ${LEGAL_CONTACT_EMAIL:-}
       LEGAL_ENTITY_NAME: ${LEGAL_ENTITY_NAME:-}
       LEGAL_GOVERNING_LAW: ${LEGAL_GOVERNING_LAW:-}
-      # Room cleanup / tiers (optional)
+      # Room cleanup
       ROOM_CLEANUP_GRACE_MS: ${ROOM_CLEANUP_GRACE_MS:-}
       ROOM_IDLE_TTL_MS: ${ROOM_IDLE_TTL_MS:-}
       ROOM_CLEANUP_SWEEPER_MS: ${ROOM_CLEANUP_SWEEPER_MS:-}
+      # Tier quotas (defaults = built-ins; override in .env as needed)
+      # TIER_DEFAULT empty → selfhost when ALLOW_DEV_AUTH, else streamer (see quotas.js)
       TIER_DEFAULT: ${TIER_DEFAULT:-}
       TIER_LIMITS_JSON: ${TIER_LIMITS_JSON:-}
+      TIER_STREAMER_MAX_API_KEYS: ${TIER_STREAMER_MAX_API_KEYS:-2}
+      TIER_STREAMER_MAX_ROOMS: ${TIER_STREAMER_MAX_ROOMS:-2}
+      TIER_STREAMER_MAX_CONTROL_CONNECTIONS: ${TIER_STREAMER_MAX_CONTROL_CONNECTIONS:-5}
+      TIER_TOURNAMENT_ORGANIZER_MAX_API_KEYS: ${TIER_TOURNAMENT_ORGANIZER_MAX_API_KEYS:-5}
+      TIER_TOURNAMENT_ORGANIZER_MAX_ROOMS: ${TIER_TOURNAMENT_ORGANIZER_MAX_ROOMS:-5}
+      TIER_TOURNAMENT_ORGANIZER_MAX_CONTROL_CONNECTIONS: ${TIER_TOURNAMENT_ORGANIZER_MAX_CONTROL_CONNECTIONS:-5}
+      TIER_LEAGUE_DIRECTOR_MAX_API_KEYS: ${TIER_LEAGUE_DIRECTOR_MAX_API_KEYS:-10}
+      TIER_LEAGUE_DIRECTOR_MAX_ROOMS: ${TIER_LEAGUE_DIRECTOR_MAX_ROOMS:-10}
+      TIER_LEAGUE_DIRECTOR_MAX_CONTROL_CONNECTIONS: ${TIER_LEAGUE_DIRECTOR_MAX_CONTROL_CONNECTIONS:-5}
+      TIER_NETWORK_ORGANIZATION_MAX_API_KEYS: ${TIER_NETWORK_ORGANIZATION_MAX_API_KEYS:-25}
+      TIER_NETWORK_ORGANIZATION_MAX_ROOMS: ${TIER_NETWORK_ORGANIZATION_MAX_ROOMS:-25}
+      TIER_NETWORK_ORGANIZATION_MAX_CONTROL_CONNECTIONS: ${TIER_NETWORK_ORGANIZATION_MAX_CONTROL_CONNECTIONS:-10}
+      TIER_SELFHOST_MAX_API_KEYS: ${TIER_SELFHOST_MAX_API_KEYS:-2}
+      TIER_SELFHOST_MAX_ROOMS: ${TIER_SELFHOST_MAX_ROOMS:-2}
+      TIER_SELFHOST_MAX_CONTROL_CONNECTIONS: ${TIER_SELFHOST_MAX_CONTROL_CONNECTIONS:-5}
       DB_DRIVER: ${DB_DRIVER:-sqlite}
     restart: unless-stopped
     healthcheck:
