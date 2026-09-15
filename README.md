@@ -37,6 +37,7 @@ Display player names, race and game info, racks (and balls where needed), logos,
 - [OBS WebSocket Setup](#obs-websocket-setup)
 - [Instant Replay](#instant-replay)
 - [CueSport Cloud](#cuesport-cloud)
+  - [Plans & products (hosted)](#plans--products-hosted)
 - [Stream Promotion](#stream-promotion)
 - [Player Statistics](#player-statistics)
 - [Game Types & Scoring Modes](#game-types--scoring-modes)
@@ -348,12 +349,37 @@ docker compose up -d --build
 ```
 
 1. Open **http://localhost:3000/dashboard** (or **:4003** with Docker) and **dev sign-in** with your `DEV_AUTH_SECRET` (requires `DEV_AUTH_ACCOUNT_EMAIL` in `.env` too).
-2. Create an **OBS Dock Key** per table (Streamer plan: 2 seats). Paste each key into that dock’s CueSport Cloud **Connection settings** (⚙) — managed or Self-hosting. Each key may only be connected on one dock at a time. **One Dock Key = one cloud table**; rooms are created automatically when the dock connects (local `?instance=` does not create separate cloud tables).
+2. Create an **OBS Dock Key** per table (**Streamer**: 2 seats by default — see [Plans & products](#plans--products-hosted)). Paste each key into that dock’s CueSport Cloud **Connection settings** (⚙) — managed or Self-hosting. Each key may only be connected on one dock at a time. **One Dock Key = one cloud table**; rooms are created automatically when the dock connects (local `?instance=` does not create separate cloud tables).
 3. Enable the **CueSport Cloud** toggle on the dock.
 4. On your phone, open **http://localhost:3000/m/{room_id}** — if you already signed in on the dashboard in the same browser, tap **Connect**; on a new device, enter the dev secret once (it is saved for next time).
 5. Optional: from mobile **Share**, create a **guest link** (`/g/{token}`) for helpers. Guests can score with the same action balls as the dock for that game (foul, undo, free ball on Snooker, respot on Bank/One Pocket), change game setup (type + options, race, event info), and Restart/End/Call Match, but cannot edit names. Standard guests cannot use Stream/Share; an **OBS Dock Owner** guest link can. Only one device may use a given guest link at once; revoke the link when you want it invalidated.
 
-See [`backend/README.md`](backend/README.md) for Supabase/Google OAuth production setup.
+See [`backend/README.md`](backend/README.md) for Supabase/Google OAuth production setup and Stripe Checkout wiring.
+
+### Plans & products (hosted)
+
+Use these **product names** in Stripe (and in the dashboard billing UI). Internal ids are what Checkout/`STRIPE_PRICE_*` and quotas use.
+
+**One OBS Dock Key = one seat = one cloud table.** Room safety cap tracks keys. Mobile + guest connections are per table (dock itself is not counted).
+
+| Product name (Stripe / UI) | Internal id | Stripe Price env | Dock keys (seats) | Room safety cap | Mobile + guest / table | Checkout |
+|----------------------------|-------------|------------------|-------------------|-----------------|------------------------|----------|
+| **Streamer** | `streamer` | `STRIPE_PRICE_STREAMER` | 2 | 2 | 5 | Self-serve |
+| **Tournament Organizer** | `tournament_organizer` | `STRIPE_PRICE_TOURNAMENT_ORGANIZER` | 5 | 5 | 5 | Self-serve |
+| **League Director** | `league_director` | `STRIPE_PRICE_LEAGUE_DIRECTOR` | 10 | 10 | 5 | Self-serve |
+| **Network Organization** | `network_organization` | — | 25 | 25 | 10 | Contact only (`BILLING_CONTACT_URL`) |
+| **Self-host** | `selfhost` | — | 2 | 2 | 5 | Not sold (local / Docker when `ALLOW_DEV_AUTH=true`) |
+
+**Stripe setup checklist** (managed cloud):
+
+1. Create three **Products** named exactly **Streamer**, **Tournament Organizer**, and **League Director**, each with a recurring **Price**.
+2. Put the Price IDs in `.env` as `STRIPE_PRICE_STREAMER`, `STRIPE_PRICE_TOURNAMENT_ORGANIZER`, `STRIPE_PRICE_LEAGUE_DIRECTOR`.
+3. Webhook: `{PUBLIC_URL}/api/stripe/webhook` — `checkout.session.completed`, `customer.subscription.*`, `invoice.paid`, `invoice.payment_failed`.
+4. Customer Portal: cancel at period end; allow switching among those three prices.
+5. Checkout uses a **30-day card-required trial** (`STRIPE_TRIAL_DAYS`, default 30) → account `trialing`, then `active`.
+6. New Google accounts start `inactive` until Checkout (or an admin **support trial**).
+
+Caps are overridable via `TIER_{TIER}_MAX_*` or `TIER_LIMITS_JSON` — see [`backend/.env.example`](backend/.env.example).
 
 ### Hosted vs self-host
 
@@ -361,7 +387,7 @@ See [`backend/README.md`](backend/README.md) for Supabase/Google OAuth productio
 |---|--------|-----------|
 | Auth | Google for account + OBS Dock Key per dock | Dev secret on dashboard; OBS Dock Key + server URL in dock Connection settings → Self-hosting |
 | Backend | `cuesport.macleod.systems` | Your own `backend/` deployment |
-| Cost | Optional paid tiers via Stripe Checkout (30-day trial); platform admins can grant a time-boxed **support trial** | Free (you run the server) |
+| Cost | **Streamer** / **Tournament Organizer** / **League Director** via Stripe Checkout (30-day trial); **Network Organization** by contact; platform admins can grant a time-boxed **support trial** | Free (you run the server; default **Self-host** caps = Streamer) |
 | Platform admin | `PLATFORM_ADMIN_EMAILS` allowlist → Admin tab + `/api/admin/*` | Usually unused; same env var works if you want it |
 
 ---

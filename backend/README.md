@@ -98,13 +98,15 @@ See [`.env.example`](.env.example).
 Built-in defaults (all overridable via the env vars above).
 **One OBS Dock Key = one live dock connection and one cloud table** (create a separate key per table and paste into each dock). Rooms are keyed by Dock Key (`api_key_id`); the dock’s local `?instance=` only isolates localStorage / BroadcastChannel. Rooms are created when a dock connects and pruned after idle — match history is never deleted with the room.
 
-| Tier | Dock keys (seats) | Room safety cap | Mobile + guest / table |
-|------|-------------------|-----------------|------------------------|
-| `streamer` | 2 | 2 | 5 |
-| `tournament_organizer` | 3 | 3 | 5 |
-| `league_director` | 10 | 10 | 5 |
-| `network_organization` | 25 | 25 | 10 |
-| `selfhost` | 2 | 2 | 5 |
+| Product name (Stripe / UI) | Internal id | Stripe Price env | Dock keys (seats) | Room safety cap | Mobile + guest / table | Checkout |
+|----------------------------|-------------|------------------|-------------------|-----------------|------------------------|----------|
+| **Streamer** | `streamer` | `STRIPE_PRICE_STREAMER` | 2 | 2 | 5 | Self-serve |
+| **Tournament Organizer** | `tournament_organizer` | `STRIPE_PRICE_TOURNAMENT_ORGANIZER` | 5 | 5 | 5 | Self-serve |
+| **League Director** | `league_director` | `STRIPE_PRICE_LEAGUE_DIRECTOR` | 10 | 10 | 5 | Self-serve |
+| **Network Organization** | `network_organization` | — | 25 | 25 | 10 | Contact only |
+| **Self-host** | `selfhost` | — | 2 | 2 | 5 | Not sold (dev / Docker) |
+
+Use the **Product name** column when creating Stripe Products. Map each Product’s recurring Price ID to the matching `STRIPE_PRICE_*` env var.
 
 ## Supabase setup (production)
 
@@ -118,15 +120,21 @@ On first Google sign-in, the server links `auth.users.id` to an `accounts` row. 
 
 ### Stripe billing (managed)
 
-1. Create three Stripe Products/Prices (Streamer, Tournament Organizer, League Director).
-2. Set `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and `STRIPE_PRICE_*` in `.env`.
-3. Add webhook endpoint `{PUBLIC_URL}/api/stripe/webhook` for `checkout.session.completed`, `customer.subscription.*`, `invoice.paid`, `invoice.payment_failed`.
-4. Enable Customer Portal (cancel / payment method / switch among the three prices).
-5. Local testing: `stripe listen --forward-to localhost:3000/api/stripe/webhook`.
+1. In Stripe, create three **Products** with these names (match the dashboard):
+   - **Streamer** → Price ID → `STRIPE_PRICE_STREAMER`
+   - **Tournament Organizer** → Price ID → `STRIPE_PRICE_TOURNAMENT_ORGANIZER`
+   - **League Director** → Price ID → `STRIPE_PRICE_LEAGUE_DIRECTOR`
+2. **Network Organization** is not a Checkout product — use `BILLING_CONTACT_URL` for sales contact.
+3. Set `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and the three `STRIPE_PRICE_*` values in `.env`.
+4. Add webhook endpoint `{PUBLIC_URL}/api/stripe/webhook` for `checkout.session.completed`, `customer.subscription.*`, `invoice.paid`, `invoice.payment_failed`.
+5. Enable Customer Portal (cancel / payment method / switch among the three self-serve prices).
+6. Local testing: `stripe listen --forward-to localhost:3000/api/stripe/webhook`.
 
-Checkout uses a **30-day card-required trial** (`STRIPE_TRIAL_DAYS`). Status becomes `trialing`, then `active`. Cancel/manage via Customer Portal. Network Organization is contact-only (`BILLING_CONTACT_URL`).
+Checkout uses a **30-day card-required trial** (`STRIPE_TRIAL_DAYS`). Status becomes `trialing`, then `active`. Cancel/manage via Customer Portal.
 
 Legal templates: `/terms` and `/privacy` (replace placeholders; obtain counsel review before commercial reliance).
+
+See the [plans table in Environment variables](#environment-variables) (Product name / Internal id / Price env) and the root [README plans section](../README.md#plans--products-hosted).
 
 ### Platform admin + trials
 

@@ -1780,9 +1780,20 @@ label.switch.toggle-disabled {
 	z-index: 200;
 }
 
+/* Open list must stack above the following player row / section (narrow / mobile wrap). */
+#player1Details:focus-within,
+#player2Details:focus-within {
+	position: relative;
+	z-index: 250;
+}
+
 .autocomplete-wrapper {
 	position: relative;
 	display: block;
+}
+
+.autocomplete-wrapper:focus-within {
+	z-index: 300;
 }
 
 .autocomplete-list {

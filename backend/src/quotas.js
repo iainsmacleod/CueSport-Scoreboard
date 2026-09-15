@@ -25,8 +25,8 @@ const BUILTIN_TIERS = {
     maxControlConnectionsPerRoom: 5,
   },
   tournament_organizer: {
-    maxApiKeys: 3,
-    maxRooms: 3,
+    maxApiKeys: 5,
+    maxRooms: 5,
     maxControlConnectionsPerRoom: 5,
   },
   league_director: {
