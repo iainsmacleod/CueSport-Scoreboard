@@ -30,8 +30,8 @@
 #   STRIPE_PRICE_STREAMER=price_...
 #   STRIPE_PRICE_TOURNAMENT_ORGANIZER=price_...
 #   STRIPE_PRICE_LEAGUE_DIRECTOR=price_...
-#   STRIPE_TRIAL_DAYS=14
 #   BILLING_CONTACT_URL=mailto:you@example.com
+# Trial days: set Product metadata trial_period_days on Streamer only (not an env var).
 # Webhook: {PUBLIC_URL}/api/stripe/webhook
 #
 # Legal / support (Terms + Privacy at /terms and /privacy):
@@ -89,7 +89,6 @@ services:
       STRIPE_PRICE_STREAMER: ${STRIPE_PRICE_STREAMER:-}
       STRIPE_PRICE_TOURNAMENT_ORGANIZER: ${STRIPE_PRICE_TOURNAMENT_ORGANIZER:-}
       STRIPE_PRICE_LEAGUE_DIRECTOR: ${STRIPE_PRICE_LEAGUE_DIRECTOR:-}
-      STRIPE_TRIAL_DAYS: ${STRIPE_TRIAL_DAYS:-14}
       BILLING_CONTACT_URL: ${BILLING_CONTACT_URL:-}
       # Legal / support
       SUPPORT_ISSUES_URL: ${SUPPORT_ISSUES_URL:-}

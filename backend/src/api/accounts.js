@@ -36,8 +36,8 @@ import {
   permissionsForAuth,
 } from '../lib/dock-roles.js';
 import { isPlatformAdmin } from '../lib/platform-admin.js';
-import { hasCloudSubscriptionAccess } from '../lib/subscription-access.js';
-import { isStripeConfigured } from '../lib/stripe-billing.js';
+import { hasCloudSubscriptionAccess, isAdminSupportTrialActive } from '../lib/subscription-access.js';
+import { getSubscriptionBillingSummary, isStripeConfigured } from '../lib/stripe-billing.js';
 
 function enrichRoom(room) {
   const cleanupMs = getRoomCleanupAfter(room.id);
@@ -107,6 +107,13 @@ export async function registerAccountRoutes(app) {
     const status = String(account.subscription_status || '').toLowerCase();
     const platformAdmin = isPlatformAdmin(account);
     const quota = getAccountQuota(account);
+    const complimentary = isAdminSupportTrialActive(account);
+    let billingSummary = null;
+    try {
+      billingSummary = await getSubscriptionBillingSummary(account);
+    } catch {
+      billingSummary = null;
+    }
     return {
       account: {
         id: account.id,
@@ -116,10 +123,13 @@ export async function registerAccountRoutes(app) {
         subscription_tier_display: getTierDisplayName(account.subscription_tier),
         trial_ends_at: account.trial_ends_at || null,
         stripe_customer_id: account.stripe_customer_id || null,
+        stripe_subscription_id: account.stripe_subscription_id || null,
         has_subscription_access: hasAccess,
+        is_complimentary: complimentary,
         needs_plan: !hasAccess && !config.allowDevAuth,
         is_trialing: status === 'trialing',
         simulated_plan: platformAdmin ? resolveSimulatedPlan(account) : null,
+        billing_summary: billingSummary,
       },
       is_platform_admin: platformAdmin,
       simulated_plan_options: platformAdmin ? getSimulatedPlanOptions() : null,

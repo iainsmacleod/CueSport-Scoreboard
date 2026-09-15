@@ -1,7 +1,7 @@
 /**
- * Cloud access: Stripe subscription active/trialing, unexpired admin support trial,
+ * Cloud access: Stripe subscription active/trialing, unexpired admin complimentary access,
  * or PLATFORM_ADMIN_EMAILS allowlist (ops — no plan required).
- * Paid tiers / product trials are owned by Stripe; trial_ends_at is support-only.
+ * Paid tiers / product trials are owned by Stripe; trial_ends_at is complimentary-only (no card).
  */
 
 import { isPlatformAdmin } from './platform-admin.js';

@@ -314,7 +314,7 @@ The OBS **dock remains the scoring authority**. Mobile and guest clients send co
 
 | Surface | URL | Purpose |
 |---------|-----|---------|
-| **Dashboard** | `/dashboard` | Sign in, see live tables, API keys, open mobile control; platform admins (env allowlist) also get an **Admin** tab for support trials and tenant ops |
+| **Dashboard** | `/dashboard` | Sign in, see live tables, API keys, open mobile control; platform admins (env allowlist) also get an **Admin** tab for complimentary access and tenant ops |
 | **Mobile control** | `/m/{room_id}` | Full remote (account owner): score, balls, setup, **Stream** (OBS start/stop + overlay P1/P2/H2H when Ball Scoring is on), Share |
 | **Guest control** | `/g/{token}` | Limited remote: score with the same action balls as the dock for that game (foul / undo; free ball on Snooker; respot on Bank / One Pocket), breaker, game type and its options (ball variant, win on break / early game, golden ball, point based), race, event info, and **Restart/End/Call Match** — no names. Standard guests have no Stream/Share; **OBS Dock Owner** guest links also get Stream + Share. **One active device per guest link** at a time (link stays valid until revoked). |
 | **Stream listing** | `/` or `/streams` | Public page of promoted live streams (requires Cloud + Promote toggle + OBS live + stream URL) |
@@ -372,12 +372,13 @@ Use these **product names** in Stripe (and in the dashboard billing UI). Interna
 
 **Stripe setup checklist** (managed cloud):
 
-1. Create three **Products** named exactly **Streamer**, **Tournament Organizer**, and **League Director**, each with a recurring **Price**.
-2. Put the Price IDs in `.env` as `STRIPE_PRICE_STREAMER`, `STRIPE_PRICE_TOURNAMENT_ORGANIZER`, `STRIPE_PRICE_LEAGUE_DIRECTOR`.
-3. Webhook: `{PUBLIC_URL}/api/stripe/webhook` — `checkout.session.completed`, `customer.subscription.*`, `invoice.paid`, `invoice.payment_failed`.
-4. Customer Portal: cancel at period end; allow switching among those three prices.
-5. Checkout uses a **14-day card-required trial** (`STRIPE_TRIAL_DAYS`, default 14) → account `trialing`, then `active`.
-6. New Google accounts start `inactive` until Checkout (or an admin **support trial**).
+1. Create three **Products** named exactly **Streamer**, **Tournament Organizer**, and **League Director**, each with a recurring **Price** (amounts only in Stripe).
+2. On **Streamer** only, set Product metadata `trial_period_days=14`. Do not set trial metadata on TO/League.
+3. Put the Price IDs in `.env` as `STRIPE_PRICE_STREAMER`, `STRIPE_PRICE_TOURNAMENT_ORGANIZER`, `STRIPE_PRICE_LEAGUE_DIRECTOR`.
+4. Webhook: `{PUBLIC_URL}/api/stripe/webhook` — `checkout.session.completed`, `customer.subscription.*`, `invoice.paid`, `invoice.payment_failed`.
+5. Customer Portal: cancel at period end; allow switching among those three prices.
+6. Streamer Checkout → card-required free trial from metadata → auto paid Streamer; TO/League charge immediately.
+7. New Google accounts start `inactive` until Checkout (or admin **Complimentary access**).
 
 Caps are overridable via `TIER_{TIER}_MAX_*` or `TIER_LIMITS_JSON` — see [`backend/.env.example`](backend/.env.example).
 
@@ -387,7 +388,7 @@ Caps are overridable via `TIER_{TIER}_MAX_*` or `TIER_LIMITS_JSON` — see [`bac
 |---|--------|-----------|
 | Auth | Google for account + OBS Dock Key per dock | Dev secret on dashboard; OBS Dock Key + server URL in dock Connection settings → Self-hosting |
 | Backend | `cuesport.macleod.systems` | Your own `backend/` deployment |
-| Cost | **Streamer** / **Tournament Organizer** / **League Director** via Stripe Checkout (14-day trial); **Network Organization** by contact; platform admins can grant a time-boxed **support trial** | Free (you run the server; default **Self-host** caps = Streamer) |
+| Cost | **Streamer** (free trial then monthly) / **Tournament Organizer** / **League Director** via Stripe Checkout; **Network Organization** by contact; platform admins can grant **Complimentary access** (no card) | Free (you run the server; default **Self-host** caps = Streamer) |
 | Platform admin | `PLATFORM_ADMIN_EMAILS` allowlist → Admin tab + `/api/admin/*` | Usually unused; same env var works if you want it |
 
 ---

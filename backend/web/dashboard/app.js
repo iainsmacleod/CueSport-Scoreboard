@@ -513,6 +513,90 @@ function renderTableCards(rooms) {
   });
 }
 
+function formatComplimentaryUntil(trialEndsAt) {
+  if (!trialEndsAt) return '—';
+  const d = parseUtcDate(trialEndsAt);
+  if (!d) return String(trialEndsAt);
+  const active = d.getTime() > Date.now();
+  return `${active ? 'Until' : 'Ended'} ${d.toLocaleString()}`;
+}
+
+function formatMoneyFromStripe(unitAmount, currency, interval) {
+  if (unitAmount == null || !Number.isFinite(Number(unitAmount))) return null;
+  const cur = String(currency || 'usd').toUpperCase();
+  const amount = Number(unitAmount) / 100;
+  let formatted;
+  try {
+    formatted = new Intl.NumberFormat(undefined, { style: 'currency', currency: cur }).format(amount);
+  } catch {
+    formatted = `$${amount.toFixed(2)}`;
+  }
+  const iv = String(interval || 'month').toLowerCase();
+  if (iv === 'month') return `${formatted}/mo`;
+  if (iv === 'year') return `${formatted}/yr`;
+  return `${formatted}/${iv}`;
+}
+
+function formatBillingDate(iso) {
+  if (!iso) return null;
+  const d = parseUtcDate(iso) || new Date(iso);
+  if (!d || Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function isComplimentaryActive(account) {
+  if (!account?.trial_ends_at) return false;
+  if (account.is_complimentary === true) return true;
+  const d = parseUtcDate(account.trial_ends_at);
+  return !!(d && d.getTime() > Date.now());
+}
+
+function buildAccountPlanLineHtml(account, quota) {
+  const display = quota?.tierDisplayName || account?.subscription_tier_display || account?.subscription_tier || '—';
+  const platformUnlimited = !!(quota?.platform_admin_unlimited || (isPlatformAdminUser && quota?.limits?.maxApiKeys == null));
+
+  if (isPlatformAdminUser) {
+    return platformUnlimited
+      ? 'Platform admin — unrestricted quotas (no plan required)'
+      : `Platform admin — simulating ${String(display).replace(/\s*\(simulated\)\s*$/i, '')} limits`;
+  }
+
+  if (isComplimentaryActive(account)) {
+    const until = formatBillingDate(account.trial_ends_at) || formatComplimentaryUntil(account.trial_ends_at);
+    const tierLabel = account.subscription_tier_display || display;
+    return `Complimentary · ${escapeHtml(tierLabel)} · until ${escapeHtml(until)} <span class="hint">(no card / not billed)</span>`;
+  }
+
+  const summary = account?.billing_summary;
+  const status = String(account?.subscription_status || '').toLowerCase();
+  const stripeStatus = String(summary?.status || status).toLowerCase();
+  const planName = summary?.planName || account?.subscription_tier_display || display;
+  const priceLabel = formatMoneyFromStripe(summary?.unitAmount, summary?.currency, summary?.interval);
+
+  if (stripeStatus === 'trialing' || account?.is_trialing) {
+    const ends = formatBillingDate(summary?.trialEnd || summary?.currentPeriodEnd);
+    const then = priceLabel ? ` · then ${escapeHtml(priceLabel)}` : '';
+    const endBit = ends ? ` · ends ${escapeHtml(ends)}` : '';
+    return `${escapeHtml(planName)} · Free trial${endBit}${then}`;
+  }
+
+  if (stripeStatus === 'active' || stripeStatus === 'past_due' || account?.stripe_subscription_id) {
+    const renews = formatBillingDate(summary?.currentPeriodEnd);
+    const priceBit = priceLabel ? ` · ${escapeHtml(priceLabel)}` : '';
+    if (stripeStatus === 'past_due') {
+      return `${escapeHtml(planName)}${priceBit} · payment past due`;
+    }
+    const renewBit = renews ? ` · renews ${escapeHtml(renews)}` : '';
+    return `${escapeHtml(planName)}${priceBit}${renewBit}`;
+  }
+
+  if (account?.needs_plan) {
+    return 'Inactive — choose a plan to unlock Cloud';
+  }
+
+  return `Plan: ${escapeHtml(display)}`;
+}
+
 function renderQuota(quota, account = null) {
   lastQuota = quota || null;
   const el = document.getElementById('quotaSummary');
@@ -528,19 +612,10 @@ function renderQuota(quota, account = null) {
   }
   const { tier, tierDisplayName, limits, usage } = quota;
   const display = tierDisplayName || tier;
-  const isTrialing = !!(account && account.is_trialing);
   const needsPlan = !!(account && account.needs_plan);
   const platformUnlimited = !!(quota.platform_admin_unlimited || (isPlatformAdminUser && limits.maxApiKeys == null));
   if (planLine) {
-    if (isPlatformAdminUser) {
-      planLine.textContent = platformUnlimited
-        ? 'Platform admin — unrestricted quotas (no plan required)'
-        : `Platform admin — simulating ${display.replace(/\s*\(simulated\)\s*$/i, '')} limits`;
-    } else if (needsPlan) {
-      planLine.innerHTML = 'No active plan — choose a subscription in Settings to create OBS Dock Keys.';
-    } else {
-      planLine.innerHTML = `Plan: ${escapeHtml(display)}${isTrialing ? ' <span class="plan-trial-badge">Trial</span>' : ''}`;
-    }
+    planLine.innerHTML = buildAccountPlanLineHtml(account, quota);
   }
   if (el) {
     if (platformUnlimited || limits.maxApiKeys == null) {
@@ -684,7 +759,7 @@ async function checkoutTier(tierId) {
 function renderBillingPanel(account, billingMeta, plansPayload) {
   const panel = document.getElementById('billingPanel');
   if (!panel) return;
-  const showBilling = !!(billingMeta?.stripeConfigured || account?.needs_plan || account?.stripe_customer_id);
+  const showBilling = !!(billingMeta?.stripeConfigured || account?.needs_plan || account?.stripe_customer_id || isComplimentaryActive(account));
   panel.classList.toggle('hidden', !showBilling);
   if (!showBilling) return;
 
@@ -696,13 +771,32 @@ function renderBillingPanel(account, billingMeta, plansPayload) {
   const termsLabel = document.getElementById('billingTermsLabel');
   const display = account?.subscription_tier_display || account?.subscription_tier || '—';
   const status = account?.subscription_status || 'inactive';
-  const trialBadge = account?.is_trialing ? ' · Trial' : '';
+  const streamerPlan = (plansPayload?.plans || []).find((p) => p.id === 'streamer');
+  const streamerTrialDays = streamerPlan?.trialDays ?? plansPayload?.trialDays ?? null;
+  const streamerPrice = formatMoneyFromStripe(streamerPlan?.unitAmount, streamerPlan?.currency, streamerPlan?.interval);
 
   if (statusEl) {
-    if (account?.needs_plan) {
-      statusEl.textContent = 'Choose a plan to start your 14-day trial (card required). Access begins immediately after Checkout.';
+    if (isComplimentaryActive(account)) {
+      const until = formatBillingDate(account.trial_ends_at) || formatComplimentaryUntil(account.trial_ends_at);
+      statusEl.textContent = `Complimentary access until ${until} (${display}) — no card, not billed. You can still subscribe via Stripe below.`;
+    } else if (account?.needs_plan) {
+      const trialBit = streamerTrialDays != null
+        ? `Streamer includes a ${streamerTrialDays}-day free trial (card required at Checkout; cancel before it ends to avoid charges).`
+        : 'Streamer may include a free trial when configured in Stripe (card required at Checkout).';
+      const thenBit = streamerPrice
+        ? ` After the trial you are charged ${streamerPrice} automatically unless you cancel.`
+        : ' After the trial you are charged the Streamer monthly price automatically unless you cancel.';
+      statusEl.textContent = `Your account has no Cloud access until you choose a plan. ${trialBit}${thenBit} Tournament Organizer and League Director bill monthly immediately (no free trial).`;
+    } else if (account?.is_trialing) {
+      const summary = account.billing_summary;
+      const ends = formatBillingDate(summary?.trialEnd || summary?.currentPeriodEnd);
+      const price = formatMoneyFromStripe(summary?.unitAmount, summary?.currency, summary?.interval);
+      statusEl.textContent = `Current: ${display} · Free trial${ends ? ` ends ${ends}` : ''}${price ? ` · then ${price}` : ''}. Manage payment methods and cancellation in the Stripe Customer Portal.`;
     } else {
-      statusEl.textContent = `Current: ${display}${trialBadge} (${status}). Manage payment methods and cancellation in the Stripe Customer Portal.`;
+      const summary = account.billing_summary;
+      const price = formatMoneyFromStripe(summary?.unitAmount, summary?.currency, summary?.interval);
+      const renews = formatBillingDate(summary?.currentPeriodEnd);
+      statusEl.textContent = `Current: ${display} (${status})${price ? ` · ${price}` : ''}${renews ? ` · renews ${renews}` : ''}. Manage payment methods and cancellation in the Stripe Customer Portal.`;
     }
   }
 
@@ -717,7 +811,7 @@ function renderBillingPanel(account, billingMeta, plansPayload) {
   plans.forEach((plan) => {
     const card = document.createElement('div');
     card.className = 'billing-plan-card';
-    if (account?.subscription_tier === plan.id && !account?.needs_plan) {
+    if (account?.subscription_tier === plan.id && !account?.needs_plan && !isComplimentaryActive(account)) {
       card.classList.add('is-current');
     }
     const limits = plan.limits || {};
@@ -728,6 +822,21 @@ function renderBillingPanel(account, billingMeta, plansPayload) {
     p.textContent = `${limits.maxApiKeys ?? '—'} dock keys · up to ${limits.maxControlConnectionsPerRoom ?? '—'} mobile/guest per table`;
     card.appendChild(h);
     card.appendChild(p);
+
+    const priceLabel = formatMoneyFromStripe(plan.unitAmount, plan.currency, plan.interval);
+    if (priceLabel || plan.trialDays) {
+      const priceEl = document.createElement('p');
+      priceEl.className = 'billing-plan-price hint';
+      if (plan.trialDays && priceLabel) {
+        priceEl.textContent = `${plan.trialDays}-day free trial, then ${priceLabel}`;
+      } else if (plan.trialDays) {
+        priceEl.textContent = `${plan.trialDays}-day free trial (card required)`;
+      } else if (priceLabel) {
+        priceEl.textContent = priceLabel;
+      }
+      card.appendChild(priceEl);
+    }
+
     if (plan.contact) {
       const a = document.createElement('a');
       a.className = 'btn secondary';
@@ -742,7 +851,11 @@ function renderBillingPanel(account, billingMeta, plansPayload) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'btn primary';
-      btn.textContent = account?.needs_plan ? 'Start trial' : 'Switch / subscribe';
+      if (account?.needs_plan || isComplimentaryActive(account)) {
+        btn.textContent = plan.trialDays ? 'Start free trial' : 'Subscribe';
+      } else {
+        btn.textContent = 'Switch / subscribe';
+      }
       btn.addEventListener('click', () => checkoutTier(plan.id));
       card.appendChild(btn);
     } else {
@@ -1355,14 +1468,6 @@ async function adminFetchJson(path, options = {}) {
   return body;
 }
 
-function formatSupportTrial(trialEndsAt) {
-  if (!trialEndsAt) return '—';
-  const d = parseUtcDate(trialEndsAt);
-  if (!d) return String(trialEndsAt);
-  const active = d.getTime() > Date.now();
-  return `${active ? 'Until' : 'Ended'} ${d.toLocaleString()}`;
-}
-
 function isViewingAllAccounts() {
   return !!(isPlatformAdminUser && platformViewAccountId === PLATFORM_VIEW_ALL);
 }
@@ -1674,7 +1779,7 @@ function renderAdminAccountsTable() {
       <td>${escapeHtml(a.email)}${isOwnAdminAccount(a.id) ? ' <span class="admin-self-badge">You</span>' : ''}</td>
       <td>${escapeHtml(a.subscription_status || '—')}</td>
       <td>${escapeHtml(adminTierLabel(a))}</td>
-      <td>${escapeHtml(formatSupportTrial(a.trial_ends_at))}</td>
+      <td>${escapeHtml(formatComplimentaryUntil(a.trial_ends_at))}</td>
       <td>${Number(a.api_key_count) || 0}</td>
       <td>${Number(a.room_count) || 0}</td>
       <td>${escapeHtml(a.last_activity_at ? formatLocalDate(a.last_activity_at) : '—')}</td>
@@ -1715,15 +1820,23 @@ async function loadAdminAccountDetail(accountId) {
     const trialBlock = isSelf
       ? ''
       : `
-      <h3 class="stats-section-title">Support trial</h3>
-      <p class="hint">Time-boxed access override. Does not set a paid tier — Stripe owns product trials and billing.</p>
+      <h3 class="stats-section-title">Complimentary access</h3>
+      <p class="hint">Outside Stripe — no credit card, not billed. Grants Cloud access until the end date. Does not create a subscription.</p>
       <form class="admin-trial-form" id="adminGrantTrialForm">
+        <label>
+          Tier
+          <select id="adminComplimentaryTier" required>
+            <option value="streamer">Streamer</option>
+            <option value="tournament_organizer">Tournament Organizer</option>
+            <option value="league_director">League Director</option>
+          </select>
+        </label>
         <label>
           Days (1–90)
           <input id="adminTrialDays" type="number" min="1" max="90" value="14" required />
         </label>
-        <button type="submit" class="btn save dash-action-btn">Grant / extend</button>
-        <button type="button" class="btn danger dash-action-btn" id="adminEndTrialBtn">End support trial</button>
+        <button type="submit" class="btn save dash-action-btn">Give complimentary access</button>
+        <button type="button" class="btn danger dash-action-btn" id="adminEndTrialBtn">Revoke complimentary access</button>
       </form>`;
     const invalidateBtn = isSelf
       ? ''
@@ -1745,7 +1858,7 @@ async function loadAdminAccountDetail(accountId) {
             ? ` <span class="hint">(billing field: ${escapeHtml(account.subscription_tier)})</span>`
             : ''
         }</div>
-        <div><strong>Support trial:</strong> ${escapeHtml(formatSupportTrial(account.trial_ends_at))}</div>
+        <div><strong>Complimentary:</strong> ${escapeHtml(formatComplimentaryUntil(account.trial_ends_at))}</div>
         <div><strong>Created:</strong> ${escapeHtml(account.created_at ? formatLocalDate(account.created_at) : '—')}</div>
         <div><strong>Quota:</strong> ${
           quota?.limits
@@ -1778,16 +1891,23 @@ async function loadAdminAccountDetail(accountId) {
         <span><strong>${Number(summary.tables) || 0}</strong> tables</span>
       </div>
     `;
+    const tierSelect = document.getElementById('adminComplimentaryTier');
+    if (tierSelect && account.subscription_tier) {
+      const t = String(account.subscription_tier);
+      if (['streamer', 'tournament_organizer', 'league_director'].includes(t)) {
+        tierSelect.value = t;
+      }
+    }
   } catch (err) {
     body.innerHTML = `<p class="error">${escapeHtml(err.message || 'Failed to load account')}</p>`;
   }
 }
 
-async function adminGrantTrial(days) {
+async function adminGrantTrial(days, tier) {
   if (!adminSelectedId || isOwnAdminAccount(adminSelectedId)) return;
   await adminFetchJson(`/api/admin/accounts/${encodeURIComponent(adminSelectedId)}/trial`, {
     method: 'POST',
-    body: JSON.stringify({ days }),
+    body: JSON.stringify({ days, tier }),
   });
   await loadAdminAccounts();
 }
@@ -1795,9 +1915,9 @@ async function adminGrantTrial(days) {
 async function adminEndTrial() {
   if (!adminSelectedId || isOwnAdminAccount(adminSelectedId)) return;
   const ok = await confirmDashAction({
-    title: 'End support trial',
-    message: 'Clear the support trial for this account? Access falls back to Stripe subscription status.',
-    confirmLabel: 'End trial',
+    title: 'Revoke complimentary access',
+    message: 'Clear complimentary access for this account? Access falls back to Stripe subscription status (or inactive if they have no plan).',
+    confirmLabel: 'Revoke access',
     danger: true,
   });
   if (!ok) return;
@@ -3927,10 +4047,11 @@ document.getElementById('adminDetailBody')?.addEventListener('submit', async (ev
   if (event.target?.id !== 'adminGrantTrialForm') return;
   event.preventDefault();
   const days = parseInt(document.getElementById('adminTrialDays')?.value, 10);
+  const tier = document.getElementById('adminComplimentaryTier')?.value || 'streamer';
   try {
-    await adminGrantTrial(days);
+    await adminGrantTrial(days, tier);
   } catch (err) {
-    setAdminStatus(err.message || 'Failed to grant support trial');
+    setAdminStatus(err.message || 'Failed to give complimentary access');
   }
 });
 

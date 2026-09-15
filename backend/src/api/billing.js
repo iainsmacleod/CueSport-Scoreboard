@@ -3,14 +3,19 @@ import { config } from '../config.js';
 import { getAccountQuota } from '../quotas.js';
 import { isAccountAdminAuth } from '../lib/dock-roles.js';
 import {
-  buildPlansCatalog,
+  buildPlansCatalogFromStripe,
   getStripe,
+  getSubscriptionBillingSummary,
   isStripeConfigured,
   mapStripeSubscriptionStatus,
   tierFromSubscription,
   tierToPriceId,
+  trialDaysForTier,
 } from '../lib/stripe-billing.js';
-import { hasCloudSubscriptionAccess } from '../lib/subscription-access.js';
+import {
+  hasCloudSubscriptionAccess,
+  isAdminSupportTrialActive,
+} from '../lib/subscription-access.js';
 
 async function resolveAccountAuth(request) {
   const auth = request.headers.authorization || '';
@@ -59,14 +64,33 @@ function syncAccountFromSubscription(accountId, subscription) {
 }
 
 export async function registerBillingRoutes(app) {
-  app.get('/api/billing/plans', async () => ({
-    plans: buildPlansCatalog(),
-    trialDays: config.stripeTrialDays,
-    stripeConfigured: isStripeConfigured(),
-    contactUrl: config.billingContactUrl || null,
-    termsUrl: `${config.publicUrl}/terms`,
-    privacyUrl: `${config.publicUrl}/privacy`,
-  }));
+  app.get('/api/billing/plans', async () => {
+    const plans = await buildPlansCatalogFromStripe();
+    const streamer = plans.find((p) => p.id === 'streamer');
+    return {
+      plans,
+      /** Streamer trial days from Stripe Product metadata (null if none). */
+      trialDays: streamer?.trialDays ?? null,
+      stripeConfigured: isStripeConfigured(),
+      contactUrl: config.billingContactUrl || null,
+      termsUrl: `${config.publicUrl}/terms`,
+      privacyUrl: `${config.publicUrl}/privacy`,
+    };
+  });
+
+  app.get('/api/billing/summary', async (request, reply) => {
+    const auth = await resolveAccountAuth(request);
+    if (!auth?.account) return reply.code(401).send({ error: 'Unauthorized' });
+    if (!isAccountAdminAuth(auth)) {
+      return reply.code(403).send({ error: 'Account sign-in required' });
+    }
+    const summary = await getSubscriptionBillingSummary(auth.account);
+    return {
+      complimentary: isAdminSupportTrialActive(auth.account),
+      trial_ends_at: auth.account.trial_ends_at || null,
+      stripe: summary,
+    };
+  });
 
   app.post('/api/billing/checkout', async (request, reply) => {
     const auth = await resolveAccountAuth(request);
@@ -108,6 +132,17 @@ export async function registerBillingRoutes(app) {
     const customerId = await ensureStripeCustomer(auth.account);
     const successUrl = `${config.publicUrl}/dashboard?billing=success`;
     const cancelUrl = `${config.publicUrl}/dashboard?billing=cancel`;
+    const trialDays = await trialDaysForTier(tier);
+
+    const subscriptionData = {
+      metadata: {
+        account_id: auth.account.id,
+        tier,
+      },
+    };
+    if (trialDays != null) {
+      subscriptionData.trial_period_days = trialDays;
+    }
 
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
@@ -116,13 +151,7 @@ export async function registerBillingRoutes(app) {
       success_url: successUrl,
       cancel_url: cancelUrl,
       line_items: [{ price: priceId, quantity: 1 }],
-      subscription_data: {
-        trial_period_days: config.stripeTrialDays,
-        metadata: {
-          account_id: auth.account.id,
-          tier,
-        },
-      },
+      subscription_data: subscriptionData,
       metadata: {
         account_id: auth.account.id,
         tier,
@@ -253,12 +282,15 @@ async function handleStripeEvent(event, log) {
 export function billingAccountFields(account) {
   const status = account?.subscription_status || 'inactive';
   const access = hasCloudSubscriptionAccess(account);
+  const complimentary = isAdminSupportTrialActive(account);
   return {
     subscription_status: status,
     subscription_tier: account?.subscription_tier || null,
     trial_ends_at: account?.trial_ends_at || null,
     stripe_customer_id: account?.stripe_customer_id || null,
+    stripe_subscription_id: account?.stripe_subscription_id || null,
     has_subscription_access: access,
+    is_complimentary: complimentary,
     needs_plan: !access && !config.allowDevAuth,
     quota: account ? getAccountQuota(account) : null,
   };

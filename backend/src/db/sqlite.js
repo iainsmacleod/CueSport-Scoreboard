@@ -702,13 +702,44 @@ export function getAccountAdminDetail(accountId) {
   };
 }
 
-/** Set or clear admin support trial end time (ISO / SQLite datetime string, or null). */
+/** Set or clear admin complimentary access end time (ISO / SQLite datetime string, or null). */
 export function setAccountTrialEndsAt(accountId, trialEndsAt) {
   const existing = getAccountById(accountId);
   if (!existing) return null;
   getDb().prepare(
     `UPDATE accounts SET trial_ends_at = ? WHERE id = ?`
   ).run(trialEndsAt || null, accountId);
+  return getAccountById(accountId);
+}
+
+/** Grant complimentary access: end date + quota tier (does not touch Stripe status). */
+export function setAccountComplimentaryAccess(accountId, { trialEndsAt, subscriptionTier } = {}) {
+  const existing = getAccountById(accountId);
+  if (!existing) return null;
+  const tier = subscriptionTier != null ? String(subscriptionTier) : existing.subscription_tier;
+  getDb().prepare(
+    `UPDATE accounts SET trial_ends_at = ?, subscription_tier = ? WHERE id = ?`
+  ).run(trialEndsAt || null, tier, accountId);
+  return getAccountById(accountId);
+}
+
+/**
+ * Revoke complimentary access. If subscription is still inactive, reset tier to streamer.
+ */
+export function clearAccountComplimentaryAccess(accountId) {
+  const existing = getAccountById(accountId);
+  if (!existing) return null;
+  const status = String(existing.subscription_status || '').toLowerCase();
+  const resetTier = status === 'inactive' || status === '';
+  if (resetTier) {
+    getDb().prepare(
+      `UPDATE accounts SET trial_ends_at = NULL, subscription_tier = 'streamer' WHERE id = ?`
+    ).run(accountId);
+  } else {
+    getDb().prepare(
+      `UPDATE accounts SET trial_ends_at = NULL WHERE id = ?`
+    ).run(accountId);
+  }
   return getAccountById(accountId);
 }
 

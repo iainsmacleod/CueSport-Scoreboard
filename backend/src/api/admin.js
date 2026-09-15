@@ -2,7 +2,7 @@ import * as sqlite from '../db/sqlite.js';
 import { resolveAuthFromRequest } from './accounts.js';
 import { isAccountAdminAuth } from '../lib/dock-roles.js';
 import { isPlatformAdmin } from '../lib/platform-admin.js';
-import { getAccountQuota } from '../quotas.js';
+import { getAccountQuota, getPaidSelfServeTiers, normalizeTierName } from '../quotas.js';
 import { getAccountStats, getAllAccountsStats, namespaceAccountStats } from '../stats/account-stats.js';
 import {
   kickAccountAdminClients,
@@ -200,11 +200,25 @@ export async function registerAdminRoutes(app) {
     if (days < TRIAL_DAYS_MIN || days > TRIAL_DAYS_MAX) {
       return reply.code(400).send({ error: `days must be an integer from ${TRIAL_DAYS_MIN} to ${TRIAL_DAYS_MAX}` });
     }
+    const allowedTiers = new Set(getPaidSelfServeTiers());
+    const tierRaw = request.body?.tier != null
+      ? String(request.body.tier).trim().toLowerCase()
+      : 'streamer';
+    if (!allowedTiers.has(tierRaw)) {
+      return reply.code(400).send({
+        error: 'tier must be streamer, tournament_organizer, or league_director',
+      });
+    }
+    const tier = normalizeTierName(tierRaw);
     const trialEndsAt = trialEndsIsoFromDays(days);
-    const updated = sqlite.setAccountTrialEndsAt(account.id, trialEndsAt);
+    const updated = sqlite.setAccountComplimentaryAccess(account.id, {
+      trialEndsAt,
+      subscriptionTier: tier,
+    });
     return {
       ok: true,
       trial_ends_at: updated.trial_ends_at,
+      subscription_tier: updated.subscription_tier,
       account: sqlite.getAccountAdminDetail(account.id),
     };
   });
@@ -215,7 +229,7 @@ export async function registerAdminRoutes(app) {
     const account = sqlite.getAccountById(request.params.id);
     if (!account) return reply.code(404).send({ error: 'Account not found' });
     if (rejectSelfAccountAdminMutation(auth, account.id, reply)) return;
-    sqlite.setAccountTrialEndsAt(account.id, null);
+    sqlite.clearAccountComplimentaryAccess(account.id);
     return {
       ok: true,
       trial_ends_at: null,

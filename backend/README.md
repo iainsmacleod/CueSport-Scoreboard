@@ -87,8 +87,7 @@ See [`.env.example`](.env.example).
 | `TIER_{TIER}_MAX_CONTROL_CONNECTIONS` | Per-tier mobile+guest connections per table |
 | `STRIPE_SECRET_KEY` | Stripe secret key (managed billing; leave empty on self-host) |
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret |
-| `STRIPE_PRICE_STREAMER` / `STRIPE_PRICE_TOURNAMENT_ORGANIZER` / `STRIPE_PRICE_LEAGUE_DIRECTOR` | Stripe Price IDs for self-serve tiers |
-| `STRIPE_TRIAL_DAYS` | Checkout trial length (default `14`) |
+| `STRIPE_PRICE_STREAMER` / `STRIPE_PRICE_TOURNAMENT_ORGANIZER` / `STRIPE_PRICE_LEAGUE_DIRECTOR` | Stripe Price IDs for self-serve tiers (amounts/trial come from Stripe) |
 | `BILLING_CONTACT_URL` | Contact CTA for Network Organization (e.g. `mailto:…`) |
 | `SUPPORT_ISSUES_URL` / `LEGAL_CONTACT_EMAIL` / `LEGAL_ENTITY_NAME` / `LEGAL_GOVERNING_LAW` | Legal page placeholders (`/terms`, `/privacy`) |
 | `ROOM_CLEANUP_GRACE_MS` | After last dock leaves, wait before deleting the room (default 45m) |
@@ -121,30 +120,30 @@ On first Google sign-in, the server links `auth.users.id` to an `accounts` row. 
 ### Stripe billing (managed)
 
 1. In Stripe, create three **Products** with these names (match the dashboard):
-   - **Streamer** → Price ID → `STRIPE_PRICE_STREAMER`
-   - **Tournament Organizer** → Price ID → `STRIPE_PRICE_TOURNAMENT_ORGANIZER`
-   - **League Director** → Price ID → `STRIPE_PRICE_LEAGUE_DIRECTOR`
+   - **Streamer** → Price ID → `STRIPE_PRICE_STREAMER` — set Product metadata `trial_period_days=14`
+   - **Tournament Organizer** → Price ID → `STRIPE_PRICE_TOURNAMENT_ORGANIZER` — no trial metadata
+   - **League Director** → Price ID → `STRIPE_PRICE_LEAGUE_DIRECTOR` — no trial metadata
 2. **Network Organization** is not a Checkout product — use `BILLING_CONTACT_URL` for sales contact.
-3. Set `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and the three `STRIPE_PRICE_*` values in `.env`.
+3. Set `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and the three `STRIPE_PRICE_*` values in `.env` (no trial env var — trial comes from Streamer Product metadata).
 4. Add webhook endpoint `{PUBLIC_URL}/api/stripe/webhook` for `checkout.session.completed`, `customer.subscription.*`, `invoice.paid`, `invoice.payment_failed`.
 5. Enable Customer Portal (cancel / payment method / switch among the three self-serve prices).
 6. Local testing: `stripe listen --forward-to localhost:3000/api/stripe/webhook`.
 
-Checkout uses a **14-day card-required trial** (`STRIPE_TRIAL_DAYS`). Status becomes `trialing`, then `active`. Cancel/manage via Customer Portal.
+**Streamer** Checkout applies a card-required free trial from Product metadata, then auto-converts to paid Streamer. **Tournament Organizer** / **League Director** charge immediately. Amounts are fetched from Stripe for the dashboard (never hardcoded). Cancel/manage via Customer Portal.
 
 Legal templates: `/terms` and `/privacy` (replace placeholders; obtain counsel review before commercial reliance).
 
 See the [plans table in Environment variables](#environment-variables) (Product name / Internal id / Price env) and the root [README plans section](../README.md#plans--products-hosted).
 
-### Platform admin + trials
+### Platform admin + complimentary access
 
-Hosted multi-tenant support is gated by **`PLATFORM_ADMIN_EMAILS`** (not Dock Key roles or subscription tiers). Allowlisted users get `is_platform_admin` on `GET /api/me`, an **Admin** tab, a **View account** filter on Tables/Stats (**My account**, **All accounts**, or one tenant), and `/api/admin/*` routes (list tenants, read tables/stats/players, revoke keys, invalidate sessions, grant/end **support trials**). Platform admins bypass subscription/trial gates on their own account and can pick a **Simulated plan** (default **Unrestricted**, or simulate any catalog tier’s dock-key/table limits via `PATCH /api/me/simulated-plan`).
+Hosted multi-tenant support is gated by **`PLATFORM_ADMIN_EMAILS`** (not Dock Key roles or subscription tiers). Allowlisted users get `is_platform_admin` on `GET /api/me`, an **Admin** tab, a **View account** filter on Tables/Stats (**My account**, **All accounts**, or one tenant), and `/api/admin/*` routes (list tenants, read tables/stats/players, revoke keys, invalidate sessions, grant/revoke **Complimentary access** with a chosen tier). Platform admins bypass subscription/trial gates on their own account and can pick a **Simulated plan** (default **Unrestricted**, or simulate any catalog tier’s dock-key/table limits via `PATCH /api/me/simulated-plan`).
 
 Access for dock/mobile join allows when **any** of:
 - `subscription_status` is `active` or `trialing` (Stripe Checkout + webhooks), **or**
-- `accounts.trial_ends_at` is set and still in the future (**admin support trial** for demos / grace / pre-card).
+- `accounts.trial_ends_at` is set and still in the future (**Complimentary access** — no card, not billed).
 
-Paid tiers are **not** edited by the admin UI; product free trials belong on Stripe (`trial_period_days` / `trialing`). Admin only sets `trial_ends_at`.
+Paid tiers are **not** edited by the admin UI; product free trials belong on Stripe (Streamer Product metadata). Admin Complimentary access sets `trial_ends_at` and `subscription_tier` only.
 
 ## WebSocket protocol
 
@@ -166,7 +165,8 @@ This backend is GPL-licensed alongside the scoreboard. You may run your own inst
 | POST | `/api/auth/dev-login` | Dev auth (secret → signed token) |
 | GET | `/api/me` | Account, rooms, keys, quota, billing flags, `is_platform_admin`, simulated plan (Bearer token) |
 | PATCH | `/api/me/simulated-plan` | Platform admin: `{ tier: "unrestricted" \| "<catalog_tier>" }` for plan-limit simulation |
-| GET | `/api/billing/plans` | Plan catalog (limits + contact tier) |
+| GET | `/api/billing/plans` | Plan catalog (limits + Stripe amounts/trial days + contact tier) |
+| GET | `/api/billing/summary` | Complimentary flag + live Stripe subscription summary |
 | POST | `/api/billing/checkout` | Stripe Checkout session `{ tier, acceptedTerms }` |
 | POST | `/api/billing/portal` | Stripe Customer Portal session |
 | POST | `/api/stripe/webhook` | Stripe webhooks (raw body + signature) |
@@ -179,8 +179,8 @@ This backend is GPL-licensed alongside the scoreboard. You may run your own inst
 | GET | `/api/admin/accounts/:id/stats` | Platform admin: account match stats |
 | GET | `/api/admin/accounts/:id/tables` | Platform admin: live tables for a tenant |
 | GET | `/api/admin/accounts/:id/players` | Platform admin: player search for a tenant |
-| POST | `/api/admin/accounts/:id/trial` | Platform admin: grant/extend support trial `{ days: 1–90 }` |
-| DELETE | `/api/admin/accounts/:id/trial` | Platform admin: end support trial |
+| POST | `/api/admin/accounts/:id/trial` | Platform admin: give complimentary access `{ days: 1–90, tier }` |
+| DELETE | `/api/admin/accounts/:id/trial` | Platform admin: revoke complimentary access |
 | POST | `/api/admin/accounts/:id/invalidate-sessions` | Platform admin: sign out everywhere for tenant |
 | POST | `/api/admin/accounts/:id/api-keys/:keyId/revoke` | Platform admin: revoke dock key |
 | POST | `/api/api-keys` | Create API key (tier-limited; requires active/trialing access on managed) |

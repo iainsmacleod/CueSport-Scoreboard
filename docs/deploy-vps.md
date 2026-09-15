@@ -201,11 +201,17 @@ Expect non-null `supabaseUrl` and `supabasePublishableKey`.
 | Dock “Dev login — enter secret” instead of Google | Dock can’t see publishable config (wrong server URL or stale dock JS) — refresh dock; check `/api/config/public` |
 | Redirect errors from Supabase | Redirect URL allowlist / `PUBLIC_URL` mismatch |
 
-New Google accounts on managed cloud (`ALLOW_DEV_AUTH=false`) are created in **SQLite** with `subscription_status=inactive` until Stripe Checkout (14-day card-required trial → `trialing` / `active`). Existing `active` accounts are grandfathered. Product defaults are **not** configured in Supabase.
+New Google accounts on managed cloud (`ALLOW_DEV_AUTH=false`) are created in **SQLite** with `subscription_status=inactive` until Stripe Checkout or admin **Complimentary access**. Streamer Checkout uses a card-required free trial when the Streamer Product has metadata `trial_period_days` (e.g. `14`) → `trialing`, then auto `active` on Streamer. Tournament Organizer / League Director charge immediately. Existing `active` accounts are grandfathered. Product defaults are **not** configured in Supabase.
 
 ### Stripe billing (production)
 
-1. Create Stripe Products/Prices for **Streamer**, **Tournament Organizer**, and **League Director**.
+**Legal vs brand:** activate Stripe as your LLC (tax ID, bank). Set public/Checkout branding to **CueSport Scoreboard Cloud** and your CueSport URL. Put the LLC name in `LEGAL_ENTITY_NAME`.
+
+1. Create Stripe Products/Prices (names must match exactly):
+   - **Streamer** — monthly USD Price; Product metadata `trial_period_days=14`
+   - **Tournament Organizer** — monthly USD Price; **no** trial metadata
+   - **League Director** — monthly USD Price; **no** trial metadata  
+   Launch amounts are entered only in Stripe (e.g. $12 / $20 / $30) — never hardcoded in the app.
 2. Add to `.env` (then recreate the container):
 
 ```env
@@ -214,18 +220,19 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 STRIPE_PRICE_STREAMER=price_...
 STRIPE_PRICE_TOURNAMENT_ORGANIZER=price_...
 STRIPE_PRICE_LEAGUE_DIRECTOR=price_...
-STRIPE_TRIAL_DAYS=14
 BILLING_CONTACT_URL=mailto:you@example.com
 LEGAL_CONTACT_EMAIL=you@example.com
-LEGAL_ENTITY_NAME=Your legal entity name
-LEGAL_GOVERNING_LAW=Your province/country
+LEGAL_ENTITY_NAME=MacLeod Systems Consulting, LLC
+LEGAL_GOVERNING_LAW=Province of Ontario, Canada
 ```
 
-3. Stripe Dashboard → Webhooks → `https://cuesport.example.com/api/stripe/webhook`
-4. Enable Customer Portal (cancel at period end; allow switching among the three prices).
+3. Stripe Dashboard → Webhooks → `https://cuesport.example.com/api/stripe/webhook`  
+   Events: `checkout.session.completed`, `customer.subscription.created/updated/deleted`, `invoice.paid`, `invoice.payment_failed`.
+4. Enable **Stripe Tax** (optional; Checkout `automatic_tax` may need a later code change) and **Customer Portal** (cancel at period end; allow switching among the three prices; CueSport branding).
 5. Review `/terms` and `/privacy` placeholders with counsel before relying on them commercially.
+6. Smoke test (Test mode): Streamer Checkout with `4242…` → `trialing` → Portal; TO Checkout → `active` immediately.
 
-Tier ids: `streamer`, `tournament_organizer`, `league_director` (plus contact-only `network_organization`). Self-host uses `selfhost`.
+Tier ids: `streamer`, `tournament_organizer`, `league_director` (plus contact-only `network_organization`). Self-host uses `selfhost`. Platform admins grant **Complimentary access** (no card) from the Admin tab.
 
 ## 7. Verify HTTPS
 

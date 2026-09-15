@@ -2204,10 +2204,10 @@ async function run() {
             Authorization: `Bearer ${tokenFresh}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ days: 7 }),
+          body: JSON.stringify({ days: 7, tier: 'streamer' }),
         });
         assert(
-          'Admin cannot grant support trial on self',
+          'Admin cannot give complimentary access on self',
           selfTrialBlocked.status === 403
             && selfTrialBlocked.body.code === 'admin_self_mutation_forbidden',
           JSON.stringify(selfTrialBlocked.body)
@@ -2415,11 +2415,12 @@ async function run() {
             Authorization: `Bearer ${tokenFresh}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ days: 7 }),
+          body: JSON.stringify({ days: 7, tier: 'tournament_organizer' }),
         });
         assert(
-          'Admin grant support trial',
-          grant.ok && !!grant.body.trial_ends_at,
+          'Admin give complimentary access',
+          grant.ok && !!grant.body.trial_ends_at
+            && grant.body.subscription_tier === 'tournament_organizer',
           JSON.stringify(grant.body)
         );
         const badDays = await fetchJson(`/api/admin/accounts/${grantTargetId}/trial`, {
@@ -2428,14 +2429,23 @@ async function run() {
             Authorization: `Bearer ${tokenFresh}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ days: 999 }),
+          body: JSON.stringify({ days: 999, tier: 'streamer' }),
         });
-        assert('Admin trial days clamped 400', badDays.status === 400);
+        assert('Admin complimentary days clamped 400', badDays.status === 400);
+        const badTier = await fetchJson(`/api/admin/accounts/${grantTargetId}/trial`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${tokenFresh}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ days: 3, tier: 'not_a_tier' }),
+        });
+        assert('Admin complimentary bad tier 400', badTier.status === 400);
         const endTrial = await fetchJson(`/api/admin/accounts/${grantTargetId}/trial`, {
           method: 'DELETE',
           headers: { Authorization: `Bearer ${tokenFresh}` },
         });
-        assert('Admin end support trial', endTrial.ok && endTrial.body.trial_ends_at == null);
+        assert('Admin revoke complimentary access', endTrial.ok && endTrial.body.trial_ends_at == null);
 
         const otherStartId = crypto.randomUUID();
         const otherEndId = crypto.randomUUID();
