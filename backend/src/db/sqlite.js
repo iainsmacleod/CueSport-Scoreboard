@@ -355,10 +355,10 @@ export function ensureAccount(email, authUserId = null) {
 }
 
 export function setAccountStripeCustomerId(accountId, customerId) {
-  if (!accountId || !customerId) return getAccountById(accountId);
+  if (!accountId) return null;
   getDb().prepare(
     `UPDATE accounts SET stripe_customer_id = ? WHERE id = ?`
-  ).run(customerId, accountId);
+  ).run(customerId || null, accountId);
   return getAccountById(accountId);
 }
 

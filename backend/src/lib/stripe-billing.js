@@ -127,8 +127,12 @@ export async function customerHasPriorSubscription(customerId) {
       limit: 1,
     });
     return (list?.data?.length || 0) > 0;
-  } catch {
-    // Fail closed for trials: if we cannot verify history, do not grant another trial.
+  } catch (err) {
+    const missing = err?.code === 'resource_missing'
+      || /no such customer/i.test(String(err?.raw?.message || err?.message || ''));
+    // Missing customer (e.g. after Test data wipe) = no subscription history.
+    if (missing) return false;
+    // Fail closed for other Stripe errors: do not grant another trial.
     return true;
   }
 }

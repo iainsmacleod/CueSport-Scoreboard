@@ -761,9 +761,20 @@ async function checkoutTier(tierId) {
 function renderBillingPanel(account, billingMeta, plansPayload) {
   const panel = document.getElementById('billingPanel');
   if (!panel) return;
-  const showBilling = !!(billingMeta?.stripeConfigured || account?.needs_plan || account?.stripe_customer_id || isComplimentaryActive(account));
+  // Platform admins are not billed — access is via PLATFORM_ADMIN_EMAILS, not Stripe.
+  const isAdmin = !!(isPlatformAdminUser || account?.is_platform_admin);
+  const showBilling = !isAdmin && !!(
+    billingMeta?.stripeConfigured
+    || account?.needs_plan
+    || account?.stripe_customer_id
+    || isComplimentaryActive(account)
+  );
   panel.classList.toggle('hidden', !showBilling);
-  if (!showBilling) return;
+  if (!showBilling) {
+    document.getElementById('manageBillingBtn')?.classList.add('hidden');
+    document.getElementById('accountManageBillingBtn')?.classList.add('hidden');
+    return;
+  }
 
   lastBillingCatalog = plansPayload || lastBillingCatalog;
   const statusEl = document.getElementById('billingStatusLine');
@@ -887,6 +898,10 @@ function renderBillingPanel(account, billingMeta, plansPayload) {
 
 async function refreshBillingUi(account, billingMeta) {
   if (!account) return;
+  if (isPlatformAdminUser || account.is_platform_admin) {
+    renderBillingPanel(account, billingMeta, null);
+    return;
+  }
   let plansPayload = null;
   try {
     if (billingMeta?.stripeConfigured || account.needs_plan) {

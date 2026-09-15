@@ -39,14 +39,32 @@ async function resolveAccountAuth(request) {
 async function ensureStripeCustomer(account) {
   const stripe = getStripe();
   if (!stripe) throw new Error('Stripe is not configured');
-  if (account.stripe_customer_id) {
-    return account.stripe_customer_id;
+
+  const existingId = account.stripe_customer_id;
+  if (existingId) {
+    try {
+      const existing = await stripe.customers.retrieve(existingId);
+      if (!existing?.deleted) return existingId;
+    } catch (err) {
+      const missing = err?.code === 'resource_missing'
+        || /no such customer/i.test(String(err?.raw?.message || err?.message || ''));
+      if (!missing) throw err;
+      // Stale ID after Stripe Test data wipe / sandbox reset.
+    }
+    const status = String(account.subscription_status || '').toLowerCase();
+    const clearPaidStatus = status === 'active' || status === 'trialing' || status === 'past_due';
+    sqlite.updateAccountSubscription(account.id, {
+      stripeSubscriptionId: null,
+      ...(clearPaidStatus ? { subscriptionStatus: 'inactive' } : {}),
+    });
   }
+
   const customer = await stripe.customers.create({
     email: account.email,
     metadata: { account_id: account.id },
   });
   sqlite.setAccountStripeCustomerId(account.id, customer.id);
+  account.stripe_customer_id = customer.id;
   return customer.id;
 }
 
@@ -224,6 +242,23 @@ export async function registerBillingRoutes(app) {
     }
 
     const stripe = getStripe();
+    try {
+      await stripe.customers.retrieve(auth.account.stripe_customer_id);
+    } catch (err) {
+      const missing = err?.code === 'resource_missing'
+        || /no such customer/i.test(String(err?.raw?.message || err?.message || ''));
+      if (!missing) throw err;
+      sqlite.updateAccountSubscription(auth.account.id, {
+        stripeSubscriptionId: null,
+        subscriptionStatus: 'inactive',
+      });
+      sqlite.setAccountStripeCustomerId(auth.account.id, null);
+      return reply.code(400).send({
+        error: 'Billing customer was reset in Stripe — choose a plan again to continue',
+        code: 'no_customer',
+      });
+    }
+
     const session = await stripe.billingPortal.sessions.create({
       customer: auth.account.stripe_customer_id,
       return_url: `${config.publicUrl}/dashboard`,
