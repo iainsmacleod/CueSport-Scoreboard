@@ -1898,9 +1898,17 @@ function isOwnAdminAccount(accountId) {
   return !!(lastAccount?.id && accountId && lastAccount.id === accountId);
 }
 
+function formatAdminTierLabel(value) {
+  if (!value) return '—';
+  return String(value)
+    .trim()
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 function adminTierLabel(account) {
-  if (account?.is_platform_admin) return 'Platform admin';
-  return account?.subscription_tier || '—';
+  if (account?.is_platform_admin) return 'Platform Admin';
+  return formatAdminTierLabel(account?.subscription_tier_display || account?.subscription_tier);
 }
 
 function renderAdminAccountsTable() {
@@ -1975,8 +1983,8 @@ async function loadAdminAccountDetail(accountId) {
           Days (1–90)
           <input id="adminTrialDays" type="number" min="1" max="90" value="14" required />
         </label>
-        <button type="submit" class="btn save dash-action-btn">Give complimentary access</button>
-        <button type="button" class="btn danger dash-action-btn" id="adminEndTrialBtn">Revoke complimentary access</button>
+        <button type="submit" class="btn save dash-action-btn">Give Complimentary Access</button>
+        <button type="button" class="btn danger dash-action-btn" id="adminEndTrialBtn">Revoke Complimentary Access</button>
       </form>`;
     const invalidateBtn = isSelf
       ? ''
@@ -1995,7 +2003,7 @@ async function loadAdminAccountDetail(accountId) {
         <div><strong>Status:</strong> ${escapeHtml(account.subscription_status || '—')}</div>
         <div><strong>Tier:</strong> ${escapeHtml(adminTierLabel(account))}${
           account.is_platform_admin && account.subscription_tier
-            ? ` <span class="hint">(billing field: ${escapeHtml(account.subscription_tier)})</span>`
+            ? ` <span class="hint">(billing field: ${escapeHtml(formatAdminTierLabel(account.subscription_tier))})</span>`
             : ''
         }</div>
         <div><strong>Complimentary:</strong> ${escapeHtml(formatComplimentaryUntil(account.trial_ends_at))}</div>
@@ -2042,14 +2050,14 @@ async function loadAdminAccountDetail(accountId) {
       document.getElementById('adminGrantTrialForm')?.querySelector('button[type="submit"]'),
       {
         icon: 'gift',
-        label: 'Give complimentary access',
-        title: 'Give complimentary access',
+        label: 'Give Complimentary Access',
+        title: 'Give Complimentary Access',
       }
     );
     setDashActionButtonContent(document.getElementById('adminEndTrialBtn'), {
       icon: 'stopSign',
-      label: 'Revoke complimentary access',
-      title: 'Revoke complimentary access',
+      label: 'Revoke Complimentary Access',
+      title: 'Revoke Complimentary Access',
     });
   } catch (err) {
     body.innerHTML = `<p class="error">${escapeHtml(err.message || 'Failed to load account')}</p>`;
@@ -2068,9 +2076,9 @@ async function adminGrantTrial(days, tier) {
 async function adminEndTrial() {
   if (!adminSelectedId || isOwnAdminAccount(adminSelectedId)) return;
   const ok = await confirmDashAction({
-    title: 'Revoke complimentary access',
+    title: 'Revoke Complimentary Access',
     message: 'Clear complimentary access for this account? If they have no active Stripe subscription, all Dock Keys will be revoked and connected docks disconnected. Access falls back to Stripe status otherwise.',
-    confirmLabel: 'Revoke access',
+    confirmLabel: 'Revoke Access',
     danger: true,
   });
   if (!ok) return;
