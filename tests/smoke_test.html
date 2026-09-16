@@ -767,6 +767,10 @@
                     !!dashboardDoc.getElementById('tablesOnboarding') &&
                     dashboardDoc.querySelectorAll('#tablesSetupTrack .tables-setup-slide').length === 4 &&
                     !!dashboardDoc.getElementById('tablesSetupOpenKeysBtn'));
+                assert('Cloud Dashboard', 'OBS setup explains both companion components',
+                    dashboardSource.indexOf('Control Panel Dock') !== -1 &&
+                    dashboardSource.indexOf('Browser Source') !== -1 &&
+                    dashboardSource.indexOf('companion OBS product') !== -1);
                 assert('Cloud Dashboard', 'Table cards use a centered responsive capped grid',
                     sharedStyles.indexOf('repeat(auto-fit, minmax(min(100%, 18rem), 22rem))') !== -1 &&
                     sharedStyles.indexOf('justify-content: center;') !== -1 &&
