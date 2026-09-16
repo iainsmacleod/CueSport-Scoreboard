@@ -702,6 +702,8 @@
                     mobileModernStyles.indexOf('linear-gradient(135deg, var(--mobile-purple), var(--mobile-blue))') !== -1 &&
                     mobileModernStyles.indexOf('body.mobile .btn.secondary') !== -1 &&
                     mobileModernStyles.indexOf('body.mobile .btn.save') !== -1);
+                assert('Cloud Mobile', 'Stream cards keep controls clear of their borders',
+                    sharedStyles.indexOf('.stream-section {\n  margin-top: 0.35rem;\n  padding: 0.75rem;') !== -1);
                 assert('Cloud Mobile', 'Same-name players can be created and selected by UUID',
                     mobileAppSource.indexOf('Create another player:') !== -1 &&
                     mobileAppSource.indexOf('Player ID ${shortId}') !== -1 &&

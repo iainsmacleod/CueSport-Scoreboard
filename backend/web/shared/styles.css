@@ -316,7 +316,10 @@ body.streams-page .btn.secondary {
   color: #ddd5ff;
   border-color: rgba(155, 92, 255, 0.38);
 }
-.stream-section { margin-top: 0.35rem; }
+.stream-section {
+  margin-top: 0.35rem;
+  padding: 0.75rem;
+}
 .stream-section .share-links-heading { margin-top: 0.75rem; }
 .stream-stats-mode-row {
   flex-direction: column;
