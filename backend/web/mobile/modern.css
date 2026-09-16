@@ -136,7 +136,7 @@ body.mobile .score-row {
 
 body.mobile .score-row .score-value {
   color: #fff;
-  font-size: clamp(2rem, 12vw, 3.5rem);
+  font-size: 2rem;
   font-weight: 800;
   text-shadow: 0 0 22px rgba(47, 128, 255, 0.28);
 }
