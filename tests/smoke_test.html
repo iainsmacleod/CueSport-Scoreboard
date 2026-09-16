@@ -683,6 +683,12 @@
                     sharedStyles.indexOf('.dash-tabs-inner') !== -1 &&
                     sharedStyles.indexOf('.mobile-bottom-nav-inner') !== -1 &&
                     sharedStyles.indexOf('max-width: var(--content-max, 720px);') !== -1);
+                assert('Cloud Mobile', 'Header, scrolling main, and footer use dashboard shell layout',
+                    sharedStyles.indexOf('body.mobile {\n  --content-max: 720px;') !== -1 &&
+                    sharedStyles.indexOf('body.mobile > header .mobile-header-row') !== -1 &&
+                    sharedStyles.indexOf('body.mobile > main#app') !== -1 &&
+                    sharedStyles.indexOf('height: 100dvh;') !== -1 &&
+                    sharedStyles.indexOf('position: static;') !== -1);
                 assert('Cloud Website', 'Public navigation and carousel buttons use purple-first styling',
                     sharedStyles.indexOf('body.landing-home .btn.primary') !== -1 &&
                     sharedStyles.indexOf('body.streams-page .btn.primary') !== -1 &&

@@ -2110,14 +2110,44 @@ a.table-card:focus-visible {
 }
 
 body.mobile.has-mobile-nav {
-  padding-bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: 0;
+}
+body.mobile {
+  --content-max: 720px;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+body.mobile > header {
+  flex: 0 0 auto;
+  width: 100%;
+}
+body.mobile > header .mobile-header-row {
+  width: 100%;
+  max-width: var(--content-max);
+  margin: 0 auto;
+}
+body.mobile > main#app {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  max-width: var(--content-max);
+  margin: 0 auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 .mobile-bottom-nav {
-  position: fixed;
-  left: 0;
-  right: 0;
+  flex: 0 0 auto;
+  position: static;
+  left: auto;
+  right: auto;
   transform: none;
-  bottom: 0;
+  bottom: auto;
   z-index: 20;
   display: block;
   width: 100%;
