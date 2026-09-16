@@ -243,6 +243,14 @@ function closeDashConfirm(result) {
 
 let dockKeyModalMode = 'create';
 let dockKeyModalKey = null;
+let activeDockKeys = [];
+
+function setDockKeyModalError(message = '') {
+  const error = document.getElementById('dashCreateKeyError');
+  if (!error) return;
+  error.textContent = message;
+  error.classList.toggle('hidden', !message);
+}
 
 function selectedDockKeyRole() {
   const select = document.getElementById('dashCreateKeyRole');
@@ -259,6 +267,7 @@ function setDockKeyRole(role) {
 function closeDockKeyModal() {
   const modal = document.getElementById('dashCreateKeyModal');
   if (modal) modal.classList.add('hidden');
+  setDockKeyModalError('');
   dockKeyModalMode = 'create';
   dockKeyModalKey = null;
 }
@@ -273,6 +282,7 @@ function openDockKeyModal({ mode = 'create', key = null } = {}) {
   const cancelBtn = document.getElementById('dashCreateKeyCancelBtn');
   const nameInput = document.getElementById('dashCreateKeyLabel');
   if (!modal) return;
+  setDockKeyModalError('');
   const editing = mode === 'edit' || mode === 'role' || mode === 'rename';
   dockKeyModalMode = editing ? 'edit' : 'create';
   dockKeyModalKey = editing ? key : null;
@@ -321,10 +331,21 @@ async function submitDockKeyModal() {
   const nameInput = document.getElementById('dashCreateKeyLabel');
   try {
     setError('');
+    setDockKeyModalError('');
     const label = String(nameInput?.value || '').trim().slice(0, 40);
     if (!label) {
-      setError('Enter a name (1–40 characters) for this dock key.');
+      setDockKeyModalError('Enter a name (1–40 characters) for this dock key.');
       nameInput?.focus();
+      return;
+    }
+    const duplicateName = activeDockKeys.some((key) => (
+      key.id !== dockKeyModalKey?.id
+      && String(key.label || '').trim().toLowerCase() === label.toLowerCase()
+    ));
+    if (duplicateName) {
+      setDockKeyModalError('Dock Key names must be unique within your account. Choose a different name.');
+      nameInput?.focus();
+      nameInput?.select();
       return;
     }
     const role = selectedDockKeyRole();
@@ -351,7 +372,7 @@ async function submitDockKeyModal() {
       revealKeyInList(created.label, created.key);
     }
   } catch (err) {
-    setError(err.message);
+    setDockKeyModalError(err.message || 'Could not save this Dock Key.');
   }
 }
 
@@ -1073,7 +1094,14 @@ async function consumeSubscribeIntent(account) {
 
 function renderBillingPanel(account, billingMeta, plansPayload) {
   const panel = document.getElementById('billingPanel');
+  const settingsPanel = document.getElementById('tabSettings');
   const tablesPromo = document.getElementById('tablesBillingPromo');
+  // Keep plan selection prominent for inactive accounts, but move billing below
+  // the operational settings once the account has access.
+  if (panel && settingsPanel) {
+    if (account?.needs_plan) settingsPanel.prepend(panel);
+    else settingsPanel.append(panel);
+  }
   // Platform admins are not billed — access is via PLATFORM_ADMIN_EMAILS, not Stripe.
   const isAdmin = !!(isPlatformAdminUser || account?.is_platform_admin);
   const showBilling = !isAdmin && !!(
@@ -1561,9 +1589,10 @@ async function shareApiKey(k) {
 function renderApiKeys(keys) {
   const keyList = document.getElementById('keyList');
   const revokeAllBtn = document.getElementById('revokeAllDockKeysBtn');
+  activeDockKeys = Array.isArray(keys) ? keys : [];
   keyList.innerHTML = '';
-  if (revokeAllBtn) revokeAllBtn.disabled = !(keys || []).length;
-  (keys || []).forEach((k) => {
+  if (revokeAllBtn) revokeAllBtn.disabled = !activeDockKeys.length;
+  activeDockKeys.forEach((k) => {
     const li = document.createElement('li');
     li.className = 'token-list-item';
     const label = document.createElement('span');
@@ -4843,6 +4872,9 @@ document.getElementById('dashCreateKeyCancelBtn')?.addEventListener('click', () 
 document.getElementById('dashCreateKeySubmitBtn')?.addEventListener('click', () => submitDockKeyModal());
 document.getElementById('dashCreateKeyRole')?.addEventListener('change', (event) => {
   updateDockKeyRoleDescription(event.target.value);
+});
+document.getElementById('dashCreateKeyLabel')?.addEventListener('input', () => {
+  setDockKeyModalError('');
 });
 document.getElementById('dashCreateKeyLabel')?.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') {

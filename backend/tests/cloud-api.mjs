@@ -534,6 +534,28 @@ async function run() {
         duplicateLabel.status === 409 && duplicateLabel.body.code === 'duplicate_key_label',
         JSON.stringify(duplicateLabel.body)
       );
+      const revokeForReuse = await fetchJson(`/api/api-keys/${apiKeyId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      assert('DELETE /api/api-keys frees its label', revokeForReuse.ok);
+      const reusedLabel = await fetchJson('/api/api-keys', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ label: primaryKeyLabel.toUpperCase() }),
+      });
+      assert(
+        'POST /api/api-keys permits a revoked label',
+        reusedLabel.ok && reusedLabel.body.key?.length === 32,
+        JSON.stringify(reusedLabel.body)
+      );
+      if (reusedLabel.ok) {
+        apiKey = reusedLabel.body.key;
+        apiKeyId = reusedLabel.body.id;
+      }
     } else {
       assert('POST /api/api-keys at limit or ok', keyRes.status === 403 && keyRes.body.code === 'api_key_limit');
       // Need a key for dock tests — create by revoking one first

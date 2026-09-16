@@ -734,9 +734,15 @@
                 assert('Cloud Dashboard', 'Inactive account links to Settings and hides default quota',
                     dashboardAppSource.indexOf('choose a plan in <a href="#billingPanel" class="dash-settings-link">Settings</a>') !== -1 &&
                     dashboardAppSource.indexOf("el.classList.toggle('hidden', needsPlan)") !== -1);
+                assert('Cloud Dashboard', 'Billing stays first when inactive and moves last when active',
+                    dashboardAppSource.indexOf('if (account?.needs_plan) settingsPanel.prepend(panel)') !== -1 &&
+                    dashboardAppSource.indexOf('else settingsPanel.append(panel)') !== -1);
                 assert('Cloud Dashboard', 'Dock Key labels request uniqueness',
                     dashboardSource.indexOf('Name/Label (unique)') !== -1 &&
-                    dashboardAppSource.indexOf('Choose a unique name for each seat') !== -1);
+                    !!dashboardDoc.getElementById('dashCreateKeyError') &&
+                    dashboardAppSource.indexOf('Choose a unique name for each seat') !== -1 &&
+                    dashboardAppSource.indexOf('let activeDockKeys = []') !== -1 &&
+                    dashboardAppSource.indexOf("setDockKeyModalError('Dock Key names must be unique within your account") !== -1);
                 assert('Cloud Dashboard', 'OBS Dock Keys can be revoked together with confirmation',
                     !!dashboardDoc.getElementById('revokeAllDockKeysBtn') &&
                     dashboardAppSource.indexOf("title: 'Revoke All OBS Dock Keys'") !== -1 &&
