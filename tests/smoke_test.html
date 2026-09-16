@@ -671,6 +671,14 @@
                 assert('Cloud Dashboard', 'Sign Out and Sign Out Everywhere return home',
                     (dashboardAppSource.match(/localSignOut\(\{[^}]*redirectHome: true[^}]*\}\)/g) || []).length === 2 &&
                     dashboardAppSource.indexOf("window.location.assign('/')") !== -1);
+                assert('Cloud Navigation', 'Dashboard uses a stable loading shell before auth resolves',
+                    !!dashboardDoc.querySelector('#dashboardBoot.app-boot') &&
+                    dashboardDoc.getElementById('loginSection')?.classList.contains('hidden') &&
+                    dashboardAppSource.indexOf('finishDashboardBoot()') !== -1);
+                assert('Cloud Navigation', 'Mobile keeps controls hidden during initial connection',
+                    !!mobileDoc.querySelector('#connectingSection.app-boot') &&
+                    mobileAppSource.indexOf("showConnecting(message || 'Connecting to table…')") !== -1 &&
+                    mobileAppSource.indexOf("setConnectionStatus('waiting')") !== -1);
                 assert('Cloud Dashboard', 'Dashboard buttons use purple-first Modern Cloud styling',
                     dashboardDoc.body.classList.contains('dashboard-page') &&
                     sharedStyles.indexOf('body.dashboard-page .btn.primary') !== -1 &&

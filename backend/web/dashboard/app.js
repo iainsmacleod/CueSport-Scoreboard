@@ -147,6 +147,13 @@ function show(id, visible) {
   }
 }
 
+function finishDashboardBoot() {
+  const boot = document.getElementById('dashboardBoot');
+  if (!boot) return;
+  boot.setAttribute('aria-busy', 'false');
+  boot.classList.add('hidden');
+}
+
 function openDashAccountModal() {
   const modal = document.getElementById('dashAccountModal');
   const btn = document.getElementById('dashAccountMenuBtn');
@@ -4238,14 +4245,13 @@ async function renderDashboard() {
     lastTablesFingerprint = '';
     lastAccount = null;
     setPlatformAdminUi(false);
+    finishDashboardBoot();
     show('loginSection', true);
     show('dashboardSection', false);
     return;
   }
   try {
     const me = await fetchMe(getServerUrl(), token);
-    show('loginSection', false);
-    show('dashboardSection', true);
     lastAccount = me.account || null;
     const emailEl = document.getElementById('userEmail');
     if (emailEl) emailEl.textContent = me.account.email;
@@ -4266,6 +4272,9 @@ async function renderDashboard() {
     if (isPlatformAdminUser) {
       await loadPlatformAccountFilterOptions().catch(() => {});
     }
+    show('loginSection', false);
+    show('dashboardSection', true);
+    finishDashboardBoot();
     wantLiveFeed = true;
     clearReconnect();
     connectLiveFeed().catch(() => {});
@@ -4279,6 +4288,7 @@ async function renderDashboard() {
     lastAccount = null;
     setPlatformAdminUi(false);
     setError(err.message);
+    finishDashboardBoot();
     show('loginSection', true);
     show('dashboardSection', false);
   }

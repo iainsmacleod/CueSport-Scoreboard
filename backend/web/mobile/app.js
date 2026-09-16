@@ -730,7 +730,11 @@ function show(id, visible) {
   document.getElementById(id).classList.toggle('hidden', !visible);
 }
 
-function showConnecting() {
+function showConnecting(message = 'Connecting to table…') {
+  const status = document.getElementById('connectingStatus');
+  if (status) status.textContent = message;
+  const section = document.getElementById('connectingSection');
+  if (section) section.setAttribute('aria-busy', 'true');
   show('connectingSection', true);
   show('loginSection', false);
   show('controlSection', false);
@@ -739,6 +743,8 @@ function showConnecting() {
 }
 
 function showLogin() {
+  const section = document.getElementById('connectingSection');
+  if (section) section.setAttribute('aria-busy', 'false');
   show('connectingSection', false);
   show('loginSection', true);
   show('controlSection', false);
@@ -748,6 +754,8 @@ function showLogin() {
 }
 
 function showControl() {
+  const section = document.getElementById('connectingSection');
+  if (section) section.setAttribute('aria-busy', 'false');
   show('connectingSection', false);
   show('loginSection', false);
   show('controlSection', true);
@@ -3085,12 +3093,9 @@ wireMobileNav();
 function startBootConnect(message) {
   wantConnection = true;
   bootConnectStarted = true;
-  show('connectingSection', false);
-  show('loginSection', false);
-  show('controlSection', true);
-  showMobileNav(true);
-  setConnectionStatus('disconnected');
-  setReconnectBanner(true, message || 'Connecting…');
+  showConnecting(message || 'Connecting to table…');
+  setConnectionStatus('waiting');
+  setReconnectBanner(false);
   ensureConnection({ force: true });
 }
 

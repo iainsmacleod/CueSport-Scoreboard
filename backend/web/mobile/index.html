@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
   <title>CueSport Scoreboard Cloud</title>
   <link rel="icon" type="image/png" href="/web/images/brand/logo.png?v=1" />
-  <link rel="stylesheet" href="/web/shared/styles.css?v=8.2.0.33" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.2.0.34" />
   <link rel="stylesheet" href="/web/mobile/modern.css?v=8.2.0.2" />
 </head>
 <body class="mobile">
@@ -41,8 +41,10 @@
       <button type="button" id="reconnectBtn" class="btn primary block">Reconnect</button>
     </div>
     <div id="viewOnlyBanner" class="view-only-banner hidden" role="status"></div>
-    <section id="connectingSection">
-      <p class="hint">Connecting…</p>
+    <section id="connectingSection" class="app-boot panel" role="status" aria-live="polite" aria-busy="true">
+      <img class="app-boot-mark" src="/web/images/brand/logo.png?v=1" alt="" />
+      <div class="app-boot-spinner" aria-hidden="true"></div>
+      <p id="connectingStatus">Connecting to table…</p>
     </section>
     <section id="loginSection" class="hidden">
       <p id="loginHint" class="hint">Sign in on the <a href="/dashboard">dashboard</a> first (same browser), or enter your <strong>dev auth secret</strong> once below.</p>
@@ -404,6 +406,6 @@
       <div id="poolRespotTargets" class="snooker-foul-targets"></div>
     </div>
   </div>
-  <script type="module" src="/web/mobile/app.js?v=8.2.0.3"></script>
+  <script type="module" src="/web/mobile/app.js?v=8.2.0.4"></script>
 </body>
 </html>

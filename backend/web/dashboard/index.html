@@ -6,7 +6,7 @@
   <title>CueSport Scoreboard Cloud — Dashboard</title>
   <link rel="icon" type="image/png" href="/web/images/brand/logo.png?v=1" />
   <link rel="apple-touch-icon" href="/web/images/balls/8ball_small.png" />
-  <link rel="stylesheet" href="/web/shared/styles.css?v=8.2.0.28" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.2.0.34" />
 </head>
 <body class="dashboard-page">
   <header class="site-header">
@@ -35,7 +35,12 @@
     </div>
   </header>
   <main id="app" class="dashboard-main">
-    <section id="loginSection" class="panel">
+    <section id="dashboardBoot" class="app-boot panel" role="status" aria-live="polite" aria-busy="true">
+      <img class="app-boot-mark" src="/web/images/brand/logo.png?v=1" alt="" />
+      <div class="app-boot-spinner" aria-hidden="true"></div>
+      <p>Loading dashboard…</p>
+    </section>
+    <section id="loginSection" class="panel hidden">
       <h2 id="loginSectionTitle">Sign In</h2>
       <p>
         CueSport Scoreboard Cloud is the managed relay for your OBS CueSport Scoreboard: remote mobile and guest control,
@@ -648,6 +653,6 @@
       </div>
     </div>
   </div>
-  <script type="module" src="/web/dashboard/app.js?v=8.2.0.15"></script>
+  <script type="module" src="/web/dashboard/app.js?v=8.2.0.16"></script>
 </body>
 </html>

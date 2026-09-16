@@ -17,6 +17,8 @@ Open:
 - **Stream listing:** http://localhost:3000/
 - **WebSocket:** ws://localhost:3000/ws
 
+The dashboard and mobile controller are separate page bundles. Their initial loading shells keep authentication and room setup from flashing the wrong view during navigation. If cross-page navigation grows more complex, consider a shared client-side application shell (or SPA router), with explicit teardown for WebSocket connections, polling, modal state, and browser history.
+
 Default database is **SQLite** at `backend/data/cuesport.db` — no external services required for development. Path is controlled by **`SQLITE_PATH`** (`src/config.js` → `src/db/sqlite.js`). On startup, a legacy `match_events` table without `account_id` is dropped and recreated (match history cleared; accounts/rooms kept). To fully reset local data, delete `cuesport.db` (and `-wal` / `-shm`) and restart.
 
 Set `DEV_AUTH_SECRET` and `DEV_AUTH_ACCOUNT_EMAIL` in `.env` (see `.env.example`) before using dev sign-in on the dashboard or mobile.
