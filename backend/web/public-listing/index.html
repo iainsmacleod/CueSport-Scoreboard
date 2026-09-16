@@ -4,14 +4,17 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>CueSport Scoreboard Cloud</title>
-  <link rel="icon" type="image/png" href="/web/images/balls/8ball_small.png" />
-  <link rel="stylesheet" href="/web/shared/styles.css?v=8.2.0.3" />
+  <link rel="icon" type="image/png" href="/web/images/brand/logo.png?v=1" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.2.0.11" />
 </head>
 <body>
   <header class="site-header">
     <div class="site-header-inner">
       <div>
-        <h1>CueSport Scoreboard Cloud <span class="site-version">v8.2.0</span></h1>
+        <a class="site-brand" href="/">
+          <img class="site-brand-mark" src="/web/images/brand/logo.png?v=1" alt="" />
+          <h1>CueSport Scoreboard Cloud <span class="site-version">v8.2.0</span></h1>
+        </a>
         <p class="subtitle">Remote scoring, multi-table control, and live stream discovery</p>
       </div>
       <nav class="site-nav" aria-label="Site">
@@ -31,41 +34,129 @@
       <p id="empty" class="hidden">No one is streaming with promotion enabled right now.</p>
     </section>
 
-    <section class="hero panel landing-marketing">
-      <h2>Score From Anywhere</h2>
-      <p>
-        Connect your OBS CueSport Scoreboard dock to CueSport Scoreboard Cloud, then control matches from your phone —
-        or share a guest scorer link.
-      </p>
-      <div class="hero-actions">
-        <a id="heroAuthBtn" class="btn primary" href="/dashboard">
-          <svg class="site-nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
-          Open Dashboard
-        </a>
-        <a class="btn" href="/streams">
-          <svg class="site-nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="14" height="12" rx="2"/><polygon points="22 8 16 12 22 16 22 8"/></svg>
-          Browse Live Streams
-        </a>
-      </div>
-    </section>
+    <div id="landingMarketing" class="landing-marketing">
+      <section class="hero panel">
+        <h2>CueSport Scoreboard Cloud</h2>
+        <p>
+          Connect every OBS CueSport Scoreboard to one secure hosted service. Run matches from your
+          phone, hand off focused guest controls, manage multiple tables, preserve searchable match
+          statistics, and promote active live streams — all from one Cloud account.
+        </p>
+        <div class="hero-actions">
+          <a id="heroAuthBtn" class="btn primary" href="/dashboard">
+            <svg class="site-nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+            Open Dashboard
+          </a>
+          <a class="btn" href="/streams">
+            <svg class="site-nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="14" height="12" rx="2"/><polygon points="22 8 16 12 22 16 22 8"/></svg>
+            Browse Live Streams
+          </a>
+        </div>
+        <p class="hint marketing-obs-note">
+          Cloud features require OBS running
+          <a href="https://github.com/iainsmacleod/CueSport-Scoreboard" target="_blank" rel="noopener noreferrer">CueSport Scoreboard</a>
+          (the free OBS dock plugin). Cloud is the hosted relay, remotes, and billing layer — not a standalone scoreboard.
+        </p>
+      </section>
 
-    <section class="feature-grid landing-marketing">
-      <article class="panel">
-        <h3>CueSport Scoreboard Cloud</h3>
-        <p>Remote mobile control, match event logging, and synced account stats. Separate from public stream listing.</p>
-      </article>
-      <article class="panel">
-        <h3>Stream Promotion</h3>
-        <p>Opt-in listing on this site <strong>only while OBS is streaming</strong> with promotion enabled on the dock.</p>
-      </article>
-      <article class="panel">
-        <h3>Multi-Table</h3>
-        <p>Run multiple OBS docks — each Dock Key registers as its own table in your account.</p>
-      </article>
-    </section>
+      <section class="panel marketing-carousel-panel" aria-roledescription="carousel" aria-label="Product highlights">
+        <div class="marketing-carousel" id="marketingCarousel" tabindex="0">
+          <div class="marketing-carousel-viewport">
+            <ul class="marketing-carousel-track" id="marketingCarouselTrack">
+              <li class="marketing-slide is-wide" data-caption="OBS CueSport Scoreboard Dock">
+                <figure class="marketing-slide-media">
+                  <img src="/web/images/marketing/obs-dock-controls.png" alt="OBS CueSport Scoreboard dock scoring controls" width="1280" height="720" loading="eager" />
+                </figure>
+                <div class="marketing-slide-caption">
+                  <h3>OBS CueSport Scoreboard Dock</h3>
+                  <p>Keep authoritative match controls beside OBS while Cloud mirrors live scoring to authenticated mobile and guest devices in real time.</p>
+                </div>
+              </li>
+              <li class="marketing-slide is-wide" data-caption="Cloud Connection">
+                <figure class="marketing-slide-media">
+                  <img src="/web/images/marketing/obs-dock-cloud.png" alt="OBS dock Cloud Connection settings" width="1280" height="720" loading="lazy" />
+                </figure>
+                <div class="marketing-slide-caption">
+                  <h3>One Dock Key per Table</h3>
+                  <p>Connect each OBS dock to its own secure Cloud seat. Manage table access, remote roles, and optional stream promotion centrally.</p>
+                </div>
+              </li>
+              <li class="marketing-slide is-phone" data-caption="Mobile Scoring">
+                <figure class="marketing-slide-media marketing-phone-frame">
+                  <img src="/web/images/marketing/mobile-score.png?v=2" alt="Mobile match scoring screen" width="390" height="844" loading="lazy" />
+                </figure>
+                <div class="marketing-slide-caption">
+                  <h3>Score From Your Phone</h3>
+                  <p>Move around the venue while controlling players, breakers, balls, fouls, racks, race details, and overall match state.</p>
+                </div>
+              </li>
+              <li class="marketing-slide is-phone" data-caption="Guest Remote Links">
+                <figure class="marketing-slide-media marketing-phone-frame">
+                  <img src="/web/images/marketing/mobile-share.png?v=2" alt="Mobile share and guest remote screen" width="390" height="844" loading="lazy" />
+                </figure>
+                <div class="marketing-slide-caption">
+                  <h3>Guest Remote Links</h3>
+                  <p>Hand a scorer a QR link with focused match controls, one active device per link, and no access to account or replay settings.</p>
+                </div>
+              </li>
+              <li class="marketing-slide is-phone" data-caption="Multi-Table Control">
+                <figure class="marketing-slide-media marketing-phone-frame">
+                  <img src="/web/images/marketing/mobile-tables.png?v=2" alt="Mobile tables list" width="390" height="844" loading="lazy" />
+                </figure>
+                <div class="marketing-slide-caption">
+                  <h3>Multi-Table Control</h3>
+                  <p>See every active OBS dock from one responsive dashboard, review the live score, and jump directly into the table that needs attention.</p>
+                </div>
+              </li>
+              <li class="marketing-slide is-wide" data-caption="Cloud Match Statistics">
+                <figure class="marketing-slide-media">
+                  <img src="/web/images/marketing/dashboard-tables.png?v=2" alt="CueSport Scoreboard Cloud match statistics leaderboard" width="1024" height="529" loading="lazy" />
+                </figure>
+                <div class="marketing-slide-caption">
+                  <h3>Cloud Match Statistics</h3>
+                  <p>Automatically retain completed results, compare leaderboard records, browse recent matches, and filter a player’s history from any device.</p>
+                </div>
+              </li>
+            </ul>
+          </div>
+          <div class="marketing-carousel-controls">
+            <button type="button" class="btn secondary marketing-carousel-btn" id="carouselPrev" aria-label="Previous slide">Prev</button>
+            <div class="marketing-carousel-dots" id="marketingCarouselDots" role="tablist" aria-label="Carousel slides"></div>
+            <button type="button" class="btn secondary marketing-carousel-btn" id="carouselNext" aria-label="Next slide">Next</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="feature-grid">
+        <article class="panel">
+          <h3>Remote Scoring</h3>
+          <p>Phone and guest remotes stay synchronized with the authoritative OBS dock. Give floor scorers responsive controls without moving them behind the streaming computer.</p>
+        </article>
+        <article class="panel">
+          <h3>Multi-table Dock Keys</h3>
+          <p>Assign one secure Dock Key to each OBS CueSport Scoreboard seat. Scale from a single weekly stream to a multi-table tournament under one account.</p>
+        </article>
+        <article class="panel">
+          <h3>Match Statistics &amp; Live Streams</h3>
+          <p>Build searchable Cloud history from completed matches, then opt into public discovery while OBS is actively streaming and promotion is enabled.</p>
+        </article>
+      </section>
+
+      <section id="landingPricing" class="panel landing-pricing hidden">
+        <h2>Plans &amp; pricing</h2>
+        <p id="landingPricingHint" class="hint">Prices come from Stripe and may update. Start on Streamer with a free trial when offered.</p>
+        <div id="landingPlanGrid" class="billing-plan-grid"></div>
+        <p id="landingPricingNotice" class="hint hidden" aria-live="polite"></p>
+      </section>
+
+      <section id="landingPricingSoon" class="panel landing-pricing-soon hidden">
+        <h2>Plans &amp; pricing</h2>
+        <p class="hint">Self-serve plans will appear here when Stripe billing is configured on this server.</p>
+        <a class="btn primary" href="/dashboard">Open Dashboard</a>
+      </section>
+    </div>
   </main>
   <script type="module">
-    // /streams shows the live list; home is marketing only (streams via Browse CTA).
     const isStreamsPage = /\/streams\/?$/.test(location.pathname);
     if (isStreamsPage) {
       document.body.classList.add('streams-page');
@@ -73,6 +164,9 @@
     } else {
       document.body.classList.add('landing-home');
     }
+
+    const SUBSCRIBE_KEY = 'cuesport_subscribe_tier';
+    const CAROUSEL_MS = 5000;
 
     function syncAuthNav() {
       const signedIn = !!localStorage.getItem('cuesport_token');
@@ -102,6 +196,198 @@
         .replace(/"/g, '&quot;');
     }
 
+    function formatMoneyFromStripe(unitAmount, currency, interval) {
+      if (unitAmount == null || !Number.isFinite(Number(unitAmount))) return null;
+      const cur = String(currency || 'usd').toUpperCase();
+      const amount = Number(unitAmount) / 100;
+      let money;
+      try {
+        money = new Intl.NumberFormat(undefined, { style: 'currency', currency: cur }).format(amount);
+      } catch {
+        money = `$${amount.toFixed(2)}`;
+      }
+      const iv = String(interval || 'month').toLowerCase();
+      if (iv === 'year') return `${money}/yr`;
+      if (iv === 'week') return `${money}/wk`;
+      return `${money}/mo`;
+    }
+
+    function setMarketingVisible(show) {
+      document.body.classList.toggle('streams-empty', !!(isStreamsPage && show));
+      if (show) startCarousel();
+      else stopCarousel();
+    }
+
+    /* ---- Carousel ---- */
+    let carouselIndex = 0;
+    let carouselTimer = null;
+    let carouselPaused = false;
+
+    function slides() {
+      return Array.from(document.querySelectorAll('#marketingCarouselTrack .marketing-slide'));
+    }
+
+    function goToSlide(index) {
+      const items = slides();
+      if (!items.length) return;
+      carouselIndex = ((index % items.length) + items.length) % items.length;
+      const track = document.getElementById('marketingCarouselTrack');
+      if (track) track.style.transform = `translateX(-${carouselIndex * 100}%)`;
+      document.querySelectorAll('#marketingCarouselDots button').forEach((dot, i) => {
+        const on = i === carouselIndex;
+        dot.classList.toggle('is-active', on);
+        dot.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
+    }
+
+    function buildDots() {
+      const dots = document.getElementById('marketingCarouselDots');
+      if (!dots) return;
+      dots.innerHTML = '';
+      slides().forEach((slide, i) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.setAttribute('role', 'tab');
+        btn.setAttribute('aria-label', slide.dataset.caption || `Slide ${i + 1}`);
+        btn.addEventListener('click', () => {
+          goToSlide(i);
+          restartCarousel();
+        });
+        dots.appendChild(btn);
+      });
+    }
+
+    function stopCarousel() {
+      if (carouselTimer) {
+        clearInterval(carouselTimer);
+        carouselTimer = null;
+      }
+    }
+
+    function startCarousel() {
+      stopCarousel();
+      const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+      if (reduce || carouselPaused) return;
+      const marketing = document.getElementById('landingMarketing');
+      if (!marketing || marketing.offsetParent === null) {
+        // Hidden via CSS (streams with live list)
+        if (isStreamsPage && !document.body.classList.contains('streams-empty')) return;
+      }
+      carouselTimer = setInterval(() => goToSlide(carouselIndex + 1), CAROUSEL_MS);
+    }
+
+    function restartCarousel() {
+      stopCarousel();
+      startCarousel();
+    }
+
+    function initCarousel() {
+      buildDots();
+      goToSlide(0);
+      const root = document.getElementById('marketingCarousel');
+      document.getElementById('carouselPrev')?.addEventListener('click', () => {
+        goToSlide(carouselIndex - 1);
+        restartCarousel();
+      });
+      document.getElementById('carouselNext')?.addEventListener('click', () => {
+        goToSlide(carouselIndex + 1);
+        restartCarousel();
+      });
+      root?.addEventListener('mouseenter', () => {
+        carouselPaused = true;
+        stopCarousel();
+      });
+      root?.addEventListener('mouseleave', () => {
+        carouselPaused = false;
+        startCarousel();
+      });
+      root?.addEventListener('focusin', () => {
+        carouselPaused = true;
+        stopCarousel();
+      });
+      root?.addEventListener('focusout', () => {
+        carouselPaused = false;
+        startCarousel();
+      });
+      let touchX = null;
+      root?.addEventListener('touchstart', (e) => {
+        touchX = e.changedTouches?.[0]?.clientX ?? null;
+      }, { passive: true });
+      root?.addEventListener('touchend', (e) => {
+        const x = e.changedTouches?.[0]?.clientX;
+        if (touchX == null || x == null) return;
+        const dx = x - touchX;
+        if (Math.abs(dx) < 40) return;
+        goToSlide(carouselIndex + (dx < 0 ? 1 : -1));
+        restartCarousel();
+        touchX = null;
+      }, { passive: true });
+      if (!isStreamsPage) startCarousel();
+    }
+
+    /* ---- Pricing ---- */
+    function goSubscribe(tier) {
+      try {
+        sessionStorage.setItem(SUBSCRIBE_KEY, tier);
+      } catch { /* ignore */ }
+      window.location.href = `/dashboard?subscribe=${encodeURIComponent(tier)}`;
+    }
+
+    async function loadPricing() {
+      const section = document.getElementById('landingPricing');
+      const soon = document.getElementById('landingPricingSoon');
+      const grid = document.getElementById('landingPlanGrid');
+      if (!section || !grid) return;
+      try {
+        const res = await fetch('/api/billing/plans');
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Failed to load plans');
+        if (!data.stripeConfigured) {
+          section.classList.add('hidden');
+          soon?.classList.remove('hidden');
+          return;
+        }
+        soon?.classList.add('hidden');
+        section.classList.remove('hidden');
+        grid.innerHTML = '';
+        const plans = (data.plans || []).filter((p) => p.checkout);
+        plans.forEach((plan) => {
+          const card = document.createElement('div');
+          card.className = 'billing-plan-card';
+          const limits = plan.limits || {};
+          const priceLabel = formatMoneyFromStripe(plan.unitAmount, plan.currency, plan.interval);
+          let priceText = priceLabel || 'See checkout';
+          if (plan.trialDays && priceLabel) priceText = `${plan.trialDays}-day free trial, then ${priceLabel}`;
+          else if (plan.trialDays) priceText = `${plan.trialDays}-day free trial (card required)`;
+          const btnLabel = plan.trialDays ? 'Start free trial' : 'Get started';
+          card.innerHTML = `
+            <h3>${escapeHtml(plan.displayName || plan.id)}</h3>
+            <p class="billing-plan-limits">${escapeHtml(String(limits.maxApiKeys ?? '—'))} dock keys · up to ${escapeHtml(String(limits.maxControlConnectionsPerRoom ?? '—'))} mobile/guest per table</p>
+            <p class="billing-plan-price hint">${escapeHtml(priceText)}</p>
+          `;
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'btn primary';
+          btn.textContent = btnLabel;
+          btn.addEventListener('click', () => goSubscribe(plan.id));
+          card.appendChild(btn);
+          grid.appendChild(card);
+        });
+        if (!grid.children.length) {
+          section.classList.add('hidden');
+          soon?.classList.remove('hidden');
+        }
+      } catch (err) {
+        section.classList.add('hidden');
+        soon?.classList.remove('hidden');
+        const notice = document.getElementById('landingPricingNotice');
+        if (notice) {
+          notice.textContent = err.message || 'Could not load plans';
+          notice.classList.remove('hidden');
+        }
+      }
+    }
+
     async function loadStreams() {
       const list = document.getElementById('streamList');
       const empty = document.getElementById('empty');
@@ -114,14 +400,17 @@
         if (!res.ok) {
           empty.textContent = 'Could not load live streams right now.';
           empty.classList.remove('hidden');
+          setMarketingVisible(true);
           return;
         }
         if (!streams.length) {
           empty.textContent = 'No one is streaming with promotion enabled right now.';
           empty.classList.remove('hidden');
+          setMarketingVisible(true);
           return;
         }
         empty.classList.add('hidden');
+        setMarketingVisible(false);
         streams.forEach((s) => {
           const st = s.state || {};
           const li = document.createElement('li');
@@ -141,13 +430,17 @@
           `;
           list.appendChild(li);
         });
-      } catch (err) {
+      } catch {
         list.innerHTML = '';
         empty.textContent = 'Could not load live streams right now.';
         empty.classList.remove('hidden');
+        setMarketingVisible(true);
       }
     }
+
     syncAuthNav();
+    initCarousel();
+    loadPricing();
     if (isStreamsPage) {
       loadStreams();
       setInterval(loadStreams, 15000);

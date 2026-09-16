@@ -4,15 +4,18 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>CueSport Scoreboard Cloud — Dashboard</title>
-  <link rel="icon" type="image/png" href="/web/images/balls/8ball_small.png" />
+  <link rel="icon" type="image/png" href="/web/images/brand/logo.png?v=1" />
   <link rel="apple-touch-icon" href="/web/images/balls/8ball_small.png" />
-  <link rel="stylesheet" href="/web/shared/styles.css?v=8.2.0.5" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.2.0.11" />
 </head>
 <body>
   <header class="site-header">
     <div class="site-header-inner">
       <div>
-        <h1>CueSport Scoreboard Cloud <span class="site-version">v8.2.0</span></h1>
+        <a class="site-brand" href="/">
+          <img class="site-brand-mark" src="/web/images/brand/logo.png?v=1" alt="" />
+          <h1>CueSport Scoreboard Cloud</h1>
+        </a>
       </div>
       <div class="site-header-actions">
         <nav class="site-nav">
@@ -114,6 +117,23 @@
         </p>
       </div>
       <div id="tabTables" class="dash-tab-panel">
+        <div id="tablesBillingPromo" class="panel billing-promo-panel hidden">
+          <h2>Choose a plan to unlock Cloud</h2>
+          <p id="tablesBillingStatusLine" class="hint"></p>
+          <div id="tablesBillingPlanPicker" class="billing-plan-grid"></div>
+          <div class="billing-terms-row">
+            <label id="tablesBillingTermsLabel" class="billing-terms-check hint">
+              <input type="checkbox" id="tablesBillingAcceptTerms" />
+              <span>
+                I agree to the
+                <a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a>
+                and
+                <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+              </span>
+            </label>
+          </div>
+          <p id="tablesBillingNotice" class="hint hidden" aria-live="polite"></p>
+        </div>
         <p class="hint">Only OBS docks currently connected appear here. Tap a table to open mobile control. Each table is one OBS Dock Key — create a key per table. On one OBS machine with multiple scoreboards, also use distinct <code>?instance=</code> values so local scoring stays separate.</p>
         <div id="tableCards" class="table-cards"></div>
       </div>

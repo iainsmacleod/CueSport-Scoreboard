@@ -1,0 +1,176 @@
+body.mobile {
+  --mobile-bg: #060b18;
+  --mobile-surface: #0d1628;
+  --mobile-raised: #121d33;
+  --mobile-border: #263552;
+  --mobile-text: #f2f4ff;
+  --mobile-muted: #98a6c7;
+  --mobile-blue: #2f80ff;
+  --mobile-purple: #9b5cff;
+  --mobile-success: #42dd8b;
+  --mobile-danger: #ff6b85;
+  background:
+    radial-gradient(circle at 15% 0%, rgba(47, 128, 255, 0.14), transparent 28rem),
+    radial-gradient(circle at 95% 10%, rgba(155, 92, 255, 0.11), transparent 24rem),
+    var(--mobile-bg);
+  color: var(--mobile-text);
+  font-family: Inter, "Segoe UI", system-ui, sans-serif;
+}
+
+body.mobile > header {
+  background: rgba(6, 11, 24, 0.92);
+  border-bottom-color: var(--mobile-border);
+  backdrop-filter: blur(14px);
+}
+
+body.mobile .mobile-header-brand h1 {
+  color: var(--mobile-text);
+  letter-spacing: -0.02em;
+}
+
+body.mobile #app {
+  background: transparent;
+}
+
+body.mobile .panel,
+body.mobile .live-board,
+body.mobile .stream-section,
+body.mobile .guest-link-item,
+body.mobile .share-qr-wrap {
+  background:
+    linear-gradient(145deg, rgba(47, 128, 255, 0.045), rgba(155, 92, 255, 0.025)),
+    var(--mobile-surface);
+  border: 1px solid var(--mobile-border);
+  border-radius: 14px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+}
+
+body.mobile h1,
+body.mobile h2,
+body.mobile h3,
+body.mobile h4,
+body.mobile strong,
+body.mobile label {
+  color: var(--mobile-text);
+}
+
+body.mobile .hint,
+body.mobile .live-meta,
+body.mobile .share-limitations,
+body.mobile .ball-grid-hint {
+  color: var(--mobile-muted);
+}
+
+body.mobile input,
+body.mobile select,
+body.mobile textarea {
+  background: var(--mobile-bg);
+  color: var(--mobile-text);
+  border-color: var(--mobile-border);
+  border-radius: 9px;
+}
+
+body.mobile input:focus,
+body.mobile select:focus,
+body.mobile textarea:focus,
+body.mobile button:focus-visible,
+body.mobile a:focus-visible {
+  outline: 2px solid var(--mobile-blue);
+  outline-offset: 2px;
+}
+
+body.mobile .btn,
+body.mobile .icon-btn {
+  background: var(--mobile-raised);
+  color: var(--mobile-text);
+  border: 1px solid var(--mobile-border);
+  border-radius: 10px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.18);
+}
+
+body.mobile .btn:hover,
+body.mobile .icon-btn:hover {
+  border-color: var(--mobile-blue);
+}
+
+body.mobile .btn.primary,
+body.mobile .btn.save,
+body.mobile .score-row .btn:last-child {
+  background: linear-gradient(135deg, var(--mobile-blue), var(--mobile-purple));
+  border-color: transparent;
+  color: #fff;
+  font-weight: 700;
+}
+
+body.mobile .btn.danger {
+  background: rgba(255, 107, 133, 0.13);
+  border-color: rgba(255, 107, 133, 0.62);
+  color: #ffdce2;
+}
+
+body.mobile .score-row {
+  background: var(--mobile-surface);
+  border: 1px solid var(--mobile-border);
+  border-radius: 12px;
+  padding: 0.65rem;
+}
+
+body.mobile .score-row .score-value {
+  color: #fff;
+  font-size: clamp(2rem, 12vw, 3.5rem);
+  font-weight: 800;
+  text-shadow: 0 0 22px rgba(47, 128, 255, 0.28);
+}
+
+body.mobile .score-row:nth-child(even) .score-value {
+  text-shadow: 0 0 22px rgba(155, 92, 255, 0.28);
+}
+
+body.mobile .slot-name,
+body.mobile .share-links-heading {
+  color: #bba0ff;
+}
+
+body.mobile .mobile-bottom-nav {
+  background: rgba(6, 11, 24, 0.94);
+  border-top-color: var(--mobile-border);
+  backdrop-filter: blur(16px);
+}
+
+body.mobile .mobile-nav-btn {
+  color: var(--mobile-muted);
+  border-radius: 10px;
+}
+
+body.mobile .mobile-nav-btn.active {
+  color: #fff;
+  background: linear-gradient(180deg, rgba(47, 128, 255, 0.18), rgba(155, 92, 255, 0.13));
+  box-shadow: inset 0 -3px 0 var(--mobile-purple);
+}
+
+body.mobile .mobile-nav-btn.active .mobile-nav-icon {
+  color: var(--mobile-purple);
+}
+
+body.mobile .conn-status.connected {
+  color: var(--mobile-success);
+}
+
+body.mobile .conn-status.disconnected {
+  color: var(--mobile-danger);
+}
+
+body.mobile .share-qr {
+  border-radius: 10px;
+}
+
+body.mobile a {
+  color: #79b0ff;
+}
+
+body.mobile button:disabled,
+body.mobile input:disabled,
+body.mobile select:disabled {
+  opacity: 0.45;
+  box-shadow: none;
+}

@@ -1,0 +1,207 @@
+:root {
+	--cs-bg: #060b18;
+	--cs-surface: #0d1628;
+	--cs-raised: #121d33;
+	--cs-border: #263552;
+	--cs-text: #f2f4ff;
+	--cs-muted: #98a6c7;
+	--cs-blue: #2f80ff;
+	--cs-purple: #9b5cff;
+	--cs-success: #42dd8b;
+	--cs-danger: #ff6b85;
+}
+
+body {
+	background:
+		radial-gradient(circle at 12% 0%, rgba(47, 128, 255, 0.12), transparent 34%),
+		radial-gradient(circle at 92% 8%, rgba(155, 92, 255, 0.1), transparent 30%),
+		var(--cs-bg);
+	color: var(--cs-text);
+	font-family: Inter, "Segoe UI", Arial, sans-serif;
+}
+
+#mainDiv {
+	background: rgba(6, 11, 24, 0.92);
+	border: 1px solid var(--cs-border);
+	box-shadow: 0 18px 50px rgba(0, 0, 0, 0.38);
+}
+
+#mainDiv div,
+#mainDiv label,
+#mainDiv span,
+#mainDiv p,
+#mainDiv h1,
+#mainDiv h2,
+#mainDiv h3 {
+	color: var(--cs-text);
+}
+
+.header {
+	background: linear-gradient(90deg, rgba(47, 128, 255, 0.1), rgba(155, 92, 255, 0.1));
+	border-bottom: 1px solid var(--cs-border);
+	padding: 9px 12px;
+}
+
+.header a span {
+	color: var(--cs-muted) !important;
+}
+
+.tab {
+	background: #091120;
+	border-bottom: 1px solid var(--cs-border);
+	padding: 5px;
+	gap: 4px;
+}
+
+.tab button,
+.zoom-btn {
+	background: transparent !important;
+	color: var(--cs-muted) !important;
+	border: 1px solid transparent !important;
+	border-radius: 7px !important;
+	font-weight: 600;
+}
+
+.tab button:hover,
+.zoom-btn:hover {
+	background: var(--cs-raised) !important;
+	color: var(--cs-text) !important;
+	border-color: var(--cs-border) !important;
+}
+
+.tab button.active {
+	background: linear-gradient(135deg, rgba(47, 128, 255, 0.26), rgba(155, 92, 255, 0.22)) !important;
+	color: #fff !important;
+	border-color: var(--cs-blue) !important;
+	box-shadow: inset 0 -2px 0 var(--cs-purple);
+}
+
+.tabcontent {
+	background: transparent !important;
+	padding: 12px !important;
+}
+
+.section-header,
+.section-header-with-controls {
+	background: linear-gradient(90deg, rgba(47, 128, 255, 0.13), rgba(155, 92, 255, 0.08)) !important;
+	color: var(--cs-text) !important;
+	border: 1px solid var(--cs-border) !important;
+	border-radius: 9px !important;
+	padding: 9px 11px !important;
+	margin: 8px 0 !important;
+	font-weight: 700;
+	letter-spacing: 0.02em;
+}
+
+input,
+select,
+textarea,
+.dropdown {
+	background: var(--cs-surface) !important;
+	color: var(--cs-text) !important;
+	border: 1px solid var(--cs-border) !important;
+	border-radius: 7px !important;
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+button:focus-visible {
+	outline: 2px solid var(--cs-blue) !important;
+	outline-offset: 2px;
+}
+
+button,
+input[type="button"],
+input[type="submit"],
+.button,
+.obs28 {
+	border-radius: 7px !important;
+	border: 1px solid var(--cs-border) !important;
+	background: var(--cs-raised) !important;
+	color: var(--cs-text) !important;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+}
+
+button:hover,
+input[type="button"]:hover,
+input[type="submit"]:hover,
+.button:hover,
+.obs28:hover {
+	border-color: var(--cs-blue) !important;
+	filter: brightness(1.08);
+}
+
+#sendPInfo,
+#sendPScores,
+#cloudConnectionSaveConnectBtn,
+.modal-footer .primary {
+	background: linear-gradient(135deg, var(--cs-blue), var(--cs-purple)) !important;
+	border-color: transparent !important;
+	color: #fff !important;
+	font-weight: 700;
+}
+
+#resetScores,
+.danger,
+button.danger {
+	background: rgba(255, 107, 133, 0.14) !important;
+	border-color: rgba(255, 107, 133, 0.65) !important;
+	color: #ffd9e0 !important;
+}
+
+#p1Score,
+#p1Balls {
+	background: rgba(47, 128, 255, 0.2) !important;
+	border: 1px solid var(--cs-blue) !important;
+	color: #fff !important;
+}
+
+#p2Score,
+#p2Balls {
+	background: rgba(155, 92, 255, 0.2) !important;
+	border: 1px solid var(--cs-purple) !important;
+	color: #fff !important;
+}
+
+.modal-content {
+	background:
+		linear-gradient(155deg, rgba(47, 128, 255, 0.08), transparent 42%),
+		var(--cs-surface) !important;
+	border: 1px solid var(--cs-border) !important;
+	border-radius: 14px !important;
+	box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55) !important;
+	color: var(--cs-text) !important;
+}
+
+.modal-header,
+.modal-footer {
+	border-color: var(--cs-border) !important;
+}
+
+#cloudRelayStatus {
+	color: var(--cs-muted) !important;
+	font-weight: 600;
+}
+
+#cloudRelayStatus.connected,
+.connected {
+	color: var(--cs-success) !important;
+}
+
+.slider_round {
+	background-color: #34415c !important;
+}
+
+input:checked + .slider_round {
+	background: linear-gradient(90deg, var(--cs-blue), var(--cs-purple)) !important;
+}
+
+button:disabled,
+input:disabled,
+select:disabled,
+.tablinks-disabled {
+	opacity: 0.42 !important;
+	box-shadow: none !important;
+}

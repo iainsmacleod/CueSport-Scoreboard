@@ -6586,6 +6586,8 @@ function togglePlayer(isChecked, options) {
 }
 
 function obsThemeChange() {
+    const modernTheme = document.getElementById("cloudModernTheme");
+    if (modernTheme) modernTheme.disabled = true;
     if (document.getElementById("obsTheme").value == "28") {
         setStorageItem("obsTheme", "28");
         document.getElementById("obsTheme").value = "28";
@@ -6653,10 +6655,24 @@ function obsThemeChange() {
         document.styleSheets[4].disabled = true;
         document.styleSheets[5].disabled = false;
     }
+    if (document.getElementById("obsTheme").value == "modern") {
+        setStorageItem("obsTheme", "modern");
+        document.getElementById("obsTheme").value = "modern";
+        document.getElementsByTagName("body")[0].style.background = "";
+        document.styleSheets[0].disabled = true;
+        document.styleSheets[1].disabled = true;
+        document.styleSheets[2].disabled = true;
+        document.styleSheets[3].disabled = true;
+        document.styleSheets[4].disabled = true;
+        document.styleSheets[5].disabled = true;
+        if (modernTheme) modernTheme.disabled = false;
+    }
 }
 
 function startThemeCheck() {
     if (getStorageItem("obsTheme") == null) { setStorageItem("obsTheme", "27"); document.getElementById("obsTheme").value = "27"; };
+    const modernTheme = document.getElementById("cloudModernTheme");
+    if (modernTheme) modernTheme.disabled = true;
     if (getStorageItem("obsTheme") == "28") {
         document.getElementById("obsTheme").value = "28";
         document.getElementsByTagName("body")[0].style.background = "#2b2e38";
@@ -6716,6 +6732,17 @@ function startThemeCheck() {
         document.styleSheets[3].disabled = true;
         document.styleSheets[4].disabled = true;
         document.styleSheets[5].disabled = false;
+    }
+    if (getStorageItem("obsTheme") == "modern") {
+        document.getElementById("obsTheme").value = "modern";
+        document.getElementsByTagName("body")[0].style.background = "";
+        document.styleSheets[0].disabled = true;
+        document.styleSheets[1].disabled = true;
+        document.styleSheets[2].disabled = true;
+        document.styleSheets[3].disabled = true;
+        document.styleSheets[4].disabled = true;
+        document.styleSheets[5].disabled = true;
+        if (modernTheme) modernTheme.disabled = false;
     }
 }
 

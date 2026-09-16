@@ -46,8 +46,18 @@ header {
 }
 .mobile-header-row h1 {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: 0.95rem;
   line-height: 1.25;
+  flex: 0 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+}
+.mobile .mobile-header-row {
+  justify-content: center;
+}
+.mobile .mobile-header-brand {
+  flex: 0 1 auto;
+  justify-content: center;
 }
 .conn-status {
   position: relative;
@@ -805,6 +815,30 @@ ul { padding-left: 1.2rem; }
   letter-spacing: 0.02em;
   white-space: nowrap;
 }
+a.site-brand {
+  color: inherit;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+a.site-brand:hover {
+  opacity: 0.88;
+}
+a.site-brand h1 {
+  margin: 0;
+}
+.site-brand-mark {
+  display: block;
+  width: 2rem;
+  height: 2rem;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+.mobile-brand-mark {
+  width: 1.8rem;
+  height: 1.8rem;
+}
 .site-nav {
   display: flex;
   gap: 0.5rem;
@@ -846,6 +880,24 @@ body.streams-page .site-nav-streams {
   outline-offset: 0;
 }
 @media (max-width: 720px) {
+  body.has-dash-nav > .site-header .site-header-inner {
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.75rem;
+  }
+  body.has-dash-nav > .site-header .site-header-inner > div:first-child {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+  }
+  body.has-dash-nav > .site-header a.site-brand h1 {
+    font-size: clamp(0.9rem, 4.5vw, 1.15rem);
+    white-space: nowrap;
+  }
+  body.has-dash-nav > .site-header .site-header-actions,
+  body.has-dash-nav > .site-header .site-nav {
+    justify-content: center;
+  }
   .site-nav .btn {
     min-width: 2.5rem;
     padding: 0.55rem 0.65rem;
@@ -914,6 +966,9 @@ body.streams-page .site-nav-streams {
 }
 body.streams-page .landing-marketing {
   display: none;
+}
+body.streams-page.streams-empty .landing-marketing {
+  display: block;
 }
 body.streams-page .live-now-panel {
   margin-top: 0;
@@ -993,6 +1048,13 @@ body.has-dash-nav .dash-tabs[hidden] {
   flex-wrap: wrap;
   margin-top: 1rem;
 }
+.marketing-obs-note {
+  margin: 1rem 0 0;
+  line-height: 1.45;
+}
+.marketing-obs-note a {
+  color: #7aa2f7;
+}
 .feature-grid {
   display: grid;
   gap: 0.75rem;
@@ -1000,6 +1062,121 @@ body.has-dash-nav .dash-tabs[hidden] {
 }
 @media (min-width: 640px) {
   .feature-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* Landing product carousel */
+.marketing-carousel-panel {
+  padding: 0.85rem 0.9rem 1rem;
+  margin-bottom: 0.75rem;
+}
+.marketing-carousel {
+  outline: none;
+}
+.marketing-carousel-viewport {
+  overflow: hidden;
+  border-radius: 8px;
+  background: rgba(15, 16, 24, 0.65);
+}
+.marketing-carousel-track {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  transition: transform 0.45s ease;
+  will-change: transform;
+}
+.marketing-slide {
+  flex: 0 0 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.marketing-slide-media {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 12rem;
+}
+.marketing-slide.is-wide .marketing-slide-media img {
+  width: 100%;
+  height: auto;
+  max-height: 22rem;
+  object-fit: contain;
+  border-radius: 6px;
+  border: 1px solid #414868;
+  background: #0f1018;
+}
+.marketing-phone-frame {
+  width: min(14rem, 72vw);
+  margin-inline: auto;
+  padding: 0.55rem;
+  border-radius: 1.35rem;
+  border: 2px solid #565f89;
+  background: #1a1b26;
+  box-shadow: inset 0 0 0 1px #292e42;
+}
+.marketing-phone-frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 9 / 19.5;
+  object-fit: cover;
+  object-position: top center;
+  border-radius: 0.95rem;
+  background: #0f1018;
+}
+.marketing-slide-caption h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+}
+.marketing-slide-caption p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  opacity: 0.9;
+}
+.marketing-carousel-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.marketing-carousel-btn {
+  flex-shrink: 0;
+}
+.marketing-carousel-dots {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem;
+  flex: 1;
+}
+.marketing-carousel-dots button {
+  width: 0.55rem;
+  height: 0.55rem;
+  padding: 0;
+  border-radius: 50%;
+  border: 0;
+  background: #565f89;
+  cursor: pointer;
+}
+.marketing-carousel-dots button.is-active {
+  background: #7aa2f7;
+  transform: scale(1.15);
+}
+.landing-pricing h2,
+.landing-pricing-soon h2 {
+  margin-top: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .marketing-carousel-track {
+    transition: none;
+  }
 }
 .dash-tabs {
   display: none;
@@ -1214,12 +1391,20 @@ a.table-card {
   color: inherit;
   text-decoration: none;
   text-align: center;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  background:
+    linear-gradient(145deg, rgba(47, 128, 255, 0.08), rgba(155, 92, 255, 0.05)),
+    #0d1628;
+  border: 1px solid #263552;
+  border-radius: 14px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+  padding: 1rem;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
   cursor: pointer;
 }
 a.table-card:hover,
 a.table-card:focus-visible {
-  border-color: #7aa2f7;
+  border-color: #2f80ff;
+  transform: translateY(-1px);
   outline: none;
 }
 .table-card h3 {
@@ -1231,7 +1416,7 @@ a.table-card:focus-visible {
   font-size: 0.75rem;
   opacity: 0.7;
 }
-.table-status.online { color: #9ece6a; opacity: 1; }
+.table-status.online { color: #42dd8b; opacity: 1; }
 .table-account-email,
 .stats-account-email {
   margin: 0.1rem 0 0;
@@ -1240,8 +1425,14 @@ a.table-card:focus-visible {
   opacity: 0.75;
   word-break: break-word;
 }
-.table-players { margin: 0.15rem 0; font-weight: 600; }
-.table-score { margin: 0; font-size: 1.15rem; font-weight: 700; }
+.table-players { margin: 0.35rem 0; font-weight: 700; color: #f2f4ff; }
+.table-score {
+  margin: 0;
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 0 22px rgba(155, 92, 255, 0.3);
+}
 .table-score-current {
   margin-top: 0.15rem;
   font-size: 1rem;
@@ -2737,6 +2928,13 @@ body.controls-locked #mobileBottomNav {
   grid-template-columns: repeat(auto-fit, minmax(11.5rem, 1fr));
   gap: 0.75rem;
   margin: 0.75rem 0 1rem;
+}
+.billing-promo-panel {
+  margin-bottom: 1rem;
+  border-color: #7aa2f7;
+}
+.billing-promo-panel h2 {
+  margin-top: 0;
 }
 .billing-plan-card {
   border: 1px solid #414868;

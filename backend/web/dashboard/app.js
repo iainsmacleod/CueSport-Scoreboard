@@ -178,6 +178,7 @@ let dashConfirmResolver = null;
 function confirmDashAction({
   title = 'Confirm',
   message = '',
+  messageHtml = '',
   confirmLabel = 'Confirm',
   danger = false,
 } = {}) {
@@ -194,14 +195,20 @@ function confirmDashAction({
     dashConfirmResolver = null;
   }
   if (titleEl) titleEl.textContent = title;
-  if (msgEl) msgEl.textContent = message;
+  if (msgEl) {
+    if (messageHtml) {
+      msgEl.innerHTML = messageHtml;
+    } else {
+      msgEl.textContent = message;
+    }
+  }
   const label = confirmLabel || 'Confirm';
   let okIcon = 'check';
   if (/revoke access/i.test(label)) okIcon = 'stopSign';
   else if (/remove|delete|revoke/i.test(label)) okIcon = 'trash';
   else if (/kick/i.test(label)) okIcon = 'kick';
   else if (/sign out/i.test(label)) okIcon = 'logOut';
-  else if (/complimentary|gift/i.test(label)) okIcon = 'gift';
+  else if (/complimentary|gift|trial/i.test(label)) okIcon = 'gift';
   setDashActionButtonContent(okBtn, {
     icon: okIcon,
     label,
@@ -593,7 +600,7 @@ function buildAccountPlanLineHtml(account, quota) {
   }
 
   if (account?.needs_plan) {
-    return 'Inactive — choose a plan under <a href="#settings" class="dash-text-link dash-settings-link">Settings</a> to unlock Cloud';
+    return 'Inactive — choose a plan below to unlock Cloud';
   }
 
   return `Plan: ${escapeHtml(display)}`;
@@ -637,7 +644,7 @@ function renderQuota(quota, account = null) {
     if (isPlatformAdminUser && !atKeyLimit) {
       hint.classList.add('hidden');
     } else if (needsPlan && !isPlatformAdminUser) {
-      hint.innerHTML = 'Choose a plan under <a href="#settings" class="dash-text-link dash-settings-link">Settings</a> to unlock OBS Dock Keys.';
+      hint.textContent = 'Choose a plan on the Tables tab (or under Settings) to unlock OBS Dock Keys.';
       hint.classList.remove('hidden');
     } else if (atKeyLimit) {
       hint.textContent = `Dock key limit reached (${limits.maxApiKeys} on ${display}). Each key connects one dock — remove an unused key to create another.`;
@@ -714,122 +721,48 @@ let lastAccount = null;
 let lastBillingCatalog = null;
 
 function setBillingNotice(msg) {
-  const el = document.getElementById('billingNotice');
-  if (!el) return;
-  if (!msg) {
-    el.textContent = '';
-    el.classList.add('hidden');
-    return;
-  }
-  el.textContent = msg;
-  el.classList.remove('hidden');
-}
-
-async function startPortal() {
-  try {
-    setBillingNotice('Opening billing portal…');
-    const result = await openBillingPortal(getServerUrl(), getToken());
-    if (result?.url) {
-      window.location.href = result.url;
+  const els = [
+    document.getElementById('billingNotice'),
+    document.getElementById('tablesBillingNotice'),
+  ].filter(Boolean);
+  els.forEach((el) => {
+    if (!msg) {
+      el.textContent = '';
+      el.classList.add('hidden');
       return;
     }
-    setBillingNotice('Billing portal did not return a URL.');
-  } catch (err) {
-    setBillingNotice(err.message || 'Could not open billing portal');
-  }
+    el.textContent = msg;
+    el.classList.remove('hidden');
+  });
 }
 
-async function checkoutTier(tierId) {
-  const accepted = document.getElementById('billingAcceptTerms')?.checked;
-  if (!accepted) {
-    setBillingNotice('Accept the Terms of Service and Privacy Policy before checkout.');
-    return;
-  }
-  try {
-    setBillingNotice('Starting Checkout…');
-    const result = await startBillingCheckout(getServerUrl(), getToken(), tierId, true);
-    if (result?.url) {
-      window.location.href = result.url;
-      return;
-    }
-    setBillingNotice('Checkout did not return a URL.');
-  } catch (err) {
-    setBillingNotice(err.message || 'Checkout failed');
-  }
-}
-
-function renderBillingPanel(account, billingMeta, plansPayload) {
-  const panel = document.getElementById('billingPanel');
-  if (!panel) return;
-  // Platform admins are not billed — access is via PLATFORM_ADMIN_EMAILS, not Stripe.
-  const isAdmin = !!(isPlatformAdminUser || account?.is_platform_admin);
-  const showBilling = !isAdmin && !!(
-    billingMeta?.stripeConfigured
-    || account?.needs_plan
-    || account?.stripe_customer_id
-    || isComplimentaryActive(account)
+function billingTermsAccepted() {
+  return !!(
+    document.getElementById('billingAcceptTerms')?.checked
+    || document.getElementById('tablesBillingAcceptTerms')?.checked
   );
-  panel.classList.toggle('hidden', !showBilling);
-  if (!showBilling) {
-    document.getElementById('manageBillingBtn')?.classList.add('hidden');
-    document.getElementById('accountManageBillingBtn')?.classList.add('hidden');
-    return;
+}
+
+function buildNeedsPlanStatusText(account, plansPayload, streamerTrialDays, streamerPrice) {
+  let planBit;
+  if (streamerTrialDays != null) {
+    const thenBit = streamerPrice
+      ? ` After the trial you are charged ${streamerPrice} automatically unless you cancel.`
+      : ' After the trial you are charged the Streamer monthly price automatically unless you cancel.';
+    planBit = `Streamer includes a ${streamerTrialDays}-day free trial (card required at Checkout; cancel before it ends to avoid charges).${thenBit}`;
+  } else if (plansPayload?.trialConfigured && plansPayload?.trialEligible === false) {
+    planBit = streamerPrice
+      ? `Streamer bills ${streamerPrice} immediately (free trial already used on this email).`
+      : 'Streamer has no free trial left on this email — subscribe to continue.';
+  } else if (streamerPrice) {
+    planBit = `Streamer bills ${streamerPrice}.`;
+  } else {
+    planBit = 'Choose Streamer or another plan to continue.';
   }
+  return `Your account has no Cloud access until you choose a plan. ${planBit} Tournament Organizer and League Director bill monthly immediately (no free trial).`;
+}
 
-  lastBillingCatalog = plansPayload || lastBillingCatalog;
-  const statusEl = document.getElementById('billingStatusLine');
-  const grid = document.getElementById('billingPlanPicker');
-  const manageBtn = document.getElementById('manageBillingBtn');
-  const accountManageBtn = document.getElementById('accountManageBillingBtn');
-  const termsLabel = document.getElementById('billingTermsLabel');
-  const display = account?.subscription_tier_display || account?.subscription_tier || '—';
-  const status = account?.subscription_status || 'inactive';
-  const streamerPlan = (plansPayload?.plans || []).find((p) => p.id === 'streamer');
-  const trialEligible = plansPayload?.trialEligible !== false;
-  const streamerTrialDays = trialEligible
-    ? (streamerPlan?.trialDays ?? plansPayload?.trialDays ?? null)
-    : null;
-  const streamerPrice = formatMoneyFromStripe(streamerPlan?.unitAmount, streamerPlan?.currency, streamerPlan?.interval);
-
-  if (statusEl) {
-    if (isComplimentaryActive(account)) {
-      const until = formatBillingDate(account.trial_ends_at) || formatComplimentaryUntil(account.trial_ends_at);
-      statusEl.textContent = `Complimentary access until ${until} (${display}) — no card, not billed. You can still subscribe via Stripe below.`;
-    } else if (account?.needs_plan) {
-      let planBit;
-      if (streamerTrialDays != null) {
-        const thenBit = streamerPrice
-          ? ` After the trial you are charged ${streamerPrice} automatically unless you cancel.`
-          : ' After the trial you are charged the Streamer monthly price automatically unless you cancel.';
-        planBit = `Streamer includes a ${streamerTrialDays}-day free trial (card required at Checkout; cancel before it ends to avoid charges).${thenBit}`;
-      } else if (plansPayload?.trialConfigured && plansPayload?.trialEligible === false) {
-        planBit = streamerPrice
-          ? `Streamer bills ${streamerPrice} immediately (free trial already used on this email).`
-          : 'Streamer has no free trial left on this email — subscribe to continue.';
-      } else if (streamerPrice) {
-        planBit = `Streamer bills ${streamerPrice}.`;
-      } else {
-        planBit = 'Choose Streamer or another plan to continue.';
-      }
-      statusEl.textContent = `Your account has no Cloud access until you choose a plan. ${planBit} Tournament Organizer and League Director bill monthly immediately (no free trial).`;
-    } else if (account?.is_trialing) {
-      const summary = account.billing_summary;
-      const ends = formatBillingDate(summary?.trialEnd || summary?.currentPeriodEnd);
-      const price = formatMoneyFromStripe(summary?.unitAmount, summary?.currency, summary?.interval);
-      statusEl.textContent = `Current: ${display} · Free trial${ends ? ` ends ${ends}` : ''}${price ? ` · then ${price}` : ''}. Manage payment methods and cancellation in the Stripe Customer Portal.`;
-    } else {
-      const summary = account.billing_summary;
-      const price = formatMoneyFromStripe(summary?.unitAmount, summary?.currency, summary?.interval);
-      const renews = formatBillingDate(summary?.currentPeriodEnd);
-      statusEl.textContent = `Current: ${display} (${status})${price ? ` · ${price}` : ''}${renews ? ` · renews ${renews}` : ''}. Manage payment methods and cancellation in the Stripe Customer Portal.`;
-    }
-  }
-
-  const canManage = !!(account?.stripe_customer_id && billingMeta?.stripeConfigured);
-  manageBtn?.classList.toggle('hidden', !canManage);
-  accountManageBtn?.classList.toggle('hidden', !canManage);
-  termsLabel?.classList.toggle('hidden', !billingMeta?.stripeConfigured);
-
+function fillBillingPlanPicker(grid, account, billingMeta, plansPayload) {
   if (!grid) return;
   grid.innerHTML = '';
   const plans = plansPayload?.plans || [];
@@ -894,6 +827,175 @@ function renderBillingPanel(account, billingMeta, plansPayload) {
     }
     grid.appendChild(card);
   });
+}
+
+async function startPortal() {
+  try {
+    setBillingNotice('Opening billing portal…');
+    const result = await openBillingPortal(getServerUrl(), getToken());
+    if (result?.url) {
+      window.location.href = result.url;
+      return;
+    }
+    setBillingNotice('Billing portal did not return a URL.');
+  } catch (err) {
+    setBillingNotice(err.message || 'Could not open billing portal');
+  }
+}
+
+async function checkoutTier(tierId) {
+  if (!billingTermsAccepted()) {
+    setBillingNotice('Accept the Terms of Service and Privacy Policy before checkout.');
+    return;
+  }
+  try {
+    setBillingNotice('Starting Checkout…');
+    const result = await startBillingCheckout(getServerUrl(), getToken(), tierId, true);
+    if (result?.url) {
+      window.location.href = result.url;
+      return;
+    }
+    setBillingNotice('Checkout did not return a URL.');
+  } catch (err) {
+    setBillingNotice(err.message || 'Checkout failed');
+  }
+}
+
+const SUBSCRIBE_INTENT_KEY = 'cuesport_subscribe_tier';
+const SUBSCRIBE_TIERS = new Set(['streamer', 'tournament_organizer', 'league_director']);
+
+function clearSubscribeIntentFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  if (!params.has('subscribe')) return;
+  params.delete('subscribe');
+  const next = `${window.location.pathname}${params.toString() ? `?${params}` : ''}${window.location.hash || ''}`;
+  window.history.replaceState({}, '', next);
+}
+
+function readAndClearSubscribeIntent() {
+  const params = new URLSearchParams(window.location.search);
+  let tier = String(params.get('subscribe') || '').trim();
+  clearSubscribeIntentFromUrl();
+  if (!tier) {
+    try {
+      tier = String(sessionStorage.getItem(SUBSCRIBE_INTENT_KEY) || '').trim();
+    } catch {
+      tier = '';
+    }
+  }
+  try {
+    sessionStorage.removeItem(SUBSCRIBE_INTENT_KEY);
+  } catch { /* ignore */ }
+  if (!SUBSCRIBE_TIERS.has(tier)) return null;
+  return tier;
+}
+
+async function consumeSubscribeIntent(account) {
+  const tier = readAndClearSubscribeIntent();
+  if (!tier) return;
+  if (isPlatformAdminUser || account?.is_platform_admin) return;
+  if (!account?.needs_plan && !isComplimentaryActive(account)) {
+    setBillingNotice('You already have Cloud access. Use Manage billing if you need to change plans.');
+    return;
+  }
+  setActiveDashTab('tables');
+  document.getElementById('tablesBillingPromo')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  const label = tier === 'streamer'
+    ? 'Streamer'
+    : tier === 'tournament_organizer'
+      ? 'Tournament Organizer'
+      : 'League Director';
+  const ok = await confirmDashAction({
+    title: `Continue with ${label}`,
+    messageHtml:
+      `Continue to Stripe Checkout for <strong>${escapeHtml(label)}</strong>?<br/><br/>`
+      + 'By continuing you agree to the '
+      + '<a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a>'
+      + ' and '
+      + '<a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>.',
+    confirmLabel: tier === 'streamer' ? 'Agree & start trial' : 'Agree & subscribe',
+    danger: false,
+  });
+  if (!ok) {
+    setBillingNotice('Checkout canceled. Choose a plan anytime below or in Settings.');
+    return;
+  }
+  const termsMain = document.getElementById('billingAcceptTerms');
+  const termsTables = document.getElementById('tablesBillingAcceptTerms');
+  if (termsMain) termsMain.checked = true;
+  if (termsTables) termsTables.checked = true;
+  await checkoutTier(tier);
+}
+
+function renderBillingPanel(account, billingMeta, plansPayload) {
+  const panel = document.getElementById('billingPanel');
+  const tablesPromo = document.getElementById('tablesBillingPromo');
+  // Platform admins are not billed — access is via PLATFORM_ADMIN_EMAILS, not Stripe.
+  const isAdmin = !!(isPlatformAdminUser || account?.is_platform_admin);
+  const showBilling = !isAdmin && !!(
+    billingMeta?.stripeConfigured
+    || account?.needs_plan
+    || account?.stripe_customer_id
+    || isComplimentaryActive(account)
+  );
+  const showTablesPromo = !isAdmin && !!account?.needs_plan && !!billingMeta?.stripeConfigured;
+
+  if (panel) panel.classList.toggle('hidden', !showBilling);
+  if (tablesPromo) tablesPromo.classList.toggle('hidden', !showTablesPromo);
+
+  if (!showBilling) {
+    document.getElementById('manageBillingBtn')?.classList.add('hidden');
+    document.getElementById('accountManageBillingBtn')?.classList.add('hidden');
+    if (!showTablesPromo) return;
+  }
+
+  lastBillingCatalog = plansPayload || lastBillingCatalog;
+  const statusEl = document.getElementById('billingStatusLine');
+  const tablesStatusEl = document.getElementById('tablesBillingStatusLine');
+  const grid = document.getElementById('billingPlanPicker');
+  const tablesGrid = document.getElementById('tablesBillingPlanPicker');
+  const manageBtn = document.getElementById('manageBillingBtn');
+  const accountManageBtn = document.getElementById('accountManageBillingBtn');
+  const termsLabel = document.getElementById('billingTermsLabel');
+  const tablesTermsLabel = document.getElementById('tablesBillingTermsLabel');
+  const display = account?.subscription_tier_display || account?.subscription_tier || '—';
+  const status = account?.subscription_status || 'inactive';
+  const streamerPlan = (plansPayload?.plans || []).find((p) => p.id === 'streamer');
+  const trialEligible = plansPayload?.trialEligible !== false;
+  const streamerTrialDays = trialEligible
+    ? (streamerPlan?.trialDays ?? plansPayload?.trialDays ?? null)
+    : null;
+  const streamerPrice = formatMoneyFromStripe(streamerPlan?.unitAmount, streamerPlan?.currency, streamerPlan?.interval);
+
+  let statusText = '';
+  if (isComplimentaryActive(account)) {
+    const until = formatBillingDate(account.trial_ends_at) || formatComplimentaryUntil(account.trial_ends_at);
+    statusText = `Complimentary access until ${until} (${display}) — no card, not billed. You can still subscribe via Stripe below.`;
+  } else if (account?.needs_plan) {
+    statusText = buildNeedsPlanStatusText(account, plansPayload, streamerTrialDays, streamerPrice);
+  } else if (account?.is_trialing) {
+    const summary = account.billing_summary;
+    const ends = formatBillingDate(summary?.trialEnd || summary?.currentPeriodEnd);
+    const price = formatMoneyFromStripe(summary?.unitAmount, summary?.currency, summary?.interval);
+    statusText = `Current: ${display} · Free trial${ends ? ` ends ${ends}` : ''}${price ? ` · then ${price}` : ''}. Manage payment methods and cancellation in the Stripe Customer Portal.`;
+  } else {
+    const summary = account.billing_summary;
+    const price = formatMoneyFromStripe(summary?.unitAmount, summary?.currency, summary?.interval);
+    const renews = formatBillingDate(summary?.currentPeriodEnd);
+    statusText = `Current: ${display} (${status})${price ? ` · ${price}` : ''}${renews ? ` · renews ${renews}` : ''}. Manage payment methods and cancellation in the Stripe Customer Portal.`;
+  }
+
+  if (statusEl) statusEl.textContent = statusText;
+  if (tablesStatusEl && showTablesPromo) tablesStatusEl.textContent = statusText;
+
+  const canManage = !!(account?.stripe_customer_id && billingMeta?.stripeConfigured);
+  manageBtn?.classList.toggle('hidden', !canManage);
+  accountManageBtn?.classList.toggle('hidden', !canManage);
+  termsLabel?.classList.toggle('hidden', !billingMeta?.stripeConfigured);
+  tablesTermsLabel?.classList.toggle('hidden', !billingMeta?.stripeConfigured);
+
+  if (showBilling) fillBillingPlanPicker(grid, account, billingMeta, plansPayload);
+  if (showTablesPromo) fillBillingPlanPicker(tablesGrid, account, billingMeta, plansPayload);
 }
 
 async function refreshBillingUi(account, billingMeta) {
@@ -3890,6 +3992,7 @@ async function renderDashboard() {
     clearReconnect();
     connectLiveFeed().catch(() => {});
     syncPlatformTablesPolling();
+    await consumeSubscribeIntent(me.account);
   } catch (err) {
     stopLiveFeed();
     localStorage.removeItem(TOKEN_KEY);
@@ -4688,6 +4791,12 @@ document.getElementById('accountManageBillingBtn')?.addEventListener('click', ()
 {
   const params = new URLSearchParams(window.location.search);
   const billing = params.get('billing');
+  const subscribeEarly = String(params.get('subscribe') || '').trim();
+  if (['streamer', 'tournament_organizer', 'league_director'].includes(subscribeEarly)) {
+    try {
+      sessionStorage.setItem('cuesport_subscribe_tier', subscribeEarly);
+    } catch { /* ignore */ }
+  }
   if (billing === 'success') {
     setBillingNotice('Checkout complete — subscription status updates when Stripe confirms (usually a few seconds).');
     params.delete('billing');
