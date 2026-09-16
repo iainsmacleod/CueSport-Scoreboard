@@ -6,15 +6,23 @@ import { getAccountQuota, getPaidSelfServeTier, normalizeTierName } from '../quo
 import { getAccountStats, getAllAccountsStats, namespaceAccountStats } from '../stats/account-stats.js';
 import {
   kickAccountAdminClients,
+  kickAccountClientsForDeletion,
   revokeApiKeySeat,
   roomHasConnectedDock,
   getRoomCleanupAfter,
   resolveRoomApiKeyId,
 } from '../ws/room-hub.js';
 import { hasCloudSubscriptionAccess } from '../lib/subscription-access.js';
+import {
+  cancelCustomerSubscriptions,
+  customerHasPriorSubscription,
+  listCancelableCustomerSubscriptions,
+} from '../lib/stripe-billing.js';
+import { deleteSupabaseAuthUser } from '../lib/supabase-admin.js';
 
 const TRIAL_DAYS_MIN = 1;
 const TRIAL_DAYS_MAX = 90;
+const accountDeletionsInFlight = new Set();
 
 async function requirePlatformAdmin(request, reply) {
   const auth = await resolveAuthFromRequest(request);
@@ -86,6 +94,20 @@ export async function registerAdminRoutes(app) {
       account: detail,
       quota: account ? getAccountQuota(account) : null,
     };
+  });
+
+  app.post('/api/admin/account-blocks/unblock', async (request, reply) => {
+    const auth = await requirePlatformAdmin(request, reply);
+    if (!auth) return;
+    const email = sqlite.normalizeAccountEmail(request.body?.email);
+    if (!email || !email.includes('@')) {
+      return reply.code(400).send({ error: 'Enter the exact email address to unblock' });
+    }
+    if (!sqlite.fingerprintAccountEmail(email)) {
+      return reply.code(503).send({ error: 'ACCOUNT_FINGERPRINT_SECRET is not configured' });
+    }
+    const unblocked = sqlite.unblockAccountEmail(email);
+    return { ok: true, unblocked };
   });
 
   app.get('/api/admin/tables', async (request, reply) => {
@@ -264,6 +286,93 @@ export async function registerAdminRoutes(app) {
       sessions_invalid_after: updated.sessions_invalid_after,
       kicked,
     };
+  });
+
+  app.post('/api/admin/accounts/:id/delete', async (request, reply) => {
+    const auth = await requirePlatformAdmin(request, reply);
+    if (!auth) return;
+    const account = sqlite.getAccountById(request.params.id);
+    if (!account) return reply.code(404).send({ error: 'Account not found' });
+    if (rejectSelfAccountAdminMutation(auth, account.id, reply)) return;
+
+    const confirmedEmail = sqlite.normalizeAccountEmail(request.body?.confirmEmail);
+    if (!confirmedEmail || confirmedEmail !== sqlite.normalizeAccountEmail(account.email)) {
+      return reply.code(400).send({
+        error: 'Type the account email exactly to confirm deletion',
+        code: 'email_confirmation_required',
+      });
+    }
+    if (!sqlite.fingerprintAccountEmail(account.email)) {
+      return reply.code(503).send({
+        error: 'ACCOUNT_FINGERPRINT_SECRET is not configured',
+        code: 'fingerprint_secret_required',
+      });
+    }
+    if (accountDeletionsInFlight.has(account.id)) {
+      return reply.code(409).send({
+        error: 'Account deletion is already in progress',
+        code: 'deletion_in_progress',
+      });
+    }
+
+    let subscriptions;
+    try {
+      subscriptions = await listCancelableCustomerSubscriptions(account.stripe_customer_id);
+    } catch (error) {
+      request.log.error({ err: error, accountId: account.id }, 'Stripe deletion preview failed');
+      return reply.code(502).send({
+        error: error?.message || 'Could not check Stripe subscriptions',
+        code: 'stripe_preview_failed',
+      });
+    }
+    if (subscriptions.length && request.body?.confirmActiveSubscription !== true) {
+      return reply.code(409).send({
+        error: 'This account has active Stripe billing. Confirm again to cancel billing and delete the account.',
+        code: 'active_subscription_confirmation_required',
+        subscriptions,
+      });
+    }
+
+    accountDeletionsInFlight.add(account.id);
+    try {
+      sqlite.markAccountDeleting(account.id);
+      const revokedKeyIds = sqlite.revokeAllApiKeysForAccount(account.id);
+      const revokedGuestLinks = sqlite.revokeAllGuestTokens(account.id);
+      const clientsKicked = kickAccountClientsForDeletion(account.id);
+
+      const priorTrial = sqlite.hasEmailUsedTrial(account.email)
+        || (account.stripe_customer_id
+          ? await customerHasPriorSubscription(account.stripe_customer_id)
+          : false);
+      const stripeResult = account.stripe_customer_id
+        ? await cancelCustomerSubscriptions(account.stripe_customer_id)
+        : { canceled: 0, subscriptions: [] };
+      await deleteSupabaseAuthUser(account.auth_user_id);
+      sqlite.finalizeAccountDeletion(account.id, {
+        blockFutureSignups: request.body?.blockFutureSignups === true,
+        trialUsed: priorTrial,
+      });
+
+      return {
+        ok: true,
+        account_id: account.id,
+        subscriptions_canceled: stripeResult.canceled,
+        keys_revoked: revokedKeyIds.length,
+        guest_links_revoked: revokedGuestLinks,
+        clients_kicked: clientsKicked,
+        future_signups_blocked: request.body?.blockFutureSignups === true,
+      };
+    } catch (error) {
+      request.log.error({ err: error, accountId: account.id }, 'Account deletion failed');
+      sqlite.setAccountDeletionError(account.id, error?.message || 'Account deletion failed');
+      return reply.code(502).send({
+        error: 'Account deletion did not complete. The account remains locked; retry deletion after resolving the service error.',
+        detail: error?.message || null,
+        code: 'account_deletion_failed',
+      });
+    } finally {
+      accountDeletionsInFlight.delete(account.id);
+    }
   });
 
   app.post('/api/admin/accounts/:id/api-keys/:keyId/revoke', async (request, reply) => {

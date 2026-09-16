@@ -32,6 +32,7 @@ const roomCleanupAfter = new Map();
 
 /** roomIds currently being deleted (skip reschedule on WS close) */
 const roomsBeingDeleted = new Set();
+const accountsBeingDeleted = new Set();
 
 let sweeperTimer = null;
 
@@ -248,7 +249,7 @@ export function handleConnection(ws) {
       });
       if (wasDock && accountId) {
         notifyAccountTables(accountId, { immediate: true });
-        if (!roomsBeingDeleted.has(roomId) && !roomHasConnectedDock(roomId)) {
+        if (!roomsBeingDeleted.has(roomId) && !accountsBeingDeleted.has(accountId) && !roomHasConnectedDock(roomId)) {
           scheduleRoomCleanup(roomId);
         }
       }
@@ -468,6 +469,15 @@ async function handleRoomClientJoin(ws, meta, msg, authenticateJoin) {
     const guest = sqlite.findGuestToken(msg.guest_token);
     if (!guest) {
       send(ws, { type: 'error', code: 'invalid_guest_token', message: 'Invalid or expired guest link' });
+      return;
+    }
+    const guestAccount = sqlite.getAccountById(guest.account_id);
+    if (!guestAccount || sqlite.isAccountDeleting(guestAccount) || sqlite.isEmailBlocked(guestAccount.email)) {
+      send(ws, {
+        type: 'error',
+        code: sqlite.isAccountDeleting(guestAccount) ? 'account_deleting' : 'account_blocked',
+        message: 'This account can no longer be accessed',
+      });
       return;
     }
     const conflict = guestTokenSessionConflict(msg.guest_token, ws);
@@ -936,6 +946,26 @@ export function kickAccountGuestClients(accountId) {
   return kickConnections(
     (meta) => meta.accountId === accountId && meta.client === 'mobile_guest',
     { code: 'guest_revoked', message: 'Guest link revoked' },
+  );
+}
+
+/** Disconnect every live socket and cancel pending room/account timers during deletion. */
+export function kickAccountClientsForDeletion(accountId) {
+  if (!accountId) return 0;
+  accountsBeingDeleted.add(accountId);
+  const pending = tablesNotifyTimers.get(accountId);
+  if (pending) clearTimeout(pending);
+  tablesNotifyTimers.delete(accountId);
+  for (const room of sqlite.getRoomsForAccount(accountId)) {
+    cancelRoomCleanup(room.id);
+    roomsBeingDeleted.add(room.id);
+  }
+  return kickConnections(
+    (meta) => meta.accountId === accountId,
+    {
+      code: 'account_deleting',
+      message: 'This account is being deleted and can no longer be accessed',
+    },
   );
 }
 

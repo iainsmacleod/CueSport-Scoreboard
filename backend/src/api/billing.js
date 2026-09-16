@@ -72,6 +72,11 @@ function syncAccountFromSubscription(accountId, subscription) {
   if (!accountId || !subscription) return null;
   const status = mapStripeSubscriptionStatus(subscription.status);
   const tier = tierFromSubscription(subscription);
+  const account = sqlite.getAccountById(accountId);
+  if (!account || sqlite.isAccountDeleting(account)) return account;
+  if (status === 'trialing') {
+    sqlite.recordEmailTrialUse(account.email);
+  }
   return sqlite.updateAccountSubscription(accountId, {
     subscriptionStatus: status,
     subscriptionTier: tier || undefined,
@@ -92,7 +97,8 @@ export async function registerBillingRoutes(app) {
     const auth = await resolveAccountAuth(request);
     if (auth?.account && isAccountAdminAuth(auth) && catalogTrialDays != null) {
       const customerId = auth.account.stripe_customer_id;
-      if (customerId && await customerHasPriorSubscription(customerId)) {
+      if (sqlite.hasEmailUsedTrial(auth.account.email)
+        || (customerId && await customerHasPriorSubscription(customerId))) {
         trialEligible = false;
       }
     }
@@ -172,7 +178,8 @@ export async function registerBillingRoutes(app) {
     const cancelUrl = `${config.publicUrl}/dashboard?billing=cancel`;
     const catalogTrialDays = await trialDaysForTier(tier);
     const priorSub = catalogTrialDays != null
-      ? await customerHasPriorSubscription(customerId)
+      ? (sqlite.hasEmailUsedTrial(auth.account.email)
+        || await customerHasPriorSubscription(customerId))
       : false;
     const trialDays = catalogTrialDays != null && !priorSub ? catalogTrialDays : null;
 
@@ -305,7 +312,10 @@ async function handleStripeEvent(event, log) {
     const customerId = typeof obj?.customer === 'string' ? obj.customer : obj?.customer?.id;
     const subscriptionId = typeof obj?.subscription === 'string' ? obj.subscription : obj?.subscription?.id;
     if (accountId && customerId) {
-      sqlite.setAccountStripeCustomerId(accountId, customerId);
+      const account = sqlite.getAccountById(accountId);
+      if (account && !sqlite.isAccountDeleting(account)) {
+        sqlite.setAccountStripeCustomerId(accountId, customerId);
+      }
     }
     if (accountId && subscriptionId) {
       const stripe = getStripe();
@@ -327,6 +337,11 @@ async function handleStripeEvent(event, log) {
       );
     if (!accountId) {
       log?.warn({ type, subscriptionId: subscription?.id }, 'Stripe subscription event with no account');
+      return;
+    }
+    const account = sqlite.getAccountById(accountId);
+    if (!account || sqlite.isAccountDeleting(account)) {
+      log?.warn({ type, accountId }, 'Ignoring Stripe event for deleting or deleted account');
       return;
     }
     if (type === 'customer.subscription.deleted') {

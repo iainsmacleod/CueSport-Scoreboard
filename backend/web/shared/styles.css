@@ -1407,6 +1407,34 @@ body.has-dash-nav .dash-tabs[hidden] {
 .admin-trial-form input {
   width: 5rem;
 }
+.admin-delete-form,
+.admin-unblock-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.65rem;
+  margin: 0.5rem 0 1rem;
+}
+.admin-delete-form > label,
+.admin-unblock-form > label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+}
+.admin-delete-form input[type="email"],
+.admin-unblock-form input[type="email"] {
+  width: min(22rem, 100%);
+}
+.admin-delete-form .admin-delete-block-check {
+  flex-direction: row;
+  align-items: center;
+  max-width: 19rem;
+}
+.admin-delete-block-check input[type="checkbox"] {
+  width: auto;
+  flex: 0 0 auto;
+}
 .admin-key-list,
 .admin-room-list {
   list-style: none;

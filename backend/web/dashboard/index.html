@@ -6,7 +6,7 @@
   <title>CueSport Scoreboard Cloud — Dashboard</title>
   <link rel="icon" type="image/png" href="/web/images/brand/logo.png?v=1" />
   <link rel="apple-touch-icon" href="/web/images/balls/8ball_small.png" />
-  <link rel="stylesheet" href="/web/shared/styles.css?v=8.2.0.16" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.2.0.17" />
 </head>
 <body>
   <header class="site-header">
@@ -332,6 +332,13 @@
             Search by email
             <input id="adminAccountSearch" type="search" placeholder="Filter accounts…" autocomplete="off" />
           </label>
+          <form id="adminUnblockEmailForm" class="admin-unblock-form">
+            <label class="stats-filter">
+              Unblock an exact email
+              <input id="adminUnblockEmail" type="email" placeholder="user@example.com" autocomplete="off" required />
+            </label>
+            <button type="submit" class="btn secondary">Allow Future Signup</button>
+          </form>
           <p id="adminStatus" class="hint" aria-live="polite"></p>
           <div class="stats-table-wrap">
             <table class="dash-stats-table" id="adminAccountsTable">
@@ -538,6 +545,6 @@
       </div>
     </div>
   </div>
-  <script type="module" src="/web/dashboard/app.js?v=8.2.0.1"></script>
+  <script type="module" src="/web/dashboard/app.js?v=8.2.0.2"></script>
 </body>
 </html>

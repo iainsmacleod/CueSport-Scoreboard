@@ -9,7 +9,8 @@
     "dev": "node --watch src/index.js",
     "migrate": "node src/db/migrate.js",
     "test": "node tests/cloud-api.mjs",
-    "test:cloud": "node tests/cloud-api.mjs"
+    "test:cloud": "node tests/cloud-api.mjs",
+    "test:account-deletion": "node tests/account-deletion-unit.mjs"
   },
   "engines": {
     "node": ">=18"

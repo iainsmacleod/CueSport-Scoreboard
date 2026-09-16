@@ -2213,6 +2213,84 @@ async function run() {
           'Admin detail marks self as platform admin',
           detail.body.account?.is_platform_admin === true
         );
+        const selfDelete = await fetchJson(`/api/admin/accounts/${accountId}/delete`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${tokenFresh}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ confirmEmail: detail.body.account?.email }),
+        });
+        assert('Admin cannot delete self', selfDelete.status === 403);
+
+        const deleteTargetId = crypto.randomUUID();
+        const deleteTargetRoomId = crypto.randomUUID();
+        const deleteTargetEmail = `admin-delete-target-${Date.now()}@example.com`;
+        {
+          const db = new Database(SQLITE_PATH);
+          try {
+            db.prepare(
+              `INSERT INTO accounts (id, email, subscription_tier, subscription_status)
+               VALUES (?, ?, 'streamer', 'inactive')`
+            ).run(deleteTargetId, deleteTargetEmail);
+            db.prepare('INSERT INTO rooms (id, account_id, label) VALUES (?, ?, ?)')
+              .run(deleteTargetRoomId, deleteTargetId, 'Delete target room');
+          } finally {
+            db.close();
+          }
+        }
+        const wrongDeleteEmail = await fetchJson(`/api/admin/accounts/${deleteTargetId}/delete`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${tokenFresh}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ confirmEmail: 'wrong@example.com' }),
+        });
+        assert('Admin deletion requires exact email', wrongDeleteEmail.status === 400);
+        const deleteTarget = await fetchJson(`/api/admin/accounts/${deleteTargetId}/delete`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${tokenFresh}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            confirmEmail: deleteTargetEmail,
+            blockFutureSignups: true,
+          }),
+        });
+        assert('Admin deletes another account', deleteTarget.ok, JSON.stringify(deleteTarget.body));
+        {
+          const db = new Database(SQLITE_PATH);
+          try {
+            assert(
+              'Admin deletion cascades account data',
+              !db.prepare('SELECT id FROM accounts WHERE id = ?').get(deleteTargetId)
+                && !db.prepare('SELECT id FROM rooms WHERE id = ?').get(deleteTargetRoomId)
+            );
+            assert(
+              'Admin deletion stores signup block fingerprint',
+              (db.prepare(
+                'SELECT COUNT(*) AS n FROM account_identity_records WHERE blocked_at IS NOT NULL'
+              ).get()?.n || 0) > 0
+            );
+          } finally {
+            db.close();
+          }
+        }
+        const unblockDeletedEmail = await fetchJson('/api/admin/account-blocks/unblock', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${tokenFresh}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email: deleteTargetEmail }),
+        });
+        assert(
+          'Admin can unblock deleted email',
+          unblockDeletedEmail.ok && unblockDeletedEmail.body.unblocked === true,
+          JSON.stringify(unblockDeletedEmail.body)
+        );
         const selfTrialBlocked = await fetchJson(`/api/admin/accounts/${accountId}/trial`, {
           method: 'POST',
           headers: {

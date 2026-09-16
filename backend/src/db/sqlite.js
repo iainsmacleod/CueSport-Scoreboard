@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { createHmac } from 'crypto';
 import Database from 'better-sqlite3';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
@@ -31,6 +32,17 @@ CREATE TABLE IF NOT EXISTS accounts (
   trial_ends_at TEXT,
   sessions_invalid_after TEXT,
   session_epoch INTEGER NOT NULL DEFAULT 1,
+  deletion_status TEXT NOT NULL DEFAULT 'active',
+  deletion_started_at TEXT,
+  deletion_error TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS account_identity_records (
+  email_fingerprint TEXT PRIMARY KEY,
+  trial_used_at TEXT,
+  deleted_at TEXT,
+  blocked_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -137,6 +149,15 @@ function ensureAccountColumns(database) {
   }
   if (!cols.has('stripe_subscription_id')) {
     database.exec('ALTER TABLE accounts ADD COLUMN stripe_subscription_id TEXT');
+  }
+  if (!cols.has('deletion_status')) {
+    database.exec("ALTER TABLE accounts ADD COLUMN deletion_status TEXT NOT NULL DEFAULT 'active'");
+  }
+  if (!cols.has('deletion_started_at')) {
+    database.exec('ALTER TABLE accounts ADD COLUMN deletion_started_at TEXT');
+  }
+  if (!cols.has('deletion_error')) {
+    database.exec('ALTER TABLE accounts ADD COLUMN deletion_error TEXT');
   }
   if (cols.has('ops_quota_tier') && !cols.has('simulated_plan')) {
     database.exec('ALTER TABLE accounts RENAME COLUMN ops_quota_tier TO simulated_plan');
@@ -278,6 +299,12 @@ export function getDb() {
     ensureMatchEventColumns(db);
     ensureAccountPlayersUuid(db);
     db.exec(MATCH_EVENTS_INDEXES);
+    db.prepare(
+      `DELETE FROM account_identity_records
+       WHERE blocked_at IS NULL
+         AND deleted_at IS NOT NULL
+         AND deleted_at < datetime('now', ?)`
+    ).run(`-${config.accountIdentityRetentionDays} days`);
   }
   return db;
 }
@@ -334,9 +361,63 @@ function defaultSubscriptionStatusSync() {
   return config.allowDevAuth ? 'active' : 'inactive';
 }
 
+export function normalizeAccountEmail(email) {
+  return String(email || '').trim().toLowerCase();
+}
+
+export function fingerprintAccountEmail(email) {
+  const normalized = normalizeAccountEmail(email);
+  if (!normalized || !config.accountFingerprintSecret) return null;
+  return createHmac('sha256', config.accountFingerprintSecret).update(normalized).digest('hex');
+}
+
+export function isEmailBlocked(email) {
+  const fingerprint = fingerprintAccountEmail(email);
+  if (!fingerprint) return false;
+  const row = getDb().prepare(
+    'SELECT blocked_at FROM account_identity_records WHERE email_fingerprint = ?'
+  ).get(fingerprint);
+  return !!row?.blocked_at;
+}
+
+export function hasEmailUsedTrial(email) {
+  const fingerprint = fingerprintAccountEmail(email);
+  if (!fingerprint) return false;
+  const row = getDb().prepare(
+    'SELECT trial_used_at FROM account_identity_records WHERE email_fingerprint = ?'
+  ).get(fingerprint);
+  return !!row?.trial_used_at;
+}
+
+export function recordEmailTrialUse(email) {
+  const fingerprint = fingerprintAccountEmail(email);
+  if (!fingerprint) return false;
+  getDb().prepare(
+    `INSERT INTO account_identity_records (email_fingerprint, trial_used_at)
+     VALUES (?, datetime('now'))
+     ON CONFLICT(email_fingerprint) DO UPDATE SET
+       trial_used_at = COALESCE(account_identity_records.trial_used_at, excluded.trial_used_at)`
+  ).run(fingerprint);
+  return true;
+}
+
+export function unblockAccountEmail(email) {
+  const fingerprint = fingerprintAccountEmail(email);
+  if (!fingerprint) return false;
+  const result = getDb().prepare(
+    'UPDATE account_identity_records SET blocked_at = NULL WHERE email_fingerprint = ? AND blocked_at IS NOT NULL'
+  ).run(fingerprint);
+  return result.changes > 0;
+}
+
 /** Dev / self-host / OAuth: ensure account exists (no default room — rooms are created on dock join). */
 export function ensureAccount(email, authUserId = null) {
   const database = getDb();
+  if (isEmailBlocked(email)) {
+    const error = new Error('This account cannot access CueSport Scoreboard Cloud');
+    error.code = 'account_blocked';
+    throw error;
+  }
   let account = database.prepare('SELECT * FROM accounts WHERE email = ?').get(email);
   if (!account) {
     const id = uuidv4();
@@ -368,6 +449,60 @@ export function findAccountIdByStripeCustomerId(customerId) {
     `SELECT id FROM accounts WHERE stripe_customer_id = ?`
   ).get(customerId);
   return row?.id || null;
+}
+
+export function isAccountDeleting(account) {
+  return account?.deletion_status === 'deleting';
+}
+
+export function markAccountDeleting(accountId) {
+  getDb().prepare(
+    `UPDATE accounts
+     SET deletion_status = 'deleting',
+         deletion_started_at = COALESCE(deletion_started_at, datetime('now')),
+         deletion_error = NULL,
+         sessions_invalid_after = datetime('now'),
+         session_epoch = COALESCE(session_epoch, 1) + 1
+     WHERE id = ?`
+  ).run(accountId);
+  return getAccountById(accountId);
+}
+
+export function setAccountDeletionError(accountId, message) {
+  getDb().prepare(
+    `UPDATE accounts SET deletion_status = 'deleting', deletion_error = ? WHERE id = ?`
+  ).run(String(message || 'Account deletion failed').slice(0, 500), accountId);
+  return getAccountById(accountId);
+}
+
+export function finalizeAccountDeletion(accountId, {
+  blockFutureSignups = false,
+  trialUsed = false,
+} = {}) {
+  const database = getDb();
+  return database.transaction(() => {
+    const account = database.prepare('SELECT * FROM accounts WHERE id = ?').get(accountId);
+    if (!account) return false;
+    const fingerprint = fingerprintAccountEmail(account.email);
+    if (!fingerprint) {
+      throw new Error('ACCOUNT_FINGERPRINT_SECRET is required to delete accounts safely');
+    }
+    database.prepare(
+      `INSERT INTO account_identity_records
+         (email_fingerprint, trial_used_at, deleted_at, blocked_at)
+       VALUES (?, ?, datetime('now'), ?)
+       ON CONFLICT(email_fingerprint) DO UPDATE SET
+         trial_used_at = COALESCE(account_identity_records.trial_used_at, excluded.trial_used_at),
+         deleted_at = excluded.deleted_at,
+         blocked_at = COALESCE(account_identity_records.blocked_at, excluded.blocked_at)`
+    ).run(
+      fingerprint,
+      trialUsed ? new Date().toISOString() : null,
+      blockFutureSignups ? new Date().toISOString() : null,
+    );
+    database.prepare('DELETE FROM accounts WHERE id = ?').run(accountId);
+    return true;
+  })();
 }
 
 /**
@@ -452,7 +587,8 @@ export function findAccountByApiKey(plaintextKey) {
   const keys = database.prepare(
     `SELECT ak.id AS key_id, ak.key_hash, ak.account_id, ak.role,
             a.email, a.subscription_status, a.subscription_tier,
-            a.trial_ends_at, a.sessions_invalid_after, a.session_epoch
+            a.trial_ends_at, a.sessions_invalid_after, a.session_epoch,
+            a.deletion_status
      FROM api_keys ak
      JOIN accounts a ON a.id = ak.account_id
      WHERE ak.revoked_at IS NULL`
@@ -468,6 +604,7 @@ export function findAccountByApiKey(plaintextKey) {
           trial_ends_at: row.trial_ends_at || null,
           sessions_invalid_after: row.sessions_invalid_after,
           session_epoch: row.session_epoch,
+          deletion_status: row.deletion_status || 'active',
         },
         keyId: row.key_id,
         role: normalizeDockKeyRole(row.role),
@@ -632,8 +769,10 @@ export function invalidateAllSessions(accountId) {
 }
 
 const ADMIN_ACCOUNT_SELECT = `
-  SELECT a.id, a.email, a.created_at, a.subscription_status, a.subscription_tier,
-         a.trial_ends_at, a.stripe_customer_id, a.session_epoch, a.sessions_invalid_after,
+  SELECT a.id, a.auth_user_id, a.email, a.created_at, a.subscription_status, a.subscription_tier,
+         a.trial_ends_at, a.stripe_customer_id, a.stripe_subscription_id,
+         a.session_epoch, a.sessions_invalid_after, a.deletion_status,
+         a.deletion_started_at, a.deletion_error,
          (SELECT COUNT(*) FROM api_keys ak WHERE ak.account_id = a.id AND ak.revoked_at IS NULL) AS api_key_count,
          (SELECT COUNT(*) FROM rooms r WHERE r.account_id = a.id) AS room_count,
          (SELECT COUNT(*) FROM room_guest_tokens g WHERE g.account_id = a.id AND g.revoked_at IS NULL) AS guest_link_count,
@@ -663,12 +802,17 @@ export function listAccountsForAdmin({ q = '', limit = 100 } = {}) {
 function mapAdminAccountRow(row) {
   const account = {
     id: row.id,
+    auth_user_id: row.auth_user_id || null,
     email: row.email,
     created_at: row.created_at,
     subscription_status: row.subscription_status,
     subscription_tier: row.subscription_tier,
     trial_ends_at: row.trial_ends_at || null,
     stripe_customer_id: row.stripe_customer_id || null,
+    stripe_subscription_id: row.stripe_subscription_id || null,
+    deletion_status: row.deletion_status || 'active',
+    deletion_started_at: row.deletion_started_at || null,
+    deletion_error: row.deletion_error || null,
     session_epoch: row.session_epoch,
     sessions_invalid_after: row.sessions_invalid_after || null,
     api_key_count: Number(row.api_key_count) || 0,

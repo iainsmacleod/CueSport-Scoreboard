@@ -75,6 +75,8 @@ See [`.env.example`](.env.example).
 | `SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_…` — browser OAuth + server `createClient` (not legacy `anon`) |
 | `SUPABASE_SECRET_KEY` | `sb_secret_…` — server-only (not legacy `service_role`; never send to browsers) |
 | `SUPABASE_JWT_SECRET` | JWT verification (or use JWKS) |
+| `ACCOUNT_FINGERPRINT_SECRET` | Stable random HMAC key used for privacy-safe trial history, deleted-account records, and optional email blocks; required on managed Cloud |
+| `ACCOUNT_IDENTITY_RETENTION_DAYS` | Retention for unblocked deletion/trial fingerprints (default 1095 days); blocked fingerprints remain until explicitly unblocked |
 | `GOOGLE_OAUTH_CLIENT_ID` | Google Web Client ID for the [official GIS Sign in with Google button](https://developers.google.com/identity/gsi/web/guides/display-button). Same client as Supabase → Auth → Google. Add `PUBLIC_URL` (and `http://localhost:3000` for local) as Authorized JavaScript origins. If unset, dashboard falls back to Supabase OAuth redirect. |
 | `ALLOW_DEV_AUTH` | Enable secret dev-login when Supabase not configured |
 | `DEV_AUTH_SECRET` | Shared secret for dev login (required when dev auth is on) |
@@ -110,7 +112,7 @@ Use the **Product name** column when creating Stripe Products. Map each Product�
 ## Supabase setup (production)
 
 1. Create a Supabase project.
-2. Run [`supabase/migrations/001_initial.sql`](supabase/migrations/001_initial.sql), [`002_session_epoch_quotas.sql`](supabase/migrations/002_session_epoch_quotas.sql), [`003_account_players_uuid.sql`](supabase/migrations/003_account_players_uuid.sql), [`004_dock_key_roles.sql`](supabase/migrations/004_dock_key_roles.sql), then [`005_admin_support_trial.sql`](supabase/migrations/005_admin_support_trial.sql) in the SQL editor.
+2. Run [`supabase/migrations/001_initial.sql`](supabase/migrations/001_initial.sql), [`002_session_epoch_quotas.sql`](supabase/migrations/002_session_epoch_quotas.sql), [`003_account_players_uuid.sql`](supabase/migrations/003_account_players_uuid.sql), [`004_dock_key_roles.sql`](supabase/migrations/004_dock_key_roles.sql), [`005_admin_support_trial.sql`](supabase/migrations/005_admin_support_trial.sql), then [`006_account_deletion.sql`](supabase/migrations/006_account_deletion.sql) in the SQL editor.
 3. Enable **Google** provider under Authentication → Providers.
 4. Add redirect URLs: `{PUBLIC_URL}/web/dashboard/`, `{PUBLIC_URL}/auth/callback`.
 5. Set env vars in `.env` (including `PLATFORM_ADMIN_EMAILS` for your ops Google accounts) and deploy.
@@ -138,6 +140,8 @@ See the [plans table in Environment variables](#environment-variables) (Product 
 ### Platform admin + complimentary access
 
 Hosted multi-tenant support is gated by **`PLATFORM_ADMIN_EMAILS`** (not Dock Key roles or subscription tiers). Allowlisted users get `is_platform_admin` on `GET /api/me`, an **Admin** tab, a **View account** filter on Tables/Stats (**My account**, **All accounts**, or one tenant), and `/api/admin/*` routes (list tenants, read tables/stats/players, revoke keys, invalidate sessions, grant/revoke **Complimentary access** with a chosen tier). Platform admins bypass subscription/trial gates on their own account and can pick a **Simulated plan** (default **Unrestricted**, or simulate any catalog tier’s dock-key/table limits via `PATCH /api/me/simulated-plan`).
+
+Platform admins can also permanently delete another account. The workflow requires the account email, requires a second confirmation when active Stripe billing will be cancelled, locks and disconnects the account, removes its Supabase identity, and cascade-deletes its Cloud data. **Block future signups from this email** is optional and reversible through **Allow Future Signup**. Email/trial records use an HMAC fingerprint rather than retaining the deleted email in plain text. Stripe customers, invoices, and tax records remain in Stripe for accounting; subscriptions are cancelled immediately.
 
 Access for dock/mobile join allows when **any** of:
 - `subscription_status` is `active` or `trialing` (Stripe Checkout + webhooks), **or**
@@ -183,6 +187,8 @@ This backend is GPL-licensed alongside the scoreboard. You may run your own inst
 | DELETE | `/api/admin/accounts/:id/trial` | Platform admin: revoke complimentary access (also revokes Dock Keys if no Stripe access remains) |
 | POST | `/api/admin/accounts/:id/invalidate-sessions` | Platform admin: sign out everywhere for tenant |
 | POST | `/api/admin/accounts/:id/api-keys/:keyId/revoke` | Platform admin: revoke dock key |
+| POST | `/api/admin/accounts/:id/delete` | Platform admin: permanently delete account; `{ confirmEmail, blockFutureSignups, confirmActiveSubscription }` |
+| POST | `/api/admin/account-blocks/unblock` | Platform admin: allow a previously blocked exact email `{ email }` |
 | POST | `/api/api-keys` | Create API key (tier-limited; requires active/trialing access on managed) |
 | GET | `/api/api-keys/:keyId` | View API key plaintext (account owner) |
 | DELETE | `/api/api-keys/:keyId` | Revoke API key (kicks connected dock) |

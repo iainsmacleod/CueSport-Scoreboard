@@ -137,6 +137,71 @@ export async function customerHasPriorSubscription(customerId) {
   }
 }
 
+function isMissingStripeResource(error) {
+  return error?.code === 'resource_missing'
+    || /no such (customer|subscription)/i.test(String(error?.raw?.message || error?.message || ''));
+}
+
+function isCancelableSubscription(subscription) {
+  return subscription && !['canceled', 'incomplete_expired'].includes(
+    String(subscription.status || '').toLowerCase()
+  );
+}
+
+/** List subscriptions that account deletion would cancel immediately. */
+export async function listCancelableCustomerSubscriptions(customerId) {
+  if (!customerId) return [];
+  const stripe = getStripe();
+  if (!stripe) throw new Error('Stripe is not configured');
+  const subscriptions = [];
+  let startingAfter;
+  try {
+    do {
+      const page = await stripe.subscriptions.list({
+        customer: customerId,
+        status: 'all',
+        limit: 100,
+        ...(startingAfter ? { starting_after: startingAfter } : {}),
+      });
+      subscriptions.push(...(page?.data || []).filter(isCancelableSubscription));
+      startingAfter = page?.has_more && page.data?.length
+        ? page.data[page.data.length - 1].id
+        : null;
+    } while (startingAfter);
+  } catch (error) {
+    if (isMissingStripeResource(error)) return [];
+    throw error;
+  }
+  return subscriptions.map((subscription) => {
+    const tier = tierFromSubscription(subscription);
+    return {
+      id: subscription.id,
+      status: subscription.status || null,
+      tier,
+      planName: tier ? getTierDisplayName(tier) : 'Stripe subscription',
+      trialEnd: unixToIso(subscription.trial_end),
+      currentPeriodEnd: unixToIso(subscription.current_period_end),
+    };
+  });
+}
+
+/** Cancel all non-ended customer subscriptions now. Safe to retry. */
+export async function cancelCustomerSubscriptions(customerId) {
+  const subscriptions = await listCancelableCustomerSubscriptions(customerId);
+  const stripe = getStripe();
+  let canceled = 0;
+  for (const subscription of subscriptions) {
+    try {
+      await stripe.subscriptions.cancel(subscription.id);
+      subscriptionSummaryCache.delete(subscription.id);
+      canceled += 1;
+    } catch (error) {
+      if (!isMissingStripeResource(error)) throw error;
+    }
+  }
+  return { canceled, subscriptions };
+}
+
 function basePlanRow(id, limits) {
   return {
     id,

@@ -1603,7 +1603,11 @@ async function adminFetchJson(path, options = {}) {
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(body.error || body.message || `Request failed (${res.status})`);
+    const error = new Error(body.error || body.message || `Request failed (${res.status})`);
+    error.code = body.code || null;
+    error.status = res.status;
+    error.body = body;
+    throw error;
   }
   return body;
 }
@@ -1986,6 +1990,25 @@ async function loadAdminAccountDetail(accountId) {
         <button type="submit" class="btn save dash-action-btn">Give Complimentary Access</button>
         <button type="button" class="btn danger dash-action-btn" id="adminEndTrialBtn">Revoke Complimentary Access</button>
       </form>`;
+    const deleteBlock = isSelf
+      ? ''
+      : `
+      <h3 class="stats-section-title">Delete Account</h3>
+      <p class="hint">Permanently removes Cloud keys, tables, guest links, players, and match history. Any active Stripe subscription will be cancelled. This cannot be undone.</p>
+      ${account.deletion_status === 'deleting'
+        ? `<p class="error">A previous deletion attempt did not finish. The account remains locked.${account.deletion_error ? ` ${escapeHtml(account.deletion_error)}` : ''} Correct the service configuration and retry below.</p>`
+        : ''}
+      <form class="admin-delete-form" id="adminDeleteAccountForm">
+        <label>
+          Type ${escapeHtml(account.email)} to confirm
+          <input id="adminDeleteConfirmEmail" type="email" autocomplete="off" required />
+        </label>
+        <label class="admin-delete-block-check">
+          <input id="adminDeleteBlockEmail" type="checkbox" />
+          <span>Block future signups from this email</span>
+        </label>
+        <button type="submit" class="btn danger dash-action-btn">Delete Account</button>
+      </form>`;
     const invalidateBtn = isSelf
       ? ''
       : '<button type="button" class="btn secondary dash-action-btn" id="adminInvalidateSessionsBtn">Invalidate sessions</button>';
@@ -2019,6 +2042,7 @@ async function loadAdminAccountDetail(accountId) {
         <button type="button" class="btn secondary dash-action-btn" id="adminViewAccountDataBtn">View tables &amp; stats</button>
         ${invalidateBtn}
       </div>
+      ${deleteBlock}
       <h3 class="stats-section-title">Dock keys</h3>
       <ul class="admin-key-list">
         ${keyRows}
@@ -2059,6 +2083,10 @@ async function loadAdminAccountDetail(accountId) {
       label: 'Revoke Complimentary Access',
       title: 'Revoke Complimentary Access',
     });
+    setDashActionButtonContent(
+      document.getElementById('adminDeleteAccountForm')?.querySelector('button[type="submit"]'),
+      { icon: 'trash', label: 'Delete Account', title: 'Delete Account' }
+    );
   } catch (err) {
     body.innerHTML = `<p class="error">${escapeHtml(err.message || 'Failed to load account')}</p>`;
   }
@@ -2101,6 +2129,56 @@ async function adminInvalidateSelectedSessions() {
     method: 'POST',
   });
   setAdminStatus('Sessions invalidated');
+}
+
+async function adminDeleteSelectedAccount(confirmEmail, blockFutureSignups, confirmActiveSubscription = false) {
+  if (!adminSelectedId || isOwnAdminAccount(adminSelectedId)) return false;
+  const initialOk = confirmActiveSubscription || await confirmDashAction({
+    title: 'Delete Account',
+    message: 'Permanently delete this account and all of its Cloud data? This cannot be undone.',
+    confirmLabel: 'Continue Deletion',
+    danger: true,
+  });
+  if (!initialOk) return false;
+
+  try {
+    await adminFetchJson(`/api/admin/accounts/${encodeURIComponent(adminSelectedId)}/delete`, {
+      method: 'POST',
+      body: JSON.stringify({
+        confirmEmail,
+        blockFutureSignups,
+        confirmActiveSubscription,
+      }),
+    });
+  } catch (error) {
+    if (error.code !== 'active_subscription_confirmation_required') throw error;
+    const plans = (error.body?.subscriptions || [])
+      .map((subscription) => `${subscription.planName || 'Stripe subscription'} (${subscription.status || 'active'})`)
+      .join(', ');
+    const confirmed = await confirmDashAction({
+      title: 'Cancel Active Subscription and Delete',
+      message: `This account still has active Stripe billing${plans ? `: ${plans}` : ''}.\n\nDeleting it will cancel billing immediately and permanently remove its Cloud data. Confirm once more to continue.`,
+      confirmLabel: 'Cancel Billing & Delete',
+      danger: true,
+    });
+    if (!confirmed) return false;
+    return adminDeleteSelectedAccount(confirmEmail, blockFutureSignups, true);
+  }
+
+  setAdminStatus(`Deleted ${confirmEmail}${blockFutureSignups ? ' and blocked future signups from that email' : ''}.`);
+  closeAdminDetail();
+  await loadAdminAccounts();
+  return true;
+}
+
+async function adminUnblockEmail(email) {
+  const result = await adminFetchJson('/api/admin/account-blocks/unblock', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+  setAdminStatus(result.unblocked
+    ? `Future signups from ${email} are allowed again.`
+    : `No signup block was found for ${email}.`);
 }
 
 async function adminRevokeKey(keyId) {
@@ -4206,6 +4284,18 @@ document.getElementById('adminAccountsBody')?.addEventListener('keydown', (event
 document.getElementById('adminDetailCloseBtn')?.addEventListener('click', () => closeAdminDetail());
 
 document.getElementById('adminDetailBody')?.addEventListener('submit', async (event) => {
+  if (event.target?.id === 'adminDeleteAccountForm') {
+    event.preventDefault();
+    const confirmEmail = String(document.getElementById('adminDeleteConfirmEmail')?.value || '').trim();
+    const blockFutureSignups = !!document.getElementById('adminDeleteBlockEmail')?.checked;
+    try {
+      await adminDeleteSelectedAccount(confirmEmail, blockFutureSignups);
+    } catch (err) {
+      setAdminStatus(err.message || 'Failed to delete account');
+      if (adminSelectedId) await loadAdminAccountDetail(adminSelectedId).catch(() => {});
+    }
+    return;
+  }
   if (event.target?.id !== 'adminGrantTrialForm') return;
   event.preventDefault();
   const days = parseInt(document.getElementById('adminTrialDays')?.value, 10);
@@ -4214,6 +4304,18 @@ document.getElementById('adminDetailBody')?.addEventListener('submit', async (ev
     await adminGrantTrial(days, tier);
   } catch (err) {
     setAdminStatus(err.message || 'Failed to give complimentary access');
+  }
+});
+
+document.getElementById('adminUnblockEmailForm')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const input = document.getElementById('adminUnblockEmail');
+  const email = String(input?.value || '').trim();
+  try {
+    await adminUnblockEmail(email);
+    if (input) input.value = '';
+  } catch (err) {
+    setAdminStatus(err.message || 'Failed to unblock email');
   }
 });
 

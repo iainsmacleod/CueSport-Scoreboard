@@ -21,7 +21,7 @@ export const config = {
   /** Publishable key (`sb_publishable_…`) — browser OAuth + server createClient (non-admin). */
   supabasePublishableKey: process.env.SUPABASE_PUBLISHABLE_KEY || '',
   /** Secret key (`sb_secret_…`) — server-only; never pass to browser createClient / public config. */
-  supabaseSecretKey: process.env.SUPABASE_SECRET_KEY || '',
+  supabaseSecretKey: process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '',
   supabaseJwtSecret: process.env.SUPABASE_JWT_SECRET || '',
   /**
    * Google OAuth Web Client ID (same client as Supabase Auth → Google provider).
@@ -32,6 +32,13 @@ export const config = {
   allowDevAuth: process.env.ALLOW_DEV_AUTH !== 'false',
   devAuthSecret: process.env.DEV_AUTH_SECRET || '',
   devAuthAccountEmail: (process.env.DEV_AUTH_ACCOUNT_EMAIL || '').trim(),
+  /** HMAC key for privacy-safe trial/deletion/blocklist email fingerprints. */
+  accountFingerprintSecret: process.env.ACCOUNT_FINGERPRINT_SECRET
+    || (process.env.ALLOW_DEV_AUTH !== 'false' ? process.env.DEV_AUTH_SECRET || '' : ''),
+  accountIdentityRetentionDays: Math.max(
+    1,
+    parseInt(process.env.ACCOUNT_IDENTITY_RETENTION_DAYS || '1095', 10) || 1095,
+  ),
   tierDefault: process.env.TIER_DEFAULT || '',
   /**
    * Comma-separated Google account emails allowed to use /api/admin and the Admin dashboard tab.

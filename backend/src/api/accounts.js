@@ -468,7 +468,7 @@ async function resolveAuthFromRequest(request) {
     const guest = sqlite.findGuestToken(guestTokenHeader);
     if (!guest || !sqlite.isDefaultDockOwnerGuestToken(guest)) return null;
     const account = sqlite.getAccountById(guest.account_id);
-    if (!account) return null;
+    if (!account || sqlite.isAccountDeleting(account) || sqlite.isEmailBlocked(account.email)) return null;
     return {
       account,
       authMethod: 'guest_dock_owner',
@@ -480,7 +480,7 @@ async function resolveAuthFromRequest(request) {
   const apiKeyHeader = request.headers['x-api-key'] || '';
   if (!token && apiKeyHeader) {
     const result = sqlite.findAccountByApiKey(apiKeyHeader);
-    if (!result) return null;
+    if (!result || sqlite.isAccountDeleting(result.account) || sqlite.isEmailBlocked(result.account.email)) return null;
     return {
       account: result.account,
       keyId: result.keyId,
@@ -493,7 +493,7 @@ async function resolveAuthFromRequest(request) {
 
   if (token.startsWith('dev:')) {
     const account = resolveDevAccountFromToken(token);
-    if (!account) return null;
+    if (!account || sqlite.isAccountDeleting(account) || sqlite.isEmailBlocked(account.email)) return null;
     return { account, authMethod: 'dev' };
   }
 

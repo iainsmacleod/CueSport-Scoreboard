@@ -142,6 +142,9 @@ SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 SUPABASE_SECRET_KEY=sb_secret_...
 # Leave empty unless you intentionally set Supabase JWT Secret (JWKS is used when empty)
 SUPABASE_JWT_SECRET=
+# Generate once with `openssl rand -hex 32`; keep stable across deployments.
+ACCOUNT_FINGERPRINT_SECRET=...
+ACCOUNT_IDENTITY_RETENTION_DAYS=1095
 
 PLATFORM_ADMIN_EMAILS=you@gmail.com
 ```
@@ -233,6 +236,14 @@ LEGAL_GOVERNING_LAW=Commonwealth of Pennsylvania, USA
 6. Smoke test (Test mode): Streamer Checkout with `4242…` → `trialing` → Portal; TO Checkout → `active` immediately.
 
 Tier ids: `streamer`, `tournament_organizer`, `league_director` (plus contact-only `network_organization`). Self-host uses `selfhost`. Platform admins grant **Complimentary access** (no card) from the Admin tab.
+
+### Account deletion and signup blocking
+
+The Admin tab can permanently delete customer accounts. Deletion revokes credentials, disconnects live clients, immediately cancels active Stripe subscriptions, removes the Supabase Auth user, and deletes account-owned SQLite data. Active billing requires a second explicit confirmation. Stripe invoice/payment/tax history remains in Stripe for accounting.
+
+Administrators may optionally block future Cloud access from the same email. The application stores only a keyed HMAC fingerprint, not the deleted email address; **Allow Future Signup** requires entering the exact email again. Set a stable `ACCOUNT_FINGERPRINT_SECRET` before enabling managed sign-in. Changing this key makes existing trial-history and email-block lookups unavailable.
+
+Unblocked deletion/trial fingerprints are retained for 1095 days by default and pruned at startup. Change `ACCOUNT_IDENTITY_RETENTION_DAYS` if your reviewed retention policy requires a different period. Signup-block fingerprints remain until a platform administrator explicitly unblocks the email.
 
 ## 7. Verify HTTPS
 

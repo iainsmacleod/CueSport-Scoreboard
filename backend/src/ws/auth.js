@@ -57,6 +57,22 @@ function subscriptionRequired(client, account) {
   return null;
 }
 
+function accountLifecycleError(account) {
+  if (sqlite.isAccountDeleting(account)) {
+    return {
+      error: 'account_deleting',
+      message: 'This account is being deleted and can no longer be accessed',
+    };
+  }
+  if (sqlite.isEmailBlocked(account?.email)) {
+    return {
+      error: 'account_blocked',
+      message: 'This account cannot access CueSport Scoreboard Cloud',
+    };
+  }
+  return null;
+}
+
 /**
  * Room ownership gate for JWT/dev joins.
  * Platform admins may open another account's mobile table as view-only (no game control).
@@ -81,6 +97,8 @@ export async function authenticateJoin({ apiKey, accessToken, roomId, client }) 
     if (!result) {
       return { error: 'invalid_api_key', message: 'Invalid or revoked API key' };
     }
+    const lifecycleErr = accountLifecycleError(result.account);
+    if (lifecycleErr) return lifecycleErr;
     if (roomId && !sqlite.roomBelongsToAccount(roomId, result.account.id)) {
       return { error: 'room_forbidden', message: 'API key does not have access to this room' };
     }
@@ -98,6 +116,8 @@ export async function authenticateJoin({ apiKey, accessToken, roomId, client }) 
       if (!account) {
         return { error: 'invalid_token', message: 'Invalid or expired dev token — sign in again' };
       }
+      const lifecycleErr = accountLifecycleError(account);
+      if (lifecycleErr) return lifecycleErr;
       const roomAccess = resolveRoomAccess(account, roomId, client);
       if (roomAccess.error) return roomAccess;
       const subErr = subscriptionRequired(client, account);
@@ -124,10 +144,22 @@ export async function authenticateJoin({ apiKey, accessToken, roomId, client }) 
 
     let account = sqlite.getAccountByAuthUserId(sub);
     if (!account) {
-      const ensured = sqlite.ensureAccount(email, sub);
-      account = ensured.account;
+      if (sqlite.isEmailBlocked(email)) {
+        return { error: 'account_blocked', message: 'This account cannot access CueSport Scoreboard Cloud' };
+      }
+      try {
+        const ensured = sqlite.ensureAccount(email, sub);
+        account = ensured.account;
+      } catch (error) {
+        if (error?.code === 'account_blocked') {
+          return { error: 'account_blocked', message: error.message };
+        }
+        throw error;
+      }
     }
 
+    const lifecycleErr = accountLifecycleError(account);
+    if (lifecycleErr) return lifecycleErr;
     if (sessionsInvalidated(account, payload.iat)) {
       return { error: 'invalid_token', message: 'Session revoked — sign in again' };
     }
