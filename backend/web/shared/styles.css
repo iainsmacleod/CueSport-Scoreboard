@@ -983,7 +983,7 @@ body.streams-page .site-nav-streams {
 }
 @media (min-width: 900px) {
   .dashboard-main {
-    --content-max: 1100px;
+    --content-max: 1440px;
   }
 }
 body.streams-page .landing-marketing {
@@ -1023,7 +1023,7 @@ body.has-dash-nav {
 }
 @media (min-width: 900px) {
   body.has-dash-nav {
-    --content-max: 1100px;
+    --content-max: 1440px;
   }
 }
 body.has-dash-nav > .site-header {
