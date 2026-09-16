@@ -574,6 +574,19 @@ export async function revokeAllGuestLinks(serverUrl, token) {
   return res.json();
 }
 
+export async function revokeAllApiKeys(serverUrl, token) {
+  const base = serverUrl.replace(/\/$/, '');
+  const res = await fetch(`${base}/api/api-keys/revoke-all`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to revoke OBS Dock Keys');
+  }
+  return res.json();
+}
+
 export async function invalidateAllSessions(serverUrl, token) {
   const base = serverUrl.replace(/\/$/, '');
   const res = await fetch(`${base}/api/sessions/invalidate-all`, {

@@ -369,8 +369,8 @@
                     cp.getStorageItem('enableBallDisplay') === 'yes' &&
                     cp.getStorageItem('useBallSet') === 'yes' &&
                     cp.getStorageItem('winAnimation') === 'yes');
-                assert('Core', 'Feature defaults: Shot Clock off',
-                    cp.getStorageItem('useClock') === 'no');
+                assert('Core', 'Feature defaults: Shot Clock on',
+                    cp.getStorageItem('useClock') === 'yes');
                 assert('Core', 'Feature defaults do not override existing values',
                     (function () {
                         cp.setStorageItem('enableBallTracker', 'no');
@@ -568,10 +568,20 @@
                 const themeSelect = cp.document.getElementById('obsTheme');
                 const modernTheme = cp.document.getElementById('cloudModernTheme');
                 const savedTheme = themeSelect?.value || '27';
+                const featureDefaults = typeof cp.getFeatureSettingDefaults === 'function'
+                    ? cp.getFeatureSettingDefaults()
+                    : {};
                 assert('Cloud UI', 'Modern Cloud theme option present',
                     !!themeSelect?.querySelector('option[value="modern"]'));
-                assert('Cloud UI', 'Modern Cloud stylesheet present and initially isolated',
-                    !!modernTheme && modernTheme.disabled === true);
+                assert('Cloud UI', 'Saved theme controls Modern Cloud stylesheet',
+                    !!modernTheme && modernTheme.disabled === (savedTheme !== 'modern'));
+                assert('Cloud UI', 'Fresh docks default all Feature Settings on',
+                    Object.keys(featureDefaults).length > 0 &&
+                    Object.values(featureDefaults).every((value) => value === 'yes') &&
+                    cp.document.getElementById('useClockSetting')?.defaultChecked === true);
+                const controlPanelSource = await fetchRepoText('../common/js/control_panel.js');
+                assert('Cloud UI', 'Fresh docks default to Modern Cloud theme',
+                    controlPanelSource.indexOf('setStorageItem("obsTheme", "modern")') !== -1);
                 if (themeSelect && modernTheme && typeof cp.obsThemeChange === 'function') {
                     themeSelect.value = 'modern';
                     cp.obsThemeChange();
@@ -628,6 +638,14 @@
                 assert('Cloud Website', 'Empty Streams page reuses marketing content',
                     landingSource.indexOf("classList.toggle('streams-empty'") !== -1 &&
                     sharedStyles.indexOf('body.streams-page.streams-empty .landing-marketing') !== -1);
+                assert('Cloud Website', 'Marketing image click pauses and resumes with an indicator',
+                    landingSource.indexOf('setCarouselPaused(!carouselPaused)') !== -1 &&
+                    landingSource.indexOf('marketing-carousel-pause-indicator') !== -1 &&
+                    landingSource.indexOf('<span>Paused</span>') !== -1);
+                assert('Cloud Website', 'Marketing Previous and Next controls use icons and edge alignment',
+                    landingDoc.querySelectorAll('.marketing-carousel-btn .carousel-control-icon').length === 2 &&
+                    sharedStyles.indexOf('.marketing-carousel-btn:first-child') !== -1 &&
+                    sharedStyles.indexOf('.marketing-carousel-btn:last-child') !== -1);
                 assert('Cloud Website', 'Streams header has centered brand layout',
                     sharedStyles.indexOf('body.streams-page .site-header-inner') !== -1 &&
                     sharedStyles.indexOf('grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr)') !== -1);
@@ -671,14 +689,16 @@
                         'setup-step-3-create-key.png',
                         'setup-step-4-paste-connect.png'
                     ].every((filename) => dashboardSource.indexOf(`/web/images/onboarding/${filename}`) !== -1));
-                assert('Cloud Dashboard', 'Setup carousel has explicit pause and resume behavior',
-                    !!dashboardDoc.getElementById('tablesSetupPause') &&
-                    dashboardAppSource.indexOf("tablesSetupPaused ? 'Resume' : 'Pause'") !== -1 &&
+                assert('Cloud Dashboard', 'Setup image click pauses and resumes with an indicator',
+                    !dashboardDoc.getElementById('tablesSetupPause') &&
+                    dashboardAppSource.indexOf('setTablesSetupPaused(!tablesSetupPaused)') !== -1 &&
+                    dashboardAppSource.indexOf('tables-setup-pause-indicator') !== -1 &&
                     dashboardAppSource.indexOf("setAttribute('aria-pressed'") !== -1);
                 assert('Cloud Dashboard', 'Setup controls use responsive accessible icons',
-                    dashboardDoc.querySelectorAll('.tables-setup-control-btn').length === 3 &&
-                    dashboardDoc.querySelectorAll('.tables-setup-control-icon').length === 4 &&
-                    dashboardSource.indexOf('Pause automatic setup steps') !== -1);
+                    dashboardDoc.querySelectorAll('.tables-setup-control-btn').length === 2 &&
+                    dashboardDoc.querySelectorAll('.tables-setup-control-icon').length === 2 &&
+                    sharedStyles.indexOf('.tables-setup-control-btn:first-child') !== -1 &&
+                    sharedStyles.indexOf('.tables-setup-control-btn:last-child') !== -1);
                 assert('Cloud Dashboard', 'Selected dashboard tab survives reload',
                     dashboardAppSource.indexOf("const DASH_TAB_KEY = 'cuesport_dashboard_tab'") !== -1 &&
                     dashboardAppSource.indexOf('localStorage.setItem(DASH_TAB_KEY, which)') !== -1 &&
@@ -686,6 +706,16 @@
                 assert('Cloud Dashboard', 'Inactive account links to Settings and hides default quota',
                     dashboardAppSource.indexOf('choose a plan in <a href="#billingPanel" class="dash-settings-link">Settings</a>') !== -1 &&
                     dashboardAppSource.indexOf("el.classList.toggle('hidden', needsPlan)") !== -1);
+                assert('Cloud Dashboard', 'Dock Key labels request uniqueness',
+                    dashboardSource.indexOf('Name/Label (unique)') !== -1 &&
+                    dashboardAppSource.indexOf('Choose a unique name for each seat') !== -1);
+                assert('Cloud Dashboard', 'OBS Dock Keys can be revoked together with confirmation',
+                    !!dashboardDoc.getElementById('revokeAllDockKeysBtn') &&
+                    dashboardAppSource.indexOf("title: 'Revoke All OBS Dock Keys'") !== -1 &&
+                    dashboardAppSource.indexOf('revokeAllApiKeys(getServerUrl(), getToken())') !== -1);
+                assert('Cloud Dashboard', 'Current billing plan has a prominent badge',
+                    dashboardAppSource.indexOf("currentBadge.textContent = 'Current plan'") !== -1 &&
+                    dashboardAppSource.indexOf("card.classList.add('is-current')") !== -1);
             } catch (error) {
                 assert('Cloud Website', 'Static Cloud UI contracts load', false, error.message || String(error));
             }

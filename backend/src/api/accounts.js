@@ -326,6 +326,12 @@ export async function registerAccountRoutes(app) {
     if (!resolvedLabel) {
       return reply.code(400).send({ error: 'Enter a name (1–40 characters) for this dock key.' });
     }
+    if (sqlite.isApiKeyLabelInUse(auth.account.id, resolvedLabel)) {
+      return reply.code(409).send({
+        error: 'Dock Key names must be unique. Choose a different name or label.',
+        code: 'duplicate_key_label',
+      });
+    }
     if (role != null && String(role).trim() && !isValidDockKeyRole(role)) {
       return reply.code(400).send({ error: 'Invalid role' });
     }
@@ -374,9 +380,15 @@ export async function registerAccountRoutes(app) {
     }
     const patch = {};
     if (label != null) {
-      const next = String(label || '').trim();
+      const next = String(label || '').trim().slice(0, 40);
       if (!next) {
         return reply.code(400).send({ error: 'Enter a name (1–40 characters) for this dock key.' });
+      }
+      if (sqlite.isApiKeyLabelInUse(auth.account.id, next, keyId)) {
+        return reply.code(409).send({
+          error: 'Dock Key names must be unique. Choose a different name or label.',
+          code: 'duplicate_key_label',
+        });
       }
       patch.label = next;
     }
@@ -423,6 +435,31 @@ export async function registerAccountRoutes(app) {
       ok: true,
       kicked,
       room_deleted: roomDeleted,
+      quota: getAccountQuota(auth.account),
+      api_keys: sqlite.getApiKeysForAccount(auth.account.id),
+      rooms: sqlite.getRoomsWithLiveState(auth.account.id).map(enrichRoom),
+    };
+  });
+
+  app.post('/api/api-keys/revoke-all', async (request, reply) => {
+    const auth = await resolveAuthFromRequest(request);
+    if (!auth?.account) return reply.code(401).send({ error: 'Unauthorized' });
+    if (!isAccountAdminAuth(auth)) {
+      return reply.code(403).send({ error: 'Account sign-in required' });
+    }
+    const keyIds = sqlite.revokeAllApiKeysForAccount(auth.account.id);
+    let kicked = 0;
+    let roomsDeleted = 0;
+    for (const keyId of keyIds) {
+      const result = revokeApiKeySeat(keyId);
+      kicked += Number(result.kicked) || 0;
+      if (result.roomDeleted) roomsDeleted += 1;
+    }
+    return {
+      ok: true,
+      revoked: keyIds.length,
+      kicked,
+      rooms_deleted: roomsDeleted,
       quota: getAccountQuota(auth.account),
       api_keys: sqlite.getApiKeysForAccount(auth.account.id),
       rooms: sqlite.getRoomsWithLiveState(auth.account.id).map(enrichRoom),

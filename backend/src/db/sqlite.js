@@ -348,6 +348,21 @@ export function getApiKeyById(keyId) {
   return getDb().prepare('SELECT * FROM api_keys WHERE id = ?').get(keyId) || null;
 }
 
+export function isApiKeyLabelInUse(accountId, label, excludeKeyId = null) {
+  const normalized = String(label || '').trim();
+  if (!accountId || !normalized) return false;
+  const row = getDb().prepare(
+    `SELECT 1
+     FROM api_keys
+     WHERE account_id = ?
+       AND revoked_at IS NULL
+       AND lower(trim(label)) = lower(?)
+       AND (? IS NULL OR id <> ?)
+     LIMIT 1`
+  ).get(accountId, normalized, excludeKeyId, excludeKeyId);
+  return !!row;
+}
+
 export function connectionLabelForApiKey(apiKeyId) {
   const key = getApiKeyById(apiKeyId);
   // Connection title is the seat name itself (OBS Dock Key N).

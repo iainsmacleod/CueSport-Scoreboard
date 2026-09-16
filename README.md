@@ -218,9 +218,9 @@ Details: [OBS WebSocket Setup](#obs-websocket-setup), [Instant Replay](#instant-
 
 ### Settings
 
-- **OBS Theme** for the dock: Default, Classic (default), Acri, Grey, Light, Rachni.
+- **OBS Theme** for the dock: Modern Cloud (default for new users), Default, Classic, Acri, Grey, Light, Rachni.
 - **Overlay Scaling** (40–100%), **Overlay Opacity**.
-- Feature toggles: Player 1 / Player 2, **Show Scores** (when off, rack/frame and ball counters are hidden on the overlay and **Manual Adjustments** and **Ball Scoring** are disabled in the dock), Shot Clock, **Active Player Indicator** (may be turned on automatically when switching to scoring-oriented game types — see below), Win Animation. Fresh installs (and newly introduced Feature Settings keys) default **on** except **Shot Clock**, which stays off.
+- Feature toggles: Player 1 / Player 2, **Show Scores** (when off, rack/frame and ball counters are hidden on the overlay and **Manual Adjustments** and **Ball Scoring** are disabled in the dock), Shot Clock, **Active Player Indicator** (may be turned on automatically when switching to scoring-oriented game types — see below), Win Animation. Fresh installs and newly introduced Feature Settings keys default **on**.
 - **Ball Scoring** (**on** by default for fresh installs; **persists** across refresh and game-type changes — not auto-enabled when switching game types), **Display Balls** (overlay; defaults on with Ball Scoring for non-Snooker; hidden for Snooker; requires Ball Scoring), Vertical/Horizontal orientation, **Ball Set Toggle** (8-Ball / Custom; on by default for fresh installs). With Ball Scoring on and Open Table, **8-Ball** auto-assigns **Chosen Ball** only after a **second** object ball is potted (so a single pot off the break stays open); Custom still assigns on the first object ball. While Ball Scoring is on, Active Player Indicator is forced on and locked.
 - **Check for Update** (compares to the latest GitHub release).
 - **Clear Instance Data** / **Clear All Data** — clears scoreboard settings only; does not affect player statistics (use Stats → Clear for that). See [Data, Clearing & Privacy](#data-clearing--privacy).

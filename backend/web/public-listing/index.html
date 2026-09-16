@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>CueSport Scoreboard Cloud</title>
   <link rel="icon" type="image/png" href="/web/images/brand/logo.png?v=1" />
-  <link rel="stylesheet" href="/web/shared/styles.css?v=8.2.0.18" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.2.0.19" />
 </head>
 <body>
   <header class="site-header">
@@ -120,9 +120,15 @@
             </ul>
           </div>
           <div class="marketing-carousel-controls">
-            <button type="button" class="btn secondary marketing-carousel-btn" id="carouselPrev" aria-label="Previous slide">Prev</button>
+            <button type="button" class="btn secondary marketing-carousel-btn" id="carouselPrev" aria-label="Previous slide" title="Previous">
+              <svg class="carousel-control-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m15.4 5.4-6.6 6.6 6.6 6.6-1.4 1.4-8-8 8-8 1.4 1.4z"/></svg>
+              <span>Previous</span>
+            </button>
             <div class="marketing-carousel-dots" id="marketingCarouselDots" role="tablist" aria-label="Carousel slides"></div>
-            <button type="button" class="btn secondary marketing-carousel-btn" id="carouselNext" aria-label="Next slide">Next</button>
+            <button type="button" class="btn secondary marketing-carousel-btn" id="carouselNext" aria-label="Next slide" title="Next">
+              <span>Next</span>
+              <svg class="carousel-control-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m8.6 18.6 6.6-6.6-6.6-6.6L10 4l8 8-8 8-1.4-1.4z"/></svg>
+            </button>
           </div>
         </div>
       </section>
@@ -207,6 +213,7 @@
     let carouselIndex = 0;
     let carouselTimer = null;
     let carouselPaused = false;
+    let carouselSwipeAt = 0;
 
     function slides() {
       return Array.from(document.querySelectorAll('#marketingCarouselTrack .marketing-slide'));
@@ -218,6 +225,13 @@
       carouselIndex = ((index % items.length) + items.length) % items.length;
       const track = document.getElementById('marketingCarouselTrack');
       if (track) track.style.transform = `translateX(-${carouselIndex * 100}%)`;
+      items.forEach((slide, i) => {
+        const active = i === carouselIndex;
+        slide.setAttribute('aria-hidden', active ? 'false' : 'true');
+        slide.toggleAttribute('inert', !active);
+        const media = slide.querySelector('.marketing-slide-media');
+        if (media) media.tabIndex = active ? 0 : -1;
+      });
       document.querySelectorAll('#marketingCarouselDots button').forEach((dot, i) => {
         const on = i === carouselIndex;
         dot.classList.toggle('is-active', on);
@@ -266,10 +280,44 @@
       startCarousel();
     }
 
+    function setCarouselPaused(paused) {
+      carouselPaused = !!paused;
+      document.querySelectorAll('.marketing-slide-media').forEach((media) => {
+        media.setAttribute('aria-pressed', carouselPaused ? 'true' : 'false');
+        media.setAttribute('aria-label', carouselPaused ? 'Resume carousel' : 'Pause carousel');
+      });
+      document.querySelectorAll('.marketing-carousel-pause-indicator').forEach((indicator) => {
+        indicator.classList.toggle('hidden', !carouselPaused);
+      });
+      if (carouselPaused) stopCarousel();
+      else startCarousel();
+    }
+
     function initCarousel() {
       buildDots();
-      goToSlide(0);
       const root = document.getElementById('marketingCarousel');
+      document.querySelectorAll('.marketing-slide-media').forEach((media) => {
+        media.classList.add('carousel-click-pause-target');
+        media.tabIndex = 0;
+        media.setAttribute('role', 'button');
+        media.setAttribute('aria-label', 'Pause carousel');
+        media.setAttribute('aria-pressed', 'false');
+        const indicator = document.createElement('span');
+        indicator.className = 'carousel-pause-indicator marketing-carousel-pause-indicator hidden';
+        indicator.setAttribute('aria-hidden', 'true');
+        indicator.innerHTML = '<svg viewBox="0 0 24 24" focusable="false"><path d="M7 5h4v14H7V5zm6 0h4v14h-4V5z"/></svg><span>Paused</span>';
+        media.appendChild(indicator);
+        media.addEventListener('click', () => {
+          if (Date.now() - carouselSwipeAt < 400) return;
+          setCarouselPaused(!carouselPaused);
+        });
+        media.addEventListener('keydown', (event) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          setCarouselPaused(!carouselPaused);
+        });
+      });
+      goToSlide(0);
       document.getElementById('carouselPrev')?.addEventListener('click', () => {
         goToSlide(carouselIndex - 1);
         restartCarousel();
@@ -277,22 +325,6 @@
       document.getElementById('carouselNext')?.addEventListener('click', () => {
         goToSlide(carouselIndex + 1);
         restartCarousel();
-      });
-      root?.addEventListener('mouseenter', () => {
-        carouselPaused = true;
-        stopCarousel();
-      });
-      root?.addEventListener('mouseleave', () => {
-        carouselPaused = false;
-        startCarousel();
-      });
-      root?.addEventListener('focusin', () => {
-        carouselPaused = true;
-        stopCarousel();
-      });
-      root?.addEventListener('focusout', () => {
-        carouselPaused = false;
-        startCarousel();
       });
       let touchX = null;
       root?.addEventListener('touchstart', (e) => {
@@ -303,6 +335,7 @@
         if (touchX == null || x == null) return;
         const dx = x - touchX;
         if (Math.abs(dx) < 40) return;
+        carouselSwipeAt = Date.now();
         goToSlide(carouselIndex + (dx < 0 ? 1 : -1));
         restartCarousel();
         touchX = null;

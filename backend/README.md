@@ -187,11 +187,12 @@ This backend is GPL-licensed alongside the scoreboard. You may run your own inst
 | DELETE | `/api/admin/accounts/:id/trial` | Platform admin: revoke complimentary access (also revokes Dock Keys if no Stripe access remains) |
 | POST | `/api/admin/accounts/:id/invalidate-sessions` | Platform admin: sign out everywhere for tenant |
 | POST | `/api/admin/accounts/:id/api-keys/:keyId/revoke` | Platform admin: revoke dock key |
-| POST | `/api/admin/accounts/:id/delete` | Platform admin: permanently delete account; `{ confirmEmail, blockFutureSignups, confirmActiveSubscription }` |
+| POST | `/api/admin/accounts/:id/delete` | Platform admin: permanently delete account; `{ confirmEmail, blockFutureSignups, allowAnotherTrial, confirmActiveSubscription }` |
 | POST | `/api/admin/account-blocks/unblock` | Platform admin: allow a previously blocked exact email `{ email }` |
 | POST | `/api/api-keys` | Create API key (tier-limited; requires active/trialing access on managed) |
 | GET | `/api/api-keys/:keyId` | View API key plaintext (account owner) |
 | DELETE | `/api/api-keys/:keyId` | Revoke API key (kicks connected dock) |
+| POST | `/api/api-keys/revoke-all` | Revoke every OBS Dock Key, disconnect docks, and remove their table mappings |
 | DELETE | `/api/rooms/:roomId` | Delete room/table mapping (keeps match history) |
 | POST | `/api/rooms/:roomId/guest-link` | Create guest scorer link (token for `/g/{token}`) |
 | GET | `/api/rooms/:roomId/guest-links` | List guest links for a room |

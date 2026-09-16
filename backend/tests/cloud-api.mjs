@@ -499,13 +499,14 @@ async function run() {
     });
     assert('POST /api/api-keys invalid role 400', badRole.status === 400);
 
+    const primaryKeyLabel = `smoke-test-${Date.now()}`;
     const keyRes = await fetchJson('/api/api-keys', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ label: 'smoke-test' }),
+      body: JSON.stringify({ label: primaryKeyLabel }),
     });
     if (keyRes.ok) {
       assert('POST /api/api-keys', keyRes.body.key?.length === 32);
@@ -520,6 +521,19 @@ async function run() {
         headers: { Authorization: `Bearer ${token}` },
       });
       assert('GET /api/api-keys/:keyId', viewRes.ok && viewRes.body.key === apiKey);
+      const duplicateLabel = await fetchJson('/api/api-keys', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ label: `  ${primaryKeyLabel.toUpperCase()}  ` }),
+      });
+      assert(
+        'POST /api/api-keys rejects duplicate label case-insensitively',
+        duplicateLabel.status === 409 && duplicateLabel.body.code === 'duplicate_key_label',
+        JSON.stringify(duplicateLabel.body)
+      );
     } else {
       assert('POST /api/api-keys at limit or ok', keyRes.status === 403 && keyRes.body.code === 'api_key_limit');
       // Need a key for dock tests — create by revoking one first
@@ -2737,6 +2751,19 @@ async function run() {
         }
       }
     }
+
+    const revokeAllDockKeys = await fetchJson('/api/api-keys/revoke-all', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${tokenFresh}` },
+    });
+    assert(
+      'POST /api/api-keys/revoke-all',
+      revokeAllDockKeys.ok
+        && Number(revokeAllDockKeys.body.revoked) >= 1
+        && Array.isArray(revokeAllDockKeys.body.api_keys)
+        && revokeAllDockKeys.body.api_keys.length === 0,
+      JSON.stringify(revokeAllDockKeys.body)
+    );
   }
 
   const streams = await fetchJson('/api/streams');

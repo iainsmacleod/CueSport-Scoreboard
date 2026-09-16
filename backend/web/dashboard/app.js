@@ -16,12 +16,13 @@ import {
   deleteRoom,
   invalidateAllSessions,
   revokeAllGuestLinks,
+  revokeAllApiKeys,
   fetchBillingPlans,
   startBillingCheckout,
   openBillingPortal,
   setSimulatedPlan,
   GAME_TYPES,
-} from '../shared/cloud-client.js?v=8.0.0.11';
+} from '../shared/cloud-client.js?v=8.0.0.12';
 import {
   computeDurationSeconds,
   formatDurationSeconds,
@@ -282,8 +283,8 @@ function openDockKeyModal({ mode = 'create', key = null } = {}) {
   }
   if (hintEl) {
     hintEl.textContent = editing
-      ? 'Update the seat name/label and role. Remove a key and create a new one to replace a leaked secret.'
-      : 'Name the seat when creating. Remove a key and create a new one to replace a leaked secret.';
+      ? 'Update the unique seat name/label and role. Remove a key and create a new one to replace a leaked secret.'
+      : 'Choose a unique name for each seat. Remove a key and create a new one to replace a leaked secret.';
   }
   if (nameWrap) nameWrap.classList.remove('hidden');
   if (roleWrap) roleWrap.classList.remove('hidden');
@@ -518,7 +519,11 @@ function renderTablesSetupCarousel() {
   tablesSetupIndex = (tablesSetupIndex + slides.length) % slides.length;
   track.style.transform = `translateX(-${tablesSetupIndex * 100}%)`;
   slides.forEach((slide, index) => {
-    slide.setAttribute('aria-hidden', index === tablesSetupIndex ? 'false' : 'true');
+    const active = index === tablesSetupIndex;
+    slide.setAttribute('aria-hidden', active ? 'false' : 'true');
+    slide.toggleAttribute('inert', !active);
+    const media = slide.querySelector('.tables-setup-media');
+    if (media) media.tabIndex = active ? 0 : -1;
   });
   document.querySelectorAll('#tablesSetupDots button').forEach((dot, index) => {
     dot.classList.toggle('active', index === tablesSetupIndex);
@@ -541,6 +546,19 @@ function startTablesSetupTimer() {
     tablesSetupIndex += 1;
     renderTablesSetupCarousel();
   }, 8000);
+}
+
+function setTablesSetupPaused(paused) {
+  tablesSetupPaused = !!paused;
+  document.querySelectorAll('.tables-setup-media').forEach((media) => {
+    media.setAttribute('aria-pressed', tablesSetupPaused ? 'true' : 'false');
+    media.setAttribute('aria-label', tablesSetupPaused ? 'Resume setup guide' : 'Pause setup guide');
+  });
+  document.querySelectorAll('.tables-setup-pause-indicator').forEach((indicator) => {
+    indicator.classList.toggle('hidden', !tablesSetupPaused);
+  });
+  if (tablesSetupPaused) stopTablesSetupTimer();
+  else startTablesSetupTimer();
 }
 
 function goToTablesSetupSlide(index) {
@@ -566,6 +584,26 @@ function initTablesSetupCarousel() {
   const dots = document.getElementById('tablesSetupDots');
   const slides = Array.from(track?.querySelectorAll('.tables-setup-slide') || []);
   if (!track || !dots || !slides.length) return;
+  slides.forEach((slide) => {
+    const media = slide.querySelector('.tables-setup-media');
+    if (!media) return;
+    media.classList.add('carousel-click-pause-target');
+    media.tabIndex = 0;
+    media.setAttribute('role', 'button');
+    media.setAttribute('aria-label', 'Pause setup guide');
+    media.setAttribute('aria-pressed', 'false');
+    const indicator = document.createElement('span');
+    indicator.className = 'carousel-pause-indicator tables-setup-pause-indicator hidden';
+    indicator.setAttribute('aria-hidden', 'true');
+    indicator.innerHTML = '<svg viewBox="0 0 24 24" focusable="false"><path d="M7 5h4v14H7V5zm6 0h4v14h-4V5z"/></svg><span>Paused</span>';
+    media.appendChild(indicator);
+    media.addEventListener('click', () => setTablesSetupPaused(!tablesSetupPaused));
+    media.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      setTablesSetupPaused(!tablesSetupPaused);
+    });
+  });
   dots.innerHTML = '';
   slides.forEach((slide, index) => {
     const dot = document.createElement('button');
@@ -580,22 +618,6 @@ function initTablesSetupCarousel() {
   });
   document.getElementById('tablesSetupNext')?.addEventListener('click', () => {
     goToTablesSetupSlide(tablesSetupIndex + 1);
-  });
-  document.getElementById('tablesSetupPause')?.addEventListener('click', (event) => {
-    tablesSetupPaused = !tablesSetupPaused;
-    const button = event.currentTarget;
-    const label = button.querySelector('.tables-setup-control-label');
-    const pauseIcon = button.querySelector('.tables-setup-pause-icon');
-    const resumeIcon = button.querySelector('.tables-setup-resume-icon');
-    const actionLabel = tablesSetupPaused ? 'Resume' : 'Pause';
-    if (label) label.textContent = actionLabel;
-    pauseIcon?.classList.toggle('hidden', tablesSetupPaused);
-    resumeIcon?.classList.toggle('hidden', !tablesSetupPaused);
-    button.setAttribute('aria-label', `${actionLabel} automatic setup steps`);
-    button.setAttribute('title', actionLabel);
-    button.setAttribute('aria-pressed', tablesSetupPaused ? 'true' : 'false');
-    if (tablesSetupPaused) stopTablesSetupTimer();
-    else startTablesSetupTimer();
   });
   document.getElementById('tablesSetupCarousel')?.addEventListener('keydown', (event) => {
     if (event.key === 'ArrowLeft') goToTablesSetupSlide(tablesSetupIndex - 1);
@@ -880,8 +902,15 @@ function fillBillingPlanPicker(grid, account, billingMeta, plansPayload) {
   plans.forEach((plan) => {
     const card = document.createElement('div');
     card.className = 'billing-plan-card';
-    if (account?.subscription_tier === plan.id && !account?.needs_plan && !isComplimentaryActive(account)) {
+    const isCurrent = account?.subscription_tier === plan.id
+      && !account?.needs_plan
+      && !isComplimentaryActive(account);
+    if (isCurrent) {
       card.classList.add('is-current');
+      const currentBadge = document.createElement('span');
+      currentBadge.className = 'billing-plan-current-badge';
+      currentBadge.textContent = 'Current plan';
+      card.appendChild(currentBadge);
     }
     const limits = plan.limits || {};
     const h = document.createElement('h3');
@@ -1527,7 +1556,9 @@ async function shareApiKey(k) {
 
 function renderApiKeys(keys) {
   const keyList = document.getElementById('keyList');
+  const revokeAllBtn = document.getElementById('revokeAllDockKeysBtn');
   keyList.innerHTML = '';
+  if (revokeAllBtn) revokeAllBtn.disabled = !(keys || []).length;
   (keys || []).forEach((k) => {
     const li = document.createElement('li');
     li.className = 'token-list-item';
@@ -4767,6 +4798,41 @@ document.getElementById('clearSavedLoginBtn')?.addEventListener('click', () => {
 document.getElementById('createKeyBtn').addEventListener('click', () => {
   openDockKeyModal({ mode: 'create' });
 });
+document.getElementById('revokeAllDockKeysBtn')?.addEventListener('click', async () => {
+  const ok = await confirmDashAction({
+    title: 'Revoke All OBS Dock Keys',
+    message:
+      'Revoke every OBS Dock Key on this account?\n\n' +
+      'All connected docks will be disconnected and their tables removed from the dashboard. The revoked keys cannot be recovered; create and paste new keys to reconnect.',
+    confirmLabel: 'Revoke All Keys',
+    danger: true,
+  });
+  if (!ok) return;
+  try {
+    setError('');
+    const result = await revokeAllApiKeys(getServerUrl(), getToken());
+    if (result.quota) renderQuota(result.quota, lastAccount);
+    if (Array.isArray(result.api_keys)) renderApiKeys(result.api_keys);
+    if (Array.isArray(result.rooms)) {
+      ownDashboardRooms = result.rooms;
+      lastDashboardRooms = result.rooms;
+      renderTableCards(result.rooms);
+      renderDebugRooms(result.rooms);
+    }
+    const revoked = Number(result.revoked) || 0;
+    const kicked = Number(result.kicked) || 0;
+    const roomsDeleted = Number(result.rooms_deleted) || 0;
+    const notice = document.getElementById('keyRevokeNotice');
+    if (notice) {
+      notice.textContent = revoked
+        ? `Revoked ${revoked} OBS Dock Key${revoked === 1 ? '' : 's'}, disconnected ${kicked} dock${kicked === 1 ? '' : 's'}, and removed ${roomsDeleted} table${roomsDeleted === 1 ? '' : 's'}.`
+        : 'No active OBS Dock Keys to revoke.';
+      notice.classList.remove('hidden');
+    }
+  } catch (err) {
+    setError(err.message);
+  }
+});
 document.getElementById('simulatedPlanSelect')?.addEventListener('change', onSimulatedPlanChange);
 document.getElementById('simulatedPlanSelectSettings')?.addEventListener('change', onSimulatedPlanChange);
 document.getElementById('dashCreateKeyCancelBtn')?.addEventListener('click', () => closeDockKeyModal());
@@ -5387,6 +5453,11 @@ setMatchModalActionButtons();
       title: 'Create a new OBS Dock Key',
     });
   }
+  setDashActionButtonContent(document.getElementById('revokeAllDockKeysBtn'), {
+    icon: 'stopSign',
+    label: 'Revoke All OBS Dock Keys',
+    title: 'Revoke every OBS Dock Key',
+  });
   setDashActionButtonContent(document.getElementById('statsPlayerRenameForm')?.querySelector('button[type="submit"]'), {
     icon: 'save',
     label: 'Save',

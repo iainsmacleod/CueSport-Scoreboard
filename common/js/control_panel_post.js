@@ -93,7 +93,7 @@ function initBallClickTargets() {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 window.onload = function () {
-	// Fresh installs / newly introduced Feature Settings keys (Shot Clock stays off).
+	// Fresh installs / newly introduced Feature Settings keys default on.
 	if (typeof ensureFeatureSettingDefaults === "function") {
 		ensureFeatureSettingDefaults();
 	}

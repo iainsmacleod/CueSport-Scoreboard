@@ -1142,6 +1142,7 @@ body.has-dash-nav .dash-tabs[hidden] {
   gap: 0.75rem;
 }
 .marketing-slide-media {
+  position: relative;
   margin: 0;
   display: flex;
   align-items: center;
@@ -1187,21 +1188,36 @@ body.has-dash-nav .dash-tabs[hidden] {
   opacity: 0.9;
 }
 .marketing-carousel-controls {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
   gap: 0.5rem;
   margin-top: 0.75rem;
 }
 .marketing-carousel-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   flex-shrink: 0;
+}
+.marketing-carousel-btn:first-child {
+  justify-self: start;
+}
+.marketing-carousel-btn:last-child {
+  justify-self: end;
+}
+.carousel-control-icon {
+  display: block;
+  width: 1.15rem;
+  height: 1.15rem;
+  flex: 0 0 auto;
+  fill: currentColor;
 }
 .marketing-carousel-dots {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: 0.4rem;
-  flex: 1;
 }
 .marketing-carousel-dots button {
   width: 0.55rem;
@@ -1389,6 +1405,7 @@ body.has-dash-nav .dash-tabs[hidden] {
   padding: 1rem;
 }
 .tables-setup-media {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1429,10 +1446,9 @@ body.has-dash-nav .dash-tabs[hidden] {
   font-weight: 800;
 }
 .tables-setup-controls {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
   gap: 0.55rem;
   margin-top: 0.8rem;
 }
@@ -1444,6 +1460,12 @@ body.has-dash-nav .dash-tabs[hidden] {
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
+}
+.tables-setup-control-btn:first-child {
+  justify-self: start;
+}
+.tables-setup-control-btn:last-child {
+  justify-self: end;
 }
 .tables-setup-control-icon {
   display: block;
@@ -1470,6 +1492,37 @@ body.has-dash-nav .dash-tabs[hidden] {
   background: #7f8cff;
   box-shadow: 0 0 0 3px rgba(127, 140, 255, 0.18);
 }
+.carousel-click-pause-target {
+  cursor: pointer;
+}
+.carousel-click-pause-target:focus-visible {
+  outline: 2px solid #7aa2f7;
+  outline-offset: -2px;
+}
+.carousel-pause-indicator {
+  position: absolute;
+  z-index: 2;
+  top: 0.65rem;
+  right: 0.65rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
+  background: rgba(7, 12, 29, 0.88);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 0.3rem 1rem rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+.carousel-pause-indicator svg {
+  width: 0.85rem;
+  height: 0.85rem;
+  fill: currentColor;
+}
 @media (max-width: 760px) {
   .tables-setup-slide {
     grid-template-columns: 1fr;
@@ -1483,7 +1536,6 @@ body.has-dash-nav .dash-tabs[hidden] {
     max-width: none;
   }
   .tables-setup-controls {
-    flex-wrap: nowrap;
     gap: 0.4rem;
   }
   .tables-setup-control-btn {
@@ -1737,6 +1789,17 @@ a.table-card:focus-visible {
 }
 .token-list-actions .btn.secondary {
   margin-top: 0;
+}
+.dock-key-primary-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin: 0.5rem 0;
+}
+#tabSettings .dock-key-primary-actions .btn {
+  margin: 0;
 }
 .token-list-item {
   display: flex;
@@ -3206,7 +3269,22 @@ body.controls-locked #mobileBottomNav {
   flex: 1;
 }
 .billing-plan-card.is-current {
-  border-color: #7aa2f7;
+  border: 2px solid #9ece6a;
+  background: rgba(158, 206, 106, 0.08);
+  box-shadow:
+    0 0 0 1px rgba(158, 206, 106, 0.22),
+    0 0 18px rgba(158, 206, 106, 0.14);
+}
+.billing-plan-current-badge {
+  align-self: flex-start;
+  padding: 0.18rem 0.45rem;
+  border-radius: 999px;
+  background: #9ece6a;
+  color: #172014;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 .billing-terms-row {
   display: block;

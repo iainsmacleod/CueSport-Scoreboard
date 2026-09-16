@@ -32,7 +32,9 @@ try {
     `INSERT INTO room_guest_tokens (token, room_id, account_id, label)
      VALUES (?, ?, ?, ?)`
   ).run('delete-guest', 'delete-room', account.id, 'Delete guest');
-  sqlite.createApiKey(account.id, 'Delete key', 'trusted_operator');
+  const deleteKey = sqlite.createApiKey(account.id, 'Delete key', 'trusted_operator');
+  assert('Dock Key labels compare case-insensitively', sqlite.isApiKeyLabelInUse(account.id, '  DELETE KEY  '));
+  assert('Dock Key label check can exclude the edited key', !sqlite.isApiKeyLabelInUse(account.id, 'Delete key', deleteKey.id));
   sqlite.recordEmailTrialUse(email);
 
   const deleting = sqlite.markAccountDeleting(account.id);

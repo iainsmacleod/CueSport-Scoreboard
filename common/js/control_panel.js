@@ -6670,7 +6670,7 @@ function obsThemeChange() {
 }
 
 function startThemeCheck() {
-    if (getStorageItem("obsTheme") == null) { setStorageItem("obsTheme", "27"); document.getElementById("obsTheme").value = "27"; };
+    if (getStorageItem("obsTheme") == null) { setStorageItem("obsTheme", "modern"); document.getElementById("obsTheme").value = "modern"; };
     const modernTheme = document.getElementById("cloudModernTheme");
     if (modernTheme) modernTheme.disabled = true;
     if (getStorageItem("obsTheme") == "28") {
@@ -7088,7 +7088,7 @@ const GAME_TYPE_SELECT_ID = "gameTypeSelect";
 /**
  * Feature Settings defaults for fresh installs and newly introduced keys.
  * Only writes when a key is absent — never overrides an explicit user choice.
- * Shot Clock stays off; all other Feature Settings toggles default on.
+ * All Feature Settings toggles default on.
  */
 function getFeatureSettingDefaults() {
     return {
@@ -7096,7 +7096,7 @@ function getFeatureSettingDefaults() {
         usePlayer2: "yes",
         scoreDisplay: "yes",
         usePlayerToggle: "yes",
-        useClock: "no",
+        useClock: "yes",
         winAnimation: "yes",
         enableBallTracker: "yes",
         useBallSet: "yes"

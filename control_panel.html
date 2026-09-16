@@ -36,7 +36,7 @@ for more information about Salotto please visit https://salotto.app
     <script src="./common/js/cloud_relay.js?v=8.0.0.21"></script>
     <script src="./common/js/stream_sharing.js?v=8.0.0.6"></script>
     <script src="./common/js/player_stats.js?v=8.2.0.2"></script>
-    <script src="./common/js/control_panel.js?v=8.2.0.3"></script>
+    <script src="./common/js/control_panel.js?v=8.2.0.4"></script>
     <script src="./common/js/cloud_commands.js?v=8.0.0.11"></script>
     <script src="./common/js/cloud_auth.js?v=8.0.0.4"></script>
     <script src="./common/js/cloud_remote.js?v=8.2.0"></script>
@@ -628,12 +628,12 @@ for more information about Salotto please visit https://salotto.app
                     <label for="obsTheme">OBS Theme</label>
                     <select class="dropdown" id="obsTheme" onchange="obsThemeChange()">
                         <option value="28">Default</option>
-                        <option value="27" selected>Classic</option>
+                        <option value="27">Classic</option>
                         <option value="acri">Acri</option>
                         <option value="grey">Grey</option>
                         <option value="light">Light</option>
                         <option value="rachni">Rachni</option>
-                        <option value="modern">Modern Cloud</option>
+                        <option value="modern" selected>Modern Cloud</option>
                     </select>
                     <span></span>
                 </div>
@@ -679,7 +679,8 @@ for more information about Salotto please visit https://salotto.app
                     </div>
                     <div class="field-inline">
                         <label for="useClockSetting" id="labelForUseClockSetting">Shot Clock</label>
-                        <input type="checkbox" class="smallSize" id="useClockSetting" onchange="clockSetting()" />
+                        <input type="checkbox" class="smallSize" id="useClockSetting" onchange="clockSetting()"
+                            checked />
                     </div>
                     <div class="field-inline" id="winAnimationDiv">
                         <label for="winAnimation">Win Animation</label>
@@ -1348,7 +1349,7 @@ for more information about Salotto please visit https://salotto.app
         </div>
     </div>
 
-    <script src="./common/js/control_panel_post.js?v=8.0.0.1"></script>
+    <script src="./common/js/control_panel_post.js?v=8.0.0.2"></script>
     <script>
         //////////////////// HotKey scripts
 
