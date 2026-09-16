@@ -432,6 +432,54 @@ input, select {
 .rack-foul-player.is-active .rack-foul-count { opacity: 1; }
 .rack-foul-player:not(.is-active) { opacity: 0.55; }
 .dev-login { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #414868; }
+.dash-login-feature-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+  margin: 1rem 0 1.15rem;
+}
+.dash-login-feature-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 0.9rem;
+  border: 1px solid rgba(122, 162, 247, 0.24);
+  border-radius: 0.75rem;
+  background:
+    linear-gradient(145deg, rgba(47, 128, 255, 0.11), rgba(138, 92, 255, 0.07)),
+    rgba(15, 16, 24, 0.48);
+}
+.dash-login-feature-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  flex: 0 0 auto;
+  border-radius: 0.65rem;
+  background: linear-gradient(135deg, #2f80ff, #8a5cff);
+  color: #fff;
+  box-shadow: 0 0.35rem 1rem rgba(47, 128, 255, 0.2);
+}
+.dash-login-feature-icon svg {
+  width: 1.3rem;
+  height: 1.3rem;
+}
+.dash-login-feature-card h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+}
+.dash-login-feature-card p {
+  margin: 0;
+  color: #c8cbe0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+@media (max-width: 720px) {
+  .dash-login-feature-grid {
+    grid-template-columns: 1fr;
+  }
+}
 .dash-login-pane {
   margin-top: 0.75rem;
 }

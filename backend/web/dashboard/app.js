@@ -426,8 +426,8 @@ function getToken() {
   return localStorage.getItem(TOKEN_KEY) || '';
 }
 
-/** Clear local dashboard session and show the login screen (stay on /dashboard). */
-function localSignOut({ clearServer = false } = {}) {
+/** Clear the local dashboard session; optionally return to the public homepage. */
+function localSignOut({ clearServer = false, redirectHome = false } = {}) {
   localStorage.removeItem(TOKEN_KEY);
   if (clearServer) localStorage.removeItem(SERVER_KEY);
   wantLiveFeed = false;
@@ -445,6 +445,10 @@ function localSignOut({ clearServer = false } = {}) {
   try {
     window.google?.accounts?.id?.disableAutoSelect?.();
   } catch (_) { /* ignore */ }
+  if (redirectHome) {
+    window.location.assign('/');
+    return;
+  }
   show('loginSection', true);
   show('dashboardSection', false);
   if (dashPublicConfigCache) {
@@ -4856,7 +4860,7 @@ document.getElementById('signOutBtn')?.addEventListener('click', async () => {
     confirmLabel: 'Sign Out',
   });
   if (!ok) return;
-  localSignOut({ clearServer: true });
+  localSignOut({ clearServer: true, redirectHome: true });
 });
 
 document.getElementById('invalidateSessionsBtn')?.addEventListener('click', async () => {
@@ -4877,7 +4881,7 @@ document.getElementById('invalidateSessionsBtn')?.addEventListener('click', asyn
     setError(err.message);
     return;
   }
-  localSignOut();
+  localSignOut({ redirectHome: true });
 });
 
 document.getElementById('revokeAllGuestsBtn')?.addEventListener('click', async () => {

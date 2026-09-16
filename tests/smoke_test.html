@@ -652,6 +652,17 @@
                 assert('Cloud Website', 'Dashboard brand has no version text',
                     (dashboardDoc.querySelector('.site-brand h1')?.textContent || '').trim() ===
                         'CueSport Scoreboard Cloud');
+                assert('Cloud Dashboard', 'Sign-in page has three current-feature cards',
+                    dashboardDoc.querySelectorAll('#loginSection .dash-login-feature-card').length === 3 &&
+                    !dashboardDoc.querySelector('#dashLoginManagedPane .dash-login-feature-grid') &&
+                    !dashboardDoc.querySelector('#dashLoginSelfHostPane .dash-login-feature-grid') &&
+                    dashboardSource.indexOf('Score From Anywhere') !== -1 &&
+                    dashboardSource.indexOf('Manage Every Table') !== -1 &&
+                    dashboardSource.indexOf('Keep the Match Story') !== -1 &&
+                    sharedStyles.indexOf('grid-template-columns: repeat(3, minmax(0, 1fr))') !== -1);
+                assert('Cloud Dashboard', 'Sign Out and Sign Out Everywhere return home',
+                    (dashboardAppSource.match(/localSignOut\(\{[^}]*redirectHome: true[^}]*\}\)/g) || []).length === 2 &&
+                    dashboardAppSource.indexOf("window.location.assign('/')") !== -1);
                 assert('Cloud Website', 'Mobile header uses logo, title, then connection status',
                     (function () {
                         const row = mobileDoc.querySelector('.mobile-header-row');
