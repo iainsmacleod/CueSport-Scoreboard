@@ -31,6 +31,8 @@ import {
 
 const TOKEN_KEY = 'cuesport_token';
 const SERVER_KEY = 'cuesport_server';
+const DASH_TAB_KEY = 'cuesport_dashboard_tab';
+const DASH_TABS = new Set(['tables', 'stats', 'settings', 'admin']);
 
 const DOCK_KEY_ROLE_LABELS = {
   administrator: 'Administrator',
@@ -1662,9 +1664,12 @@ function updatePlatformAccountFilterVisibility(which = getActiveDashTab()) {
 }
 
 function setActiveDashTab(which) {
+  if (which === 'account') which = 'settings';
+  if (!DASH_TABS.has(which)) which = 'tables';
   if (which === 'admin' && !isPlatformAdminUser) {
     which = 'tables';
   }
+  localStorage.setItem(DASH_TAB_KEY, which);
   document.querySelectorAll('.dash-tab').forEach((t) => {
     t.classList.toggle('active', t.dataset.tab === which);
   });
@@ -2113,6 +2118,10 @@ async function loadAdminAccountDetail(accountId) {
           <input id="adminDeleteBlockEmail" type="checkbox" />
           <span>Block future signups from this email</span>
         </label>
+        <label class="admin-delete-block-check">
+          <input id="adminDeleteAllowTrial" type="checkbox" />
+          <span>Allow this email another Streamer trial</span>
+        </label>
         <button type="submit" class="btn danger dash-action-btn">Delete Account</button>
       </form>`;
     const invalidateBtn = isSelf
@@ -2237,7 +2246,12 @@ async function adminInvalidateSelectedSessions() {
   setAdminStatus('Sessions invalidated');
 }
 
-async function adminDeleteSelectedAccount(confirmEmail, blockFutureSignups, confirmActiveSubscription = false) {
+async function adminDeleteSelectedAccount(
+  confirmEmail,
+  blockFutureSignups,
+  allowAnotherTrial,
+  confirmActiveSubscription = false
+) {
   if (!adminSelectedId || isOwnAdminAccount(adminSelectedId)) return false;
   const initialOk = confirmActiveSubscription || await confirmDashAction({
     title: 'Delete Account',
@@ -2253,6 +2267,7 @@ async function adminDeleteSelectedAccount(confirmEmail, blockFutureSignups, conf
       body: JSON.stringify({
         confirmEmail,
         blockFutureSignups,
+        allowAnotherTrial,
         confirmActiveSubscription,
       }),
     });
@@ -2268,10 +2283,13 @@ async function adminDeleteSelectedAccount(confirmEmail, blockFutureSignups, conf
       danger: true,
     });
     if (!confirmed) return false;
-    return adminDeleteSelectedAccount(confirmEmail, blockFutureSignups, true);
+    return adminDeleteSelectedAccount(confirmEmail, blockFutureSignups, allowAnotherTrial, true);
   }
 
-  setAdminStatus(`Deleted ${confirmEmail}${blockFutureSignups ? ' and blocked future signups from that email' : ''}.`);
+  const outcomes = [];
+  if (blockFutureSignups) outcomes.push('blocked future signups from that email');
+  if (allowAnotherTrial) outcomes.push('reset its Streamer trial eligibility');
+  setAdminStatus(`Deleted ${confirmEmail}${outcomes.length ? ` and ${outcomes.join(' and ')}` : ''}.`);
   closeAdminDetail();
   await loadAdminAccounts();
   return true;
@@ -4165,6 +4183,7 @@ async function renderDashboard() {
     const emailEl = document.getElementById('userEmail');
     if (emailEl) emailEl.textContent = me.account.email;
     setPlatformAdminUi(!!me.is_platform_admin);
+    setActiveDashTab(localStorage.getItem(DASH_TAB_KEY) || 'tables');
     renderQuota(me.quota, me.account);
     syncSimulatedPlanSelect(me);
     renderApiKeys(me.api_keys);
@@ -4394,8 +4413,9 @@ document.getElementById('adminDetailBody')?.addEventListener('submit', async (ev
     event.preventDefault();
     const confirmEmail = String(document.getElementById('adminDeleteConfirmEmail')?.value || '').trim();
     const blockFutureSignups = !!document.getElementById('adminDeleteBlockEmail')?.checked;
+    const allowAnotherTrial = !!document.getElementById('adminDeleteAllowTrial')?.checked;
     try {
-      await adminDeleteSelectedAccount(confirmEmail, blockFutureSignups);
+      await adminDeleteSelectedAccount(confirmEmail, blockFutureSignups, allowAnotherTrial);
     } catch (err) {
       setAdminStatus(err.message || 'Failed to delete account');
       if (adminSelectedId) await loadAdminAccountDetail(adminSelectedId).catch(() => {});

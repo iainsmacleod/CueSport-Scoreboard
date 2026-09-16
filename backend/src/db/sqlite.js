@@ -513,6 +513,7 @@ export function setAccountDeletionError(accountId, message) {
 export function finalizeAccountDeletion(accountId, {
   blockFutureSignups = false,
   trialUsed = false,
+  allowAnotherTrial = false,
 } = {}) {
   const database = getDb();
   return database.transaction(() => {
@@ -535,9 +536,14 @@ export function finalizeAccountDeletion(accountId, {
     ).run(
       fingerprint,
       authUserFingerprint,
-      trialUsed ? new Date().toISOString() : null,
+      trialUsed && !allowAnotherTrial ? new Date().toISOString() : null,
       blockFutureSignups ? new Date().toISOString() : null,
     );
+    if (allowAnotherTrial) {
+      database.prepare(
+        'UPDATE account_identity_records SET trial_used_at = NULL WHERE email_fingerprint = ?'
+      ).run(fingerprint);
+    }
     database.prepare('DELETE FROM accounts WHERE id = ?').run(accountId);
     return true;
   })();

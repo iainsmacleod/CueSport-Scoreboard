@@ -69,6 +69,21 @@ try {
   assert('stale JWT identity cannot recreate the deleted account', staleIdentityBlocked);
   assert('unblocked email can create a new inactive account', !!sqlite.ensureAccount(email, 'replacement-auth-user').account);
   assert('unblocking does not restore trial eligibility', sqlite.hasEmailUsedTrial(email));
+
+  const resetEmail = 'reset.trial@example.com';
+  const resetAuthUserId = 'auth-user-reset-trial';
+  const { account: resetAccount } = sqlite.ensureAccount(resetEmail, resetAuthUserId);
+  sqlite.recordEmailTrialUse(resetEmail);
+  sqlite.finalizeAccountDeletion(resetAccount.id, {
+    trialUsed: true,
+    allowAnotherTrial: true,
+  });
+  assert('admin can reset trial eligibility during deletion', !sqlite.hasEmailUsedTrial(resetEmail));
+  assert('trial reset keeps the deleted identity tombstone', sqlite.isAuthUserDeleted(resetAuthUserId));
+  assert(
+    'trial reset allows a genuinely new identity',
+    !!sqlite.ensureAccount(resetEmail, 'replacement-reset-auth-user').account
+  );
 } finally {
   if (database?.open) database.close();
   fs.rmSync(tempDir, { recursive: true, force: true });

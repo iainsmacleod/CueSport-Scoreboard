@@ -351,6 +351,7 @@ export async function registerAdminRoutes(app) {
       sqlite.finalizeAccountDeletion(account.id, {
         blockFutureSignups: request.body?.blockFutureSignups === true,
         trialUsed: priorTrial,
+        allowAnotherTrial: request.body?.allowAnotherTrial === true,
       });
 
       return {
@@ -361,6 +362,7 @@ export async function registerAdminRoutes(app) {
         guest_links_revoked: revokedGuestLinks,
         clients_kicked: clientsKicked,
         future_signups_blocked: request.body?.blockFutureSignups === true,
+        trial_eligibility_reset: request.body?.allowAnotherTrial === true,
       };
     } catch (error) {
       request.log.error({ err: error, accountId: account.id }, 'Account deletion failed');

@@ -644,9 +644,11 @@
                             !!(logo.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING) &&
                             !!(title.compareDocumentPosition(status) & Node.DOCUMENT_POSITION_FOLLOWING);
                     })());
-                assert('Cloud Admin', 'Account deletion requires typed email and optional signup block',
+                assert('Cloud Admin', 'Account deletion supports typed email, signup block, and trial reset',
                     dashboardAppSource.indexOf('adminDeleteConfirmEmail') !== -1 &&
                     dashboardAppSource.indexOf('adminDeleteBlockEmail') !== -1 &&
+                    dashboardAppSource.indexOf('adminDeleteAllowTrial') !== -1 &&
+                    dashboardAppSource.indexOf('allowAnotherTrial') !== -1 &&
                     dashboardAppSource.indexOf('active_subscription_confirmation_required') !== -1);
                 assert('Cloud Admin', 'Email unblock control is present',
                     !!dashboardDoc.getElementById('adminUnblockEmailForm') &&
@@ -677,6 +679,10 @@
                     dashboardDoc.querySelectorAll('.tables-setup-control-btn').length === 3 &&
                     dashboardDoc.querySelectorAll('.tables-setup-control-icon').length === 4 &&
                     dashboardSource.indexOf('Pause automatic setup steps') !== -1);
+                assert('Cloud Dashboard', 'Selected dashboard tab survives reload',
+                    dashboardAppSource.indexOf("const DASH_TAB_KEY = 'cuesport_dashboard_tab'") !== -1 &&
+                    dashboardAppSource.indexOf('localStorage.setItem(DASH_TAB_KEY, which)') !== -1 &&
+                    dashboardAppSource.indexOf("localStorage.getItem(DASH_TAB_KEY) || 'tables'") !== -1);
             } catch (error) {
                 assert('Cloud Website', 'Static Cloud UI contracts load', false, error.message || String(error));
             }
