@@ -678,9 +678,10 @@
                     sharedStyles.indexOf('body.dashboard-page .dash-tab.active') !== -1 &&
                     sharedStyles.indexOf('body.dashboard-page .stats-subtab.active') !== -1);
                 assert('Cloud Navigation', 'Footer tabs share the centered main content width',
-                    sharedStyles.indexOf('body.has-dash-nav > .dash-tabs') !== -1 &&
-                    sharedStyles.indexOf('max-width: var(--content-max);') !== -1 &&
-                    sharedStyles.indexOf('left: 50%;') !== -1 &&
+                    !!dashboardDoc.querySelector('.dash-tabs > .dash-tabs-inner') &&
+                    !!mobileDoc.querySelector('.mobile-bottom-nav > .mobile-bottom-nav-inner') &&
+                    sharedStyles.indexOf('.dash-tabs-inner') !== -1 &&
+                    sharedStyles.indexOf('.mobile-bottom-nav-inner') !== -1 &&
                     sharedStyles.indexOf('max-width: var(--content-max, 720px);') !== -1);
                 assert('Cloud Website', 'Public navigation and carousel buttons use purple-first styling',
                     sharedStyles.indexOf('body.landing-home .btn.primary') !== -1 &&

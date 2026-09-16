@@ -1280,9 +1280,9 @@ body.has-dash-nav > .dash-tabs {
   right: auto;
   bottom: auto;
   width: 100%;
-  max-width: var(--content-max);
-  margin: 0 auto;
-  display: flex;
+  max-width: none;
+  margin: 0;
+  display: block;
 }
 body.has-dash-nav .dash-tabs[hidden] {
   display: none;
@@ -1441,13 +1441,21 @@ body.has-dash-nav .dash-tabs[hidden] {
   display: none;
   position: static;
   z-index: 20;
-  gap: 0.25rem;
   margin: 0;
-  padding: 0.5rem 0.4rem calc(0.5rem + env(safe-area-inset-bottom, 0px));
+  padding: 0;
   background: #16161e;
   border-top: 1px solid #292e42;
   width: 100%;
   box-sizing: border-box;
+}
+.dash-tabs-inner {
+  display: flex;
+  width: 100%;
+  max-width: var(--content-max, 720px);
+  margin: 0 auto;
+  padding: 0.5rem 0.4rem calc(0.5rem + env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
+  gap: 0.25rem;
 }
 .dash-tab {
   flex: 1;
@@ -2099,19 +2107,27 @@ body.mobile.has-mobile-nav {
 }
 .mobile-bottom-nav {
   position: fixed;
-  left: 50%;
-  right: auto;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
+  transform: none;
   bottom: 0;
   z-index: 20;
+  display: block;
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+  padding: 0;
+  background: #16161e;
+  border-top: 1px solid #292e42;
+}
+.mobile-bottom-nav-inner {
   display: flex;
   width: 100%;
   max-width: var(--content-max, 720px);
+  margin: 0 auto;
+  padding: 0.5rem 0.4rem calc(0.5rem + env(safe-area-inset-bottom, 0px));
   box-sizing: border-box;
   gap: 0.25rem;
-  padding: 0.5rem 0.4rem calc(0.5rem + env(safe-area-inset-bottom, 0px));
-  background: #16161e;
-  border-top: 1px solid #292e42;
 }
 .mobile-nav-btn {
   flex: 1;
