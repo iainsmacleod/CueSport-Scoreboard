@@ -241,7 +241,7 @@ Tier ids: `streamer`, `tournament_organizer`, `league_director` (plus contact-on
 
 The Admin tab can permanently delete customer accounts. Deletion revokes credentials, disconnects live clients, immediately cancels active Stripe subscriptions, removes the Supabase Auth user, and deletes account-owned SQLite data. Active billing requires a second explicit confirmation. Stripe invoice/payment/tax history remains in Stripe for accounting.
 
-Administrators may optionally block future Cloud access from the same email. The application stores only a keyed HMAC fingerprint, not the deleted email address; **Allow Future Signup** requires entering the exact email again. Set a stable `ACCOUNT_FINGERPRINT_SECRET` before enabling managed sign-in. Changing this key makes existing trial-history and email-block lookups unavailable.
+Administrators may optionally block future Cloud access from the same email. The application stores keyed HMAC fingerprints rather than the deleted email or Supabase identity; the identity fingerprint rejects an already-issued JWT for the deleted user without preventing a genuinely new Supabase signup unless the email was explicitly blocked. **Allow Future Signup** requires entering the exact email again. Set a stable `ACCOUNT_FINGERPRINT_SECRET` before enabling managed sign-in. Changing this key makes existing deleted-identity, trial-history, and email-block lookups unavailable.
 
 Unblocked deletion/trial fingerprints are retained for 1095 days by default and pruned at startup. Change `ACCOUNT_IDENTITY_RETENTION_DAYS` if your reviewed retention policy requires a different period. Signup-block fingerprints remain until a platform administrator explicitly unblocks the email.
 

@@ -50,6 +50,7 @@ try {
   assert('account children cascade', db.prepare('SELECT COUNT(*) AS n FROM rooms WHERE account_id = ?').get(account.id).n === 0);
   assert('trial use survives deletion', sqlite.hasEmailUsedTrial(email));
   assert('optional signup block survives deletion', sqlite.isEmailBlocked(email));
+  assert('deleted Supabase identity is tombstoned', sqlite.isAuthUserDeleted('auth-user-delete-test'));
 
   let blocked = false;
   try {
@@ -59,6 +60,13 @@ try {
   }
   assert('blocked email cannot recreate an account', blocked);
   assert('exact email can be unblocked', sqlite.unblockAccountEmail(email));
+  let staleIdentityBlocked = false;
+  try {
+    sqlite.ensureAccount(email, 'auth-user-delete-test');
+  } catch (error) {
+    staleIdentityBlocked = error?.code === 'account_deleted';
+  }
+  assert('stale JWT identity cannot recreate the deleted account', staleIdentityBlocked);
   assert('unblocked email can create a new inactive account', !!sqlite.ensureAccount(email, 'replacement-auth-user').account);
   assert('unblocking does not restore trial eligibility', sqlite.hasEmailUsedTrial(email));
 } finally {

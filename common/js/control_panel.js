@@ -1204,7 +1204,7 @@ const SNOOKER_BREAK_BALL_COLORS = {
     green: "#43a047",
     brown: "#8d6e63",
     blue: "#1e88e5",
-    pink: "#ec407a",
+    pink: "#ff66c4",
     black: "#f5f5f5",
     gold: "#ffc107",
     freeball: "#b0bec5"

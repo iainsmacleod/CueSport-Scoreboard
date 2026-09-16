@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS accounts (
 
 CREATE TABLE IF NOT EXISTS account_identity_records (
   email_fingerprint TEXT PRIMARY KEY,
+  auth_user_fingerprint TEXT,
   trial_used_at TEXT,
   deleted_at TEXT,
   blocked_at TEXT,
@@ -165,6 +166,16 @@ function ensureAccountColumns(database) {
     // Platform admin: null/unrestricted = no caps; otherwise a catalog tier id for testing.
     database.exec('ALTER TABLE accounts ADD COLUMN simulated_plan TEXT');
   }
+}
+
+function ensureAccountIdentityRecordColumns(database) {
+  const cols = new Set(tableColumns(database, 'account_identity_records'));
+  if (!cols.has('auth_user_fingerprint')) {
+    database.exec('ALTER TABLE account_identity_records ADD COLUMN auth_user_fingerprint TEXT');
+  }
+  database.exec(
+    'CREATE INDEX IF NOT EXISTS idx_account_identity_auth_user ON account_identity_records(auth_user_fingerprint)'
+  );
 }
 
 function ensureApiKeyColumns(database) {
@@ -293,6 +304,7 @@ export function getDb() {
     db.pragma('foreign_keys = ON');
     db.exec(SCHEMA);
     ensureAccountColumns(db);
+    ensureAccountIdentityRecordColumns(db);
     ensureApiKeyColumns(db);
     ensureRoomDockColumns(db);
     ensureMatchEventsAccountScoped(db);
@@ -371,6 +383,24 @@ export function fingerprintAccountEmail(email) {
   return createHmac('sha256', config.accountFingerprintSecret).update(normalized).digest('hex');
 }
 
+export function fingerprintAuthUserId(authUserId) {
+  const normalized = String(authUserId || '').trim();
+  if (!normalized || !config.accountFingerprintSecret) return null;
+  return createHmac('sha256', config.accountFingerprintSecret)
+    .update(`auth-user\0${normalized}`)
+    .digest('hex');
+}
+
+export function isAuthUserDeleted(authUserId) {
+  const fingerprint = fingerprintAuthUserId(authUserId);
+  if (!fingerprint) return false;
+  const row = getDb().prepare(
+    `SELECT deleted_at FROM account_identity_records
+     WHERE auth_user_fingerprint = ? AND deleted_at IS NOT NULL`
+  ).get(fingerprint);
+  return !!row?.deleted_at;
+}
+
 export function isEmailBlocked(email) {
   const fingerprint = fingerprintAccountEmail(email);
   if (!fingerprint) return false;
@@ -413,6 +443,11 @@ export function unblockAccountEmail(email) {
 /** Dev / self-host / OAuth: ensure account exists (no default room — rooms are created on dock join). */
 export function ensureAccount(email, authUserId = null) {
   const database = getDb();
+  if (authUserId && isAuthUserDeleted(authUserId)) {
+    const error = new Error('This deleted account identity can no longer access CueSport Scoreboard Cloud');
+    error.code = 'account_deleted';
+    throw error;
+  }
   if (isEmailBlocked(email)) {
     const error = new Error('This account cannot access CueSport Scoreboard Cloud');
     error.code = 'account_blocked';
@@ -484,19 +519,22 @@ export function finalizeAccountDeletion(accountId, {
     const account = database.prepare('SELECT * FROM accounts WHERE id = ?').get(accountId);
     if (!account) return false;
     const fingerprint = fingerprintAccountEmail(account.email);
-    if (!fingerprint) {
+    const authUserFingerprint = fingerprintAuthUserId(account.auth_user_id);
+    if (!fingerprint || (account.auth_user_id && !authUserFingerprint)) {
       throw new Error('ACCOUNT_FINGERPRINT_SECRET is required to delete accounts safely');
     }
     database.prepare(
       `INSERT INTO account_identity_records
-         (email_fingerprint, trial_used_at, deleted_at, blocked_at)
-       VALUES (?, ?, datetime('now'), ?)
+         (email_fingerprint, auth_user_fingerprint, trial_used_at, deleted_at, blocked_at)
+       VALUES (?, ?, ?, datetime('now'), ?)
        ON CONFLICT(email_fingerprint) DO UPDATE SET
+         auth_user_fingerprint = excluded.auth_user_fingerprint,
          trial_used_at = COALESCE(account_identity_records.trial_used_at, excluded.trial_used_at),
          deleted_at = excluded.deleted_at,
          blocked_at = COALESCE(account_identity_records.blocked_at, excluded.blocked_at)`
     ).run(
       fingerprint,
+      authUserFingerprint,
       trialUsed ? new Date().toISOString() : null,
       blockFutureSignups ? new Date().toISOString() : null,
     );

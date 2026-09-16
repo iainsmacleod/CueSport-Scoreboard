@@ -141,6 +141,12 @@ export async function authenticateJoin({ apiKey, accessToken, roomId, client }) 
       return { error: 'invalid_token', message: 'Invalid access token' };
     }
     const email = payload.email || payload.user_metadata?.email || `${sub}@supabase.local`;
+    if (sqlite.isAuthUserDeleted(sub)) {
+      return {
+        error: 'account_deleted',
+        message: 'This deleted account identity can no longer access CueSport Scoreboard Cloud',
+      };
+    }
 
     let account = sqlite.getAccountByAuthUserId(sub);
     if (!account) {
