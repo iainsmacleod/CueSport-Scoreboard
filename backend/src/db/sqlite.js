@@ -1417,6 +1417,20 @@ export function upsertAccountPlayer(accountId, name, playerId = null) {
   return id;
 }
 
+/** Always create a distinct roster identity, even when the display name exists. */
+export function createAccountPlayer(accountId, name) {
+  if (!accountId) return null;
+  const display = truncatePlayerName(name);
+  const normalized = normalizePlayerName(display);
+  if (!normalized) return null;
+  const id = uuidv4();
+  getDb().prepare(
+    `INSERT INTO account_players (id, account_id, name, name_normalized, last_seen_at)
+     VALUES (?, ?, ?, ?, datetime('now'))`
+  ).run(id, accountId, display, normalized);
+  return getAccountPlayer(accountId, id);
+}
+
 export function getAccountPlayer(accountId, playerId) {
   if (!accountId || !playerId) return null;
   return getDb().prepare(

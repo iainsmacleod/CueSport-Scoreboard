@@ -602,7 +602,10 @@
                     fetchRepoText('../backend/web/dashboard/app.js'),
                     fetchRepoText('../backend/web/mobile/index.html'),
                     fetchRepoText('../backend/web/shared/styles.css'),
-                    fetchRepoText('../backend/web/mobile/modern.css')
+                    fetchRepoText('../backend/web/mobile/modern.css'),
+                    fetchRepoText('../backend/web/shared/cloud-client.js'),
+                    fetchRepoText('../common/js/cloud_commands.js'),
+                    fetchRepoText('../backend/web/mobile/app.js')
                 ]);
                 const landingSource = sourceFiles[0];
                 const dashboardSource = sourceFiles[1];
@@ -610,6 +613,9 @@
                 const mobileSource = sourceFiles[3];
                 const sharedStyles = sourceFiles[4];
                 const mobileModernStyles = sourceFiles[5];
+                const cloudClientSource = sourceFiles[6];
+                const cloudCommandsSource = sourceFiles[7];
+                const mobileAppSource = sourceFiles[8];
                 const parser = new DOMParser();
                 const landingDoc = parser.parseFromString(landingSource, 'text/html');
                 const dashboardDoc = parser.parseFromString(dashboardSource, 'text/html');
@@ -671,6 +677,11 @@
                     sharedStyles.indexOf('linear-gradient(135deg, var(--dashboard-purple), var(--dashboard-blue))') !== -1 &&
                     sharedStyles.indexOf('body.dashboard-page .dash-tab.active') !== -1 &&
                     sharedStyles.indexOf('body.dashboard-page .stats-subtab.active') !== -1);
+                assert('Cloud Navigation', 'Footer tabs share the centered main content width',
+                    sharedStyles.indexOf('body.has-dash-nav > .dash-tabs') !== -1 &&
+                    sharedStyles.indexOf('max-width: var(--content-max);') !== -1 &&
+                    sharedStyles.indexOf('left: 50%;') !== -1 &&
+                    sharedStyles.indexOf('max-width: var(--content-max, 720px);') !== -1);
                 assert('Cloud Website', 'Public navigation and carousel buttons use purple-first styling',
                     sharedStyles.indexOf('body.landing-home .btn.primary') !== -1 &&
                     sharedStyles.indexOf('body.streams-page .btn.primary') !== -1 &&
@@ -680,6 +691,15 @@
                     mobileModernStyles.indexOf('linear-gradient(135deg, var(--mobile-purple), var(--mobile-blue))') !== -1 &&
                     mobileModernStyles.indexOf('body.mobile .btn.secondary') !== -1 &&
                     mobileModernStyles.indexOf('body.mobile .btn.save') !== -1);
+                assert('Cloud Mobile', 'Same-name players can be created and selected by UUID',
+                    mobileAppSource.indexOf('Create another player:') !== -1 &&
+                    mobileAppSource.indexOf('Player ID ${shortId}') !== -1 &&
+                    mobileAppSource.indexOf("sendCmd('set_player_name', { slot, name, playerId: playerId || null })") !== -1 &&
+                    cloudClientSource.indexOf('export async function createAccountPlayer') !== -1);
+                assert('Cloud Dock', 'Remote player selection binds and clears UUID identity',
+                    cloudCommandsSource.indexOf("el.setAttribute('data-player-id', playerId)") !== -1 &&
+                    cloudCommandsSource.indexOf("el.removeAttribute('data-player-id')") !== -1 &&
+                    cloudCommandsSource.indexOf('invalidateCloudStatsCache') !== -1);
                 assert('Cloud Website', 'Mobile header uses logo, title, then connection status',
                     (function () {
                         const row = mobileDoc.querySelector('.mobile-header-row');
@@ -1147,6 +1167,32 @@
             assert('PlayerStats API', 'Create binds data-player-id to new short player',
                 p1Input.getAttribute('data-player-id') === (shortPlayer && shortPlayer.id),
                 p1Input.getAttribute('data-player-id'));
+            p1Input.value = shortPrefixName;
+            p1Input.dispatchEvent(new Event('input', { bubbles: true }));
+            await sleep(250);
+            const duplicateCreateItem = p1List && p1List.querySelector('.autocomplete-new');
+            assert('PlayerStats API', 'Exact name offers Create another player',
+                (duplicateCreateItem && duplicateCreateItem.textContent || '').indexOf('Create another player') !== -1,
+                (duplicateCreateItem && duplicateCreateItem.textContent) || '');
+            if (duplicateCreateItem) {
+                duplicateCreateItem.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+            }
+            await sleep(200);
+            p1Input.value = shortPrefixName;
+            p1Input.dispatchEvent(new Event('input', { bubbles: true }));
+            await sleep(250);
+            const duplicateHits = await cp.PlayerStats.searchPlayers(shortPrefixName, 8);
+            const duplicateRows = p1List ? Array.from(p1List.querySelectorAll('.autocomplete-item:not(.autocomplete-new)')) : [];
+            assert('PlayerStats API', 'Duplicate names keep distinct player UUIDs',
+                duplicateHits.filter(function (p) {
+                    return p.nameNormalized === shortPrefixName.toLowerCase();
+                }).length === 2 &&
+                new Set(duplicateHits.map(function (p) { return p.id; })).size === duplicateHits.length);
+            assert('PlayerStats API', 'Duplicate autocomplete rows show distinguishing player IDs',
+                duplicateRows.filter(function (row) {
+                    return row.textContent.indexOf('Player ID') !== -1;
+                }).length >= 2,
+                duplicateRows.map(function (row) { return row.textContent; }).join(' | '));
             p1List.classList.add('noShow');
             p1Input.value = '';
             p1Input.removeAttribute('data-player-id');

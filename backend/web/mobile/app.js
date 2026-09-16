@@ -5,8 +5,9 @@ import {
   fetchGuestLinks,
   revokeGuestLink,
   fetchPlayers,
+  createAccountPlayer,
   GAME_TYPES,
-} from '../shared/cloud-client.js?v=8.0.0.8';
+} from '../shared/cloud-client.js?v=8.2.0.13';
 import {
   parseRaceTarget,
   isRaceLocked,
@@ -968,6 +969,16 @@ function applyState(state) {
   // Form fields — always sync from dock (including empty), unless the user has unsaved edits
   if (state.player1Name != null) document.getElementById('p1Name').value = state.player1Name;
   if (state.player2Name != null) document.getElementById('p2Name').value = state.player2Name;
+  if (state.player1Id != null) {
+    const input = document.getElementById('p1Name');
+    if (state.player1Id) input?.setAttribute('data-player-id', state.player1Id);
+    else input?.removeAttribute('data-player-id');
+  }
+  if (state.player2Id != null) {
+    const input = document.getElementById('p2Name');
+    if (state.player2Id) input?.setAttribute('data-player-id', state.player2Id);
+    else input?.removeAttribute('data-player-id');
+  }
   if (state.raceInfo != null) {
     raceDirty = applyCommittedTextField('raceInput', state.raceInfo, raceDirty);
   }
@@ -2264,20 +2275,48 @@ function dockPlayerName(slot) {
   return truncatePlayerName(slot === '1' ? (lastState.player1Name || '') : (lastState.player2Name || ''));
 }
 
+function dockPlayerId(slot) {
+  return String(slot === '1' ? (lastState.player1Id || '') : (lastState.player2Id || ''));
+}
+
 function commitPlayerNameIfChanged(slot) {
   const input = document.getElementById(slot === '1' ? 'p1Name' : 'p2Name');
   if (!input) return;
   const name = truncatePlayerName(input.value);
   if (!name) return;
-  if (normalizePlayerName(name) === normalizePlayerName(dockPlayerName(slot))) return;
-  sendCmd('set_player_name', { slot, name });
+  const playerId = String(input.getAttribute('data-player-id') || '');
+  if (
+    normalizePlayerName(name) === normalizePlayerName(dockPlayerName(slot))
+    && playerId === dockPlayerId(slot)
+  ) return;
+  sendCmd('set_player_name', { slot, name, playerId: playerId || null });
 }
 
-function pickPlayerName(slot, name) {
+function pickPlayer(slot, player) {
   const input = document.getElementById(slot === '1' ? 'p1Name' : 'p2Name');
-  const trimmed = truncatePlayerName(name);
-  if (input) input.value = trimmed;
-  sendCmd('set_player_name', { slot, name: trimmed });
+  const name = truncatePlayerName(player?.name);
+  const playerId = String(player?.id || '');
+  if (input) {
+    input.value = name;
+    if (playerId) input.setAttribute('data-player-id', playerId);
+    else input.removeAttribute('data-player-id');
+  }
+  sendCmd('set_player_name', { slot, name, playerId: playerId || null });
+}
+
+async function createAndPickPlayer(slot, name) {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) {
+    pickPlayer(slot, { name });
+    return;
+  }
+  try {
+    const player = await createAccountPlayer(window.location.origin, token, truncatePlayerName(name));
+    if (player) pickPlayer(slot, player);
+  } catch (err) {
+    console.error('Create player error:', err);
+    window.alert(`Could not create player: ${err.message || 'Unknown error'}`);
+  }
 }
 
 function initPlayerAutocompleteForSlot(slot, inputId, listId) {
@@ -2310,7 +2349,12 @@ function initPlayerAutocompleteForSlot(slot, inputId, listId) {
       const exactExists = !!(queryNorm && results.some(
         (p) => normalizePlayerName(p.name) === queryNorm,
       ));
-      const createName = (!browseAll && query && !exactExists) ? truncatePlayerName(query) : null;
+      const createName = query ? truncatePlayerName(query) : null;
+      const nameCounts = results.reduce((counts, player) => {
+        const key = normalizePlayerName(player.name);
+        counts.set(key, (counts.get(key) || 0) + 1);
+        return counts;
+      }, new Map());
 
       playerAutocompleteState[slot].results = results;
       playerAutocompleteState[slot].createNewName = createName;
@@ -2330,10 +2374,13 @@ function initPlayerAutocompleteForSlot(slot, inputId, listId) {
       if (createName) {
         const createItem = document.createElement('div');
         createItem.className = 'autocomplete-item autocomplete-new';
-        createItem.textContent = `Create new player: "${createName}"`;
+        createItem.dataset.index = '0';
+        createItem.textContent = exactExists
+          ? `Create another player: "${createName}"`
+          : `Create new player: "${createName}"`;
         createItem.addEventListener('mousedown', (e) => {
           e.preventDefault();
-          pickPlayerName(slot, createName);
+          createAndPickPlayer(slot, createName);
           hideList();
         });
         list.appendChild(createItem);
@@ -2343,11 +2390,16 @@ function initPlayerAutocompleteForSlot(slot, inputId, listId) {
         const item = document.createElement('div');
         item.className = 'autocomplete-item';
         item.dataset.index = String(createName ? index + 1 : index);
+        const duplicateName = (nameCounts.get(normalizePlayerName(player.name)) || 0) > 1;
+        const shortId = String(player.id || '').slice(0, 8);
+        const preview = duplicateName
+          ? `${formatPlayerPreview(player.last_seen_at)} · Player ID ${shortId}`
+          : formatPlayerPreview(player.last_seen_at);
         item.innerHTML = `<span class="autocomplete-name">${escapeHtml(player.name)}</span>`
-          + `<span class="autocomplete-preview">${escapeHtml(formatPlayerPreview(player.last_seen_at))}</span>`;
+          + `<span class="autocomplete-preview">${escapeHtml(preview)}</span>`;
         item.addEventListener('mousedown', (e) => {
           e.preventDefault();
-          pickPlayerName(slot, player.name);
+          pickPlayer(slot, player);
           hideList();
         });
         list.appendChild(item);
@@ -2377,21 +2429,22 @@ function initPlayerAutocompleteForSlot(slot, inputId, listId) {
     if (index < 0) return;
     if (state.createNewName) {
       if (index === 0) {
-        pickPlayerName(slot, state.createNewName);
+        createAndPickPlayer(slot, state.createNewName);
         hideList();
         return;
       }
       const player = state.results[index - 1];
-      if (player) pickPlayerName(slot, player.name);
+      if (player) pickPlayer(slot, player);
       hideList();
       return;
     }
     const player = state.results[index];
-    if (player) pickPlayerName(slot, player.name);
+    if (player) pickPlayer(slot, player);
     hideList();
   };
 
   input.addEventListener('input', () => {
+    input.removeAttribute('data-player-id');
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => refresh(), 150);
   });

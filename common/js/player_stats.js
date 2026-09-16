@@ -3427,7 +3427,9 @@
 
         const existingId = getPlayerIdFromInput(slot);
         if (existingId) {
-            const player = await getPlayer(existingId);
+            const player = skipLocalCareerWrites()
+                ? await findCloudRosterPlayer(existingId)
+                : await getPlayer(existingId);
             if (!player) {
                 setPlayerIdOnInput(slot, null);
                 return null;
@@ -5627,6 +5629,11 @@
             const exactExists = !!(queryNorm && results.some(function (p) {
                 return (p.nameNormalized || normalizeName(p.name)) === queryNorm;
             }));
+            const nameCounts = results.reduce(function (counts, player) {
+                const key = player.nameNormalized || normalizeName(player.name);
+                counts[key] = (counts[key] || 0) + 1;
+                return counts;
+            }, {});
             // Offer create whenever there is a typed name (including browse-all with a query),
             // so a second player can share a display name.
             const createName = query ? truncateName(query) : null;
@@ -5668,8 +5675,10 @@
                 const lastPlayed = player.lastPlayedAt
                     ? new Date(player.lastPlayedAt).toLocaleDateString()
                     : '';
-                const disambig = exactExists
-                    ? (' · ' + (lastPlayed || shortId))
+                const playerNameKey = player.nameNormalized || normalizeName(player.name);
+                const duplicateName = (nameCounts[playerNameKey] || 0) > 1;
+                const disambig = duplicateName
+                    ? (' · ' + (lastPlayed || 'Never played') + ' · Player ID ' + shortId)
                     : '';
                 item.innerHTML = '<span class="autocomplete-name">' + escapeHtml(player.name) +
                     escapeHtml(disambig) + '</span>' +

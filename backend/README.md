@@ -206,4 +206,5 @@ This backend is GPL-licensed alongside the scoreboard. You may run your own inst
 | DELETE | `/api/stats/matches/:startEventId` | Delete a completed match, or abandon an in-progress (unended) match. Abandon clears the room session pointer and, when a dock is connected to that room, relays `abandon_match` (`dockNotified` in the response). |
 | PATCH | `/api/stats/players` | Rename a player across all match history + roster |
 | GET | `/api/players` | Account player roster (autocomplete) |
+| POST | `/api/players` | Create a distinct UUID player identity (duplicate display names allowed) |
 | GET | `/api/streams` | Active public streams |

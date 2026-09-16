@@ -191,6 +191,19 @@ export async function registerAccountRoutes(app) {
     return { players };
   });
 
+  app.post('/api/players', async (request, reply) => {
+    const auth = await resolveAuthFromRequest(request);
+    if (!auth?.account) return reply.code(401).send({ error: 'Unauthorized' });
+    if (!permissionsForAuth(auth).canManagePlayers) {
+      return reply.code(403).send({ error: 'Forbidden' });
+    }
+    const player = sqlite.createAccountPlayer(auth.account.id, request.body?.name);
+    if (!player) {
+      return reply.code(400).send({ error: 'Enter a player name.' });
+    }
+    return reply.code(201).send({ player });
+  });
+
   app.post('/api/rooms/:roomId/guest-link', async (request, reply) => {
     const auth = await resolveAuthFromRequest(request);
     if (!auth?.account) return reply.code(401).send({ error: 'Unauthorized' });

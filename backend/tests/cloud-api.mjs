@@ -450,6 +450,44 @@ async function run() {
       );
     }
     const accountId = me.body.account?.id;
+    const duplicatePlayerName = `Same Name ${Date.now().toString(36)}`;
+    const duplicatePlayers = [];
+    for (let i = 0; i < 2; i++) {
+      const createdPlayer = await fetchJson('/api/players', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name: duplicatePlayerName }),
+      });
+      assert(
+        `POST /api/players creates duplicate identity ${i + 1}`,
+        createdPlayer.status === 201 && !!createdPlayer.body.player?.id,
+        JSON.stringify(createdPlayer.body),
+      );
+      if (createdPlayer.body.player) duplicatePlayers.push(createdPlayer.body.player);
+    }
+    assert(
+      'Duplicate player names receive distinct UUIDs',
+      duplicatePlayers.length === 2 && duplicatePlayers[0].id !== duplicatePlayers[1].id,
+      JSON.stringify(duplicatePlayers),
+    );
+    const duplicateSearch = await fetchJson(
+      `/api/players?q=${encodeURIComponent(duplicatePlayerName)}&limit=8`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    const duplicateSearchIds = new Set(
+      (duplicateSearch.body.players || [])
+        .filter((player) => player.name === duplicatePlayerName)
+        .map((player) => player.id),
+    );
+    assert(
+      'GET /api/players returns every same-name identity',
+      duplicateSearch.ok
+        && duplicatePlayers.every((player) => duplicateSearchIds.has(player.id)),
+      JSON.stringify(duplicateSearch.body),
+    );
 
     // Free seats/rooms from prior smoke runs so this account is under tier caps.
     for (const room of me.body.rooms || []) {
@@ -942,6 +980,51 @@ async function run() {
     // Session + state persistence
     const dock2 = await wsJoin({ client: 'dock', apiKey, instanceId: smokeInstance }).catch(() => null);
     if (dock2) {
+      if (duplicatePlayers.length === 2) {
+        const duplicateSessionId = `same-name-${Date.now().toString(36)}`;
+        dock2.ws.send(JSON.stringify({
+          type: 'session',
+          room_id: roomId,
+          action: 'start',
+          payload: {
+            gameType: 'game1',
+            player1: duplicatePlayerName,
+            player2: duplicatePlayerName,
+            player1Id: duplicatePlayers[0].id,
+            player2Id: duplicatePlayers[1].id,
+            sessionId: duplicateSessionId,
+          },
+        }));
+        dock2.ws.send(JSON.stringify({
+          type: 'session',
+          room_id: roomId,
+          action: 'end',
+          payload: {
+            matchId: duplicateSessionId,
+            sessionId: duplicateSessionId,
+            winnerSlot: '1',
+            scores: { p1: 3, p2: 1 },
+            reason: 'race_complete',
+          },
+        }));
+        await sleep(200);
+        const duplicateStats = await fetchJson('/api/stats', {
+          headers: { Authorization: `Bearer ${tokenFresh}` },
+        });
+        const duplicateMatch = (duplicateStats.body.matches || []).find(
+          (match) => match.id === duplicateSessionId,
+        );
+        const playerIds = new Set((duplicateStats.body.players || []).map((player) => player.id));
+        assert(
+          'Same-name match remains assigned to selected UUIDs',
+          duplicateStats.ok
+            && duplicateMatch?.player1Id === duplicatePlayers[0].id
+            && duplicateMatch?.player2Id === duplicatePlayers[1].id
+            && playerIds.has(duplicatePlayers[0].id)
+            && playerIds.has(duplicatePlayers[1].id),
+          JSON.stringify(duplicateMatch || duplicateStats.body),
+        );
+      }
       dock2.ws.send(JSON.stringify({
         type: 'session',
         room_id: roomId,

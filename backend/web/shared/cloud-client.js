@@ -428,6 +428,24 @@ export async function fetchPlayers(serverUrl, token, query = '', limit = 8) {
   return data.players || [];
 }
 
+export async function createAccountPlayer(serverUrl, token, name) {
+  const base = serverUrl.replace(/\/$/, '');
+  const res = await fetch(`${base}/api/players`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to create player');
+  }
+  const data = await res.json();
+  return data.player || null;
+}
+
 export async function createApiKey(serverUrl, token, label, role) {
   const base = serverUrl.replace(/\/$/, '');
   const res = await fetch(`${base}/api/api-keys`, {

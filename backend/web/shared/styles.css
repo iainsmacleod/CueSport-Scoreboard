@@ -1280,7 +1280,8 @@ body.has-dash-nav > .dash-tabs {
   right: auto;
   bottom: auto;
   width: 100%;
-  max-width: none;
+  max-width: var(--content-max);
+  margin: 0 auto;
   display: flex;
 }
 body.has-dash-nav .dash-tabs[hidden] {
@@ -2098,11 +2099,15 @@ body.mobile.has-mobile-nav {
 }
 .mobile-bottom-nav {
   position: fixed;
-  left: 0;
-  right: 0;
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
   bottom: 0;
   z-index: 20;
   display: flex;
+  width: 100%;
+  max-width: var(--content-max, 720px);
+  box-sizing: border-box;
   gap: 0.25rem;
   padding: 0.5rem 0.4rem calc(0.5rem + env(safe-area-inset-bottom, 0px));
   background: #16161e;

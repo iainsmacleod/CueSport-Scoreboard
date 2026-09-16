@@ -158,12 +158,25 @@
             case 'set_player_name': {
                 const slot = payload && payload.slot;
                 const name = payload && payload.name != null ? String(payload.name) : '';
+                const playerId = payload && payload.playerId != null
+                    ? String(payload.playerId).trim()
+                    : '';
+                let el = null;
                 if (slot === '1' || slot === 1) {
-                    const el = document.getElementById('p1Name');
-                    if (el) el.value = name.substring(0, 20);
+                    el = document.getElementById('p1Name');
                 } else if (slot === '2' || slot === 2) {
-                    const el = document.getElementById('p2Name');
-                    if (el) el.value = name.substring(0, 20);
+                    el = document.getElementById('p2Name');
+                }
+                if (el) {
+                    el.value = name.substring(0, 20);
+                    if (playerId) {
+                        el.setAttribute('data-player-id', playerId);
+                    } else {
+                        el.removeAttribute('data-player-id');
+                    }
+                }
+                if (window.PlayerStats && typeof window.PlayerStats.invalidateCloudStatsCache === 'function') {
+                    window.PlayerStats.invalidateCloudStatsCache();
                 }
                 postNames();
                 return Promise.resolve().then(publishAfterScoring);
