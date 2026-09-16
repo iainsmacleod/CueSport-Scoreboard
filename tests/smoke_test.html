@@ -727,6 +727,10 @@
                     !!dashboardDoc.getElementById('tablesOnboarding') &&
                     dashboardDoc.querySelectorAll('#tablesSetupTrack .tables-setup-slide').length === 4 &&
                     !!dashboardDoc.getElementById('tablesSetupOpenKeysBtn'));
+                assert('Cloud Dashboard', 'Table cards use a centered responsive capped grid',
+                    sharedStyles.indexOf('repeat(auto-fit, minmax(min(100%, 18rem), 22rem))') !== -1 &&
+                    sharedStyles.indexOf('justify-content: center;') !== -1 &&
+                    sharedStyles.indexOf('.table-cards {\n    grid-template-columns: minmax(0, 1fr);') !== -1);
                 assert('Cloud Dashboard', 'Setup guide covers managed and self-hosted Cloud',
                     dashboardSource.indexOf('managed service for the simplest setup') !== -1 &&
                     dashboardSource.indexOf('choose <strong>Self-hosting</strong>') !== -1 &&
