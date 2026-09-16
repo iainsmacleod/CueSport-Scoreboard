@@ -420,11 +420,14 @@
                     cp.document.getElementById('remoteTab') &&
                 cp.document.getElementById('remoteTab').nextElementSibling ===
                     cp.document.getElementById('generalSettingsTab'));
-            assert('Core', 'Remote tab disabled until Cloud connected',
-                cp.document.getElementById('remoteTab').classList.contains('tablinks-disabled') &&
-                cp.document.getElementById('remoteTab').getAttribute('aria-disabled') === 'true' &&
+            assert('Core', 'Disconnected Remote tab stays accessible with Cloud promotion',
+                !cp.document.getElementById('remoteTab').classList.contains('tablinks-disabled') &&
+                cp.document.getElementById('remoteTab').getAttribute('aria-disabled') === 'false' &&
                 typeof cp.isRemoteTabAvailable === 'function' &&
-                cp.isRemoteTabAvailable() === false);
+                cp.isRemoteTabAvailable() === false &&
+                !!cp.document.getElementById('cloudRemotePromotion') &&
+                !!cp.document.getElementById('cloudRemoteConnectBtn') &&
+                cp.document.getElementById('cloudRemoteConnected').classList.contains('noShow'));
             assert('Core', 'Cloud Settings header and blurb',
                 (cp.document.getElementById('cloudRelayLabel')?.textContent || '').trim() ===
                     'CueSport Scoreboard Cloud' &&
@@ -669,7 +672,7 @@
                     dashboardSource.indexOf('Keep the Match Story') !== -1 &&
                     sharedStyles.indexOf('grid-template-columns: repeat(3, minmax(0, 1fr))') !== -1);
                 assert('Cloud Dashboard', 'Sign Out and Sign Out Everywhere return home',
-                    (dashboardAppSource.match(/localSignOut\(\{[^}]*redirectHome: true[^}]*\}\)/g) || []).length === 2 &&
+                    (dashboardAppSource.match(/localSignOut\(\{[^}]*redirectHome: true[^}]*\}\)/g) || []).length >= 2 &&
                     dashboardAppSource.indexOf("window.location.assign('/')") !== -1);
                 assert('Cloud Navigation', 'Dashboard uses a stable loading shell before auth resolves',
                     !!dashboardDoc.querySelector('#dashboardBoot.app-boot') &&
@@ -679,6 +682,18 @@
                     !!mobileDoc.querySelector('#connectingSection.app-boot') &&
                     mobileAppSource.indexOf("showConnecting(message || 'Connecting to table…')") !== -1 &&
                     mobileAppSource.indexOf("setConnectionStatus('waiting')") !== -1);
+                assert('Cloud Mobile', 'Forced table exits return home instead of showing saved login',
+                    mobileAppSource.indexOf('function shouldLeaveTableForHome') !== -1 &&
+                    mobileAppSource.indexOf("window.location.replace('/')") !== -1 &&
+                    !!mobileDoc.getElementById('setupClearTokenBtn'));
+                assert('Cloud Accounts', 'Deleted-account clients are returned to the homepage',
+                    dashboardAppSource.indexOf("e.code === 'account_deleting'") !== -1 &&
+                    mobileAppSource.indexOf("'account_deleting'") !== -1 &&
+                    mobileAppSource.indexOf("'account_blocked'") !== -1);
+                assert('Cloud Dashboard', 'Player leaderboard shows sortable date added',
+                    !!dashboardDoc.querySelector('#statsLeaderboardTable th[data-sort-key="dateAdded"]') &&
+                    dashboardAppSource.indexOf("case 'dateAdded':") !== -1 &&
+                    dashboardAppSource.indexOf('formatStatsDate(p.createdAt)') !== -1);
                 assert('Cloud Dashboard', 'Dashboard buttons use purple-first Modern Cloud styling',
                     dashboardDoc.body.classList.contains('dashboard-page') &&
                     sharedStyles.indexOf('body.dashboard-page .btn.primary') !== -1 &&

@@ -22,7 +22,7 @@ for more information about Salotto please visit https://salotto.app
     <link rel="stylesheet" href="./common/css/control_panel/grey.css?v=8.0.0" />
     <link rel="stylesheet" href="./common/css/control_panel/light.css?v=8.0.0" />
     <link rel="stylesheet" href="./common/css/control_panel/rachni.css?v=8.0.0" />
-    <link rel="stylesheet" href="./common/css/control_panel/required.css?v=8.0.0.47" />
+    <link rel="stylesheet" href="./common/css/control_panel/required.css?v=8.0.0.48" />
     <link id="cloudModernTheme" rel="stylesheet" href="./common/css/control_panel/cloud-modern.css?v=8.2.0.2" disabled />
     <script>
         //---------------------------------------------------------------------------------------------
@@ -36,10 +36,10 @@ for more information about Salotto please visit https://salotto.app
     <script src="./common/js/cloud_relay.js?v=8.0.0.21"></script>
     <script src="./common/js/stream_sharing.js?v=8.0.0.6"></script>
     <script src="./common/js/player_stats.js?v=8.2.0.3"></script>
-    <script src="./common/js/control_panel.js?v=8.2.0.4"></script>
+    <script src="./common/js/control_panel.js?v=8.2.0.5"></script>
     <script src="./common/js/cloud_commands.js?v=8.2.0.12"></script>
     <script src="./common/js/cloud_auth.js?v=8.0.0.4"></script>
-    <script src="./common/js/cloud_remote.js?v=8.2.0"></script>
+    <script src="./common/js/cloud_remote.js?v=8.2.0.1"></script>
     <script src="hotkeys.js?v=8.0.0"></script>
 
     <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
@@ -69,7 +69,7 @@ for more information about Salotto please visit https://salotto.app
             <button id="controlsTab" class="tablinks" onclick="openTab(event, 'Controls')">Controls</button>
             <button id="imagesTab" class="tablinks" onclick="openTab(event, 'Images')">Images</button>
             <button id="statsTab" class="tablinks" onclick="openTab(event, 'StatsSettings')">Stats</button>
-            <button id="remoteTab" class="tablinks tablinks-disabled" onclick="openTab(event, 'RemoteSettings')" aria-disabled="true" title="Connect CueSport Scoreboard Cloud in Settings to use Remote">Remote</button>
+            <button id="remoteTab" class="tablinks" onclick="openTab(event, 'RemoteSettings')" aria-disabled="false">Remote</button>
             <button id="generalSettingsTab" class="tablinks" onclick="openTab(event, 'GeneralSettings')">Settings</button>
         </div>
         <!-- Player/Team/Game Information Tab -->
@@ -595,6 +595,22 @@ for more information about Salotto please visit https://salotto.app
         </div>
         <!-- Remote Tab (guest QR) -->
         <div id="RemoteSettings" class="tabcontent">
+            <div id="cloudRemotePromotion" class="cloud-remote-promotion">
+                <div class="section-header">Control your table from anywhere</div>
+                <img
+                    class="cloud-remote-promotion-image"
+                    src="./backend/web/images/marketing/mobile-score.png"
+                    alt="CueSport Scoreboard remote table controls on a mobile phone"
+                />
+                <div class="cloud-remote-promotion-copy">
+                    <p>Run scoring, players, match setup, streaming, and replay controls from a phone or tablet instead of staying at the OBS computer.</p>
+                    <p>Choose hosted CueSport Scoreboard Cloud for the quickest managed setup, or connect this Dock to your own self-hosted Cloud server.</p>
+                    <button type="button" class="hover obs28 button cloud-remote-promotion-cta" id="cloudRemoteConnectBtn">
+                        Open Remote Connection Settings
+                    </button>
+                </div>
+            </div>
+            <div id="cloudRemoteConnected" class="noShow">
             <div class="section-header" id="cloudRemoteSectionHeader">Guest control</div>
             <p class="stats-tab-help" id="cloudRemoteHelp">Share guest links for this table. The default OBS Dock Owner link is for elevated remote control (scoring, Stream, Share). Named guest links are for scorers only — no names, Stream, or Share. One device per link; QR and URL stay hidden until Show.</p>
             <div class="cloud-remote-default">
@@ -618,6 +634,7 @@ for more information about Salotto please visit https://salotto.app
                     <div class="hover obs28 button" id="cloudRemoteCreateBtn">Create link</div>
                 </div>
                 <ul id="cloudRemoteExtraList" class="cloud-remote-extra-list"></ul>
+            </div>
             </div>
         </div>
         <!-- General Settings Tab -->

@@ -114,7 +114,7 @@ Use the **Product name** column when creating Stripe Products. Map each Productâ
 ## Supabase setup (production)
 
 1. Create a Supabase project.
-2. Run [`supabase/migrations/001_initial.sql`](supabase/migrations/001_initial.sql), [`002_session_epoch_quotas.sql`](supabase/migrations/002_session_epoch_quotas.sql), [`003_account_players_uuid.sql`](supabase/migrations/003_account_players_uuid.sql), [`004_dock_key_roles.sql`](supabase/migrations/004_dock_key_roles.sql), [`005_admin_support_trial.sql`](supabase/migrations/005_admin_support_trial.sql), then [`006_account_deletion.sql`](supabase/migrations/006_account_deletion.sql) in the SQL editor.
+2. Run [`supabase/migrations/001_initial.sql`](supabase/migrations/001_initial.sql), [`002_session_epoch_quotas.sql`](supabase/migrations/002_session_epoch_quotas.sql), [`003_account_players_uuid.sql`](supabase/migrations/003_account_players_uuid.sql), [`004_dock_key_roles.sql`](supabase/migrations/004_dock_key_roles.sql), [`005_admin_support_trial.sql`](supabase/migrations/005_admin_support_trial.sql), [`006_account_deletion.sql`](supabase/migrations/006_account_deletion.sql), then [`007_account_player_created_at.sql`](supabase/migrations/007_account_player_created_at.sql) in the SQL editor.
 3. Enable **Google** provider under Authentication â†’ Providers.
 4. Add redirect URLs: `{PUBLIC_URL}/web/dashboard/`, `{PUBLIC_URL}/auth/callback`.
 5. Set env vars in `.env` (including `PLATFORM_ADMIN_EMAILS` for your ops Google accounts) and deploy.

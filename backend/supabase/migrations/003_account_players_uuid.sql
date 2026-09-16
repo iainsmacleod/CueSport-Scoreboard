@@ -8,6 +8,7 @@ create table account_players (
   account_id uuid not null references accounts(id) on delete cascade,
   name text not null,
   name_normalized text not null,
+  created_at timestamptz not null default now(),
   last_seen_at timestamptz not null default now()
 );
 

@@ -114,6 +114,7 @@ CREATE TABLE IF NOT EXISTS account_players (
   account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   name_normalized TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
   last_seen_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -286,11 +287,36 @@ function ensureAccountPlayersUuid(database) {
       account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
       name TEXT NOT NULL,
       name_normalized TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
       last_seen_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
     CREATE INDEX IF NOT EXISTS idx_account_players_account ON account_players(account_id);
     CREATE INDEX IF NOT EXISTS idx_account_players_name ON account_players(account_id, name_normalized);
   `);
+}
+
+function ensureAccountPlayerColumns(database) {
+  const cols = new Set(tableColumns(database, 'account_players'));
+  if (!cols.has('created_at')) {
+    database.exec('ALTER TABLE account_players ADD COLUMN created_at TEXT');
+    database.exec(`
+      UPDATE account_players
+      SET created_at = COALESCE(
+        (
+          SELECT MIN(e.created_at)
+          FROM match_events e
+          WHERE e.account_id = account_players.account_id
+            AND e.event_type = 'session:start'
+            AND (
+              json_extract(e.payload, '$.player1Id') = account_players.id
+              OR json_extract(e.payload, '$.player2Id') = account_players.id
+            )
+        ),
+        last_seen_at,
+        datetime('now')
+      )
+    `);
+  }
 }
 
 export function getDb() {
@@ -310,6 +336,7 @@ export function getDb() {
     ensureMatchEventsAccountScoped(db);
     ensureMatchEventColumns(db);
     ensureAccountPlayersUuid(db);
+    ensureAccountPlayerColumns(db);
     db.exec(MATCH_EVENTS_INDEXES);
     db.prepare(
       `DELETE FROM account_identity_records
@@ -1384,8 +1411,8 @@ export function upsertAccountPlayer(accountId, name, playerId = null) {
       return null;
     }
     database.prepare(
-      `INSERT INTO account_players (id, account_id, name, name_normalized, last_seen_at)
-       VALUES (?, ?, ?, ?, datetime('now'))
+      `INSERT INTO account_players (id, account_id, name, name_normalized, created_at, last_seen_at)
+       VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
        ON CONFLICT(id) DO UPDATE SET
          name = excluded.name,
          name_normalized = excluded.name_normalized,
@@ -1411,8 +1438,8 @@ export function upsertAccountPlayer(accountId, name, playerId = null) {
 
   const id = uuidv4();
   database.prepare(
-    `INSERT INTO account_players (id, account_id, name, name_normalized, last_seen_at)
-     VALUES (?, ?, ?, ?, datetime('now'))`
+    `INSERT INTO account_players (id, account_id, name, name_normalized, created_at, last_seen_at)
+     VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))`
   ).run(id, accountId, display, normalized);
   return id;
 }
@@ -1425,8 +1452,8 @@ export function createAccountPlayer(accountId, name) {
   if (!normalized) return null;
   const id = uuidv4();
   getDb().prepare(
-    `INSERT INTO account_players (id, account_id, name, name_normalized, last_seen_at)
-     VALUES (?, ?, ?, ?, datetime('now'))`
+    `INSERT INTO account_players (id, account_id, name, name_normalized, created_at, last_seen_at)
+     VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))`
   ).run(id, accountId, display, normalized);
   return getAccountPlayer(accountId, id);
 }
@@ -1434,7 +1461,7 @@ export function createAccountPlayer(accountId, name) {
 export function getAccountPlayer(accountId, playerId) {
   if (!accountId || !playerId) return null;
   return getDb().prepare(
-    'SELECT id, account_id, name, name_normalized, last_seen_at FROM account_players WHERE id = ? AND account_id = ?'
+    'SELECT id, account_id, name, name_normalized, created_at, last_seen_at FROM account_players WHERE id = ? AND account_id = ?'
   ).get(playerId, accountId) || null;
 }
 
@@ -1443,7 +1470,7 @@ export function listAccountPlayers(accountId) {
   if (!accountId) return [];
   seedAccountPlayersFromSessions(accountId);
   return getDb().prepare(
-    `SELECT id, name, last_seen_at FROM account_players
+    `SELECT id, name, created_at, last_seen_at FROM account_players
      WHERE account_id = ?
      ORDER BY name COLLATE NOCASE ASC`
   ).all(accountId);
@@ -1478,7 +1505,7 @@ export function searchAccountPlayers(accountId, query, limit = 8) {
   const normalized = normalizePlayerName(query);
   if (!normalized) {
     return getDb().prepare(
-      `SELECT id, name, last_seen_at FROM account_players
+      `SELECT id, name, created_at, last_seen_at FROM account_players
        WHERE account_id = ?
        ORDER BY last_seen_at DESC, name COLLATE NOCASE ASC
        LIMIT ?`
@@ -1486,7 +1513,7 @@ export function searchAccountPlayers(accountId, query, limit = 8) {
   }
   const like = `%${normalized}%`;
   return getDb().prepare(
-    `SELECT id, name, last_seen_at FROM account_players
+    `SELECT id, name, created_at, last_seen_at FROM account_players
      WHERE account_id = ? AND (name_normalized LIKE ? OR LOWER(name) LIKE ?)
      ORDER BY
        CASE WHEN name_normalized = ? THEN 0 WHEN name_normalized LIKE ? THEN 1 ELSE 2 END,

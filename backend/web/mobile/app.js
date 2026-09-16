@@ -7,7 +7,7 @@ import {
   fetchPlayers,
   createAccountPlayer,
   GAME_TYPES,
-} from '../shared/cloud-client.js?v=8.2.0.13';
+} from '../shared/cloud-client.js?v=8.2.0.14';
 import {
   parseRaceTarget,
   isRaceLocked,
@@ -626,8 +626,12 @@ async function reconnectQuiet(options = {}) {
     scheduleReconnect();
   } catch (err) {
     if (!wantConnection) return;
+    if (shouldLeaveTableForHome(err)) {
+      leaveTableForHome({ clearToken: shouldClearCurrentLogin(err) });
+      return;
+    }
     if (shouldClearSavedLogin(err)) {
-      forceRelogin(reloginMessage(err), { clearToken: true });
+      leaveTableForHome({ clearToken: true });
       return;
     }
     setReconnectBanner(true, 'Connection lost — tap Reconnect');
@@ -767,6 +771,8 @@ function shouldClearSavedLogin(err) {
   const code = err?.code || '';
   if (
     code === 'session_revoked' ||
+    code === 'account_deleting' ||
+    code === 'account_blocked' ||
     code === 'invalid_token' ||
     code === 'room_forbidden' ||
     code === 'auth_required'
@@ -777,6 +783,24 @@ function shouldClearSavedLogin(err) {
   // Network / timeout must NOT clear the token — that breaks mobile resume.
   if (isTransientConnectError(err)) return false;
   return /session revoked|unauthorized|invalid token|expired token/i.test(msg);
+}
+
+function shouldLeaveTableForHome(err) {
+  return [
+    'room_deleted',
+    'room_forbidden',
+    'guest_revoked',
+    'invalid_guest_token',
+    'account_deleting',
+    'account_blocked',
+    'session_revoked',
+    'invalid_token',
+    'auth_required',
+  ].includes(String(err?.code || ''));
+}
+
+function shouldClearCurrentLogin(err) {
+  return !isGuestMode && shouldClearSavedLogin(err);
 }
 
 function isTransientConnectError(err) {
@@ -795,7 +819,7 @@ function reloginMessage(err) {
     return 'Signed out everywhere. Sign in again to reconnect.';
   }
   if (code === 'room_forbidden') {
-    return 'This room belongs to another account. Sign in with the dev secret for that account, or open the mobile link from your dashboard.';
+    return 'This table belongs to another account. Open its mobile link from the dashboard.';
   }
   if (code === 'control_connection_limit') {
     return err.message || 'Too many devices controlling this table. Disconnect another phone or upgrade your plan.';
@@ -841,6 +865,18 @@ function forceRelogin(reason, { clearToken = true } = {}) {
   showLogin();
   setError(reason || '');
   syncLoginPanel();
+}
+
+function leaveTableForHome({ clearToken = false } = {}) {
+  wantConnection = false;
+  clearReconnectTimer();
+  setReconnectBanner(false);
+  if (clearToken) localStorage.removeItem(TOKEN_KEY);
+  if (client) {
+    try { client.disconnect(); } catch (_) { /* ignore */ }
+    client = null;
+  }
+  window.location.replace('/');
 }
 
 function setError(msg) {
@@ -2783,15 +2819,8 @@ async function connectGuestSession({ quiet, isCurrent }) {
   wireClientLifecycle(client);
   client.on('error', (e) => {
     if (!isCurrent()) return;
-    if (e.code === 'guest_revoked' || e.code === 'invalid_guest_token') {
-      wantConnection = false;
-      clearReconnectTimer();
-      setReconnectBanner(false);
-      show('controlSection', false);
-      showMobileNav(false);
-      show('connectingSection', false);
-      setConnectionStatus('disconnected');
-      setError('This guest link has been revoked.');
+    if (shouldLeaveTableForHome(e)) {
+      leaveTableForHome({ clearToken: shouldClearCurrentLogin(e) });
       return;
     }
     if (e.code === 'guest_link_in_use') {
@@ -2830,11 +2859,8 @@ async function connectGuestSession({ quiet, isCurrent }) {
     if (!isCurrent()) throw err;
     show('connectingSection', false);
     setConnectionStatus('disconnected');
-    if (err?.code === 'guest_revoked' || err?.code === 'invalid_guest_token') {
-      wantConnection = false;
-      clearReconnectTimer();
-      setReconnectBanner(false);
-      setError('This guest link has been revoked.');
+    if (shouldLeaveTableForHome(err)) {
+      leaveTableForHome({ clearToken: shouldClearCurrentLogin(err) });
       return;
     }
     if (err?.code === 'guest_link_in_use') {
@@ -2856,7 +2882,7 @@ async function connectAuthenticatedSession({ quiet, isCurrent }) {
   if (!roomId) {
     wantConnection = false;
     showLogin();
-    setError('Room ID missing in URL (/m/{room_id})');
+    setError('Table ID missing in URL (/m/{table_id})');
     return;
   }
 
@@ -2900,12 +2926,8 @@ async function connectAuthenticatedSession({ quiet, isCurrent }) {
   wireClientLifecycle(client);
   client.on('error', (e) => {
     if (!isCurrent()) return;
-    if (e.code === 'session_revoked') {
-      forceRelogin(reloginMessage(e), { clearToken: true });
-      return;
-    }
-    if (e.code === 'invalid_token' || e.code === 'room_forbidden' || e.code === 'auth_required') {
-      forceRelogin(reloginMessage(e), { clearToken: true });
+    if (shouldLeaveTableForHome(e)) {
+      leaveTableForHome({ clearToken: shouldClearCurrentLogin(e) });
       return;
     }
     if (e.code === 'control_connection_limit') {
@@ -2953,6 +2975,10 @@ async function connectAuthenticatedSession({ quiet, isCurrent }) {
     }
   } catch (err) {
     if (!isCurrent()) throw err;
+    if (shouldLeaveTableForHome(err)) {
+      leaveTableForHome({ clearToken: shouldClearCurrentLogin(err) });
+      return;
+    }
     if (err?.code === 'control_connection_limit') {
       wantConnection = false;
       clearReconnectTimer();
@@ -3047,14 +3073,16 @@ document.getElementById('devSecret')?.addEventListener('keydown', (event) => {
 }());
 
 document.getElementById('clearTokenBtn')?.addEventListener('click', () => {
-  if (!window.confirm('Clear Saved Login on this device? You will return to the main page to sign in again.')) return;
-  wantConnection = false;
-  clearReconnectTimer();
-  localStorage.removeItem(TOKEN_KEY);
-  try { client?.disconnect(); } catch (_) { /* ignore */ }
-  client = null;
-  window.location.href = '/';
+  clearSavedLogin();
 });
+document.getElementById('setupClearTokenBtn')?.addEventListener('click', () => {
+  clearSavedLogin();
+});
+
+function clearSavedLogin() {
+  if (!window.confirm('Clear Saved Login on this device? You will return to the main page to sign in again.')) return;
+  leaveTableForHome({ clearToken: true });
+}
 document.getElementById('reconnectBtn')?.addEventListener('click', () => {
   ensureConnection({ force: true });
 });

@@ -385,7 +385,7 @@ function resolveRoomIdForJoin(msg, auth, client) {
         label: msg.instance_label || null,
       });
       if (!room) {
-        return { error: 'room_forbidden', message: 'No access to this room' };
+        return { error: 'room_forbidden', message: 'No access to this table' };
       }
       return { roomId: room.id };
     }
@@ -551,7 +551,7 @@ async function handleRoomClientJoin(ws, meta, msg, authenticateJoin) {
       roomId = roomId.roomId;
     }
     if (!roomId) {
-      send(ws, { type: 'error', code: 'room_required', message: 'room_id is required' });
+      send(ws, { type: 'error', code: 'room_required', message: 'Table ID is required' });
       return;
     }
 
@@ -565,14 +565,14 @@ async function handleRoomClientJoin(ws, meta, msg, authenticateJoin) {
 
   const room = sqlite.getRoom(roomId);
   if (!room) {
-    send(ws, { type: 'error', code: 'room_not_found', message: 'Room not found' });
+    send(ws, { type: 'error', code: 'room_not_found', message: 'Table not found' });
     return;
   }
   const foreignRoom = !!(accountId && room.account_id && room.account_id !== accountId);
   if (foreignRoom) {
     // Only platform-admin mobile (flagged in authenticateJoin) may spectate foreign rooms.
     if (!(client === 'mobile' && meta.platformAdminView)) {
-      send(ws, { type: 'error', code: 'room_forbidden', message: 'No access to this room' });
+      send(ws, { type: 'error', code: 'room_forbidden', message: 'No access to this table' });
       return;
     }
     meta.platformAdminView = true;

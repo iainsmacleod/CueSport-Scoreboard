@@ -473,6 +473,12 @@ async function run() {
       duplicatePlayers.length === 2 && duplicatePlayers[0].id !== duplicatePlayers[1].id,
       JSON.stringify(duplicatePlayers),
     );
+    assert(
+      'Created players include date added',
+      duplicatePlayers.length === 2
+        && duplicatePlayers.every((player) => !Number.isNaN(Date.parse(player.created_at))),
+      JSON.stringify(duplicatePlayers),
+    );
     const duplicateSearch = await fetchJson(
       `/api/players?q=${encodeURIComponent(duplicatePlayerName)}&limit=8`,
       { headers: { Authorization: `Bearer ${token}` } },
@@ -1110,6 +1116,12 @@ async function run() {
       const rtPlayer2 = (rtStats.body.players || []).find((p) => p.name === rtP2Name);
       assert('Stats round-trip P1 on leaderboard', !!rtPlayer1);
       assert('Stats round-trip P2 on leaderboard', !!rtPlayer2);
+      assert(
+        'Stats leaderboard players include date added',
+        !Number.isNaN(Date.parse(rtPlayer1?.createdAt))
+          && !Number.isNaN(Date.parse(rtPlayer2?.createdAt)),
+        JSON.stringify({ p1: rtPlayer1?.createdAt, p2: rtPlayer2?.createdAt }),
+      );
       assert(
         'Stats round-trip P1 gamesWon ≥ 1',
         !!(rtPlayer1 && rtPlayer1.gamesWon >= 1),

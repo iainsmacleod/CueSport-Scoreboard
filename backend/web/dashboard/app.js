@@ -22,7 +22,7 @@ import {
   openBillingPortal,
   setSimulatedPlan,
   GAME_TYPES,
-} from '../shared/cloud-client.js?v=8.0.0.12';
+} from '../shared/cloud-client.js?v=8.2.0.14';
 import {
   computeDurationSeconds,
   formatDurationSeconds,
@@ -109,6 +109,7 @@ const LEADERBOARD_SORT_DEFAULTS = {
   matches: 'desc',
   winPct: 'desc',
   racks: 'desc',
+  dateAdded: 'desc',
   lastPlayed: 'desc',
 };
 let leaderboardSortKey = 'matches';
@@ -1201,7 +1202,7 @@ function roomCleanupStatus(room) {
   return 'idle';
 }
 
-/** Title is the seat currently mapped to this room (OBS Dock Key N). */
+/** Title is the seat currently mapped to this table (OBS Dock Key N). */
 function connectionDisplayTitle(room) {
   const candidates = [
     room.api_key_label,
@@ -2222,7 +2223,7 @@ async function loadAdminAccountDetail(accountId) {
         <div><strong>Created:</strong> ${escapeHtml(account.created_at ? formatLocalDate(account.created_at) : '—')}</div>
         <div><strong>Quota:</strong> ${
           quota?.limits
-            ? `${quota.usage?.apiKeys ?? 0}/${quota.limits.maxApiKeys == null ? '∞' : quota.limits.maxApiKeys} keys · ${quota.usage?.rooms ?? 0}/${quota.limits.maxRooms == null ? '∞' : quota.limits.maxRooms} rooms`
+            ? `${quota.usage?.apiKeys ?? 0}/${quota.limits.maxApiKeys == null ? '∞' : quota.limits.maxApiKeys} keys · ${quota.usage?.rooms ?? 0}/${quota.limits.maxRooms == null ? '∞' : quota.limits.maxRooms} tables`
             : '—'
         }</div>
       </div>
@@ -2236,14 +2237,14 @@ async function loadAdminAccountDetail(accountId) {
       <ul class="admin-key-list">
         ${keyRows}
       </ul>
-      <h3 class="stats-section-title">Rooms</h3>
+      <h3 class="stats-section-title">Tables</h3>
       <ul class="admin-room-list">
         ${rooms.length ? rooms.map((r) => `
           <li>
             <span>${escapeHtml(r.dock_label || r.label || r.id)} · guests ${Number(r.guest_link_count) || 0}</span>
             <span class="hint">${escapeHtml(r.last_seen_at ? `Seen ${formatLocalDate(r.last_seen_at)}` : 'No dock seen')}</span>
           </li>
-        `).join('') : '<li class="hint">No rooms</li>'}
+        `).join('') : '<li class="hint">No tables</li>'}
       </ul>
       <h3 class="stats-section-title">Stats snapshot</h3>
       <div class="admin-stats-summary">
@@ -2501,7 +2502,7 @@ function compareLeaderboardPlayers(a, b, key, dir) {
   const bPlayed = (Number(b.gamesWon) || 0) + (Number(b.gamesDrawn) || 0) + (Number(b.gamesLost) || 0) > 0;
   // Zero-stat roster players always sit after ranked players, A→Z among themselves.
   if (aPlayed !== bPlayed) return aPlayed ? -1 : 1;
-  if (!aPlayed && key !== 'name') {
+  if (!aPlayed && key !== 'name' && key !== 'dateAdded') {
     return String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' });
   }
   const mul = dir === 'asc' ? 1 : -1;
@@ -2520,6 +2521,9 @@ function compareLeaderboardPlayers(a, b, key, dir) {
       break;
     case 'lastPlayed':
       cmp = String(a.lastPlayedAt || '').localeCompare(String(b.lastPlayedAt || ''));
+      break;
+    case 'dateAdded':
+      cmp = String(a.createdAt || '').localeCompare(String(b.createdAt || ''));
       break;
     case 'matches':
     default:
@@ -2668,7 +2672,7 @@ function safeHttpUrl(value) {
   return url;
 }
 
-/** Prefer match.streamUrl from stats API; fall back to live room state on dashboard. */
+/** Prefer match.streamUrl from stats API; fall back to live table state on dashboard. */
 function resolveMatchStreamUrl(match) {
   const direct = safeHttpUrl(match && match.streamUrl);
   if (direct) return direct;
@@ -2786,6 +2790,7 @@ function statsFromMatches(matches) {
         tableRuns: 0,
         ballsPotted: 0,
         fouls: 0,
+        createdAt: null,
         lastPlayedAt: null,
         accountId: meta.accountId || null,
         accountEmail: meta.accountEmail || null,
@@ -2872,6 +2877,7 @@ function applyStatsFilters(data) {
     if (!src) continue;
     if (!p.accountEmail && src.accountEmail) p.accountEmail = src.accountEmail;
     if (!p.accountId && src.accountId) p.accountId = src.accountId;
+    p.createdAt = src.createdAt || p.createdAt || null;
   }
   for (const p of data.players || []) {
     const id = String(p?.id || '').trim();
@@ -2917,7 +2923,7 @@ function renderAccountStats() {
 
   if (!statsData) {
     summaryEl.innerHTML = '';
-    boardBody.innerHTML = '<tr><td colspan="6" class="dash-stats-empty">No stats loaded.</td></tr>';
+    boardBody.innerHTML = '<tr><td colspan="7" class="dash-stats-empty">No stats loaded.</td></tr>';
     matchBody.innerHTML = '<tr><td colspan="5" class="dash-stats-empty">No stats loaded.</td></tr>';
     updateLeaderboardSortHeaders();
     renderLeaderboardPager(null);
@@ -2947,7 +2953,7 @@ function renderAccountStats() {
   updateLeaderboardSortHeaders();
 
   if (!filtered.players.length) {
-    boardBody.innerHTML = '<tr><td colspan="6" class="dash-stats-empty">No completed matches yet. Play a race on a connected dock to populate stats.</td></tr>';
+    boardBody.innerHTML = '<tr><td colspan="7" class="dash-stats-empty">No completed matches yet. Play a race on a connected dock to populate stats.</td></tr>';
     renderLeaderboardPager(null);
   } else {
     const sorted = sortLeaderboardPlayers(filtered.players);
@@ -2960,6 +2966,7 @@ function renderAccountStats() {
         <td>${formatMatchRecord(p.gamesWon, p.gamesDrawn, p.gamesLost)}</td>
         <td>${playerWinPct(p)}%</td>
         <td>${p.racksWon}/${p.racksLost}</td>
+        <td>${escapeHtml(formatStatsDate(p.createdAt))}</td>
         <td>${escapeHtml(formatStatsDate(p.lastPlayedAt))}</td>
       </tr>
     `).join('');
@@ -4220,8 +4227,14 @@ async function connectLiveFeed() {
     scheduleAccountStatsRefreshFromLiveFeed();
   });
   client.on('error', (e) => {
-    if (e.code === 'invalid_token' || e.code === 'room_forbidden' || e.code === 'session_revoked') {
-      localSignOut();
+    if (
+      e.code === 'account_deleting'
+      || e.code === 'account_blocked'
+      || e.code === 'invalid_token'
+      || e.code === 'room_forbidden'
+      || e.code === 'session_revoked'
+    ) {
+      localSignOut({ redirectHome: true });
     }
   });
   client.on('close', () => {

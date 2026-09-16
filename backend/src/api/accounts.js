@@ -262,7 +262,7 @@ export async function registerAccountRoutes(app) {
     }
     const result = performDeleteRoom(roomId);
     if (!result.ok) {
-      return reply.code(404).send({ error: 'Room not found' });
+      return reply.code(404).send({ error: 'Table not found' });
     }
     return {
       ok: true,
@@ -308,7 +308,7 @@ export async function registerAccountRoutes(app) {
   // Manual room create disabled — rooms are created when an OBS dock connects.
   app.post('/api/rooms', async (_request, reply) => {
     return reply.code(410).send({
-      error: 'Room creation via API is disabled',
+      error: 'Table creation via API is disabled',
       code: 'rooms_created_on_dock_join',
       message: 'Tables are created automatically when an OBS dock connects with an OBS Dock Key.',
     });

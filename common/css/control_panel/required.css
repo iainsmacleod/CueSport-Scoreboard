@@ -2919,6 +2919,71 @@ label.switch.toggle-disabled {
 	margin: 0;
 }
 
+.cloud-remote-promotion {
+	display: grid;
+	grid-template-columns: minmax(180px, 280px) minmax(0, 1fr);
+	align-items: center;
+	gap: 22px;
+	margin: 12px 0 8px;
+	padding: 18px;
+	border: 1px solid rgba(155, 92, 255, 0.45);
+	border-radius: 12px;
+	background:
+		radial-gradient(circle at 15% 10%, rgba(155, 92, 255, 0.18), transparent 42%),
+		rgba(7, 16, 36, 0.55);
+}
+
+.cloud-remote-promotion .section-header {
+	grid-column: 1 / -1;
+	margin: 0;
+	text-align: center;
+}
+
+.cloud-remote-promotion-image {
+	display: block;
+	width: 100%;
+	max-height: 390px;
+	object-fit: contain;
+	border-radius: 10px;
+	box-shadow: 0 14px 30px rgba(0, 0, 0, 0.38);
+}
+
+.cloud-remote-promotion-copy {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 10px;
+	font-size: 0.95rem;
+	line-height: 1.5;
+}
+
+.cloud-remote-promotion-copy p {
+	margin: 0;
+}
+
+.cloud-remote-promotion-cta {
+	width: auto;
+	max-width: 100%;
+	margin-top: 4px;
+	padding: 10px 14px;
+	font: inherit;
+}
+
+@media (max-width: 560px) {
+	.cloud-remote-promotion {
+		grid-template-columns: 1fr;
+		padding: 14px;
+	}
+
+	.cloud-remote-promotion .section-header {
+		grid-column: 1;
+	}
+
+	.cloud-remote-promotion-image {
+		max-height: 320px;
+	}
+}
+
 .cloud-remote-default {
 	display: flex;
 	flex-direction: column;

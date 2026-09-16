@@ -157,20 +157,16 @@
     function updateRemoteTabAvailability() {
         const available = isRemoteTabAvailable();
         const tab = document.getElementById('remoteTab');
+        const promotion = document.getElementById('cloudRemotePromotion');
+        const connected = document.getElementById('cloudRemoteConnected');
         if (tab) {
-            tab.classList.toggle('tablinks-disabled', !available);
-            tab.setAttribute('aria-disabled', available ? 'false' : 'true');
-            if (available) {
-                tab.removeAttribute('title');
-            } else {
-                tab.title = 'Connect CueSport Scoreboard Cloud in Settings to use Remote';
-            }
+            tab.classList.remove('tablinks-disabled');
+            tab.setAttribute('aria-disabled', 'false');
+            tab.removeAttribute('title');
         }
+        if (promotion) promotion.classList.toggle('noShow', available);
+        if (connected) connected.classList.toggle('noShow', !available);
         if (!available) {
-            const panel = document.getElementById('RemoteSettings');
-            if (panel && panel.style.display === 'block' && typeof selectControlPanelTab === 'function') {
-                selectControlPanelTab('GeneralSettings');
-            }
             clearSelection();
             updateRemoteHelpCopy();
         } else {
@@ -476,8 +472,19 @@
         const copyBtn = document.getElementById('cloudRemoteCopyBtn');
         const createBtn = document.getElementById('cloudRemoteCreateBtn');
         const revealBtn = document.getElementById('cloudRemoteRevealBtn');
+        const connectBtn = document.getElementById('cloudRemoteConnectBtn');
         if (copyBtn) copyBtn.addEventListener('click', copyRemoteUrl);
         if (createBtn) createBtn.addEventListener('click', createExtraLink);
+        if (connectBtn) {
+            connectBtn.addEventListener('click', function () {
+                if (typeof window.selectControlPanelTab === 'function') {
+                    window.selectControlPanelTab('GeneralSettings');
+                }
+                if (typeof window.openCloudConnectionModal === 'function') {
+                    window.openCloudConnectionModal();
+                }
+            });
+        }
         if (revealBtn) {
             revealBtn.addEventListener('click', toggleReveal);
             revealBtn.addEventListener('keydown', function (event) {

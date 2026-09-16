@@ -211,11 +211,6 @@ function selectControlPanelTab(tabName) {
         !window.isStatsTabAvailable()) {
         return false;
     }
-    if (tabName === "RemoteSettings" &&
-        typeof window.isRemoteTabAvailable === "function" &&
-        !window.isRemoteTabAvailable()) {
-        return false;
-    }
     var i, tabcontent, tablinks;
     tabcontent = document.getElementsByClassName("tabcontent");
     for (i = 0; i < tabcontent.length; i++) {
@@ -300,11 +295,6 @@ function openTab(evt, tabName) {
         !window.isStatsTabAvailable()) {
         return;
     }
-    if (tabName === "RemoteSettings" &&
-        typeof window.isRemoteTabAvailable === "function" &&
-        !window.isRemoteTabAvailable()) {
-        return;
-    }
     selectControlPanelTab(tabName);
     if (evt && evt.currentTarget) {
         // selectControlPanelTab already marked the mapped button; keep click target in sync
@@ -341,12 +331,6 @@ document.addEventListener("DOMContentLoaded", function () {
     if (tabToOpen === "ReplaySettings") {
         tabToOpen = "GeneralSettings";
     }
-    if (tabToOpen === "RemoteSettings" &&
-        typeof window.isRemoteTabAvailable === "function" &&
-        !window.isRemoteTabAvailable()) {
-        tabToOpen = "GeneralSettings";
-    }
-
     if (tabToOpen === "StatsSettings" &&
         typeof window.isStatsTabAvailable === "function" &&
         !window.isStatsTabAvailable()) {

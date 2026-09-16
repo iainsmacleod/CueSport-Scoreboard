@@ -86,6 +86,7 @@ export function summarizeAccountStats(events) {
         tableRuns: 0,
         ballsPotted: 0,
         fouls: 0,
+        createdAt: null,
         lastPlayedAt: null,
       });
     } else if (display) {
@@ -274,6 +275,7 @@ function emptyRosterPlayer(row) {
     tableRuns: 0,
     ballsPotted: 0,
     fouls: 0,
+    createdAt: row.created_at || null,
     lastPlayedAt: null,
   };
 }
@@ -315,6 +317,7 @@ export function mergeRosterPlayersIntoStats(stats, rosterRows) {
       if (row.name && (!existing.name || existing.name === id)) {
         existing.name = row.name;
       }
+      existing.createdAt = row.created_at || existing.createdAt || null;
       continue;
     }
     byId.set(id, emptyRosterPlayer(row));

@@ -542,7 +542,7 @@ export async function deleteRoom(serverUrl, token, roomId) {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || err.message || 'Failed to delete room');
+    throw new Error(err.error || err.message || 'Failed to delete table');
   }
   return res.json();
 }

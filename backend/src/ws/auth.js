@@ -84,7 +84,7 @@ function resolveRoomAccess(account, roomId, client) {
   if (client === 'mobile' && isPlatformAdmin(account)) {
     return { ok: true, platformAdminView: true };
   }
-  return { error: 'room_forbidden', message: 'No access to this room' };
+  return { error: 'room_forbidden', message: 'No access to this table' };
 }
 
 /**
@@ -100,7 +100,7 @@ export async function authenticateJoin({ apiKey, accessToken, roomId, client }) 
     const lifecycleErr = accountLifecycleError(result.account);
     if (lifecycleErr) return lifecycleErr;
     if (roomId && !sqlite.roomBelongsToAccount(roomId, result.account.id)) {
-      return { error: 'room_forbidden', message: 'API key does not have access to this room' };
+      return { error: 'room_forbidden', message: 'API key does not have access to this table' };
     }
     const subErr = subscriptionRequired(client, result.account);
     if (subErr) return subErr;
