@@ -11,6 +11,22 @@ html {
   overflow-x: clip;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  scrollbar-color: #414868 #16161e;
+  scrollbar-width: thin;
+}
+html::-webkit-scrollbar {
+  width: 12px;
+}
+html::-webkit-scrollbar-track {
+  background: #16161e;
+}
+html::-webkit-scrollbar-thumb {
+  background: #414868;
+  border: 3px solid #16161e;
+  border-radius: 999px;
+}
+html::-webkit-scrollbar-thumb:hover {
+  background: #565f89;
 }
 body {
   font-family: Poppins, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
@@ -847,6 +863,12 @@ a.site-brand h1 {
 /* Home already has Dashboard + Browse Live Streams in the hero — don't duplicate in the header. */
 body.landing-home .site-nav {
   display: none;
+}
+body.landing-home .site-header-inner {
+  width: 100%;
+  max-width: none;
+  justify-content: center;
+  text-align: center;
 }
 /* Home: marketing first — streams live on /streams via Browse Live Streams. */
 body.landing-home .live-now-panel {
