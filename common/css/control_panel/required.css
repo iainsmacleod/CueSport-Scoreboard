@@ -1065,17 +1065,20 @@ a.cp-text-link:hover {
 	font-size: 16px;
 	font-variant: small-caps;
 	width: 100%;
+	box-sizing: border-box;
 }
 
 .section-header-with-controls > span {
 	text-decoration: underline;
 	flex: 1;
+	min-width: 0;
 }
 
 .section-controls {
 	display: flex;
 	align-items: center;
 	gap: 12px;
+	flex: 0 0 auto;
 }
 
 .settings-cog-btn {
