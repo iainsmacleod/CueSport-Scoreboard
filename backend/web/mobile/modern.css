@@ -75,7 +75,7 @@ body.mobile select:focus,
 body.mobile textarea:focus,
 body.mobile button:focus-visible,
 body.mobile a:focus-visible {
-  outline: 2px solid var(--mobile-blue);
+  outline: 2px solid #b98cff;
   outline-offset: 2px;
 }
 
@@ -90,15 +90,28 @@ body.mobile .icon-btn {
 
 body.mobile .btn:hover,
 body.mobile .icon-btn:hover {
-  border-color: var(--mobile-blue);
+  border-color: var(--mobile-purple);
 }
 
 body.mobile .btn.primary,
-body.mobile .btn.save,
 body.mobile .score-row .btn:last-child {
-  background: linear-gradient(135deg, var(--mobile-blue), var(--mobile-purple));
+  background: linear-gradient(135deg, var(--mobile-purple), var(--mobile-blue));
   border-color: transparent;
   color: #fff;
+  font-weight: 700;
+}
+
+body.mobile .btn.secondary {
+  background: rgba(30, 34, 55, 0.9);
+  border-color: rgba(155, 92, 255, 0.4);
+  color: #ddd5ff;
+}
+
+body.mobile .btn.save,
+body.mobile .btn.success {
+  background: rgba(66, 221, 139, 0.15);
+  border-color: rgba(66, 221, 139, 0.62);
+  color: #caffdf;
   font-weight: 700;
 }
 
@@ -106,6 +119,12 @@ body.mobile .btn.danger {
   background: rgba(255, 107, 133, 0.13);
   border-color: rgba(255, 107, 133, 0.62);
   color: #ffdce2;
+}
+
+body.mobile .btn.cancel {
+  background: rgba(255, 107, 133, 0.08);
+  border-color: rgba(255, 107, 133, 0.46);
+  color: #ffc1cc;
 }
 
 body.mobile .score-row {
@@ -144,7 +163,7 @@ body.mobile .mobile-nav-btn {
 
 body.mobile .mobile-nav-btn.active {
   color: #fff;
-  background: linear-gradient(180deg, rgba(47, 128, 255, 0.18), rgba(155, 92, 255, 0.13));
+  background: linear-gradient(180deg, rgba(155, 92, 255, 0.2), rgba(47, 128, 255, 0.1));
   box-shadow: inset 0 -3px 0 var(--mobile-purple);
 }
 
@@ -165,7 +184,7 @@ body.mobile .share-qr {
 }
 
 body.mobile a {
-  color: #79b0ff;
+  color: #b99cff;
 }
 
 body.mobile button:disabled,

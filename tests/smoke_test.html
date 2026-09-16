@@ -601,13 +601,15 @@
                     fetchRepoText('../backend/web/dashboard/index.html'),
                     fetchRepoText('../backend/web/dashboard/app.js'),
                     fetchRepoText('../backend/web/mobile/index.html'),
-                    fetchRepoText('../backend/web/shared/styles.css')
+                    fetchRepoText('../backend/web/shared/styles.css'),
+                    fetchRepoText('../backend/web/mobile/modern.css')
                 ]);
                 const landingSource = sourceFiles[0];
                 const dashboardSource = sourceFiles[1];
                 const dashboardAppSource = sourceFiles[2];
                 const mobileSource = sourceFiles[3];
                 const sharedStyles = sourceFiles[4];
+                const mobileModernStyles = sourceFiles[5];
                 const parser = new DOMParser();
                 const landingDoc = parser.parseFromString(landingSource, 'text/html');
                 const dashboardDoc = parser.parseFromString(dashboardSource, 'text/html');
@@ -663,6 +665,21 @@
                 assert('Cloud Dashboard', 'Sign Out and Sign Out Everywhere return home',
                     (dashboardAppSource.match(/localSignOut\(\{[^}]*redirectHome: true[^}]*\}\)/g) || []).length === 2 &&
                     dashboardAppSource.indexOf("window.location.assign('/')") !== -1);
+                assert('Cloud Dashboard', 'Dashboard buttons use purple-first Modern Cloud styling',
+                    dashboardDoc.body.classList.contains('dashboard-page') &&
+                    sharedStyles.indexOf('body.dashboard-page .btn.primary') !== -1 &&
+                    sharedStyles.indexOf('linear-gradient(135deg, var(--dashboard-purple), var(--dashboard-blue))') !== -1 &&
+                    sharedStyles.indexOf('body.dashboard-page .dash-tab.active') !== -1 &&
+                    sharedStyles.indexOf('body.dashboard-page .stats-subtab.active') !== -1);
+                assert('Cloud Website', 'Public navigation and carousel buttons use purple-first styling',
+                    sharedStyles.indexOf('body.landing-home .btn.primary') !== -1 &&
+                    sharedStyles.indexOf('body.streams-page .btn.primary') !== -1 &&
+                    sharedStyles.indexOf('linear-gradient(135deg, var(--public-purple), var(--public-blue))') !== -1 &&
+                    sharedStyles.indexOf('body.landing-home .btn.secondary') !== -1);
+                assert('Cloud Mobile', 'Mobile buttons use purple-first Modern Cloud styling',
+                    mobileModernStyles.indexOf('linear-gradient(135deg, var(--mobile-purple), var(--mobile-blue))') !== -1 &&
+                    mobileModernStyles.indexOf('body.mobile .btn.secondary') !== -1 &&
+                    mobileModernStyles.indexOf('body.mobile .btn.save') !== -1);
                 assert('Cloud Website', 'Mobile header uses logo, title, then connection status',
                     (function () {
                         const row = mobileDoc.querySelector('.mobile-header-row');
