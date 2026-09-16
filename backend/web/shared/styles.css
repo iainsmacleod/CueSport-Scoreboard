@@ -62,11 +62,13 @@ header {
 }
 .mobile-header-row h1 {
   margin: 0;
-  font-size: 0.95rem;
-  line-height: 1.25;
+  font-size: clamp(0.72rem, 3.8vw, 0.95rem);
+  line-height: 1.1;
   flex: 0 1 auto;
   min-width: 0;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .mobile .mobile-header-row {
   justify-content: center;

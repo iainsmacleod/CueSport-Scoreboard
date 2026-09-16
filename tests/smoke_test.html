@@ -721,6 +721,11 @@
                             !!(logo.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING) &&
                             !!(title.compareDocumentPosition(status) & Node.DOCUMENT_POSITION_FOLLOWING);
                     })());
+                assert('Cloud Mobile', 'Header title scales without wrapping or pushing status icons',
+                    sharedStyles.indexOf('font-size: clamp(0.72rem, 3.8vw, 0.95rem);') !== -1 &&
+                    sharedStyles.indexOf('white-space: nowrap;') !== -1 &&
+                    sharedStyles.indexOf('text-overflow: ellipsis;') !== -1 &&
+                    sharedStyles.indexOf('.conn-status {\n  position: relative;\n  flex-shrink: 0;') !== -1);
                 assert('Cloud Admin', 'Account deletion supports typed email, signup block, and trial reset',
                     dashboardAppSource.indexOf('adminDeleteConfirmEmail') !== -1 &&
                     dashboardAppSource.indexOf('adminDeleteBlockEmail') !== -1 &&
