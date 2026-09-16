@@ -689,6 +689,10 @@
                     sharedStyles.indexOf('body.mobile > main#app') !== -1 &&
                     sharedStyles.indexOf('height: 100dvh;') !== -1 &&
                     sharedStyles.indexOf('position: static;') !== -1);
+                assert('Cloud Mobile', 'Desktop header and footer widen without stretching mobile-first main',
+                    sharedStyles.indexOf('body.mobile .mobile-bottom-nav-inner {\n    max-width: 1440px;') !== -1 &&
+                    sharedStyles.indexOf('body.mobile > main#app {\n  flex: 1 1 auto;') !== -1 &&
+                    sharedStyles.indexOf('max-width: var(--content-max);') !== -1);
                 assert('Cloud Website', 'Public navigation and carousel buttons use purple-first styling',
                     sharedStyles.indexOf('body.landing-home .btn.primary') !== -1 &&
                     sharedStyles.indexOf('body.streams-page .btn.primary') !== -1 &&
