@@ -683,6 +683,9 @@
                     dashboardAppSource.indexOf("const DASH_TAB_KEY = 'cuesport_dashboard_tab'") !== -1 &&
                     dashboardAppSource.indexOf('localStorage.setItem(DASH_TAB_KEY, which)') !== -1 &&
                     dashboardAppSource.indexOf("localStorage.getItem(DASH_TAB_KEY) || 'tables'") !== -1);
+                assert('Cloud Dashboard', 'Inactive account links to Settings and hides default quota',
+                    dashboardAppSource.indexOf('choose a plan in <a href="#billingPanel" class="dash-settings-link">Settings</a>') !== -1 &&
+                    dashboardAppSource.indexOf("el.classList.toggle('hidden', needsPlan)") !== -1);
             } catch (error) {
                 assert('Cloud Website', 'Static Cloud UI contracts load', false, error.message || String(error));
             }

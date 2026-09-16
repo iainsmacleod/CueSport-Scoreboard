@@ -708,7 +708,7 @@ function buildAccountPlanLineHtml(account, quota) {
   }
 
   if (account?.needs_plan) {
-    return 'Inactive — choose a plan below to unlock Cloud';
+    return 'Inactive — choose a plan in <a href="#billingPanel" class="dash-settings-link">Settings</a> to unlock Cloud';
   }
 
   return `Plan: ${escapeHtml(display)}`;
@@ -735,7 +735,10 @@ function renderQuota(quota, account = null) {
     planLine.innerHTML = buildAccountPlanLineHtml(account, quota);
   }
   if (el) {
-    if (platformUnlimited || limits.maxApiKeys == null) {
+    el.classList.toggle('hidden', needsPlan);
+    if (needsPlan) {
+      el.textContent = '';
+    } else if (platformUnlimited || limits.maxApiKeys == null) {
       el.textContent = `Dock seats (keys) ${usage.apiKeys} · Mobile/guest unrestricted per table`;
     } else {
       el.textContent =
