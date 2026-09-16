@@ -4568,7 +4568,7 @@
         bindSlot('1');
         bindSlot('2');
         if (changed) {
-            voidPersistPendingSession();
+            queuePersistPendingSession();
         }
         return changed;
     }

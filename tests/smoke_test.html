@@ -217,6 +217,14 @@
             .replace(/>/g, '&gt;');
     }
 
+    async function fetchRepoText(relativePath) {
+        const response = await fetch(relativePath + (relativePath.indexOf('?') === -1 ? '?' : '&') + '_=' + Date.now());
+        if (!response.ok) {
+            throw new Error(relativePath + ' returned HTTP ' + response.status);
+        }
+        return response.text();
+    }
+
     /** Ball Scoring / manual balls need Show Scores on and both players enabled. */
     function ensureScoresVisible(cp) {
         cp.setStorageItem('usePlayer1', 'yes');
@@ -556,6 +564,99 @@
             await sleep(50);
 
             // --- CueSport Cloud (client modules in control panel) ---
+            {
+                const themeSelect = cp.document.getElementById('obsTheme');
+                const modernTheme = cp.document.getElementById('cloudModernTheme');
+                const savedTheme = themeSelect?.value || '27';
+                assert('Cloud UI', 'Modern Cloud theme option present',
+                    !!themeSelect?.querySelector('option[value="modern"]'));
+                assert('Cloud UI', 'Modern Cloud stylesheet present and initially isolated',
+                    !!modernTheme && modernTheme.disabled === true);
+                if (themeSelect && modernTheme && typeof cp.obsThemeChange === 'function') {
+                    themeSelect.value = 'modern';
+                    cp.obsThemeChange();
+                    assert('Cloud UI', 'Modern Cloud theme enables only when selected',
+                        modernTheme.disabled === false);
+                    themeSelect.value = '27';
+                    cp.obsThemeChange();
+                    assert('Cloud UI', 'Changing theme disables Modern Cloud stylesheet',
+                        modernTheme.disabled === true);
+                    themeSelect.value = savedTheme;
+                    cp.obsThemeChange();
+                }
+            }
+            try {
+                const sourceFiles = await Promise.all([
+                    fetchRepoText('../backend/web/public-listing/index.html'),
+                    fetchRepoText('../backend/web/dashboard/index.html'),
+                    fetchRepoText('../backend/web/dashboard/app.js'),
+                    fetchRepoText('../backend/web/mobile/index.html'),
+                    fetchRepoText('../backend/web/shared/styles.css')
+                ]);
+                const landingSource = sourceFiles[0];
+                const dashboardSource = sourceFiles[1];
+                const dashboardAppSource = sourceFiles[2];
+                const mobileSource = sourceFiles[3];
+                const sharedStyles = sourceFiles[4];
+                const parser = new DOMParser();
+                const landingDoc = parser.parseFromString(landingSource, 'text/html');
+                const dashboardDoc = parser.parseFromString(dashboardSource, 'text/html');
+                const mobileDoc = parser.parseFromString(mobileSource, 'text/html');
+                const slides = landingDoc.querySelectorAll('#marketingCarouselTrack .marketing-slide');
+
+                assert('Cloud Website', 'Public brand links home without version text',
+                    landingDoc.querySelector('.site-brand')?.getAttribute('href') === '/' &&
+                    (landingDoc.querySelector('.site-brand h1')?.textContent || '').trim() ===
+                        'CueSport Scoreboard Cloud');
+                assert('Cloud Website', 'Marketing carousel contains six real product slides',
+                    slides.length === 6 &&
+                    Array.from(slides).every(function (slide) {
+                        return !!slide.querySelector('img[src*="/web/images/marketing/"]') &&
+                            !!slide.querySelector('.marketing-slide-caption h3') &&
+                            !!slide.querySelector('.marketing-slide-caption p');
+                    }), String(slides.length));
+                assert('Cloud Website', 'Redundant feature-card grid removed',
+                    !landingDoc.querySelector('.feature-grid') &&
+                    landingSource.indexOf('class="feature-grid"') === -1);
+                assert('Cloud Website', 'Merged carousel copy uses customer language',
+                    landingSource.indexOf('Everyone sees the same score instantly') !== -1 &&
+                    landingSource.indexOf('add more tables as your events grow') !== -1 &&
+                    landingSource.indexOf('help viewers find your stream when you go live') !== -1);
+                assert('Cloud Website', 'Pricing plans retain sign-in subscription deep link',
+                    !!landingDoc.getElementById('landingPricing') &&
+                    landingSource.indexOf('/dashboard?subscribe=') !== -1);
+                assert('Cloud Website', 'Empty Streams page reuses marketing content',
+                    landingSource.indexOf("classList.toggle('streams-empty'") !== -1 &&
+                    sharedStyles.indexOf('body.streams-page.streams-empty .landing-marketing') !== -1);
+                assert('Cloud Website', 'Streams header has centered brand layout',
+                    sharedStyles.indexOf('body.streams-page .site-header-inner') !== -1 &&
+                    sharedStyles.indexOf('grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr)') !== -1);
+                assert('Cloud Website', 'Dashboard brand has no version text',
+                    (dashboardDoc.querySelector('.site-brand h1')?.textContent || '').trim() ===
+                        'CueSport Scoreboard Cloud');
+                assert('Cloud Website', 'Mobile header uses logo, title, then connection status',
+                    (function () {
+                        const row = mobileDoc.querySelector('.mobile-header-row');
+                        const logo = row?.querySelector('.mobile-brand-mark');
+                        const title = row?.querySelector('h1');
+                        const status = row?.querySelector('[id*="connection"], [id*="Connection"]');
+                        return !!row && !!logo && !!title && !!status &&
+                            !!(logo.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING) &&
+                            !!(title.compareDocumentPosition(status) & Node.DOCUMENT_POSITION_FOLLOWING);
+                    })());
+                assert('Cloud Admin', 'Account deletion requires typed email and optional signup block',
+                    dashboardAppSource.indexOf('adminDeleteConfirmEmail') !== -1 &&
+                    dashboardAppSource.indexOf('adminDeleteBlockEmail') !== -1 &&
+                    dashboardAppSource.indexOf('active_subscription_confirmation_required') !== -1);
+                assert('Cloud Admin', 'Email unblock control is present',
+                    !!dashboardDoc.getElementById('adminUnblockEmailForm') &&
+                    dashboardAppSource.indexOf('/api/admin/account-blocks/unblock') !== -1);
+                assert('Cloud Admin', 'Complimentary action labels use title case',
+                    dashboardAppSource.indexOf("label: 'Give Complimentary Access'") !== -1 &&
+                    dashboardAppSource.indexOf("label: 'Revoke Complimentary Access'") !== -1);
+            } catch (error) {
+                assert('Cloud Website', 'Static Cloud UI contracts load', false, error.message || String(error));
+            }
             assert('Cloud', 'cloudRelay loaded', typeof cp.cloudRelay === 'object');
             assert('Cloud', 'cloudCommands loaded', typeof cp.cloudCommands === 'object');
             assert('Cloud', 'cloudRemote helpers loaded',
