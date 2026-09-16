@@ -6,7 +6,7 @@
   <title>CueSport Scoreboard Cloud — Dashboard</title>
   <link rel="icon" type="image/png" href="/web/images/brand/logo.png?v=1" />
   <link rel="apple-touch-icon" href="/web/images/balls/8ball_small.png" />
-  <link rel="stylesheet" href="/web/shared/styles.css?v=8.2.0.17" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.2.0.19" />
 </head>
 <body>
   <header class="site-header">
@@ -134,7 +134,80 @@
           </div>
           <p id="tablesBillingNotice" class="hint hidden" aria-live="polite"></p>
         </div>
-        <p class="hint">Only OBS docks currently connected appear here. Tap a table to open mobile control. Each table is one OBS Dock Key — create a key per table. On one OBS machine with multiple scoreboards, also use distinct <code>?instance=</code> values so local scoring stays separate.</p>
+        <section id="tablesOnboarding" class="panel tables-onboarding hidden" aria-label="Connect your first OBS dock">
+          <div class="tables-onboarding-head">
+            <div>
+              <p class="tables-onboarding-kicker">No Tables Connected Yet</p>
+              <h2>Connect Your First OBS Scoreboard</h2>
+            </div>
+            <span id="tablesSetupStepCount" class="hint">Step 1 of 4</span>
+          </div>
+          <div id="tablesSetupCarousel" class="tables-setup-carousel" tabindex="0" aria-roledescription="carousel">
+            <div class="tables-setup-viewport">
+              <div id="tablesSetupTrack" class="tables-setup-track">
+                <article class="tables-setup-slide" data-setup-title="Add CueSport Scoreboard to OBS">
+                  <figure class="tables-setup-media">
+                    <img src="/web/images/onboarding/setup-step-1-obs-dock.png?v=1" alt="CueSport Scoreboard dock ready to use in OBS" width="642" height="647" />
+                  </figure>
+                  <div class="tables-setup-copy">
+                    <span class="tables-setup-number">1</span>
+                    <h3>Add the Scoreboard Dock to OBS</h3>
+                    <p>Download and extract CueSport Scoreboard, then use <strong>OBS → Docks → Custom Browser Docks</strong> to add <code>control_panel.html</code>.</p>
+                    <a class="btn secondary" href="https://github.com/iainsmacleod/CueSport-Scoreboard#installation" target="_blank" rel="noopener noreferrer">View OBS Installation</a>
+                  </div>
+                </article>
+                <article class="tables-setup-slide" data-setup-title="Choose your Cloud service">
+                  <figure class="tables-setup-media">
+                    <img src="/web/images/onboarding/setup-step-2-cloud-choice.png?v=1" alt="CueSport Scoreboard Cloud connection window showing managed and self-hosted choices" width="502" height="515" loading="lazy" />
+                  </figure>
+                  <div class="tables-setup-copy">
+                    <span class="tables-setup-number">2</span>
+                    <h3>Open Cloud Connection</h3>
+                    <p>In the OBS dock, open <strong>CueSport Scoreboard Cloud</strong>. Use the managed service for the simplest setup, or choose <strong>Self-hosting</strong> and enter your own Cloud server address.</p>
+                  </div>
+                </article>
+                <article class="tables-setup-slide" data-setup-title="Create an OBS Dock Key">
+                  <figure class="tables-setup-media">
+                    <img src="/web/images/onboarding/setup-step-3-create-key.png?v=1" alt="Create Dock Key window with Table 1 and Trusted Operator selected" width="768" height="430" loading="lazy" />
+                  </figure>
+                  <div class="tables-setup-copy">
+                    <span class="tables-setup-number">3</span>
+                    <h3>Create a Dock Key</h3>
+                    <p>In this dashboard, open <strong>Settings → OBS Dock Keys</strong> and create one named key for each table or OBS dock.</p>
+                    <p class="hint">Running multiple scoreboards on one computer? Give each dock and matching Browser Source a different <code>?instance=</code> value.</p>
+                    <button type="button" id="tablesSetupOpenKeysBtn" class="btn secondary">Open OBS Dock Keys</button>
+                  </div>
+                </article>
+                <article class="tables-setup-slide" data-setup-title="Paste the key and connect">
+                  <figure class="tables-setup-media tables-setup-media-key">
+                    <img src="/web/images/onboarding/setup-step-4-paste-connect.png?v=1" alt="OBS Dock Key pasted into Cloud Connection above Save and Connect" width="502" height="515" loading="lazy" />
+                  </figure>
+                  <div class="tables-setup-copy">
+                    <span class="tables-setup-number">4</span>
+                    <h3>Paste, Save, and Connect</h3>
+                    <p>Copy the new key, paste it into the OBS dock’s Cloud Connection window, then select <strong>Save &amp; Connect</strong>. When the status shows connected, your table appears here automatically.</p>
+                  </div>
+                </article>
+              </div>
+            </div>
+            <div class="tables-setup-controls">
+              <button type="button" id="tablesSetupPrev" class="btn secondary tables-setup-control-btn" aria-label="Previous setup step" title="Previous">
+                <svg class="tables-setup-control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15.4 5.4-6.6 6.6 6.6 6.6-1.4 1.4-8-8 8-8 1.4 1.4z"/></svg>
+                <span class="tables-setup-control-label">Previous</span>
+              </button>
+              <div id="tablesSetupDots" class="tables-setup-dots" role="tablist" aria-label="Setup steps"></div>
+              <button type="button" id="tablesSetupPause" class="btn secondary tables-setup-control-btn" aria-label="Pause automatic setup steps" aria-pressed="false" title="Pause">
+                <svg class="tables-setup-control-icon tables-setup-pause-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h4v14H7V5zm6 0h4v14h-4V5z"/></svg>
+                <svg class="tables-setup-control-icon tables-setup-resume-icon hidden" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7L8 5z"/></svg>
+                <span class="tables-setup-control-label">Pause</span>
+              </button>
+              <button type="button" id="tablesSetupNext" class="btn secondary tables-setup-control-btn" aria-label="Next setup step" title="Next">
+                <span class="tables-setup-control-label">Next</span>
+                <svg class="tables-setup-control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m8.6 18.6 6.6-6.6-6.6-6.6L10 4l8 8-8 8-1.4-1.4z"/></svg>
+              </button>
+            </div>
+          </div>
+        </section>
         <div id="tableCards" class="table-cards"></div>
       </div>
 
@@ -283,7 +356,7 @@
             </button>
           </div>
         </div>
-        <div class="panel">
+        <div class="panel" id="dockKeysPanel">
           <h2>OBS Dock Keys</h2>
           <p class="hint">One key per OBS CueSport Scoreboard dock; a second dock using the same key will be rejected.</p>
           <p class="hint">Create a named key for each table, pick a role, then paste it into that CueSport Scoreboard dock&rsquo;s Cloud Connection settings.</p>
@@ -545,6 +618,6 @@
       </div>
     </div>
   </div>
-  <script type="module" src="/web/dashboard/app.js?v=8.2.0.2"></script>
+  <script type="module" src="/web/dashboard/app.js?v=8.2.0.5"></script>
 </body>
 </html>

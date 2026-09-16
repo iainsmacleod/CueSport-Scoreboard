@@ -505,6 +505,107 @@ function tablesFingerprint(rooms) {
   })));
 }
 
+let tablesSetupIndex = 0;
+let tablesSetupTimer = null;
+let tablesSetupPaused = false;
+
+function renderTablesSetupCarousel() {
+  const track = document.getElementById('tablesSetupTrack');
+  const slides = Array.from(track?.querySelectorAll('.tables-setup-slide') || []);
+  if (!track || !slides.length) return;
+  tablesSetupIndex = (tablesSetupIndex + slides.length) % slides.length;
+  track.style.transform = `translateX(-${tablesSetupIndex * 100}%)`;
+  slides.forEach((slide, index) => {
+    slide.setAttribute('aria-hidden', index === tablesSetupIndex ? 'false' : 'true');
+  });
+  document.querySelectorAll('#tablesSetupDots button').forEach((dot, index) => {
+    dot.classList.toggle('active', index === tablesSetupIndex);
+    dot.setAttribute('aria-selected', index === tablesSetupIndex ? 'true' : 'false');
+  });
+  const count = document.getElementById('tablesSetupStepCount');
+  if (count) count.textContent = `Step ${tablesSetupIndex + 1} of ${slides.length}`;
+}
+
+function stopTablesSetupTimer() {
+  if (tablesSetupTimer) clearInterval(tablesSetupTimer);
+  tablesSetupTimer = null;
+}
+
+function startTablesSetupTimer() {
+  stopTablesSetupTimer();
+  const onboarding = document.getElementById('tablesOnboarding');
+  if (tablesSetupPaused || !onboarding || onboarding.classList.contains('hidden')) return;
+  tablesSetupTimer = setInterval(() => {
+    tablesSetupIndex += 1;
+    renderTablesSetupCarousel();
+  }, 8000);
+}
+
+function goToTablesSetupSlide(index) {
+  tablesSetupIndex = index;
+  renderTablesSetupCarousel();
+  startTablesSetupTimer();
+}
+
+function setTablesOnboardingVisible(visible) {
+  const onboarding = document.getElementById('tablesOnboarding');
+  if (!onboarding) return;
+  onboarding.classList.toggle('hidden', !visible);
+  if (visible) {
+    renderTablesSetupCarousel();
+    startTablesSetupTimer();
+  } else {
+    stopTablesSetupTimer();
+  }
+}
+
+function initTablesSetupCarousel() {
+  const track = document.getElementById('tablesSetupTrack');
+  const dots = document.getElementById('tablesSetupDots');
+  const slides = Array.from(track?.querySelectorAll('.tables-setup-slide') || []);
+  if (!track || !dots || !slides.length) return;
+  dots.innerHTML = '';
+  slides.forEach((slide, index) => {
+    const dot = document.createElement('button');
+    dot.type = 'button';
+    dot.setAttribute('role', 'tab');
+    dot.setAttribute('aria-label', `Show step ${index + 1}: ${slide.dataset.setupTitle || ''}`);
+    dot.addEventListener('click', () => goToTablesSetupSlide(index));
+    dots.appendChild(dot);
+  });
+  document.getElementById('tablesSetupPrev')?.addEventListener('click', () => {
+    goToTablesSetupSlide(tablesSetupIndex - 1);
+  });
+  document.getElementById('tablesSetupNext')?.addEventListener('click', () => {
+    goToTablesSetupSlide(tablesSetupIndex + 1);
+  });
+  document.getElementById('tablesSetupPause')?.addEventListener('click', (event) => {
+    tablesSetupPaused = !tablesSetupPaused;
+    const button = event.currentTarget;
+    const label = button.querySelector('.tables-setup-control-label');
+    const pauseIcon = button.querySelector('.tables-setup-pause-icon');
+    const resumeIcon = button.querySelector('.tables-setup-resume-icon');
+    const actionLabel = tablesSetupPaused ? 'Resume' : 'Pause';
+    if (label) label.textContent = actionLabel;
+    pauseIcon?.classList.toggle('hidden', tablesSetupPaused);
+    resumeIcon?.classList.toggle('hidden', !tablesSetupPaused);
+    button.setAttribute('aria-label', `${actionLabel} automatic setup steps`);
+    button.setAttribute('title', actionLabel);
+    button.setAttribute('aria-pressed', tablesSetupPaused ? 'true' : 'false');
+    if (tablesSetupPaused) stopTablesSetupTimer();
+    else startTablesSetupTimer();
+  });
+  document.getElementById('tablesSetupCarousel')?.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowLeft') goToTablesSetupSlide(tablesSetupIndex - 1);
+    if (event.key === 'ArrowRight') goToTablesSetupSlide(tablesSetupIndex + 1);
+  });
+  document.getElementById('tablesSetupOpenKeysBtn')?.addEventListener('click', () => {
+    setActiveDashTab('settings');
+    document.getElementById('dockKeysPanel')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  });
+  renderTablesSetupCarousel();
+}
+
 function renderTableCards(rooms) {
   const fp = tablesFingerprint(rooms);
   if (fp === lastTablesFingerprint) return;
@@ -514,9 +615,14 @@ function renderTableCards(rooms) {
   container.innerHTML = '';
   const activeRooms = (rooms || []).filter((room) => room.dock_connected);
   if (!activeRooms.length) {
-    container.innerHTML = '<p class="hint">No docks online. Enable CueSport Scoreboard Cloud on an OBS CueSport Scoreboard dock — connected tables appear here automatically.</p>';
+    const viewingAnotherAccount = isViewingOtherAccount();
+    setTablesOnboardingVisible(!viewingAnotherAccount);
+    if (viewingAnotherAccount) {
+      container.innerHTML = '<p class="hint">No docks are currently online for this account.</p>';
+    }
     return;
   }
+  setTablesOnboardingVisible(false);
   activeRooms.forEach((room) => {
     container.appendChild(formatTableCard(room, getServerUrl()));
   });
@@ -913,7 +1019,7 @@ async function consumeSubscribeIntent(account) {
       + '<a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a>'
       + ' and '
       + '<a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>.',
-    confirmLabel: tier === 'streamer' ? 'Agree & start trial' : 'Agree & subscribe',
+    confirmLabel: tier === 'streamer' ? 'Agree & Start Trial' : 'Agree & Subscribe',
     danger: false,
   });
   if (!ok) {
@@ -5347,4 +5453,5 @@ setMatchModalActionButtons();
   });
 }
 
+initTablesSetupCarousel();
 renderDashboard();

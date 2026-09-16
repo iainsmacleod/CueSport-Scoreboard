@@ -654,6 +654,29 @@
                 assert('Cloud Admin', 'Complimentary action labels use title case',
                     dashboardAppSource.indexOf("label: 'Give Complimentary Access'") !== -1 &&
                     dashboardAppSource.indexOf("label: 'Revoke Complimentary Access'") !== -1);
+                assert('Cloud Dashboard', 'Empty Tables guide contains four setup steps',
+                    !!dashboardDoc.getElementById('tablesOnboarding') &&
+                    dashboardDoc.querySelectorAll('#tablesSetupTrack .tables-setup-slide').length === 4 &&
+                    !!dashboardDoc.getElementById('tablesSetupOpenKeysBtn'));
+                assert('Cloud Dashboard', 'Setup guide covers managed and self-hosted Cloud',
+                    dashboardSource.indexOf('managed service for the simplest setup') !== -1 &&
+                    dashboardSource.indexOf('choose <strong>Self-hosting</strong>') !== -1 &&
+                    dashboardSource.indexOf('Save &amp; Connect') !== -1);
+                assert('Cloud Dashboard', 'Setup guide uses genuine screenshots for every step',
+                    [
+                        'setup-step-1-obs-dock.png',
+                        'setup-step-2-cloud-choice.png',
+                        'setup-step-3-create-key.png',
+                        'setup-step-4-paste-connect.png'
+                    ].every((filename) => dashboardSource.indexOf(`/web/images/onboarding/${filename}`) !== -1));
+                assert('Cloud Dashboard', 'Setup carousel has explicit pause and resume behavior',
+                    !!dashboardDoc.getElementById('tablesSetupPause') &&
+                    dashboardAppSource.indexOf("tablesSetupPaused ? 'Resume' : 'Pause'") !== -1 &&
+                    dashboardAppSource.indexOf("setAttribute('aria-pressed'") !== -1);
+                assert('Cloud Dashboard', 'Setup controls use responsive accessible icons',
+                    dashboardDoc.querySelectorAll('.tables-setup-control-btn').length === 3 &&
+                    dashboardDoc.querySelectorAll('.tables-setup-control-icon').length === 4 &&
+                    dashboardSource.indexOf('Pause automatic setup steps') !== -1);
             } catch (error) {
                 assert('Cloud Website', 'Static Cloud UI contracts load', false, error.message || String(error));
             }
