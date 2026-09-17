@@ -14,13 +14,25 @@ The scoreboard remains free and GPL licensed, and local operation still works wi
 - **Match statistics** — leaderboards, player history, duplicate-name UUID identities, match editing, and Date Added
 - **Live Streams** — optionally promote streams while OBS is actively broadcasting
 
+![Cloud dashboard — live connected table](https://raw.githubusercontent.com/iainsmacleod/CueSport-Scoreboard/main/docs/release-notes/8.2.0/images/05-cloud-dashboard.png)
+
+![Mobile remote scoring](https://raw.githubusercontent.com/iainsmacleod/CueSport-Scoreboard/main/docs/release-notes/8.2.0/images/06-cloud-mobile-control.png)
+
+![OBS Remote tab — control your table from anywhere](https://raw.githubusercontent.com/iainsmacleod/CueSport-Scoreboard/main/docs/release-notes/8.2.0/images/04-remote-tab.png)
+
 ### Also included
 
-- Optional Modern Cloud OBS theme and refreshed dashboard/mobile controls
+- Optional **Modern Cloud** OBS theme and refreshed dashboard/mobile controls
 - Correct Break & Run / Table Run recording for 8, 9, and 10-Ball
 - Separate Snooker Highest Break and Straight Pool Longest Run
 - Improved Snooker scoring, foul, free-ball, Undo, and overlay statistics
 - Safer sessions, Dock Key permissions, account deletion, and trial handling
+
+![Modern Cloud theme — Setup](https://raw.githubusercontent.com/iainsmacleod/CueSport-Scoreboard/main/docs/release-notes/8.2.0/images/01-modern-cloud-setup.png)
+
+![Modern Cloud theme — Controls with ball scoring](https://raw.githubusercontent.com/iainsmacleod/CueSport-Scoreboard/main/docs/release-notes/8.2.0/images/02-modern-cloud-controls.png)
+
+![Settings — CueSport Scoreboard Cloud and Replay](https://raw.githubusercontent.com/iainsmacleod/CueSport-Scoreboard/main/docs/release-notes/8.2.0/images/03-settings-cloud.png)
 
 ### Hosted service
 

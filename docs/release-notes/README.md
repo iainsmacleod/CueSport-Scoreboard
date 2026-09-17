@@ -20,20 +20,28 @@ docs/release-notes/
 
 ## Capture screenshots
 
-From the **repository root**:
-
-```bash
-python -m http.server 8765
-```
-
-In another terminal:
+From `docs/release-notes/` (self-contained for **8.2.0+**; no separate static server required):
 
 ```bash
 cd docs/release-notes
 npm install
+npx playwright install chromium
 node capture-screenshots.mjs --version 8.2.0
 git add 8.2.0/images/
 git commit -m "Update 8.2.0 release note screenshots"
+```
+
+For **7.x** captures, also serve the repo root on port 8765:
+
+```bash
+# repo root
+python -m http.server 8765
+```
+
+Optional live Cloud backend for 8.2.0+:
+
+```bash
+node capture-screenshots.mjs --version 8.2.0 --cloud http://localhost:4003
 ```
 
 Output: `docs/release-notes/<version>/images/*.png`

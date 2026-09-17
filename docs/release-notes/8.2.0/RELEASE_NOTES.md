@@ -19,7 +19,7 @@ CueSport Scoreboard Cloud connects the OBS dock, web dashboard, phones, and gues
 - **Delegate without extra accounts** — create a uniquely named OBS Dock Key for each table or operator and assign Administrator, Trusted Operator, or Operator permissions. Temporary guest links provide focused mobile scoring access.
 - **One Dock Key = one cloud table** — keys can be individually shared, renamed, or revoked, and each key may connect one OBS dock at a time.
 
-![CueSport Scoreboard Cloud dashboard](../../readme/images/04-cloud-dashboard.png)
+![CueSport Scoreboard Cloud dashboard](images/05-cloud-dashboard.png)
 
 ---
 
@@ -33,7 +33,9 @@ CueSport Scoreboard Cloud connects the OBS dock, web dashboard, phones, and gues
 - Connection safeguards stop remote controls from drifting when the dock or relay is offline.
 - Restart Match, End Match, and Call Match Early use explicit confirmation.
 
-![CueSport Scoreboard Cloud mobile control](../../readme/images/05-cloud-mobile-control.png)
+![CueSport Scoreboard Cloud mobile control](images/06-cloud-mobile-control.png)
+
+![OBS Remote tab — control your table from anywhere](images/04-remote-tab.png)
 
 ---
 
@@ -100,6 +102,12 @@ Billing applies only to the optional managed service. Self-hosted deployments re
 - Manual Active Player changes now create their own Undo entry without reversing scores or pots.
 - Snooker foul, free-ball, current-break, possible-break, difference, and points-remaining behavior received extensive corrections and test coverage.
 - Ultimate Pool Balls remain available alongside the existing ball variants.
+
+![Modern Cloud theme — Setup](images/01-modern-cloud-setup.png)
+
+![Modern Cloud theme — Controls with ball scoring](images/02-modern-cloud-controls.png)
+
+![Settings — CueSport Scoreboard Cloud and Replay](images/03-settings-cloud.png)
 
 ---
 
