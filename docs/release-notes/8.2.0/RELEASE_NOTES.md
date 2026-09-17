@@ -2,7 +2,7 @@
 
 **7.2.2 → 8.2.0** · September 2026
 
-Major release: introducing **CueSport Scoreboard Cloud** — optional hosted or self-hosted remote scoring, multi-table management, match history, player statistics, guest controls, and live-stream discovery for the OBS CueSport Scoreboard.
+Major release: introducing **CueSport Scoreboard Cloud** — optional hosted or self-hosted remote scoring, multi-table management, match history, player statistics, guest controls, and live-stream discovery for the OBS CueSport Scoreboard — plus deeper **scoring** work across cue sports, with **Snooker** as a first-class focus (frames, points, fouls, free ball, breaks, and remote control).
 
 The scoreboard remains free, GPL-licensed software and continues to work locally without Cloud. Cloud adds connected services around the existing OBS dock and browser source.
 
@@ -25,7 +25,7 @@ CueSport Scoreboard Cloud connects the OBS dock, web dashboard, phones, and gues
 
 ## Remote scoring from any device
 
-- Full mobile control for players, breaker, scores, balls, fouls, undo, race, event information, and match actions.
+- Full mobile control for players, breaker, scores, balls, fouls, undo, race, event information, and match actions — including full **Snooker** frames/points, free ball, foul picker, and live break display.
 - Responsive table list for moving between multiple connected OBS scoreboards.
 - Guest links and QR codes for scorers who should not receive account or replay access.
 - One active device per guest link, with immediate individual or account-wide revocation.
@@ -34,6 +34,8 @@ CueSport Scoreboard Cloud connects the OBS dock, web dashboard, phones, and gues
 - Restart Match, End Match, and Call Match Early use explicit confirmation.
 
 ![CueSport Scoreboard Cloud mobile control](images/06-cloud-mobile-control.png)
+
+![Mobile Snooker control — frames, points, colours, break & remaining](images/08-cloud-mobile-snooker.png)
 
 ![OBS Remote tab — control your table from anywhere](images/04-remote-tab.png)
 
@@ -58,6 +60,7 @@ Hosted service operators also receive a separate Platform Admin workspace for cu
 
 - Account leaderboard with sortable player performance and **Date Added**.
 - Recent completed and in-progress matches.
+- Expand a match to inspect **per-rack or per-frame detail** — for Snooker that includes frame score, fouls, highest break, who broke, and frame duration.
 - Player detail filtered by opponent and game.
 - Rename players across their history, edit match details, or delete incorrect records.
 - Players use UUID identities, allowing multiple different players to have the same display name.
@@ -66,6 +69,21 @@ Hosted service operators also receive a separate Platform Admin workspace for cu
 - **Kill** removes an unfinished cloud match and tells the connected dock to clear the board and return to Setup.
 - Highest Break for Snooker and Longest Run for Straight Pool are tracked independently.
 - Correct Break & Run and Table Run capture for 8-Ball, 9-Ball, and 10-Ball.
+
+![Cloud Stats — expanded Snooker match with frame-by-frame detail](images/09-cloud-stats-match-detail.png)
+
+---
+
+## Scoring depth (with a Snooker focus)
+
+CueSport Scoreboard’s ball-scoring path is shared across game types, and 8.2.0 tightens the rules that streamers and referees rely on:
+
+- **All games** — Breaking Player / Active Player flow, Undo stacks, race locking, and match end controls (Restart / End / Call Match Early) stay aligned between the OBS dock and remote clients.
+- **8 / 9 / 10-Ball** — correct Break & Run and Table Run recording; Win on Break / Early Game Ball options.
+- **Snooker (headline)** — frames + points, red/colour sequence, foul modal with correct point values, Free Ball on the incoming visit, optional Golden Ball, shared undo through the current frame, and overlay fields for Current Break, Possible Break, Difference, and Points Remaining.
+- **Mobile Snooker** — the same colour grid, foul/free-ball/undo actions, live break strip, points remaining, and dual frame/point steppers as the dock.
+
+![OBS dock — Snooker ball scoring, Free Ball, Foul, Undo](images/07-dock-snooker-controls.png)
 
 ---
 
