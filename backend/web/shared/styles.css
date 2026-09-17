@@ -1536,6 +1536,57 @@ body.has-dash-nav .dash-tabs[hidden] {
   word-break: break-all;
   opacity: 0.9;
 }
+.account-content {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 64rem;
+  margin: 0 auto 0.75rem;
+}
+.account-content .account-section {
+  margin: 0;
+  border: 1px solid rgba(155, 92, 255, 0.22);
+}
+.account-overview-section,
+#accountSubscriptionSection {
+  grid-column: 1 / -1;
+}
+.account-overview-section .account-email {
+  margin-bottom: 0;
+}
+.account-plan-line {
+  margin: 0 0 0.45rem;
+  line-height: 1.4;
+}
+.account-billing-details {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(155, 92, 255, 0.2);
+}
+.account-section-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.account-section-actions .btn,
+.account-section-actions .btn.secondary {
+  margin: 0;
+}
+#adminAccountMount:not(:empty) {
+  margin-bottom: 1rem;
+}
+@media (max-width: 720px) {
+  .account-content {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .account-overview-section,
+  #accountSubscriptionSection {
+    grid-column: 1;
+  }
+}
 .account-session-actions {
   margin: 0.25rem 0 0.75rem;
   justify-content: space-between;

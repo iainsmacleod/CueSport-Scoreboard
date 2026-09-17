@@ -6,7 +6,7 @@
   <title>CueSport Scoreboard Cloud — Dashboard</title>
   <link rel="icon" type="image/png" href="/web/images/brand/logo.png?v=1" />
   <link rel="apple-touch-icon" href="/web/images/balls/8ball_small.png" />
-  <link rel="stylesheet" href="/web/shared/styles.css?v=8.2.0.34" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.2.0.35" />
 </head>
 <body class="dashboard-page">
   <header class="site-header">
@@ -23,13 +23,6 @@
             <svg class="site-nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="14" height="12" rx="2"/><polygon points="22 8 16 12 22 16 22 8"/></svg>
             <span class="site-nav-label">Live Streams</span>
           </a>
-          <button type="button" id="dashAccountMenuBtn" class="btn account-menu-btn hidden" title="Account" aria-label="Account" aria-haspopup="dialog" aria-expanded="false" aria-controls="dashAccountModal">
-            <svg class="site-nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-              <circle cx="12" cy="7" r="4"/>
-            </svg>
-            <span class="site-nav-label">Account</span>
-          </button>
         </nav>
       </div>
     </div>
@@ -353,26 +346,6 @@
       </div>
 
       <div id="tabSettings" class="dash-tab-panel hidden">
-        <div id="billingPanel" class="panel hidden">
-          <h2>Billing &amp; plans</h2>
-          <p id="billingStatusLine" class="hint"></p>
-          <div id="billingPlanPicker" class="billing-plan-grid"></div>
-          <div class="billing-terms-row">
-            <label id="billingTermsLabel" class="billing-terms-check hint">
-              <input type="checkbox" id="billingAcceptTerms" />
-              <span>
-                I agree to the
-                <a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a>
-                and
-                <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
-              </span>
-            </label>
-          </div>
-          <div class="row account-session-actions billing-actions">
-            <button type="button" id="manageBillingBtn" class="btn secondary dash-action-btn hidden">Manage billing</button>
-          </div>
-          <p id="billingNotice" class="hint hidden" aria-live="polite"></p>
-        </div>
         <div class="panel">
           <h2>Guest Remote Control Sessions</h2>
           <p class="hint">
@@ -394,15 +367,6 @@
             <strong>Share</strong> — copy and send the key to another manager of an OBS instance.<br />
             <strong>Edit</strong> — change the seat name/label and role (Administrator, Trusted Operator, or Operator).<br />
             <strong>Remove</strong> — frees the seat and disconnects any dock using it. Create a new key to replace a leaked one.
-          </p>
-          <label id="simulatedPlanWrapSettings" class="stats-filter simulated-plan-filter hidden">
-            Simulated plan
-            <select id="simulatedPlanSelectSettings" aria-label="Platform admin simulated plan">
-              <option value="unrestricted">Unrestricted</option>
-            </select>
-          </label>
-          <p class="hint simulated-plan-hint hidden" id="simulatedPlanHint">
-            Platform admin only: simulate a paid plan&rsquo;s dock-key limits, or leave Unrestricted.
           </p>
           <div class="dock-key-primary-actions">
             <button id="createKeyBtn" class="btn dash-action-btn" type="button" title="Create Dock Key" aria-label="Create Dock Key">Create Dock Key</button>
@@ -426,7 +390,76 @@
         </div>
       </div>
 
+      <div id="tabAccount" class="dash-tab-panel hidden">
+        <div id="accountUserMount">
+          <div id="accountContent" class="account-content">
+            <section class="panel account-section account-overview-section">
+              <h2>Account</h2>
+              <p id="userEmail" class="account-email"></p>
+            </section>
+
+            <section class="panel account-section" id="accountSubscriptionSection">
+              <h2>Subscription</h2>
+              <p id="accountPlanLine" class="account-plan-line"></p>
+              <p id="quotaSummary" class="hint"></p>
+              <label id="simulatedPlanWrap" class="stats-filter simulated-plan-filter hidden">
+                Simulated plan
+                <select id="simulatedPlanSelect" aria-label="Platform admin simulated plan">
+                  <option value="unrestricted">Unrestricted</option>
+                </select>
+              </label>
+              <p class="hint simulated-plan-hint hidden" id="simulatedPlanHint">
+                Platform admin only: simulate a paid plan&rsquo;s dock-key limits, or leave Unrestricted.
+              </p>
+              <div id="billingPanel" class="account-billing-details hidden">
+                <p id="billingStatusLine" class="hint"></p>
+                <div id="billingPlanPicker" class="billing-plan-grid"></div>
+                <div class="billing-terms-row">
+                  <label id="billingTermsLabel" class="billing-terms-check hint">
+                    <input type="checkbox" id="billingAcceptTerms" />
+                    <span>
+                      I agree to the
+                      <a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a>
+                      and
+                      <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+                    </span>
+                  </label>
+                </div>
+                <div class="row account-section-actions billing-actions">
+                  <button type="button" id="manageBillingBtn" class="btn secondary dash-action-btn hidden">Manage Subscription</button>
+                </div>
+                <p id="billingNotice" class="hint hidden" aria-live="polite"></p>
+              </div>
+            </section>
+
+            <section class="panel account-section">
+              <h2>Manage Sessions</h2>
+              <p class="hint">Manage saved access on this browser or sign out every dashboard and admin mobile session.</p>
+              <div class="row account-section-actions">
+                <button type="button" id="accountClearSavedLoginBtn" class="btn secondary dash-action-btn hidden" title="Clear Saved Login" aria-label="Clear Saved Login">
+                  <span class="dash-action-label">Clear Saved Login</span>
+                </button>
+                <button type="button" id="invalidateSessionsBtn" class="btn danger dash-action-btn" title="Clear All Logins" aria-label="Clear All Logins">
+                  <span class="dash-action-label">Clear All Logins</span>
+                </button>
+              </div>
+            </section>
+
+            <section class="panel account-section">
+              <h2>Log-out</h2>
+              <p class="hint">Sign out of CueSport Scoreboard Cloud on this browser.</p>
+              <div class="row account-section-actions">
+                <button type="button" id="signOutBtn" class="btn dash-action-btn" title="Sign Out" aria-label="Sign Out">
+                  <span class="dash-action-label">Sign Out</span>
+                </button>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+
       <div id="tabAdmin" class="dash-tab-panel hidden">
+        <div id="adminAccountMount"></div>
         <div class="panel">
           <h2>Platform Admin</h2>
           <p class="hint">
@@ -494,6 +527,12 @@
         <path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a7.2 7.2 0 0 0-1.62-.94l-.36-2.54A.48.48 0 0 0 14 2h-4a.48.48 0 0 0-.48.41l-.36 2.54c-.59.24-1.13.55-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.65 8.87a.49.49 0 0 0 .12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.38.3.59.22l2.39-.96c.5.39 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h4c.24 0 .44-.17.48-.41l.36-2.54c.59-.24 1.13-.55 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.61l-2.03-1.58zM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5z"/>
       </svg>
       <span>Settings</span>
+    </button>
+    <button type="button" class="dash-tab" data-tab="account" id="dashAccountTabBtn">
+      <svg class="dash-tab-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10zm0 2c-5.33 0-8 2.67-8 5v3h16v-3c0-2.33-2.67-5-8-5z"/>
+      </svg>
+      <span>Account</span>
     </button>
     <button type="button" class="dash-tab hidden" data-tab="admin" id="dashAdminTabBtn">
       <svg class="dash-tab-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -628,32 +667,6 @@
       </div>
     </div>
   </div>
-  <div id="dashAccountModal" class="dash-modal hidden" role="dialog" aria-modal="true" aria-labelledby="dashAccountTitle">
-    <div class="dash-modal-card panel dash-confirm-card">
-      <h2 id="dashAccountTitle">Account</h2>
-      <p id="userEmail" class="account-email"></p>
-      <p id="accountPlanLine" class="hint"></p>
-      <label id="simulatedPlanWrap" class="stats-filter simulated-plan-filter hidden">
-        Simulated plan
-        <select id="simulatedPlanSelect" aria-label="Platform admin simulated plan">
-          <option value="unrestricted">Unrestricted</option>
-        </select>
-      </label>
-      <p id="quotaSummary" class="hint"></p>
-      <div class="stats-toolbar dash-confirm-actions account-session-actions">
-        <button type="button" id="accountManageBillingBtn" class="btn secondary dash-action-btn hidden" title="Manage billing">Manage billing</button>
-        <button type="button" id="signOutBtn" class="btn dash-action-btn" title="Sign Out" aria-label="Sign Out">
-          <svg class="dash-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-          <span class="dash-action-label">Sign Out</span>
-        </button>
-        <button type="button" id="invalidateSessionsBtn" class="btn secondary dash-action-btn" title="Sign Out Everywhere" aria-label="Sign Out Everywhere">
-          <svg class="dash-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-          <span class="dash-action-label">Sign Out Everywhere</span>
-        </button>
-        <button type="button" id="dashAccountCloseBtn" class="btn cancel dash-action-btn" title="Close" aria-label="Close">Close</button>
-      </div>
-    </div>
-  </div>
-  <script type="module" src="/web/dashboard/app.js?v=8.2.0.18"></script>
+  <script type="module" src="/web/dashboard/app.js?v=8.2.0.21"></script>
 </body>
 </html>

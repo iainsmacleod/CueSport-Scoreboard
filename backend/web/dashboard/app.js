@@ -33,7 +33,7 @@ import {
 const TOKEN_KEY = 'cuesport_token';
 const SERVER_KEY = 'cuesport_server';
 const DASH_TAB_KEY = 'cuesport_dashboard_tab';
-const DASH_TABS = new Set(['tables', 'stats', 'settings', 'admin']);
+const DASH_TABS = new Set(['tables', 'stats', 'settings', 'account', 'admin']);
 
 const DOCK_KEY_ROLE_LABELS = {
   administrator: 'Administrator',
@@ -142,9 +142,6 @@ function show(id, visible) {
       if (visible) tabs.removeAttribute('hidden');
       else tabs.setAttribute('hidden', '');
     }
-    const accountBtn = document.getElementById('dashAccountMenuBtn');
-    if (accountBtn) accountBtn.classList.toggle('hidden', !visible);
-    if (!visible) closeDashAccountModal();
   }
 }
 
@@ -153,21 +150,6 @@ function finishDashboardBoot() {
   if (!boot) return;
   boot.setAttribute('aria-busy', 'false');
   boot.classList.add('hidden');
-}
-
-function openDashAccountModal() {
-  const modal = document.getElementById('dashAccountModal');
-  const btn = document.getElementById('dashAccountMenuBtn');
-  if (!modal) return;
-  modal.classList.remove('hidden');
-  if (btn) btn.setAttribute('aria-expanded', 'true');
-}
-
-function closeDashAccountModal() {
-  const modal = document.getElementById('dashAccountModal');
-  const btn = document.getElementById('dashAccountMenuBtn');
-  if (modal) modal.classList.add('hidden');
-  if (btn) btn.setAttribute('aria-expanded', 'false');
 }
 
 function setError(msg) {
@@ -470,7 +452,6 @@ function localSignOut({ clearServer = false, redirectHome = false } = {}) {
   statsLoaded = false;
   setPlatformAdminUi(false);
   setError('');
-  closeDashAccountModal();
   try {
     window.google?.accounts?.id?.disableAutoSelect?.();
   } catch (_) { /* ignore */ }
@@ -763,7 +744,7 @@ function buildAccountPlanLineHtml(account, quota) {
   }
 
   if (account?.needs_plan) {
-    return 'Inactive — choose a plan in <a href="#billingPanel" class="dash-settings-link">Settings</a> to unlock Cloud';
+    return 'Inactive — choose a plan in <a href="#billingPanel" class="dash-account-link">Account</a> to unlock Cloud';
   }
 
   return `Plan: ${escapeHtml(display)}`;
@@ -810,7 +791,7 @@ function renderQuota(quota, account = null) {
     if (isPlatformAdminUser && !atKeyLimit) {
       hint.classList.add('hidden');
     } else if (needsPlan && !isPlatformAdminUser) {
-      hint.textContent = 'Choose a plan on the Tables tab (or under Settings) to unlock OBS Dock Keys.';
+      hint.textContent = 'Choose a plan on the Tables tab (or under Account) to unlock OBS Dock Keys.';
       hint.classList.remove('hidden');
     } else if (atKeyLimit) {
       hint.textContent = `Dock key limit reached (${limits.maxApiKeys} on ${display}). Each key connects one dock — remove an unused key to create another.`;
@@ -822,18 +803,12 @@ function renderQuota(quota, account = null) {
 }
 
 function syncSimulatedPlanSelect(me) {
-  const wraps = [
-    document.getElementById('simulatedPlanWrap'),
-    document.getElementById('simulatedPlanWrapSettings'),
-  ].filter(Boolean);
-  const selects = [
-    document.getElementById('simulatedPlanSelect'),
-    document.getElementById('simulatedPlanSelectSettings'),
-  ].filter(Boolean);
+  const wrap = document.getElementById('simulatedPlanWrap');
+  const select = document.getElementById('simulatedPlanSelect');
   const isAdmin = !!(me?.is_platform_admin || isPlatformAdminUser);
-  wraps.forEach((el) => el.classList.toggle('hidden', !isAdmin));
+  wrap?.classList.toggle('hidden', !isAdmin);
   document.getElementById('simulatedPlanHint')?.classList.toggle('hidden', !isAdmin);
-  if (!isAdmin) return;
+  if (!isAdmin || !select) return;
   const options = Array.isArray(me?.simulated_plan_options) && me.simulated_plan_options.length
     ? me.simulated_plan_options
     : [
@@ -847,12 +822,10 @@ function syncSimulatedPlanSelect(me) {
   const selected = me?.account?.simulated_plan
     || me?.quota?.simulated_plan
     || 'unrestricted';
-  selects.forEach((select) => {
-    select.innerHTML = options.map((opt) =>
-      `<option value="${escapeHtml(opt.id)}">${escapeHtml(opt.label)}</option>`
-    ).join('');
-    select.value = options.some((o) => o.id === selected) ? selected : 'unrestricted';
-  });
+  select.innerHTML = options.map((opt) =>
+    `<option value="${escapeHtml(opt.id)}">${escapeHtml(opt.label)}</option>`
+  ).join('');
+  select.value = options.some((o) => o.id === selected) ? selected : 'unrestricted';
 }
 
 async function onSimulatedPlanChange(event) {
@@ -1068,11 +1041,11 @@ async function consumeSubscribeIntent(account) {
   if (!tier) return;
   if (isPlatformAdminUser || account?.is_platform_admin) return;
   if (!account?.needs_plan && !isComplimentaryActive(account)) {
-    setBillingNotice('You already have Cloud access. Use Manage billing if you need to change plans.');
+    setBillingNotice('You already have Cloud access. Use Manage Subscription if you need to change plans.');
     return;
   }
-  setActiveDashTab('tables');
-  document.getElementById('tablesBillingPromo')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  setActiveDashTab('account');
+  document.getElementById('accountSubscriptionSection')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
   const label = tier === 'streamer'
     ? 'Streamer'
     : tier === 'tournament_organizer'
@@ -1090,7 +1063,7 @@ async function consumeSubscribeIntent(account) {
     danger: false,
   });
   if (!ok) {
-    setBillingNotice('Checkout canceled. Choose a plan anytime below or in Settings.');
+    setBillingNotice('Checkout canceled. Choose a plan anytime under Account.');
     return;
   }
   const termsMain = document.getElementById('billingAcceptTerms');
@@ -1102,14 +1075,7 @@ async function consumeSubscribeIntent(account) {
 
 function renderBillingPanel(account, billingMeta, plansPayload) {
   const panel = document.getElementById('billingPanel');
-  const settingsPanel = document.getElementById('tabSettings');
   const tablesPromo = document.getElementById('tablesBillingPromo');
-  // Keep plan selection prominent for inactive accounts, but move billing below
-  // the operational settings once the account has access.
-  if (panel && settingsPanel) {
-    if (account?.needs_plan) settingsPanel.prepend(panel);
-    else settingsPanel.append(panel);
-  }
   // Platform admins are not billed — access is via PLATFORM_ADMIN_EMAILS, not Stripe.
   const isAdmin = !!(isPlatformAdminUser || account?.is_platform_admin);
   const showBilling = !isAdmin && !!(
@@ -1125,7 +1091,6 @@ function renderBillingPanel(account, billingMeta, plansPayload) {
 
   if (!showBilling) {
     document.getElementById('manageBillingBtn')?.classList.add('hidden');
-    document.getElementById('accountManageBillingBtn')?.classList.add('hidden');
     if (!showTablesPromo) return;
   }
 
@@ -1135,7 +1100,6 @@ function renderBillingPanel(account, billingMeta, plansPayload) {
   const grid = document.getElementById('billingPlanPicker');
   const tablesGrid = document.getElementById('tablesBillingPlanPicker');
   const manageBtn = document.getElementById('manageBillingBtn');
-  const accountManageBtn = document.getElementById('accountManageBillingBtn');
   const termsLabel = document.getElementById('billingTermsLabel');
   const tablesTermsLabel = document.getElementById('tablesBillingTermsLabel');
   const display = account?.subscription_tier_display || account?.subscription_tier || '—';
@@ -1170,7 +1134,6 @@ function renderBillingPanel(account, billingMeta, plansPayload) {
 
   const canManage = !!(account?.stripe_customer_id && billingMeta?.stripeConfigured);
   manageBtn?.classList.toggle('hidden', !canManage);
-  accountManageBtn?.classList.toggle('hidden', !canManage);
   termsLabel?.classList.toggle('hidden', !billingMeta?.stripeConfigured);
   tablesTermsLabel?.classList.toggle('hidden', !billingMeta?.stripeConfigured);
 
@@ -1725,32 +1688,28 @@ function renderApiKeys(keys) {
 
 function getActiveDashTab() {
   const active = document.querySelector('.dash-tab.active');
-  const tab = active?.dataset?.tab || 'tables';
-  if (tab === 'account') return 'settings';
-  return tab;
+  return active?.dataset?.tab || 'tables';
 }
 
 function updatePlatformAccountFilterVisibility(which = getActiveDashTab()) {
   const filterBar = document.getElementById('platformAccountFilterBar');
   if (!filterBar) return;
-  const tab = which === 'account' ? 'settings' : which;
-  const showFilter = isPlatformAdminUser && (tab === 'tables' || tab === 'stats');
+  const showFilter = isPlatformAdminUser && (which === 'tables' || which === 'stats');
   filterBar.classList.toggle('hidden', !showFilter);
 }
 
 function setActiveDashTab(which) {
-  if (which === 'account') which = 'settings';
   if (!DASH_TABS.has(which)) which = 'tables';
-  if (which === 'admin' && !isPlatformAdminUser) {
-    which = 'tables';
-  }
+  if (which === 'account' && isPlatformAdminUser) which = 'admin';
+  if (which === 'admin' && !isPlatformAdminUser) which = 'account';
   localStorage.setItem(DASH_TAB_KEY, which);
   document.querySelectorAll('.dash-tab').forEach((t) => {
     t.classList.toggle('active', t.dataset.tab === which);
   });
   show('tabTables', which === 'tables');
   show('tabStats', which === 'stats');
-  show('tabSettings', which === 'settings' || which === 'account');
+  show('tabSettings', which === 'settings');
+  show('tabAccount', which === 'account');
   show('tabAdmin', which === 'admin');
   updatePlatformAccountFilterVisibility(which);
   syncPlatformTablesPolling();
@@ -2029,11 +1988,22 @@ function setAdminStatus(msg) {
   if (el) el.textContent = msg || '';
 }
 
+function mountAccountContentForRole() {
+  const content = document.getElementById('accountContent');
+  const destination = document.getElementById(
+    isPlatformAdminUser ? 'adminAccountMount' : 'accountUserMount'
+  );
+  if (content && destination && content.parentElement !== destination) {
+    destination.appendChild(content);
+  }
+}
+
 function setPlatformAdminUi(enabled) {
   const wasAdmin = isPlatformAdminUser;
   isPlatformAdminUser = !!enabled;
-  const tabBtn = document.getElementById('dashAdminTabBtn');
-  if (tabBtn) tabBtn.classList.toggle('hidden', !isPlatformAdminUser);
+  document.getElementById('dashAdminTabBtn')?.classList.toggle('hidden', !isPlatformAdminUser);
+  document.getElementById('dashAccountTabBtn')?.classList.toggle('hidden', isPlatformAdminUser);
+  mountAccountContentForRole();
   updatePlatformAccountFilterVisibility();
   if (!isPlatformAdminUser) {
     platformViewAccountId = '';
@@ -2052,9 +2022,11 @@ function setPlatformAdminUi(enabled) {
     const detail = document.getElementById('adminDetailPanel');
     if (detail) detail.classList.add('hidden');
     const activeAdmin = document.querySelector('.dash-tab.active[data-tab="admin"]');
-    if (activeAdmin) setActiveDashTab('tables');
+    if (activeAdmin) setActiveDashTab('account');
   } else {
     if (!wasAdmin) platformViewAccountId = PLATFORM_VIEW_ALL;
+    const activeAccount = document.querySelector('.dash-tab.active[data-tab="account"]');
+    if (activeAccount) setActiveDashTab('admin');
     loadPlatformAccountFilterOptions().catch(() => {});
   }
   syncPlatformTablesPolling();
@@ -2153,7 +2125,7 @@ async function loadAdminAccountDetail(accountId) {
     const summary = stats?.summary || {};
     const isSelf = isOwnAdminAccount(account.id);
     const selfNote = isSelf
-      ? `<p class="hint admin-self-note">This is your platform admin account. Support actions are disabled here — manage keys and sessions in Settings.</p>`
+      ? `<p class="hint admin-self-note">This is your platform admin account. Support actions are disabled here — manage your sessions above and keys in Settings.</p>`
       : '';
     const trialBlock = isSelf
       ? ''
@@ -4855,6 +4827,9 @@ document.getElementById('createKeyBtn').addEventListener('click', () => {
   openDockKeyModal({ mode: 'create' });
 });
 document.getElementById('revokeAllDockKeysBtn')?.addEventListener('click', async () => {
+  const revokeAllBtn = document.getElementById('revokeAllDockKeysBtn');
+  const notice = document.getElementById('keyRevokeNotice');
+  const activeBefore = activeDockKeys.length;
   const ok = await confirmDashAction({
     title: 'Revoke All OBS Dock Keys',
     message:
@@ -4864,11 +4839,18 @@ document.getElementById('revokeAllDockKeysBtn')?.addEventListener('click', async
     danger: true,
   });
   if (!ok) return;
+  if (revokeAllBtn) revokeAllBtn.disabled = true;
+  if (notice) {
+    notice.textContent = 'Revoking all OBS Dock Keys…';
+    notice.classList.remove('hidden');
+  }
   try {
     setError('');
     const result = await revokeAllApiKeys(getServerUrl(), getToken());
     if (result.quota) renderQuota(result.quota, lastAccount);
-    if (Array.isArray(result.api_keys)) renderApiKeys(result.api_keys);
+    // A successful bulk endpoint revokes every key. Clear immediately even if
+    // an older server omitted api_keys from its response.
+    renderApiKeys(Array.isArray(result.api_keys) ? result.api_keys : []);
     if (Array.isArray(result.rooms)) {
       ownDashboardRooms = result.rooms;
       lastDashboardRooms = result.rooms;
@@ -4878,7 +4860,6 @@ document.getElementById('revokeAllDockKeysBtn')?.addEventListener('click', async
     const revoked = Number(result.revoked) || 0;
     const kicked = Number(result.kicked) || 0;
     const roomsDeleted = Number(result.rooms_deleted) || 0;
-    const notice = document.getElementById('keyRevokeNotice');
     if (notice) {
       notice.textContent = revoked
         ? `Revoked ${revoked} OBS Dock Key${revoked === 1 ? '' : 's'}, disconnected ${kicked} dock${kicked === 1 ? '' : 's'}, and removed ${roomsDeleted} table${roomsDeleted === 1 ? '' : 's'}.`
@@ -4886,11 +4867,40 @@ document.getElementById('revokeAllDockKeysBtn')?.addEventListener('click', async
       notice.classList.remove('hidden');
     }
   } catch (err) {
+    // Revocation is committed before dock/table cleanup. If cleanup failed and
+    // the endpoint returned 500, refresh so successfully revoked keys still
+    // disappear rather than leaving a stale list.
+    try {
+      const me = await fetchMe(getServerUrl(), getToken());
+      const keys = Array.isArray(me.api_keys) ? me.api_keys : [];
+      renderApiKeys(keys);
+      if (me.quota) renderQuota(me.quota, me.account || lastAccount);
+      if (Array.isArray(me.rooms)) {
+        ownDashboardRooms = me.rooms;
+        lastDashboardRooms = me.rooms;
+        renderTableCards(me.rooms);
+        renderDebugRooms(me.rooms);
+      }
+      if (activeBefore > 0 && keys.length === 0) {
+        if (notice) {
+          notice.textContent = `Revoked ${activeBefore} OBS Dock Key${activeBefore === 1 ? '' : 's'}. Some disconnected table cleanup may still be completing.`;
+          notice.classList.remove('hidden');
+        }
+        return;
+      }
+    } catch (_) {
+      // Report the original revoke failure when the authoritative refresh also fails.
+    }
+    if (notice) {
+      notice.textContent = `Could not revoke all OBS Dock Keys: ${err.message}`;
+      notice.classList.remove('hidden');
+    }
     setError(err.message);
+  } finally {
+    if (revokeAllBtn) revokeAllBtn.disabled = !activeDockKeys.length;
   }
 });
 document.getElementById('simulatedPlanSelect')?.addEventListener('change', onSimulatedPlanChange);
-document.getElementById('simulatedPlanSelectSettings')?.addEventListener('change', onSimulatedPlanChange);
 document.getElementById('dashCreateKeyCancelBtn')?.addEventListener('click', () => closeDockKeyModal());
 document.getElementById('dashCreateKeySubmitBtn')?.addEventListener('click', () => submitDockKeyModal());
 document.getElementById('dashCreateKeyRole')?.addEventListener('change', (event) => {
@@ -4906,9 +4916,18 @@ document.getElementById('dashCreateKeyLabel')?.addEventListener('keydown', (even
   }
 });
 
+document.getElementById('accountClearSavedLoginBtn')?.addEventListener('click', async () => {
+  const ok = await confirmDashAction({
+    title: 'Clear Saved Login',
+    message: 'Remove the saved login and server details from this browser?',
+    confirmLabel: 'Clear Saved Login',
+    danger: true,
+  });
+  if (!ok) return;
+  localSignOut({ clearServer: true, redirectHome: true });
+});
+
 document.getElementById('signOutBtn')?.addEventListener('click', async () => {
-  // Close account modal first — confirm shares the same stacking context and would open underneath.
-  closeDashAccountModal();
   const ok = await confirmDashAction({
     title: 'Sign Out',
     message: 'Sign out of this dashboard on this device?',
@@ -4919,14 +4938,13 @@ document.getElementById('signOutBtn')?.addEventListener('click', async () => {
 });
 
 document.getElementById('invalidateSessionsBtn')?.addEventListener('click', async () => {
-  closeDashAccountModal();
   const ok = await confirmDashAction({
-    title: 'Sign Out Everywhere',
+    title: 'Clear All Logins',
     message:
-      'Sign out on every device?\n\n' +
+      'Clear every saved login and sign out all devices?\n\n' +
       'This dashboard, other admin browsers, and admin mobile control will be signed out and disconnected. ' +
       'Guest links are not affected.',
-    confirmLabel: 'Sign Out Everywhere',
+    confirmLabel: 'Clear All Logins',
     danger: true,
   });
   if (!ok) return;
@@ -4961,22 +4979,11 @@ document.getElementById('revokeAllGuestsBtn')?.addEventListener('click', async (
   }
 });
 
-document.getElementById('dashAccountMenuBtn')?.addEventListener('click', () => {
-  const modal = document.getElementById('dashAccountModal');
-  if (modal && !modal.classList.contains('hidden')) closeDashAccountModal();
-  else openDashAccountModal();
-});
-document.getElementById('dashAccountCloseBtn')?.addEventListener('click', () => closeDashAccountModal());
-document.getElementById('dashAccountModal')?.addEventListener('click', (event) => {
-  if (event.target && event.target.id === 'dashAccountModal') closeDashAccountModal();
-});
-
 document.addEventListener('click', (event) => {
-  const link = event.target?.closest?.('a.dash-settings-link');
+  const link = event.target?.closest?.('a.dash-account-link');
   if (!link) return;
   event.preventDefault();
-  closeDashAccountModal();
-  setActiveDashTab('settings');
+  setActiveDashTab(isPlatformAdminUser ? 'admin' : 'account');
   document.getElementById('billingPanel')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
 });
 
@@ -4995,17 +5002,11 @@ document.getElementById('dashShareKeyModal')?.addEventListener('click', (event) 
 });
 document.addEventListener('keydown', (event) => {
   if (event.key !== 'Escape') return;
-  // Prefer the top-most dialog (confirm stacks above account/share).
+  // Prefer the top-most dialog.
   const confirmModal = document.getElementById('dashConfirmModal');
   if (confirmModal && !confirmModal.classList.contains('hidden')) {
     event.preventDefault();
     closeDashConfirm(false);
-    return;
-  }
-  const accountModal = document.getElementById('dashAccountModal');
-  if (accountModal && !accountModal.classList.contains('hidden')) {
-    event.preventDefault();
-    closeDashAccountModal();
     return;
   }
   const shareModal = document.getElementById('dashShareKeyModal');
@@ -5148,9 +5149,6 @@ document.getElementById('googleBtn')?.addEventListener('click', () => {
 document.getElementById('manageBillingBtn')?.addEventListener('click', () => {
   startPortal();
 });
-document.getElementById('accountManageBillingBtn')?.addEventListener('click', () => {
-  startPortal();
-});
 
 {
   const params = new URLSearchParams(window.location.search);
@@ -5194,6 +5192,7 @@ function applyDashLoginCapabilities(config) {
   // Dev secret is for self-host / lab only (ALLOW_DEV_AUTH). Official managed sets this false.
   const selfHost = !!(config?.allowDevAuth && config?.devAuthConfigured);
   dashAuthCapabilities = { google, selfHost, hybrid: google && selfHost };
+  document.getElementById('accountClearSavedLoginBtn')?.classList.toggle('hidden', !selfHost);
 
   const managedPane = document.getElementById('dashLoginManagedPane');
   const selfHostPane = document.getElementById('dashLoginSelfHostPane');
@@ -5589,19 +5588,24 @@ setMatchModalActionButtons();
     label: 'Clear Saved Login',
     title: 'Clear Saved Login',
   });
-  setDashActionButtonContent(document.getElementById('dashAccountCloseBtn'), {
-    icon: 'close',
-    label: 'Close',
-    title: 'Close',
+  setDashActionButtonContent(document.getElementById('accountClearSavedLoginBtn'), {
+    icon: 'trash',
+    label: 'Clear Saved Login',
+    title: 'Clear Saved Login',
+  });
+  setDashActionButtonContent(document.getElementById('invalidateSessionsBtn'), {
+    icon: 'stopSign',
+    label: 'Clear All Logins',
+    title: 'Clear All Logins',
+  });
+  setDashActionButtonContent(document.getElementById('signOutBtn'), {
+    icon: 'logOut',
+    label: 'Sign Out',
+    title: 'Sign Out',
   });
   setDashActionButtonContent(document.getElementById('manageBillingBtn'), {
     icon: 'edit',
-    label: 'Manage billing',
-    title: 'Open Stripe Customer Portal',
-  });
-  setDashActionButtonContent(document.getElementById('accountManageBillingBtn'), {
-    icon: 'edit',
-    label: 'Manage billing',
+    label: 'Manage Subscription',
     title: 'Open Stripe Customer Portal',
   });
 }

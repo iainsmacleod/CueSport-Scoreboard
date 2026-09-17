@@ -3075,9 +3075,6 @@ document.getElementById('devSecret')?.addEventListener('keydown', (event) => {
 document.getElementById('clearTokenBtn')?.addEventListener('click', () => {
   clearSavedLogin();
 });
-document.getElementById('setupClearTokenBtn')?.addEventListener('click', () => {
-  clearSavedLogin();
-});
 
 function clearSavedLogin() {
   if (!window.confirm('Clear Saved Login on this device? You will return to the main page to sign in again.')) return;

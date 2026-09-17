@@ -671,9 +671,10 @@
                     dashboardSource.indexOf('Manage Every Table') !== -1 &&
                     dashboardSource.indexOf('Keep the Match Story') !== -1 &&
                     sharedStyles.indexOf('grid-template-columns: repeat(3, minmax(0, 1fr))') !== -1);
-                assert('Cloud Dashboard', 'Sign Out and Sign Out Everywhere return home',
+                assert('Cloud Dashboard', 'Sign Out and Clear All Logins return home',
                     (dashboardAppSource.match(/localSignOut\(\{[^}]*redirectHome: true[^}]*\}\)/g) || []).length >= 2 &&
-                    dashboardAppSource.indexOf("window.location.assign('/')") !== -1);
+                    dashboardAppSource.indexOf("window.location.assign('/')") !== -1 &&
+                    dashboardSource.indexOf('Clear All Logins') !== -1);
                 assert('Cloud Navigation', 'Dashboard uses a stable loading shell before auth resolves',
                     !!dashboardDoc.querySelector('#dashboardBoot.app-boot') &&
                     dashboardDoc.getElementById('loginSection')?.classList.contains('hidden') &&
@@ -685,7 +686,15 @@
                 assert('Cloud Mobile', 'Forced table exits return home instead of showing saved login',
                     mobileAppSource.indexOf('function shouldLeaveTableForHome') !== -1 &&
                     mobileAppSource.indexOf("window.location.replace('/')") !== -1 &&
-                    !!mobileDoc.getElementById('setupClearTokenBtn'));
+                    !mobileDoc.getElementById('mobileAccountPanel'));
+                assert('Cloud Dashboard', 'Header keeps home brand and Live Streams only',
+                    dashboardDoc.querySelector('.site-brand')?.getAttribute('href') === '/' &&
+                    !!dashboardDoc.querySelector('.site-header-actions a[href="/streams"]') &&
+                    !dashboardDoc.getElementById('dashAccountMenuBtn') &&
+                    !dashboardDoc.getElementById('dashAccountModal'));
+                assert('Cloud Dashboard', 'Clear Saved Login is available in Account sessions',
+                    !!dashboardDoc.querySelector('#accountContent #accountClearSavedLoginBtn') &&
+                    dashboardAppSource.indexOf("localSignOut({ clearServer: true, redirectHome: true })") !== -1);
                 assert('Cloud Accounts', 'Deleted-account clients are returned to the homepage',
                     dashboardAppSource.indexOf("e.code === 'account_deleting'") !== -1 &&
                     mobileAppSource.indexOf("'account_deleting'") !== -1 &&
@@ -800,12 +809,19 @@
                     dashboardAppSource.indexOf("const DASH_TAB_KEY = 'cuesport_dashboard_tab'") !== -1 &&
                     dashboardAppSource.indexOf('localStorage.setItem(DASH_TAB_KEY, which)') !== -1 &&
                     dashboardAppSource.indexOf("localStorage.getItem(DASH_TAB_KEY) || 'tables'") !== -1);
-                assert('Cloud Dashboard', 'Inactive account links to Settings and hides default quota',
-                    dashboardAppSource.indexOf('choose a plan in <a href="#billingPanel" class="dash-settings-link">Settings</a>') !== -1 &&
+                assert('Cloud Dashboard', 'Inactive account links to Account and hides default quota',
+                    dashboardAppSource.indexOf('choose a plan in <a href="#billingPanel" class="dash-account-link">Account</a>') !== -1 &&
                     dashboardAppSource.indexOf("el.classList.toggle('hidden', needsPlan)") !== -1);
-                assert('Cloud Dashboard', 'Billing stays first when inactive and moves last when active',
-                    dashboardAppSource.indexOf('if (account?.needs_plan) settingsPanel.prepend(panel)') !== -1 &&
-                    dashboardAppSource.indexOf('else settingsPanel.append(panel)') !== -1);
+                assert('Cloud Dashboard', 'Billing moved from Settings into Account subscription',
+                    !!dashboardDoc.querySelector('#accountSubscriptionSection #billingPanel') &&
+                    !dashboardDoc.querySelector('#tabSettings #billingPanel') &&
+                    dashboardSource.indexOf('Manage Subscription') !== -1);
+                assert('Cloud Dashboard', 'Regular users get Account while platform admins get combined Admin',
+                    !!dashboardDoc.querySelector('.dash-tab[data-tab="account"]') &&
+                    !!dashboardDoc.querySelector('.dash-tab[data-tab="admin"]') &&
+                    !!dashboardDoc.getElementById('adminAccountMount') &&
+                    dashboardAppSource.indexOf('mountAccountContentForRole') !== -1 &&
+                    dashboardAppSource.indexOf("isPlatformAdminUser ? 'adminAccountMount' : 'accountUserMount'") !== -1);
                 assert('Cloud Dashboard', 'Dock Key labels request uniqueness',
                     dashboardSource.indexOf('Name/Label (unique)') !== -1 &&
                     !!dashboardDoc.getElementById('dashCreateKeyError') &&
@@ -815,7 +831,9 @@
                 assert('Cloud Dashboard', 'OBS Dock Keys can be revoked together with confirmation',
                     !!dashboardDoc.getElementById('revokeAllDockKeysBtn') &&
                     dashboardAppSource.indexOf("title: 'Revoke All OBS Dock Keys'") !== -1 &&
-                    dashboardAppSource.indexOf('revokeAllApiKeys(getServerUrl(), getToken())') !== -1);
+                    dashboardAppSource.indexOf('revokeAllApiKeys(getServerUrl(), getToken())') !== -1 &&
+                    dashboardAppSource.indexOf('renderApiKeys(Array.isArray(result.api_keys) ? result.api_keys : [])') !== -1 &&
+                    dashboardAppSource.indexOf('const me = await fetchMe(getServerUrl(), getToken())') !== -1);
                 assert('Cloud Dashboard', 'Current billing plan has a prominent badge',
                     dashboardAppSource.indexOf("currentBadge.textContent = 'Current plan'") !== -1 &&
                     dashboardAppSource.indexOf("card.classList.add('is-current')") !== -1);

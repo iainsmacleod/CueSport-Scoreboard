@@ -464,9 +464,15 @@ export async function registerAccountRoutes(app) {
     let kicked = 0;
     let roomsDeleted = 0;
     for (const keyId of keyIds) {
-      const result = revokeApiKeySeat(keyId);
-      kicked += Number(result.kicked) || 0;
-      if (result.roomDeleted) roomsDeleted += 1;
+      try {
+        const result = revokeApiKeySeat(keyId);
+        kicked += Number(result.kicked) || 0;
+        if (result.roomDeleted) roomsDeleted += 1;
+      } catch (err) {
+        // The database revocation is authoritative. A stale room/socket must not
+        // turn a successful bulk revoke into a 500 that leaves the UI unchanged.
+        request.log.warn({ err, keyId }, 'Could not clean up revoked OBS Dock Key seat');
+      }
     }
     return {
       ok: true,
