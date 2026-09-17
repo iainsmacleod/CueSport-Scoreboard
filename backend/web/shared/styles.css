@@ -1100,27 +1100,15 @@ a.site-brand h1 {
   gap: 0.5rem;
   flex-wrap: wrap;
 }
-/* Home already has Dashboard + Browse Live Streams in the hero — don't duplicate in the header. */
-body.landing-home .site-nav {
-  display: none;
-}
-body.landing-home .site-header-inner {
-  width: 100%;
-  max-width: none;
-  justify-content: center;
-  text-align: center;
-}
-body.landing-home .site-header-inner > div:first-child {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
+/* Keep the brand centered while Sign In / Dashboard stays at the right edge. */
+body.landing-home .site-header-inner,
 body.streams-page .site-header-inner {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   width: 100%;
   max-width: none;
 }
+body.landing-home .site-header-inner > div:first-child,
 body.streams-page .site-header-inner > div:first-child {
   grid-column: 2;
   justify-self: center;
@@ -1129,17 +1117,20 @@ body.streams-page .site-header-inner > div:first-child {
   align-items: center;
   text-align: center;
 }
+body.landing-home .site-header-actions,
 body.streams-page .site-header-actions {
   grid-column: 3;
   justify-self: end;
 }
 @media (max-width: 720px) {
+  body.landing-home .site-header-inner,
   body.streams-page .site-header-inner {
     display: flex;
     flex-direction: column;
     justify-content: center;
     text-align: center;
   }
+  body.landing-home .site-header-actions,
   body.streams-page .site-header-actions {
     justify-content: center;
   }
@@ -1148,7 +1139,8 @@ body.streams-page .site-header-actions {
 body.landing-home .live-now-panel {
   display: none;
 }
-/* On /streams you're already viewing the list — keep only Sign In / Dashboard. */
+/* Both pages already link to Live Streams in their content; keep the header action focused on auth. */
+body.landing-home .site-nav-streams,
 body.streams-page .site-nav-streams {
   display: none;
 }
@@ -1250,6 +1242,16 @@ body.streams-page .site-nav-streams {
   min-width: 0;
   overflow-x: hidden;
   overflow-x: clip;
+}
+body.landing-home,
+body.streams-page {
+  --content-max: 720px;
+}
+@media (min-width: 900px) {
+  body.landing-home,
+  body.streams-page {
+    --content-max: 1440px;
+  }
 }
 /* Dashboard: phone-friendly by default, room to breathe on desktop */
 .dashboard-main {
@@ -1362,6 +1364,8 @@ body.has-dash-nav .dash-tabs[hidden] {
 }
 .marketing-carousel-viewport {
   overflow: hidden;
+  padding: 0.55rem;
+  box-sizing: border-box;
   border-radius: 8px;
   background: rgba(15, 16, 24, 0.65);
 }
@@ -1427,6 +1431,27 @@ body.has-dash-nav .dash-tabs[hidden] {
   font-size: 0.9rem;
   line-height: 1.45;
   opacity: 0.9;
+}
+@media (min-width: 900px) {
+  .marketing-slide {
+    flex-basis: 52%;
+    margin: 0;
+    opacity: 0.48;
+    transform: scale(0.92);
+    transition: opacity 0.45s ease, transform 0.45s ease;
+    border: 1px solid rgba(155, 92, 255, 0.18);
+    border-radius: 8px;
+    background: rgba(26, 27, 38, 0.72);
+  }
+  .marketing-slide.is-active {
+    opacity: 1;
+    transform: scale(1);
+    border-color: rgba(155, 92, 255, 0.48);
+    background: rgba(36, 40, 59, 0.96);
+  }
+  .marketing-slide.is-clone {
+    opacity: 0.48;
+  }
 }
 .marketing-carousel-controls {
   display: grid;

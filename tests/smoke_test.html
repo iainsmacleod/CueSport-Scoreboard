@@ -629,6 +629,10 @@
                     landingDoc.querySelector('.site-brand')?.getAttribute('href') === '/' &&
                     (landingDoc.querySelector('.site-brand h1')?.textContent || '').trim() ===
                         'CueSport Scoreboard Cloud');
+                assert('Cloud Website', 'Homepage header includes the responsive sign-in or dashboard action',
+                    landingDoc.getElementById('authNavBtn')?.getAttribute('href') === '/dashboard' &&
+                    landingSource.indexOf("const navLabel = signedIn ? 'Dashboard' : 'Sign In'") !== -1 &&
+                    sharedStyles.indexOf('body.landing-home .site-nav-streams') !== -1);
                 assert('Cloud Website', 'Marketing carousel contains six real product slides',
                     slides.length === 6 &&
                     Array.from(slides).every(function (slide) {
@@ -636,6 +640,11 @@
                             !!slide.querySelector('.marketing-slide-caption h3') &&
                             !!slide.querySelector('.marketing-slide-caption p');
                     }), String(slides.length));
+                assert('Cloud Website', 'Desktop carousel centers one card with adjacent cards visible',
+                    landingSource.indexOf('buildCarouselClones()') !== -1 &&
+                    landingSource.indexOf('const slideWidth = desktop ? 52 : 100') !== -1 &&
+                    sharedStyles.indexOf('flex-basis: 52%') !== -1 &&
+                    sharedStyles.indexOf('.marketing-slide.is-active') !== -1);
                 assert('Cloud Website', 'Redundant feature-card grid removed',
                     !landingDoc.querySelector('.feature-grid') &&
                     landingSource.indexOf('class="feature-grid"') === -1);

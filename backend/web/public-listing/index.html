@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>CueSport Scoreboard Cloud</title>
   <link rel="icon" type="image/png" href="/web/images/brand/logo.png?v=1" />
-  <link rel="stylesheet" href="/web/shared/styles.css?v=8.2.0.20" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.2.0.42" />
 </head>
-<body>
+<body class="landing-home">
   <header class="site-header">
     <div class="site-header-inner">
       <div>
@@ -45,11 +45,11 @@
         <div class="hero-actions">
           <a id="heroAuthBtn" class="btn primary" href="/dashboard">
             <svg class="site-nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
-            Open Dashboard
+            Dashboard
           </a>
           <a class="btn" href="/streams">
             <svg class="site-nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="14" height="12" rx="2"/><polygon points="22 8 16 12 22 16 22 8"/></svg>
-            Browse Live Streams
+            Live Streams
           </a>
         </div>
         <p class="hint marketing-obs-note">
@@ -143,17 +143,16 @@
       <section id="landingPricingSoon" class="panel landing-pricing-soon hidden">
         <h2>Plans &amp; pricing</h2>
         <p class="hint">Self-serve plans will appear here when Stripe billing is configured on this server.</p>
-        <a class="btn primary" href="/dashboard">Open Dashboard</a>
+        <a class="btn primary" href="/dashboard">Dashboard</a>
       </section>
     </div>
   </main>
   <script type="module">
     const isStreamsPage = /\/streams\/?$/.test(location.pathname);
     if (isStreamsPage) {
+      document.body.classList.remove('landing-home');
       document.body.classList.add('streams-page');
       document.title = 'Live Streams — CueSport Scoreboard Cloud';
-    } else {
-      document.body.classList.add('landing-home');
     }
 
     const SUBSCRIBE_KEY = 'cuesport_subscribe_tier';
@@ -172,7 +171,7 @@
       }
       const hero = document.getElementById('heroAuthBtn');
       if (hero) {
-        const heroLabel = 'Open Dashboard';
+        const heroLabel = 'Dashboard';
         hero.innerHTML = `${dashIcon}${heroLabel}`;
         hero.setAttribute('aria-label', heroLabel);
         hero.title = heroLabel;
@@ -216,7 +215,23 @@
     let carouselSwipeAt = 0;
 
     function slides() {
-      return Array.from(document.querySelectorAll('#marketingCarouselTrack .marketing-slide'));
+      return Array.from(document.querySelectorAll('#marketingCarouselTrack .marketing-slide:not(.is-clone)'));
+    }
+
+    function buildCarouselClones() {
+      const track = document.getElementById('marketingCarouselTrack');
+      const items = slides();
+      if (!track || items.length < 2) return;
+      track.querySelectorAll('.marketing-slide.is-clone').forEach((slide) => slide.remove());
+      const before = items[items.length - 1].cloneNode(true);
+      const after = items[0].cloneNode(true);
+      [before, after].forEach((clone) => {
+        clone.classList.add('is-clone');
+        clone.setAttribute('aria-hidden', 'true');
+        clone.setAttribute('inert', '');
+      });
+      track.prepend(before);
+      track.append(after);
     }
 
     function goToSlide(index) {
@@ -224,9 +239,15 @@
       if (!items.length) return;
       carouselIndex = ((index % items.length) + items.length) % items.length;
       const track = document.getElementById('marketingCarouselTrack');
-      if (track) track.style.transform = `translateX(-${carouselIndex * 100}%)`;
+      if (track) {
+        const desktop = window.matchMedia?.('(min-width: 900px)')?.matches;
+        const slideWidth = desktop ? 52 : 100;
+        const centerOffset = desktop ? 24 : 0;
+        track.style.transform = `translateX(${centerOffset - ((carouselIndex + 1) * slideWidth)}%)`;
+      }
       items.forEach((slide, i) => {
         const active = i === carouselIndex;
+        slide.classList.toggle('is-active', active);
         slide.setAttribute('aria-hidden', active ? 'false' : 'true');
         slide.toggleAttribute('inert', !active);
         const media = slide.querySelector('.marketing-slide-media');
@@ -296,7 +317,7 @@
     function initCarousel() {
       buildDots();
       const root = document.getElementById('marketingCarousel');
-      document.querySelectorAll('.marketing-slide-media').forEach((media) => {
+      document.querySelectorAll('.marketing-slide:not(.is-clone) .marketing-slide-media').forEach((media) => {
         media.classList.add('carousel-click-pause-target');
         media.tabIndex = 0;
         media.setAttribute('role', 'button');
@@ -317,7 +338,9 @@
           setCarouselPaused(!carouselPaused);
         });
       });
+      buildCarouselClones();
       goToSlide(0);
+      window.addEventListener('resize', () => goToSlide(carouselIndex));
       document.getElementById('carouselPrev')?.addEventListener('click', () => {
         goToSlide(carouselIndex - 1);
         restartCarousel();
