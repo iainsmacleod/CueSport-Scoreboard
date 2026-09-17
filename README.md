@@ -623,7 +623,7 @@ Reads `DEV_AUTH_SECRET` from `backend/.env`. Options: `--skip-api`, `--skip-smok
 
 ## Release notes
 
-Versioned changelogs and screenshot tooling live in [`docs/release-notes/`](docs/release-notes/). README screenshots are in [`docs/readme/images/`](docs/readme/images/) (regenerate with [`docs/readme/capture-screenshots.mjs`](docs/readme/capture-screenshots.mjs)). Run `docs/release-notes/create-release.ps1 -Version 8.0.0` (requires [GitHub CLI](https://cli.github.com/)) to refresh release-note captures and open a **draft** GitHub release.
+Versioned changelogs and screenshot tooling live in [`docs/release-notes/`](docs/release-notes/). README screenshots are in [`docs/readme/images/`](docs/readme/images/) (regenerate with [`docs/readme/capture-screenshots.mjs`](docs/readme/capture-screenshots.mjs)). Run `docs/release-notes/create-release.ps1 -Version 8.2.0` (requires [GitHub CLI](https://cli.github.com/)) to refresh release-note captures and open a **draft** GitHub release.
 
 ---
 
