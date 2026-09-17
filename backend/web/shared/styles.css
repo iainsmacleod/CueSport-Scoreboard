@@ -477,6 +477,10 @@ body.streams-page .btn.secondary {
   min-width: 0;
   box-sizing: border-box;
 }
+body.dashboard-page #dashboardSection .panel,
+body.mobile main .panel {
+  border: 1px solid rgba(155, 92, 255, 0.22);
+}
 .panel h2 { margin: 0 0 0.5rem; font-size: 1rem; }
 input, select {
   width: 100%;
@@ -1541,12 +1545,10 @@ body.has-dash-nav .dash-tabs[hidden] {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.75rem;
   width: 100%;
-  max-width: 64rem;
   margin: 0 auto 0.75rem;
 }
 .account-content .account-section {
   margin: 0;
-  border: 1px solid rgba(155, 92, 255, 0.22);
 }
 .account-overview-section,
 #accountSubscriptionSection {
@@ -1554,6 +1556,9 @@ body.has-dash-nav .dash-tabs[hidden] {
 }
 .account-overview-section .account-email {
   margin-bottom: 0;
+}
+.account-deployment-type {
+  margin: 0.3rem 0 0;
 }
 .account-plan-line {
   margin: 0 0 0.45rem;
@@ -1567,6 +1572,7 @@ body.has-dash-nav .dash-tabs[hidden] {
 .account-section-actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   flex-wrap: wrap;
   gap: 0.5rem;
   margin-top: 0.5rem;

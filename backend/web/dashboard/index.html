@@ -6,7 +6,7 @@
   <title>CueSport Scoreboard Cloud — Dashboard</title>
   <link rel="icon" type="image/png" href="/web/images/brand/logo.png?v=1" />
   <link rel="apple-touch-icon" href="/web/images/balls/8ball_small.png" />
-  <link rel="stylesheet" href="/web/shared/styles.css?v=8.2.0.35" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.2.0.38" />
 </head>
 <body class="dashboard-page">
   <header class="site-header">
@@ -116,7 +116,6 @@
         </div>
         <div class="dash-login-actions">
           <button id="devLoginBtn" class="btn primary" type="button">Login</button>
-          <button type="button" id="clearSavedLoginBtn" class="btn secondary">Clear Saved Login</button>
         </div>
         <p id="dashShowManagedWrap" class="dash-login-switch hidden">
           <a href="#" id="dashShowManagedLink" class="dash-text-link">Sign in with Google instead</a>
@@ -396,6 +395,7 @@
             <section class="panel account-section account-overview-section">
               <h2>Account</h2>
               <p id="userEmail" class="account-email"></p>
+              <p id="accountDeploymentType" class="hint account-deployment-type hidden"></p>
             </section>
 
             <section class="panel account-section" id="accountSubscriptionSection">
@@ -434,11 +434,8 @@
 
             <section class="panel account-section">
               <h2>Manage Sessions</h2>
-              <p class="hint">Manage saved access on this browser or sign out every dashboard and admin mobile session.</p>
+              <p class="hint">Sign out every dashboard and admin mobile session.</p>
               <div class="row account-section-actions">
-                <button type="button" id="accountClearSavedLoginBtn" class="btn secondary dash-action-btn hidden" title="Clear Saved Login" aria-label="Clear Saved Login">
-                  <span class="dash-action-label">Clear Saved Login</span>
-                </button>
                 <button type="button" id="invalidateSessionsBtn" class="btn danger dash-action-btn" title="Clear All Logins" aria-label="Clear All Logins">
                   <span class="dash-action-label">Clear All Logins</span>
                 </button>
@@ -667,6 +664,6 @@
       </div>
     </div>
   </div>
-  <script type="module" src="/web/dashboard/app.js?v=8.2.0.21"></script>
+  <script type="module" src="/web/dashboard/app.js?v=8.2.0.24"></script>
 </body>
 </html>

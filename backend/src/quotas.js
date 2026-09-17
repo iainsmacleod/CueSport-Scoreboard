@@ -1,5 +1,6 @@
 import * as sqlite from './db/sqlite.js';
 import { isPlatformAdmin } from './lib/platform-admin.js';
+import { config } from './config.js';
 
 /** Built-in subscription tier caps — override via TIER_LIMITS_JSON or TIER_{TIER}_MAX_* env.
  *  Option A: 1 OBS Dock Key = 1 table (room) + 1 dock connection (seat).
@@ -171,6 +172,19 @@ export function getSimulatedPlanOptions() {
 
 export function getAccountQuota(account) {
   const usage = getAccountUsage(account.id);
+  if (config.allowDevAuth) {
+    return {
+      tier: 'selfhost',
+      tierDisplayName: 'Self-host (unrestricted)',
+      limits: {
+        maxApiKeys: null,
+        maxRooms: null,
+        maxControlConnectionsPerRoom: null,
+      },
+      usage,
+      self_host_unrestricted: true,
+    };
+  }
   if (isPlatformAdmin(account)) {
     const simulated = resolveSimulatedPlan(account);
     if (simulated === 'unrestricted') {
@@ -248,6 +262,7 @@ export function assertCanCreateRoom(account) {
 
 /** Soft ceiling for mobile/guest seats per table. */
 export function getMaxControlConnections(account) {
+  if (config.allowDevAuth) return 100;
   if (isPlatformAdmin(account)) {
     const simulated = resolveSimulatedPlan(account);
     if (simulated === 'unrestricted') return 100;

@@ -692,8 +692,10 @@
                     !!dashboardDoc.querySelector('.site-header-actions a[href="/streams"]') &&
                     !dashboardDoc.getElementById('dashAccountMenuBtn') &&
                     !dashboardDoc.getElementById('dashAccountModal'));
-                assert('Cloud Dashboard', 'Clear Saved Login is available in Account sessions',
-                    !!dashboardDoc.querySelector('#accountContent #accountClearSavedLoginBtn') &&
+                assert('Cloud Dashboard', 'Redundant Clear Saved Login controls are removed',
+                    !dashboardDoc.getElementById('accountClearSavedLoginBtn') &&
+                    !dashboardDoc.getElementById('clearSavedLoginBtn') &&
+                    dashboardAppSource.indexOf('clearSavedDashboardLogin') === -1 &&
                     dashboardAppSource.indexOf("localSignOut({ clearServer: true, redirectHome: true })") !== -1);
                 assert('Cloud Accounts', 'Deleted-account clients are returned to the homepage',
                     dashboardAppSource.indexOf("e.code === 'account_deleting'") !== -1 &&
@@ -822,6 +824,11 @@
                     !!dashboardDoc.getElementById('adminAccountMount') &&
                     dashboardAppSource.indexOf('mountAccountContentForRole') !== -1 &&
                     dashboardAppSource.indexOf("isPlatformAdminUser ? 'adminAccountMount' : 'accountUserMount'") !== -1);
+                assert('Cloud Dashboard', 'Managed admins and self-host owners see deployment type',
+                    !!dashboardDoc.getElementById('accountDeploymentType') &&
+                    dashboardAppSource.indexOf("dashPublicConfigCache.allowDevAuth ? 'Self-hosted' : 'Managed'") !== -1 &&
+                    dashboardAppSource.indexOf('isPlatformAdminUser || selfHosted') !== -1 &&
+                    dashboardAppSource.indexOf('quota?.self_host_unrestricted') !== -1);
                 assert('Cloud Dashboard', 'Dock Key labels request uniqueness',
                     dashboardSource.indexOf('Name/Label (unique)') !== -1 &&
                     !!dashboardDoc.getElementById('dashCreateKeyError') &&

@@ -708,6 +708,10 @@ function buildAccountPlanLineHtml(account, quota) {
   const display = quota?.tierDisplayName || account?.subscription_tier_display || account?.subscription_tier || '—';
   const platformUnlimited = !!(quota?.platform_admin_unlimited || (isPlatformAdminUser && quota?.limits?.maxApiKeys == null));
 
+  if (quota?.self_host_unrestricted) {
+    return 'Self-hosted deployment — unrestricted access (no subscription required)';
+  }
+
   if (isPlatformAdminUser) {
     return platformUnlimited
       ? 'Platform admin — unrestricted quotas (no plan required)'
@@ -1998,12 +2002,24 @@ function mountAccountContentForRole() {
   }
 }
 
+function updateAccountDeploymentType() {
+  const line = document.getElementById('accountDeploymentType');
+  if (!line) return;
+  const selfHosted = !!dashPublicConfigCache?.allowDevAuth;
+  const showDeployment = !!dashPublicConfigCache && (isPlatformAdminUser || selfHosted);
+  line.classList.toggle('hidden', !showDeployment);
+  line.textContent = showDeployment
+    ? `Deployment: ${dashPublicConfigCache.allowDevAuth ? 'Self-hosted' : 'Managed'}`
+    : '';
+}
+
 function setPlatformAdminUi(enabled) {
   const wasAdmin = isPlatformAdminUser;
   isPlatformAdminUser = !!enabled;
   document.getElementById('dashAdminTabBtn')?.classList.toggle('hidden', !isPlatformAdminUser);
   document.getElementById('dashAccountTabBtn')?.classList.toggle('hidden', isPlatformAdminUser);
   mountAccountContentForRole();
+  updateAccountDeploymentType();
   updatePlatformAccountFilterVisibility();
   if (!isPlatformAdminUser) {
     platformViewAccountId = '';
@@ -4783,12 +4799,6 @@ async function submitDevLogin() {
   }
 }
 
-function clearSavedDashboardLogin() {
-  localSignOut({ clearServer: true });
-  const secretEl = document.getElementById('devSecret');
-  if (secretEl) secretEl.value = '';
-}
-
 document.getElementById('devLoginBtn').addEventListener('click', () => {
   submitDevLogin();
 });
@@ -4817,11 +4827,6 @@ document.getElementById('devSecret')?.addEventListener('keydown', (event) => {
     input.focus();
   });
 }());
-
-document.getElementById('clearSavedLoginBtn')?.addEventListener('click', () => {
-  if (!window.confirm('Clear Saved Login on this device? You will need to sign in again.')) return;
-  clearSavedDashboardLogin();
-});
 
 document.getElementById('createKeyBtn').addEventListener('click', () => {
   openDockKeyModal({ mode: 'create' });
@@ -4914,17 +4919,6 @@ document.getElementById('dashCreateKeyLabel')?.addEventListener('keydown', (even
     event.preventDefault();
     submitDockKeyModal();
   }
-});
-
-document.getElementById('accountClearSavedLoginBtn')?.addEventListener('click', async () => {
-  const ok = await confirmDashAction({
-    title: 'Clear Saved Login',
-    message: 'Remove the saved login and server details from this browser?',
-    confirmLabel: 'Clear Saved Login',
-    danger: true,
-  });
-  if (!ok) return;
-  localSignOut({ clearServer: true, redirectHome: true });
 });
 
 document.getElementById('signOutBtn')?.addEventListener('click', async () => {
@@ -5188,11 +5182,11 @@ function setDashLoginTitle(mode) {
 
 function applyDashLoginCapabilities(config) {
   dashPublicConfigCache = config || null;
+  updateAccountDeploymentType();
   const google = !!(config?.supabaseUrl && config?.supabasePublishableKey);
   // Dev secret is for self-host / lab only (ALLOW_DEV_AUTH). Official managed sets this false.
   const selfHost = !!(config?.allowDevAuth && config?.devAuthConfigured);
   dashAuthCapabilities = { google, selfHost, hybrid: google && selfHost };
-  document.getElementById('accountClearSavedLoginBtn')?.classList.toggle('hidden', !selfHost);
 
   const managedPane = document.getElementById('dashLoginManagedPane');
   const selfHostPane = document.getElementById('dashLoginSelfHostPane');
@@ -5582,16 +5576,6 @@ setMatchModalActionButtons();
     icon: 'logIn',
     label: 'Login',
     title: 'Login',
-  });
-  setDashActionButtonContent(document.getElementById('clearSavedLoginBtn'), {
-    icon: 'trash',
-    label: 'Clear Saved Login',
-    title: 'Clear Saved Login',
-  });
-  setDashActionButtonContent(document.getElementById('accountClearSavedLoginBtn'), {
-    icon: 'trash',
-    label: 'Clear Saved Login',
-    title: 'Clear Saved Login',
   });
   setDashActionButtonContent(document.getElementById('invalidateSessionsBtn'), {
     icon: 'stopSign',

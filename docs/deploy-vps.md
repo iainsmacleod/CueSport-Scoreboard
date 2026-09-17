@@ -2,6 +2,8 @@
 
 Guide for hosting the managed CueSport Scoreboard Cloud backend on a single Linux VPS with **Docker Compose**, **Caddy** (HTTPS), **SQLite** (app data), and **Supabase Auth** (Google sign-in).
 
+This is the **managed, multi-tenant hosted-service** deployment: customers receive separate Google-authenticated accounts and service operators use `PLATFORM_ADMIN_EMAILS` for support. A normal self-hosted installation instead uses one server-owner account and delegates OBS access with named, role-scoped Dock Keys or temporary guest links; it does not need Platform Admin or Stripe.
+
 This is the recommended soft-launch / early SaaS layout. App data stays on the VPS; Supabase is identity only (not your product database).
 
 ## Architecture

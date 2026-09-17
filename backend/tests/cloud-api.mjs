@@ -400,7 +400,11 @@ async function run() {
     assert(
       'GET /api/me includes quota',
       me.body.quota?.limits
-        && (me.body.quota.limits.maxApiKeys != null || me.body.quota.platform_admin_unlimited === true)
+        && (
+          me.body.quota.limits.maxApiKeys != null
+          || me.body.quota.platform_admin_unlimited === true
+          || me.body.quota.self_host_unrestricted === true
+        )
     );
     assert(
       'GET /api/me quota uses renamed tier ids',
@@ -421,6 +425,14 @@ async function run() {
       'GET /api/me includes is_platform_admin boolean',
       typeof me.body.is_platform_admin === 'boolean'
     );
+    if (config.body.allowDevAuth) {
+      assert(
+        'Self-host account is unrestricted without Platform Admin',
+        me.body.is_platform_admin === false
+          && me.body.quota?.self_host_unrestricted === true
+          && me.body.quota?.limits?.maxApiKeys == null
+      );
+    }
     assert(
       'GET /api/me includes trial_ends_at',
       me.body.account && Object.prototype.hasOwnProperty.call(me.body.account, 'trial_ends_at')
@@ -2234,7 +2246,7 @@ async function run() {
       {
         const { config } = await import('../src/config.js');
         const adminEmail = config.platformAdminEmails[0];
-        if (adminEmail) {
+        if (adminEmail && !config.allowDevAuth) {
           assert(
             'Access gate: platform admin bypasses inactive',
             hasCloudSubscriptionAccess({
@@ -2245,11 +2257,11 @@ async function run() {
           );
         } else {
           assert(
-            'Access gate: unknown email stays blocked when inactive',
+            'Access gate: non-managed email stays blocked when inactive',
             !hasCloudSubscriptionAccess({
               subscription_status: 'inactive',
               trial_ends_at: null,
-              email: 'not-an-admin@example.com',
+              email: adminEmail || 'not-an-admin@example.com',
             })
           );
         }

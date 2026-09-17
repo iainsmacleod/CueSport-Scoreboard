@@ -23,6 +23,19 @@ Default database is **SQLite** at `backend/data/cuesport.db` — no external ser
 
 Set `DEV_AUTH_SECRET` and `DEV_AUTH_ACCOUNT_EMAIL` in `.env` (see `.env.example`) before using dev sign-in on the dashboard or mobile.
 
+### Self-host access model
+
+A normal self-hosted deployment has **one unrestricted server-owner account**, identified by `DEV_AUTH_ACCOUNT_EMAIL` and protected by `DEV_AUTH_SECRET`. It is not intended to host separate end-user accounts. Subscription testing, simulated plans, billing gates, and Platform Admin are disabled in self-host mode.
+
+Delegate access without sharing the owner login:
+
+- Create a separate, uniquely named **OBS Dock Key** for each OBS dock/table or operator.
+- Assign the appropriate key role: **Administrator**, **Trusted Operator**, or **Operator**.
+- Revoke an individual key when an operator or dock should no longer connect; other keys and the owner account are unaffected.
+- Create temporary **guest links** for mobile scorers. Players in the roster and statistics do not need login accounts.
+
+The optional hosted service uses a different model: Google-authenticated customer accounts are isolated from one another, tiers are connected to Stripe, and allowlisted service operators use Platform Admin for customer support. Platform Admin is normally unnecessary on a single-account self-host.
+
 ### Docker (self-host)
 
 ```bash
@@ -62,7 +75,7 @@ docker build -f backend/Dockerfile -t cuesport-cloud:latest .
 
 1. Open **Connection settings** (⚙) → **Self-hosting** in the dock.
 2. Set **Server URL** (e.g. `http://localhost:3000` or `http://localhost:4003` with Docker).
-3. Create an account on the dashboard (dev login) and create an **OBS Dock Key**.
+3. Sign in to the server-owner account with the dev secret and create a named, role-appropriate **OBS Dock Key**. Share Dock Keys with OBS operators instead of sharing the owner login.
 4. Paste the Dock Key into the dock and enable cloud relay. **One Dock Key = one cloud table** (room identity is the key, not the dock `?instance=` query). Rooms are created when the dock connects.
 
 ## Environment variables
@@ -83,7 +96,7 @@ See [`.env.example`](.env.example).
 | `ALLOW_DEV_AUTH` | Enable secret dev-login when Supabase not configured |
 | `DEV_AUTH_SECRET` | Shared secret for dev login (required when dev auth is on) |
 | `DEV_AUTH_ACCOUNT_EMAIL` | Email for the single self-host account (required when dev auth is on; use your Google address to ease later managed migration) |
-| `PLATFORM_ADMIN_EMAILS` | Comma-separated Google emails allowed to use `/api/admin/*` and the dashboard **Admin** tab (hosted multi-tenant support) |
+| `PLATFORM_ADMIN_EMAILS` | Hosted multi-tenant service operators allowed to use `/api/admin/*` and the dashboard **Admin** tab; ignored when self-host/dev auth is enabled |
 | `TIER_DEFAULT` | Default subscription tier (`streamer`, `tournament_organizer`, `league_director`, `network_organization`, `selfhost`) |
 | `TIER_LIMITS_JSON` | Optional JSON override of the full tier catalog |
 | `TIER_{TIER}_MAX_API_KEYS` | Per-tier OBS Dock Key (seat) cap |
@@ -107,7 +120,7 @@ Built-in defaults (all overridable via the env vars above).
 | **Tournament Organizer** | `tournament_organizer` | `STRIPE_PRICE_TOURNAMENT_ORGANIZER` | 5 | 5 | 5 | Self-serve |
 | **League Director** | `league_director` | `STRIPE_PRICE_LEAGUE_DIRECTOR` | 10 | 10 | 5 | Self-serve |
 | **Network Organization** | `network_organization` | — | 25 | 25 | 10 | Contact only |
-| **Self-host** | `selfhost` | — | 2 | 2 | 5 | Not sold (dev / Docker) |
+| **Self-host** | `selfhost` | — | Unrestricted | Unrestricted | Unrestricted | Not sold (dev / Docker) |
 
 Use the **Product name** column when creating Stripe Products. Map each Product’s recurring Price ID to the matching `STRIPE_PRICE_*` env var.
 
@@ -141,7 +154,7 @@ See the [plans table in Environment variables](#environment-variables) (Product 
 
 ### Platform admin + complimentary access
 
-Hosted multi-tenant support is gated by **`PLATFORM_ADMIN_EMAILS`** (not Dock Key roles or subscription tiers). Allowlisted users get `is_platform_admin` on `GET /api/me`, an **Admin** tab, a **View account** filter on Tables/Stats (**My account**, **All accounts**, or one tenant), and `/api/admin/*` routes (list tenants, read tables/stats/players, revoke keys, invalidate sessions, grant/revoke **Complimentary access** with a chosen tier). Platform admins bypass subscription/trial gates on their own account and can pick a **Simulated plan** (default **Unrestricted**, or simulate any catalog tier’s dock-key/table limits via `PATCH /api/me/simulated-plan`).
+On the managed deployment (`ALLOW_DEV_AUTH=false`), hosted multi-tenant support is gated by **`PLATFORM_ADMIN_EMAILS`** (not Dock Key roles or subscription tiers). Allowlisted service operators get `is_platform_admin` on `GET /api/me`, an **Admin** tab, a **View account** filter on Tables/Stats (**My account**, **All accounts**, or one tenant), and `/api/admin/*` routes (list tenants, read tables/stats/players, revoke keys, invalidate sessions, grant/revoke **Complimentary access** with a chosen tier). Platform admins bypass subscription/trial gates on their own account and can pick a **Simulated plan** (default **Unrestricted**, or simulate any catalog tier’s dock-key/table limits via `PATCH /api/me/simulated-plan`). In self-host mode, the owner account is unrestricted and Platform Admin plus simulated-plan controls are disabled.
 
 Platform admins can also permanently delete another account. The workflow requires the account email, requires a second confirmation when active Stripe billing will be cancelled, locks and disconnects the account, removes its Supabase identity, and cascade-deletes its Cloud data. **Block future signups from this email** and **Allow this email another Streamer trial** are independent opt-in deletion choices; email blocking is reversible through **Allow Future Signup**. Email/trial records and the deleted Supabase identity use HMAC fingerprints rather than retaining plaintext identity data; the identity fingerprint prevents an already-issued JWT from recreating the deleted account while still allowing a genuinely new signup unless the email was blocked. Stripe customers, invoices, and tax records remain in Stripe for accounting; subscriptions are cancelled immediately.
 
