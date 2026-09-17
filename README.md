@@ -103,7 +103,7 @@ You do not need a public server for the scoreboard itself. Local files or a tiny
 
 **Replay/Share** — OBS WebSocket, **CueSport Scoreboard Cloud** relay, and stream promotion.
 
-![Control panel — Replay/Share tab with CueSport Scoreboard Cloud](docs/readme/images/03-control-panel-cloud.png)
+![Control panel — Settings tab with CueSport Scoreboard Cloud](docs/readme/images/03-control-panel-cloud.png)
 
 ### CueSport Scoreboard Cloud (optional)
 

@@ -23,8 +23,8 @@ Output files:
 
 | File | Content |
 |------|---------|
-| `01-control-panel-setup.png` | Setup tab |
-| `02-control-panel-controls.png` | Controls tab (ball scoring) |
-| `03-control-panel-cloud.png` | Replay/Share + CueSport Scoreboard Cloud |
+| `01-control-panel-setup.png` | Setup tab (Modern Cloud theme) |
+| `02-control-panel-controls.png` | Controls tab with ball scoring (Modern Cloud theme) |
+| `03-control-panel-cloud.png` | Settings tab — Cloud + Replay/Share (Modern Cloud theme) |
 | `04-cloud-dashboard.png` | Cloud dashboard (Tables) |
 | `05-cloud-mobile-control.png` | Mobile remote control |

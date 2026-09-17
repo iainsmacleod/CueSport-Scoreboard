@@ -150,10 +150,24 @@ async function clickTab(page, tabButtonId, tabContentId) {
   await page.waitForTimeout(300);
 }
 
+async function enableModernCloudTheme(page) {
+  await page.evaluate(() => {
+    try {
+      localStorage.setItem('obsTheme', 'modern');
+    } catch (_) { /* ignore */ }
+    const select = document.getElementById('obsTheme');
+    if (select) select.value = 'modern';
+    if (typeof obsThemeChange === 'function') obsThemeChange();
+    else if (typeof startThemeCheck === 'function') startThemeCheck();
+  });
+  await page.waitForTimeout(250);
+}
+
 async function captureControlPanel(browser, panelBase) {
   const page = await browser.newPage({ viewport: { width: 520, height: 900 } });
   await page.goto(`${panelBase}/control_panel.html`, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForTimeout(800);
+  await enableModernCloudTheme(page);
 
   await clickTab(page, 'gameInfoTab', 'GameInfo');
   await page.locator('#GameInfo').screenshot({ path: path.join(OUT, '01-control-panel-setup.png') });
@@ -169,9 +183,11 @@ async function captureControlPanel(browser, panelBase) {
   await page.waitForTimeout(500);
   await page.locator('#Controls').screenshot({ path: path.join(OUT, '02-control-panel-controls.png') });
 
-  await clickTab(page, 'replaySettingsTab', 'ReplaySettings');
+  await clickTab(page, 'generalSettingsTab', 'GeneralSettings');
+  // Focus the Cloud + Replay/Share block that the README image highlights
+  await page.locator('#cloudRelayLabel').scrollIntoViewIfNeeded();
   await page.waitForTimeout(400);
-  await page.locator('#ReplaySettings').screenshot({ path: path.join(OUT, '03-control-panel-cloud.png') });
+  await page.locator('#GeneralSettings').screenshot({ path: path.join(OUT, '03-control-panel-cloud.png') });
   await page.close();
 }
 
