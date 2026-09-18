@@ -25,7 +25,52 @@ let isObsReady = false;
 // Initialize from localStorage - use getStorageItem for consistency with prefix handling
 let isMonitoringActive = getStorageItem('isMonitoringActive') === 'true' || false;
 let isConnected = getStorageItem('isConnected') === 'true' || false;
-let replayHistory = JSON.parse(localStorage.getItem('replayHistory')) || [];
+const REPLAY_CLIP_LABEL_MAX = 20;
+
+function normalizeReplayEntry(entry) {
+    if (typeof entry === 'string') {
+        const path = entry.trim();
+        return path ? { path: path, label: '' } : null;
+    }
+    if (entry && typeof entry === 'object' && typeof entry.path === 'string') {
+        const path = entry.path.trim();
+        if (!path) return null;
+        const label = typeof entry.label === 'string'
+            ? entry.label.trim().slice(0, REPLAY_CLIP_LABEL_MAX)
+            : '';
+        return { path: path, label: label };
+    }
+    return null;
+}
+
+function loadReplayHistory() {
+    let raw;
+    try {
+        raw = JSON.parse(localStorage.getItem('replayHistory')) || [];
+    } catch (_) {
+        raw = [];
+    }
+    if (!Array.isArray(raw)) raw = [];
+    return raw.map(normalizeReplayEntry).filter(Boolean);
+}
+
+function saveReplayHistory(history) {
+    const normalized = (history || []).map(normalizeReplayEntry).filter(Boolean);
+    localStorage.setItem('replayHistory', JSON.stringify(normalized));
+    return normalized;
+}
+
+function sanitizeReplayClipLabel(label) {
+    if (label == null) return '';
+    return String(label).trim().slice(0, REPLAY_CLIP_LABEL_MAX);
+}
+
+function getReplayClipDisplayLabel(entry, index) {
+    const custom = entry && typeof entry.label === 'string' ? entry.label.trim() : '';
+    return custom || ('Clip ' + (index + 1));
+}
+
+let replayHistory = loadReplayHistory();
 /** True while an Instant Replay / historic clip is playing in OBS (monitor button → Replay Active). */
 let isReplayPlaybackActive = false;
 // function updateTabVisibility() {
@@ -44,9 +89,9 @@ let isReplayPlaybackActive = false;
 
 function toggleReplayClipsVisibility() {
     const replayClips = document.getElementById("replayClips");
-    const buttons = replayClips.querySelectorAll("button");
+    const playButtons = replayClips.querySelectorAll("button.clip-button");
 
-    const hasVisibleClip = Array.from(buttons).some(btn => btn.style.display !== "none");
+    const hasVisibleClip = Array.from(playButtons).some(btn => btn.style.display === "inline-block");
     const connected = getStorageItem("isConnected") !== "false";
 
     replayClips.classList.toggle("noShow", !connected || !hasVisibleClip);
@@ -8080,16 +8125,16 @@ async function triggerInstantReplay() {
 
         console.log('Replay ready and playback requested for:', savedPath);
 
-        // Save new replay path to history
-        replayHistory.push(savedPath);
+        // Save new replay path to history (label rides with the entry on splice/shift)
+        replayHistory = loadReplayHistory();
+        replayHistory.push({ path: savedPath, label: '' });
 
         // Keep only the last 5 entries
         if (replayHistory.length > 5) {
             replayHistory.shift(); // removes the oldest (first) entry
         }
 
-        // Save replayHistory to localStorage
-        localStorage.setItem('replayHistory', JSON.stringify(replayHistory));
+        replayHistory = saveReplayHistory(replayHistory);
         console.log('Updated Replay History:', replayHistory);
 
     } catch (error) {
@@ -8101,14 +8146,14 @@ async function triggerInstantReplay() {
 
 async function playPreviousReplay(index) {
     // Always rehydrate the array from localStorage
-    const replayHistory = JSON.parse(localStorage.getItem('replayHistory')) || [];
+    replayHistory = loadReplayHistory();
 
     if (index < 0 || index >= replayHistory.length) {
         console.warn('Invalid replay index');
         return;
     }
 
-    const filePath = replayHistory[index];
+    const filePath = replayHistory[index] && replayHistory[index].path;
     if (!filePath) {
         console.warn('No replay file found at this index.');
         return;
@@ -8187,8 +8232,7 @@ function deleteClip(index, event, options) {
         event.preventDefault();
     }
 
-    // Get current replay history from localStorage (or use global if it exists)
-    replayHistory = JSON.parse(localStorage.getItem('replayHistory')) || [];
+    replayHistory = loadReplayHistory();
 
     // Validate index
     if (index < 0 || index >= replayHistory.length) {
@@ -8198,18 +8242,16 @@ function deleteClip(index, event, options) {
 
     const skipConfirm = !!(options && options.skipConfirm);
     if (!skipConfirm) {
-        const clipNumber = index + 1;
-        const confirmed = confirm(`Are you sure you want to delete Clip ${clipNumber}?`);
+        const displayName = getReplayClipDisplayLabel(replayHistory[index], index);
+        const confirmed = confirm(`Are you sure you want to delete ${displayName}?`);
         if (!confirmed) {
             return;
         }
     }
 
-    // Remove the clip from the array
+    // Remove the clip from the array (label travels with remaining entries)
     replayHistory.splice(index, 1);
-
-    // Save updated history to localStorage
-    localStorage.setItem('replayHistory', JSON.stringify(replayHistory));
+    replayHistory = saveReplayHistory(replayHistory);
 
     console.log('Clip deleted. Updated Replay History:', replayHistory);
 
@@ -8222,8 +8264,45 @@ function deleteClip(index, event, options) {
     }
 }
 
+/**
+ * Rename a clip label. When labelArg is omitted, prompts interactively (dock UI).
+ * Empty/whitespace clears the custom name so the slot shows "Clip N".
+ */
+function renameClip(index, labelArg, event) {
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
+
+    replayHistory = loadReplayHistory();
+    if (index < 0 || index >= replayHistory.length) {
+        console.warn('Invalid clip index for rename');
+        return;
+    }
+
+    let nextLabel = labelArg;
+    if (typeof nextLabel === 'undefined') {
+        const current = getReplayClipDisplayLabel(replayHistory[index], index);
+        const input = prompt(
+            `Rename clip label (${REPLAY_CLIP_LABEL_MAX} character maximum)`,
+            current
+        );
+        if (input === null) return;
+        nextLabel = input;
+    }
+
+    replayHistory[index].label = sanitizeReplayClipLabel(nextLabel);
+    replayHistory = saveReplayHistory(replayHistory);
+    updateReplayButtonsVisibility();
+    toggleReplayClipsVisibility();
+
+    if (window.cloudRelay && typeof window.cloudRelay.pushDockStateSoon === 'function') {
+        window.cloudRelay.pushDockStateSoon(0);
+    }
+}
+
 function updateReplayButtonsVisibility() {
-    const replayHistory = JSON.parse(localStorage.getItem('replayHistory')) || [];
+    replayHistory = loadReplayHistory();
 
     for (let i = 0; i < 5; i++) {
         const buttonId = `prvReplayClip${i + 1}`;
@@ -8232,6 +8311,7 @@ function updateReplayButtonsVisibility() {
         const wrapper = document.getElementById(wrapperId);
         const clipLabel = button ? button.querySelector('.clip-label') : null;
         const deleteBtn = wrapper ? wrapper.querySelector('.clip-delete-btn') : null;
+        const editBtn = wrapper ? wrapper.querySelector('.clip-edit-btn') : null;
         
         if (!button || !wrapper) continue;
 
@@ -8240,20 +8320,30 @@ function updateReplayButtonsVisibility() {
             button.style.display = 'inline-block';
             wrapper.style.display = 'inline-block';
             button.disabled = false;
+
+            const displayName = getReplayClipDisplayLabel(replayHistory[i], i);
             
-            // Update button label
+            // Update button label (textContent — labels are user-editable)
             if (clipLabel) {
-                clipLabel.textContent = `Clip ${i + 1}`;
+                clipLabel.textContent = displayName;
             } else {
-                button.innerHTML = `<span class="clip-label">Clip ${i + 1}</span>`;
+                button.textContent = '';
+                const span = document.createElement('span');
+                span.className = 'clip-label';
+                span.textContent = displayName;
+                button.appendChild(span);
             }
             
             // Update onclick to use correct index
             button.setAttribute('onclick', `playPreviousReplay(${i})`);
             
-            // Update delete button onclick
+            // Update delete / edit button onclick
             if (deleteBtn) {
                 deleteBtn.setAttribute('onclick', `deleteClip(${i}, event)`);
+            }
+            if (editBtn) {
+                editBtn.setAttribute('onclick', `renameClip(${i}, undefined, event)`);
+                editBtn.title = `Rename ${displayName}`;
             }
         } else {
             button.style.display = 'none';

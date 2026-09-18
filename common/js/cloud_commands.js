@@ -366,6 +366,12 @@
                     return Promise.resolve().then(publishAfterScoring);
                 }
                 return Promise.resolve();
+            case 'rename_clip':
+                if (payload && payload.index != null && typeof renameClip === 'function') {
+                    renameClip(parseInt(payload.index, 10), payload.label != null ? payload.label : '');
+                    return Promise.resolve().then(publishAfterScoring);
+                }
+                return Promise.resolve();
             case 'undo':
                 if (typeof undoLastScoringAction === 'function') {
                     return Promise.resolve(undoLastScoringAction()).then(publishAfterScoring);

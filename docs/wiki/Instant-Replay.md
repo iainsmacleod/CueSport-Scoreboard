@@ -45,8 +45,9 @@ Click **Update Sources** after editing. Names must match OBS **exactly** (includ
    - OBS saves the buffer (last *Maximum Replay Time* seconds).
    - Monitoring stops.
    - The file loads into your Media Source and plays; the indicator (if set) shows.
-4. Up to **five** clip paths are kept as **Clip 1–5**. Click a clip to play it again.
-5. **×** / delete on a clip removes it from the list only — it does **not** delete the video file on disk. Clean up replay files manually.
+4. Up to **five** clip paths are kept (shown as **Clip 1–5** by default). Click a clip to play it again.
+5. **✎** renames a clip’s button label (mobile and dock). Custom names stay with that clip when you clear another slot or when a sixth clip shifts the oldest out. Clearing the name restores the default **Clip N** for the current slot.
+6. **×** / delete on a clip removes it from the list only — it does **not** delete the video file on disk. Clean up replay files manually.
 
 **Checklist:** WebSocket connected · Replay Buffer on · Media Source name saved · Monitoring active before Instant Replay.
 

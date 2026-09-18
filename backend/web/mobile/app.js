@@ -1946,6 +1946,7 @@ function syncReplayPanel(state) {
   }
 
   const clipsRow = document.getElementById('replayClipsRow');
+  const labels = Array.isArray(state.replayClipLabels) ? state.replayClipLabels : [];
   let anyClip = false;
   document.querySelectorAll('#replayClipsRow .clip-wrap').forEach((wrap) => {
     const idx = parseInt(wrap.dataset.clipIndex, 10);
@@ -1954,8 +1955,22 @@ function syncReplayPanel(state) {
     if (has) anyClip = true;
     const playBtn = wrap.querySelector('[data-cmd="play_clip"]');
     const clearBtn = wrap.querySelector('.clip-clear');
-    if (playBtn) playBtn.disabled = !has || replayPlaying;
-    if (clearBtn) clearBtn.disabled = !has || replayPlaying;
+    const editBtn = wrap.querySelector('.clip-edit');
+    const displayName = (labels[idx] && String(labels[idx]).trim()) || `Clip ${idx + 1}`;
+    if (playBtn) {
+      playBtn.disabled = !has || replayPlaying;
+      playBtn.textContent = displayName;
+    }
+    if (clearBtn) {
+      clearBtn.disabled = !has || replayPlaying;
+      clearBtn.setAttribute('aria-label', `Clear ${displayName}`);
+      clearBtn.title = `Clear ${displayName}`;
+    }
+    if (editBtn) {
+      editBtn.disabled = !has || replayPlaying;
+      editBtn.setAttribute('aria-label', `Rename ${displayName}`);
+      editBtn.title = `Rename ${displayName}`;
+    }
   });
   if (clipsRow) {
     clipsRow.classList.toggle('hidden', !anyClip);
@@ -2178,6 +2193,7 @@ let pendingMatchConfirm = null;
 function getMatchActionConfirmCopy(cmd, opts = {}) {
   const resetLabel = getResetActionLabel();
   const clipNum = (opts.index != null ? Number(opts.index) : 0) + 1;
+  const clipName = (opts.clipName && String(opts.clipName).trim()) || `Clip ${clipNum}`;
   const copy = {
     reset_scores: {
       title: resetLabel,
@@ -2195,8 +2211,8 @@ function getMatchActionConfirmCopy(cmd, opts = {}) {
       confirm: 'Call Match Early',
     },
     delete_clip: {
-      title: `Clear Clip ${clipNum}`,
-      message: `Remove Clip ${clipNum} from saved replay history? This cannot be undone from here. NOTE: This does not remove the video from the local machine, delete manually to restore space.`,
+      title: `Clear ${clipName}`,
+      message: `Remove ${clipName} from saved replay history? This cannot be undone from here. NOTE: This does not remove the video from the local machine, delete manually to restore space.`,
       confirm: 'Clear Clip',
     },
   };
@@ -2878,11 +2894,84 @@ function wireReplayClearButtons() {
       }
       const index = parseInt(btn.dataset.deleteIndex, 10);
       if (!Number.isFinite(index)) return;
+      const wrap = btn.closest('.clip-wrap');
+      const playBtn = wrap?.querySelector('[data-cmd="play_clip"]');
+      const clipName = playBtn?.textContent?.trim() || `Clip ${index + 1}`;
       openMatchConfirmModal(
         'delete_clip',
         () => sendCmd('delete_clip', { index }),
-        { index }
+        { index, clipName }
       );
+    });
+  });
+}
+
+const REPLAY_CLIP_LABEL_MAX = 20;
+let pendingRenameClipIndex = null;
+
+function closeRenameClipModal() {
+  pendingRenameClipIndex = null;
+  document.getElementById('renameClipModal')?.classList.add('hidden');
+}
+
+function openRenameClipModal(index, currentLabel) {
+  pendingRenameClipIndex = index;
+  const input = document.getElementById('renameClipModalInput');
+  const title = document.getElementById('renameClipModalTitle');
+  const defaultName = `Clip ${index + 1}`;
+  if (title) title.textContent = `Rename ${currentLabel || defaultName}`;
+  if (input) {
+    // Prefill custom label only when it differs from the default slot name
+    const shown = (currentLabel && String(currentLabel).trim()) || defaultName;
+    input.value = shown === defaultName ? '' : shown;
+  }
+  document.getElementById('renameClipModal')?.classList.remove('hidden');
+  if (input) {
+    input.focus();
+    input.select();
+  }
+}
+
+function wireRenameClipModal() {
+  const dismiss = () => closeRenameClipModal();
+  document.getElementById('renameClipModalCancel')?.addEventListener('click', dismiss);
+  document.getElementById('renameClipModalDismiss')?.addEventListener('click', dismiss);
+  document.getElementById('renameClipModalBackdrop')?.addEventListener('click', dismiss);
+  document.getElementById('renameClipModalSave')?.addEventListener('click', () => {
+    const index = pendingRenameClipIndex;
+    const input = document.getElementById('renameClipModalInput');
+    closeRenameClipModal();
+    if (index == null || !Number.isFinite(index)) return;
+    const label = String(input?.value ?? '').trim().slice(0, REPLAY_CLIP_LABEL_MAX);
+    sendCmd('rename_clip', { index, label });
+  });
+  document.getElementById('renameClipModalInput')?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      document.getElementById('renameClipModalSave')?.click();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      dismiss();
+    }
+  });
+}
+
+function wireReplayEditButtons() {
+  document.querySelectorAll('.clip-edit').forEach((btn) => {
+    btn.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (btn.disabled || btn.closest('.clip-wrap')?.classList.contains('hidden')) return;
+      if (!controlsEnabled()) {
+        setError(controlLockMessage());
+        return;
+      }
+      const index = parseInt(btn.dataset.renameIndex, 10);
+      if (!Number.isFinite(index)) return;
+      const wrap = btn.closest('.clip-wrap');
+      const playBtn = wrap?.querySelector('[data-cmd="play_clip"]');
+      const currentLabel = playBtn?.textContent?.trim() || `Clip ${index + 1}`;
+      openRenameClipModal(index, currentLabel);
     });
   });
 }
@@ -3193,6 +3282,8 @@ window.addEventListener('online', () => {
 
 wireCommands();
 wireReplayClearButtons();
+wireReplayEditButtons();
+wireRenameClipModal();
 wireSetupPanel();
 wirePlayerAutocomplete();
 wireMatchConfirmModal();

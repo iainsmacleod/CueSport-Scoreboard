@@ -573,6 +573,7 @@
                 ? !!isReplayPlaybackActive
                 : /replay\s*active/i.test((document.getElementById('btnMonitorGame') || {}).textContent || '');
             // replayHistory is stored without instance prefix (matches control_panel.js)
+            // Entries may be legacy path strings or { path, label } objects.
             let replayHistory = [];
             try {
                 const raw = localStorage.getItem('replayHistory');
@@ -581,18 +582,40 @@
             } catch (_) {
                 replayHistory = [];
             }
-            state.replayClipCount = replayHistory.length;
+            function replayEntryPath(entry) {
+                if (typeof entry === 'string') return entry.trim();
+                if (entry && typeof entry === 'object' && typeof entry.path === 'string') {
+                    return entry.path.trim();
+                }
+                return '';
+            }
+            function replayEntryDisplayLabel(entry, index) {
+                if (entry && typeof entry === 'object' && typeof entry.label === 'string') {
+                    const custom = entry.label.trim();
+                    if (custom) return custom.slice(0, 20);
+                }
+                return 'Clip ' + (index + 1);
+            }
+            state.replayClipCount = replayHistory.filter(function (e) { return !!replayEntryPath(e); }).length;
             state.replayClips = [0, 1, 2, 3, 4].map(function (i) {
-                if (replayHistory[i]) return true;
+                if (replayEntryPath(replayHistory[i])) return true;
                 const clipBtn = document.getElementById('prvReplayClip' + (i + 1));
                 if (!clipBtn) return false;
                 // control_panel sets display to inline-block when the slot has a clip
                 return clipBtn.style.display === 'inline-block' ||
                     (clipBtn.style.display !== 'none' && !clipBtn.disabled && clipBtn.offsetParent !== null);
             });
+            state.replayClipLabels = [0, 1, 2, 3, 4].map(function (i) {
+                if (!state.replayClips[i]) return '';
+                if (replayEntryPath(replayHistory[i])) {
+                    return replayEntryDisplayLabel(replayHistory[i], i);
+                }
+                return 'Clip ' + (i + 1);
+            });
             if (!state.replayClipCount) {
                 state.replayClipCount = state.replayClips.filter(Boolean).length;
-            }            // Match control_panel updateCallGameButton: never call early once race is complete.
+            }
+            // Match control_panel updateCallGameButton: never call early once race is complete.
             state.canCallGame = !state.gameScoringLocked &&
                 window.PlayerStats &&
                 typeof window.PlayerStats.canCallGame === 'function' &&

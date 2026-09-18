@@ -259,22 +259,27 @@
             </div>
             <div class="row clips hidden" id="replayClipsRow">
               <div class="clip-wrap hidden" data-clip-index="0">
+                <button type="button" class="btn clip-edit" data-rename-index="0" title="Rename clip" aria-label="Rename Clip 1">✎</button>
                 <button type="button" class="btn" data-cmd="play_clip" data-index="0">Clip 1</button>
                 <button type="button" class="btn danger clip-clear" data-delete-index="0" title="Clear clip" aria-label="Clear clip 1">×</button>
               </div>
               <div class="clip-wrap hidden" data-clip-index="1">
+                <button type="button" class="btn clip-edit" data-rename-index="1" title="Rename clip" aria-label="Rename Clip 2">✎</button>
                 <button type="button" class="btn" data-cmd="play_clip" data-index="1">Clip 2</button>
                 <button type="button" class="btn danger clip-clear" data-delete-index="1" title="Clear clip" aria-label="Clear clip 2">×</button>
               </div>
               <div class="clip-wrap hidden" data-clip-index="2">
+                <button type="button" class="btn clip-edit" data-rename-index="2" title="Rename clip" aria-label="Rename Clip 3">✎</button>
                 <button type="button" class="btn" data-cmd="play_clip" data-index="2">Clip 3</button>
                 <button type="button" class="btn danger clip-clear" data-delete-index="2" title="Clear clip" aria-label="Clear clip 3">×</button>
               </div>
               <div class="clip-wrap hidden" data-clip-index="3">
+                <button type="button" class="btn clip-edit" data-rename-index="3" title="Rename clip" aria-label="Rename Clip 4">✎</button>
                 <button type="button" class="btn" data-cmd="play_clip" data-index="3">Clip 4</button>
                 <button type="button" class="btn danger clip-clear" data-delete-index="3" title="Clear clip" aria-label="Clear clip 4">×</button>
               </div>
               <div class="clip-wrap hidden" data-clip-index="4">
+                <button type="button" class="btn clip-edit" data-rename-index="4" title="Rename clip" aria-label="Rename Clip 5">✎</button>
                 <button type="button" class="btn" data-cmd="play_clip" data-index="4">Clip 5</button>
                 <button type="button" class="btn danger clip-clear" data-delete-index="4" title="Clear clip" aria-label="Clear clip 5">×</button>
               </div>
@@ -378,6 +383,23 @@
       <div class="row equal confirm-modal-actions">
         <button type="button" class="btn" id="confirmModalDismiss">Cancel</button>
         <button type="button" class="btn danger" id="confirmModalConfirm">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="renameClipModal" class="mobile-modal hidden" role="dialog" aria-modal="true" aria-labelledby="renameClipModalTitle">
+    <div class="mobile-modal-backdrop" id="renameClipModalBackdrop"></div>
+    <div class="mobile-modal-sheet confirm-modal-sheet">
+      <div class="mobile-modal-head">
+        <h2 id="renameClipModalTitle">Rename Clip</h2>
+        <button type="button" class="icon-btn mobile-modal-close" id="renameClipModalCancel" aria-label="Cancel">×</button>
+      </div>
+      <label class="rename-clip-label" for="renameClipModalInput">Label (max 20 characters)</label>
+      <input type="text" id="renameClipModalInput" class="rename-clip-input" maxlength="20" autocomplete="off" />
+      <p class="hint rename-clip-hint">Leave blank to use the default Clip number.</p>
+      <div class="row equal confirm-modal-actions">
+        <button type="button" class="btn" id="renameClipModalDismiss">Cancel</button>
+        <button type="button" class="btn primary" id="renameClipModalSave">Save</button>
       </div>
     </div>
   </div>

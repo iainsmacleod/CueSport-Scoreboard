@@ -1551,11 +1551,13 @@ label.switch.toggle-disabled {
 .clip-button {
 	position: relative;
 	padding-right: 0;
-	transition: padding-right 0.2s ease;
+	padding-left: 0;
+	transition: padding-right 0.2s ease, padding-left 0.2s ease;
 }
 
 .clip-button-wrapper:hover .clip-button {
 	padding-right: 28px;
+	padding-left: 28px;
 }
 
 .clip-delete-btn {
@@ -1576,7 +1578,26 @@ label.switch.toggle-disabled {
 	z-index: 10;
 }
 
-.clip-button-wrapper:hover .clip-delete-btn {
+.clip-edit-btn {
+	position: absolute;
+	left: 0;
+	top: 0;
+	width: 28px;
+	height: 28px;
+	background-color: #4a5568;
+	border: 2px solid black;
+	border-right: none;
+	border-radius: 0px 0px 0px 10px;
+	cursor: pointer;
+	display: none;
+	align-items: center;
+	justify-content: center;
+	padding: 0;
+	z-index: 10;
+}
+
+.clip-button-wrapper:hover .clip-delete-btn,
+.clip-button-wrapper:hover .clip-edit-btn {
 	display: flex;
 }
 
@@ -1584,9 +1605,21 @@ label.switch.toggle-disabled {
 	background-color: #c82333;
 }
 
+.clip-edit-btn:hover {
+	background-color: #2d3748;
+}
+
 .delete-x {
 	color: white;
 	font-size: 20px;
+	font-weight: bold;
+	line-height: 1;
+	user-select: none;
+}
+
+.edit-pencil {
+	color: white;
+	font-size: 14px;
 	font-weight: bold;
 	line-height: 1;
 	user-select: none;

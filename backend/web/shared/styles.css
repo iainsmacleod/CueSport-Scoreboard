@@ -449,7 +449,7 @@ body.streams-page .btn.secondary {
 }
 .row.clips > .btn {
   width: 100%;
-  /* Match .clip-wrap height (play button stretched to .clip-clear) */
+  /* Match .clip-wrap height (play button stretched to side controls) */
   min-height: calc(1.25rem + 1.1rem);
   box-sizing: border-box;
 }
@@ -461,13 +461,17 @@ body.streams-page .btn.secondary {
   flex: none;
 }
 .clip-wrap .btn[data-cmd="play_clip"] { flex: 1; margin: 0.25rem 0; }
-.clip-wrap .clip-clear {
+.clip-wrap .clip-clear,
+.clip-wrap .clip-edit {
   flex: 0 0 2.5rem;
   padding: 0.55rem 0;
   margin: 0.25rem 0;
   font-size: 1.25rem;
   line-height: 1;
   font-weight: 700;
+}
+.clip-wrap .clip-edit {
+  font-size: 1rem;
 }
 .panel {
   background: #24283b;
@@ -2233,6 +2237,25 @@ a.table-card:focus-visible {
   opacity: 0.92;
 }
 .confirm-modal-actions { margin-top: 0.25rem; }
+.rename-clip-label {
+  display: block;
+  margin: 0 0 0.35rem;
+  font-size: 0.85rem;
+  color: #a9b1d6;
+}
+.rename-clip-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.65rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid #414868;
+  background: #1a1b26;
+  color: #c0caf5;
+  font-size: 1rem;
+}
+.rename-clip-hint {
+  margin: 0.5rem 0 0.75rem;
+}
 .snooker-foul-targets {
   display: flex;
   flex-wrap: wrap;
