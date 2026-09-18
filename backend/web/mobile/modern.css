@@ -107,6 +107,42 @@ body.mobile .btn.secondary {
   color: #ddd5ff;
 }
 
+/* Active streaming / stats / monitoring / player slot — same strong highlight as dock active player */
+body.mobile .btn.stream-active,
+body.mobile .btn.stats-active,
+body.mobile .btn.monitor-active,
+body.mobile .btn.rack-breaker-current,
+body.mobile .btn.rack-breaker-current:disabled {
+  opacity: 1;
+  color: #fff;
+  font-weight: 800;
+  background: linear-gradient(135deg, rgba(47, 128, 255, 0.55), rgba(155, 92, 255, 0.42));
+  border-color: var(--mobile-blue);
+  box-shadow:
+    0 0 0 1px rgba(47, 128, 255, 0.45),
+    0 0 18px rgba(47, 128, 255, 0.28),
+    0 6px 16px rgba(0, 0, 0, 0.28);
+  filter: none;
+}
+
+body.mobile .btn.stats-inactive,
+body.mobile .btn.rack-breaker-inactive {
+  opacity: 0.38;
+  background: rgba(18, 29, 51, 0.55);
+  border-color: rgba(38, 53, 82, 0.7);
+  color: var(--mobile-muted);
+  box-shadow: none;
+  font-weight: 600;
+}
+
+body.mobile .btn.stats-inactive:hover,
+body.mobile .btn.rack-breaker-inactive:hover {
+  opacity: 0.72;
+  border-color: var(--mobile-blue);
+  color: var(--mobile-text);
+  filter: none;
+}
+
 body.mobile .btn.save,
 body.mobile .btn.success {
   background: rgba(66, 221, 139, 0.15);

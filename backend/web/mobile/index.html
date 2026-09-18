@@ -231,15 +231,15 @@
           <h2>Stream</h2>
           <p id="replayObsHint" class="hint hidden">Connect OBS WebSocket on the dock Settings tab to control streaming, monitoring, and clips.</p>
           <div class="stream-section" id="streamOutputSection">
-            <h3 class="share-links-heading">Live stream</h3>
-            <p class="hint">Start or stop the OBS stream output for this table.</p>
+            <h3 class="share-links-heading">Live Stream</h3>
+            <p class="hint">Start or stop streaming on your remotely connected OBS instance.</p>
             <div class="row clips" id="streamOutputRow">
               <button type="button" class="btn stream-btn" id="streamToggleBtn" data-cmd="toggle_streaming">Start Streaming</button>
             </div>
           </div>
           <div class="stream-section" id="streamStatsSection">
-            <h3 class="share-links-heading">Statistics</h3>
-            <p class="hint" id="streamStatsHint">Show the same career stats panel on the overlay. Requires Ball Scoring on the dock. Tap again to hide.</p>
+            <h3 class="share-links-heading">Statistics Display</h3>
+            <p class="hint" id="streamStatsHint">Display individual player as well as head-to-head statistics on your stream. Click to enable and disable.</p>
             <div class="row clips stream-stats-mode-row" id="streamStatsModeRow">
               <button type="button" class="btn stats-inactive" id="streamStatsP1Btn" data-cmd="toggle_overlay_stats" data-mode="p1" aria-pressed="false">Player 1</button>
               <button type="button" class="btn stats-inactive" id="streamStatsP2Btn" data-cmd="toggle_overlay_stats" data-mode="p2" aria-pressed="false">Player 2</button>
@@ -250,21 +250,12 @@
               <div id="streamStatsBody" class="stream-stats-body"></div>
             </div>
           </div>
-          <div class="stream-section" id="streamReplayUnlockSection">
-            <h3 class="share-links-heading">Replay function</h3>
-            <p class="hint">Unlock monitoring, Instant Replay, and clip controls for this table.</p>
-            <div class="row clips">
-              <button type="button" class="btn" id="replayControlsEnableBtn" data-cmd="set_replay_controls">Enable Replay Function</button>
-            </div>
-          </div>
-          <div class="stream-section hidden" id="streamReplaySection">
-            <h3 class="share-links-heading">Monitoring and clips</h3>
-            <div class="row clips" id="replayControlsDisableRow">
-              <button type="button" class="btn secondary" id="replayControlsDisableBtn" data-cmd="set_replay_controls_off">Disable Replay Function</button>
-            </div>
+          <div class="stream-section" id="streamReplaySection">
+            <h3 class="share-links-heading">Instant Replay Control</h3>
+            <p class="hint">Control stream monitoring and record/playback highlights from your game!</p>
             <div class="row clips" id="replayMonitorRow">
-              <button type="button" class="btn monitor-btn" id="monitorBtn" data-cmd="toggle_monitoring">Monitor Game</button>
-              <button type="button" class="btn" id="instantReplayBtn" data-cmd="instant_replay" disabled title="Start Monitor Game first">Instant Replay</button>
+              <button type="button" class="btn monitor-btn" id="monitorBtn" data-cmd="set_stream_monitoring">Start Monitoring</button>
+              <button type="button" class="btn" id="instantReplayBtn" data-cmd="instant_replay" disabled title="Start Monitoring first">Create Clip</button>
             </div>
             <div class="row clips hidden" id="replayClipsRow">
               <div class="clip-wrap hidden" data-clip-index="0">

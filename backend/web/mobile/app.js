@@ -1875,14 +1875,12 @@ function syncMatchActionButtons(state) {
 }
 
 /**
- * Stream tab: account-owner OBS start/stop, plus monitoring/clips when unlocked.
+ * Stream tab: account-owner OBS start/stop, plus Instant Replay monitoring/clips.
  */
 function syncReplayPanel(state) {
   const monitoring = !!state.monitoringActive;
   const replayPlaying = !!state.replayPlaybackActive;
   const streaming = state.obsStreaming === true;
-  // Dock already folds active monitoring into replayControlsEnabled.
-  const replayControlsEnabled = state.replayControlsEnabled === true;
   // Monitoring implies OBS was usable; don't hide clips if obsConnected lagged false.
   const obsConnected = state.obsConnected === true || monitoring || replayPlaying || streaming;
   const clips = Array.isArray(state.replayClips)
@@ -1908,45 +1906,43 @@ function syncReplayPanel(state) {
     streamBtn.classList.toggle('stream-active', streaming || streamBtn.dataset.streamExpect === '1');
   }
 
-  const unlockSection = document.getElementById('streamReplayUnlockSection');
+  const canUseMonitoring = obsConnected && !(isGuestMode && !isDockOwnerGuest);
   const replaySection = document.getElementById('streamReplaySection');
-  const enableBtn = document.getElementById('replayControlsEnableBtn');
-  if (unlockSection) {
-    // Account owner (non-guest mobile) can unlock when OBS socket is up but replay controls are off.
-    unlockSection.classList.toggle('hidden', (isGuestMode && !isDockOwnerGuest) || !obsConnected || replayControlsEnabled);
-  }
-  if (enableBtn) {
-    enableBtn.disabled = !obsConnected || (isGuestMode && !isDockOwnerGuest);
-  }
   if (replaySection) {
-    replaySection.classList.toggle('hidden', !replayControlsEnabled);
+    replaySection.classList.toggle('hidden', !canUseMonitoring);
   }
 
   const monitorBtn = document.getElementById('monitorBtn');
   if (monitorBtn) {
+    const monitorPending = monitorBtn.dataset.monitorPending === '1';
+    const expectOn = monitorBtn.dataset.monitorExpect === '1';
+    if (monitorPending && monitoring === expectOn) {
+      monitorBtn.dataset.monitorPending = '0';
+      monitorBtn.dataset.monitorExpect = '';
+    }
+    const showActive = monitoring || (monitorBtn.dataset.monitorPending === '1' && expectOn);
     if (replayPlaying) {
       monitorBtn.textContent = 'Replay Active';
       monitorBtn.classList.remove('monitor-active');
       monitorBtn.classList.add('replay-active');
       monitorBtn.disabled = true;
     } else {
-      monitorBtn.textContent = monitoring ? 'Stop Monitoring' : 'Resume Monitoring';
-      monitorBtn.classList.toggle('monitor-active', monitoring);
+      monitorBtn.textContent = showActive ? 'Disable Monitoring' : 'Start Monitoring';
+      monitorBtn.classList.toggle('monitor-active', showActive);
       monitorBtn.classList.remove('replay-active');
-      monitorBtn.disabled = !obsConnected;
+      monitorBtn.disabled = !canUseMonitoring || monitorBtn.dataset.monitorPending === '1';
     }
   }
 
   const instantBtn = document.getElementById('instantReplayBtn');
   if (instantBtn) {
-    // Keep Instant Replay visible once unlocked; only hide while a historic clip plays
-    // (same moment the dock shows "Replay Active" and Instant Replay is unavailable).
+    // Instant Replay / Create Clip stays available while monitoring; hide only during clip playback.
     const canInstant = monitoring && !replayPlaying;
     instantBtn.classList.remove('hidden');
     instantBtn.disabled = !canInstant;
     instantBtn.title = replayPlaying
       ? 'Unavailable while a replay is playing'
-      : (monitoring ? 'Save and play Instant Replay' : 'Start Monitor Game first');
+      : (monitoring ? 'Create and play a clip' : 'Start Monitoring first');
   }
 
   const clipsRow = document.getElementById('replayClipsRow');
@@ -2814,6 +2810,35 @@ function wireCommands() {
           btn.setAttribute('aria-pressed', nextOn ? 'true' : 'false');
         });
         sendCmd(cmd, payload);
+        return;
+      }
+      if (cmd === 'set_stream_monitoring') {
+        setError('');
+        const monitoringNow = !!(lastState && lastState.monitoringActive);
+        const enable = !monitoringNow;
+        el.dataset.monitorPending = '1';
+        el.dataset.monitorExpect = enable ? '1' : '0';
+        el.disabled = true;
+        el.textContent = enable ? 'Disable Monitoring' : 'Start Monitoring';
+        el.classList.toggle('monitor-active', enable);
+        if (!sendCmd('set_stream_monitoring', { enabled: enable })) {
+          el.dataset.monitorPending = '0';
+          el.dataset.monitorExpect = '';
+          el.disabled = false;
+          syncReplayPanel(lastState || {});
+          return;
+        }
+        lastState = Object.assign({}, lastState || {}, {
+          replayControlsEnabled: true,
+          monitoringActive: enable,
+        });
+        syncReplayPanel(lastState);
+        setTimeout(() => {
+          el.dataset.monitorPending = '0';
+          el.dataset.monitorExpect = '';
+          el.disabled = false;
+          syncReplayPanel(lastState || {});
+        }, 6000);
         return;
       }
       if (cmd === 'set_replay_controls' || cmd === 'set_replay_controls_off') {

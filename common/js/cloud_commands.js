@@ -326,6 +326,13 @@
                 return Promise.resolve(
                     typeof toggleReplayMonitoring === 'function' ? toggleReplayMonitoring() : undefined
                 ).then(publishAfterScoring);
+            case 'set_stream_monitoring': {
+                const enabled = !!(payload && payload.enabled);
+                if (typeof window.setStreamMonitoringEnabled !== 'function') {
+                    return Promise.reject(new Error('Stream monitoring is unavailable — reload the OBS dock'));
+                }
+                return Promise.resolve(window.setStreamMonitoringEnabled(enabled)).then(publishAfterScoring);
+            }
             case 'toggle_streaming':
                 if (typeof window.toggleObsStreaming !== 'function') {
                     return Promise.reject(new Error('Streaming control is unavailable — reload the OBS dock'));
@@ -377,7 +384,8 @@
         window.cloudRelay.onCommand(function (action, payload) {
             Promise.resolve(runCommand(action, payload)).catch(function (err) {
                 console.error('cloud_commands:', err);
-                if ((action === 'toggle_streaming' || action === 'set_replay_controls') && typeof alert === 'function') {
+                if ((action === 'toggle_streaming' || action === 'set_replay_controls' ||
+                    action === 'set_stream_monitoring') && typeof alert === 'function') {
                     alert(err && err.message ? err.message : 'Command failed');
                 }
             });

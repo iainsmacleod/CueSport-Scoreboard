@@ -706,6 +706,7 @@ function handleEvent(ws, meta, msg) {
 const ACCOUNT_OWNER_COMMANDS = new Set([
   'toggle_streaming',
   'set_replay_controls',
+  'set_stream_monitoring',
 ]);
 
 function handleCommand(ws, meta, msg) {

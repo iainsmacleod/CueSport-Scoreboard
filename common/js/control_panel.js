@@ -7860,6 +7860,43 @@ async function setReplayControlsEnabled(enabled) {
 }
 window.setReplayControlsEnabled = setReplayControlsEnabled;
 
+/**
+ * Mobile Instant Replay Control: enable auto-resume + unlock controls + start/stop buffer.
+ * Start Monitoring turns auto-resume on and starts the OBS replay buffer.
+ * Disable Monitoring only stops the buffer (section stays available to start again).
+ */
+async function setStreamMonitoringEnabled(enabled) {
+    const on = !!enabled;
+    if (on) {
+        setStorageItem('autoResumeReplayBuffer', 'yes');
+        const autoResumeCheckbox = document.getElementById('autoResumeReplayBuffer');
+        if (autoResumeCheckbox) {
+            autoResumeCheckbox.checked = true;
+        }
+        setStorageItem('replayControlsEnabled', 'true');
+        if (getStorageItem('isMonitoringActive') !== 'true') {
+            if (typeof toggleReplayMonitoring === 'function') {
+                await toggleReplayMonitoring();
+            }
+        } else {
+            markReplayControlsEnabled();
+            setMonitorButtonText();
+        }
+    } else if (getStorageItem('isMonitoringActive') === 'true') {
+        if (typeof toggleReplayMonitoring === 'function') {
+            await toggleReplayMonitoring();
+        }
+    }
+    if (window.cloudRelay && typeof window.cloudRelay.pushDockStateSoon === 'function') {
+        window.cloudRelay.pushDockStateSoon(0);
+    }
+    return {
+        enabled: on,
+        monitoring: getStorageItem('isMonitoringActive') === 'true',
+    };
+}
+window.setStreamMonitoringEnabled = setStreamMonitoringEnabled;
+
 function markReplayControlsEnabled() {
     setStorageItem('replayControlsEnabled', 'true');
 }
