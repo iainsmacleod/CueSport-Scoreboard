@@ -7,7 +7,7 @@ import {
   fetchPlayers,
   createAccountPlayer,
   GAME_TYPES,
-} from '../shared/cloud-client.js?v=8.2.2.14';
+} from '../shared/cloud-client.js?v=8.2.3';
 import {
   parseRaceTarget,
   isRaceLocked,
