@@ -4,7 +4,7 @@
 # Usage (on the VPS):
 #   sudo bash /opt/cuesport/backend/deploy/update-vps.sh
 #   sudo bash /opt/cuesport/backend/deploy/update-vps.sh main
-#   BRANCH=stripe-integration bash /opt/cuesport/backend/deploy/update-vps.sh
+#   BRANCH=feature-branch bash /opt/cuesport/backend/deploy/update-vps.sh
 #
 # Safe by default: never deletes backend/data/ or backend/.env.
 # For a true wipe+reinstall, back those up first and do it manually.
@@ -13,7 +13,7 @@ set -euo pipefail
 
 APP_DIR="${APP_DIR:-/opt/cuesport}"
 REPO_URL="${REPO_URL:-https://github.com/iainsmacleod/CueSport-Scoreboard.git}"
-DEFAULT_BRANCH="${DEFAULT_BRANCH:-stripe-integration}"
+DEFAULT_BRANCH="${DEFAULT_BRANCH:-main}"
 BACKEND_DIR="${APP_DIR}/backend"
 DATA_DIR="${BACKEND_DIR}/data"
 ENV_FILE="${BACKEND_DIR}/.env"
