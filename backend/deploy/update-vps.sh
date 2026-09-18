@@ -44,7 +44,15 @@ if [[ ! -d .git ]]; then
 else
   echo "==> Fetching and checking out ${BRANCH}…"
   git remote set-url origin "${REPO_URL}" 2>/dev/null || true
+  # Prior single-branch clones only track one ref; widen fetch so we can switch branches.
+  git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
   git fetch --prune origin
+  if ! git rev-parse --verify --quiet "origin/${BRANCH}" >/dev/null; then
+    echo "ERROR: origin/${BRANCH} not found after fetch." >&2
+    echo "Available remote branches:" >&2
+    git branch -r >&2 || true
+    exit 1
+  fi
   # Keep local data/.env even if they are untracked — never clean -fdx here.
   git checkout -B "${BRANCH}" "origin/${BRANCH}"
   git reset --hard "origin/${BRANCH}"
