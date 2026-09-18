@@ -2023,9 +2023,9 @@ function buildStreamStatsH2HTable(stats) {
   if (stats.showTableRun && (p1Tr > 0 || p2Tr > 0)) {
     rows.push({ label: 'Table Run', left: p1Tr, right: p2Tr });
   }
-  if (!rows.length) {
-    return '<div class="stream-stats-empty">No stats enabled for this game type.</div>';
-  }
+    if (!rows.length) {
+        return '<div class="stream-stats-empty">No stats recorded for this game</div>';
+    }
   let html = '<table class="stream-stats-table stream-stats-h2h-table"><thead><tr>' +
     '<th class="stream-stats-col-player">' + escapeStreamStatsText(p1Name) + '</th>' +
     '<th class="stream-stats-col-label"></th>' +
@@ -2107,9 +2107,9 @@ function buildStreamStatsPlayerTable(stats) {
   if (stats.showWinStreak !== false && winStreak > 0) {
     rows.push({ label: 'Win Streak', value: winStreak });
   }
-  if (!rows.length) {
-    return '<div class="stream-stats-empty">No stats enabled for this game type.</div>';
-  }
+    if (!rows.length) {
+        return '<div class="stream-stats-empty">No stats recorded for this game</div>';
+    }
   let html = '<table class="stream-stats-table stream-stats-player-table">' +
     '<thead><tr><th>Stat</th><th>Value</th></tr></thead><tbody>';
   rows.forEach((row, index) => {

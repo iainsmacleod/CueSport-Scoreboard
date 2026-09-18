@@ -581,7 +581,7 @@ function buildOverlayH2HTable(stats) {
     }
 
     if (!rows.length) {
-        return '<div class="overlay-stats-empty">No stats enabled for this game type.</div>';
+        return '<div class="overlay-stats-empty">No stats recorded for this game</div>';
     }
 
     let html = '<table class="overlay-stats-table overlay-stats-h2h-table">' +
@@ -673,7 +673,7 @@ function buildOverlayPlayerTable(stats) {
     }
 
     if (!rows.length) {
-        return '<div class="overlay-stats-empty">No stats enabled for this game type.</div>';
+        return '<div class="overlay-stats-empty">No stats recorded for this game</div>';
     }
 
     let html = '<table class="overlay-stats-table overlay-stats-player-table">' +

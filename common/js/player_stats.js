@@ -5282,6 +5282,17 @@
         const currentBreak = readLiveCurrentBreakForSlot(slot);
         const possibleBreak = readLivePossibleBreakForSlot(slot);
         const scoreMargin = readLiveScoreMarginForSlot(slot);
+        const typed = typeStats || createEmptyTypeStats();
+        // Prefer live match-scoped pots/fouls/HB while scoring; after Call/End Match the
+        // session clears — fall back to career type stats so the overlay is not empty.
+        const liveBalls = matchStats.ballsPotted || 0;
+        const liveFouls = matchStats.fouls || 0;
+        const liveHighest = isStraightPoolGameType(gameType)
+            ? (matchStats.highestRun || 0)
+            : (matchStats.highestBreak || 0);
+        const careerHighest = isStraightPoolGameType(gameType)
+            ? (typed.highestRun || 0)
+            : (typed.highestBreak || 0);
         return {
             visible: visible,
             mode: mode,
@@ -5317,18 +5328,15 @@
             showTableRun: overlayStatEnabled(gameType, 'tableRun'),
             rackLabel: rackOrFrameLabel(false, gameType),
             racksLabel: rackOrFrameLabel(true, gameType),
-            gamesWL: formatWL(typeStats.gamesWon, typeStats.gamesLost),
-            racksWL: formatWL(typeStats.racksWon, typeStats.racksLost),
-            // Match-scoped only — cleared when End Match / Clear Game starts a new session
-            ballsPotted: matchStats.ballsPotted || 0,
-            fouls: matchStats.fouls || 0,
-            highestBreak: isStraightPoolGameType(gameType)
-                ? (matchStats.highestRun || 0)
-                : (matchStats.highestBreak || 0),
-            breakAndRuns: typeStats.breakAndRuns || 0,
-            tableRuns: typeStats.tableRuns || 0,
-            winRate: getWinPct(typeStats.gamesWon, typeStats.gamesLost),
-            rackWinRate: getWinPct(typeStats.racksWon, typeStats.racksLost),
+            gamesWL: formatWL(typed.gamesWon, typed.gamesLost),
+            racksWL: formatWL(typed.racksWon, typed.racksLost),
+            ballsPotted: liveBalls || (typed.ballsWon || 0),
+            fouls: liveFouls || (typed.fouls || 0),
+            highestBreak: Math.max(liveHighest, careerHighest),
+            breakAndRuns: typed.breakAndRuns || 0,
+            tableRuns: typed.tableRuns || 0,
+            winRate: getWinPct(typed.gamesWon, typed.gamesLost),
+            rackWinRate: getWinPct(typed.racksWon, typed.racksLost),
             winStreak: getCurrentWinStreak(playerId, matches)
         };
     }
