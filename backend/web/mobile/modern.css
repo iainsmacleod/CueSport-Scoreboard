@@ -158,17 +158,27 @@ body.mobile .mobile-bottom-nav {
 
 body.mobile .mobile-nav-btn {
   color: var(--mobile-muted);
+  background: transparent;
+  border: 1px solid transparent;
   border-radius: 10px;
+}
+
+body.mobile .mobile-nav-btn:hover {
+  color: var(--mobile-text);
+  background: var(--mobile-raised);
+  border-color: var(--mobile-border);
 }
 
 body.mobile .mobile-nav-btn.active {
   color: #fff;
-  background: linear-gradient(180deg, rgba(155, 92, 255, 0.2), rgba(47, 128, 255, 0.1));
-  box-shadow: inset 0 -3px 0 var(--mobile-purple);
+  background: linear-gradient(135deg, rgba(47, 128, 255, 0.26), rgba(155, 92, 255, 0.22));
+  border-color: var(--mobile-blue);
+  outline: none;
+  box-shadow: inset 0 -2px 0 var(--mobile-purple);
 }
 
 body.mobile .mobile-nav-btn.active .mobile-nav-icon {
-  color: var(--mobile-purple);
+  color: #fff;
 }
 
 body.mobile .conn-status.connected {

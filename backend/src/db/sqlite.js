@@ -1478,11 +1478,35 @@ export function listAccountPlayers(accountId) {
 
 export function upsertAccountPlayersFromState(accountId, state) {
   if (!accountId || !state || typeof state !== 'object') return;
-  if (state.player1Name) {
-    upsertAccountPlayer(accountId, state.player1Name, state.player1Id || null);
+  // Name-only state must not create roster rows — that raced with client UUIDs from
+  // typing/blur and produced duplicate same-name identities. Create only when a
+  // player id is bound (explicit Create / selected roster player) or via session:start.
+  touchAccountPlayerFromState(accountId, state.player1Name, state.player1Id || null);
+  touchAccountPlayerFromState(accountId, state.player2Name, state.player2Id || null);
+}
+
+/** Update/create when id is known; name-only only refreshes an existing roster row. */
+function touchAccountPlayerFromState(accountId, name, playerId) {
+  if (!accountId) return;
+  const display = truncatePlayerName(name);
+  const normalized = normalizePlayerName(display);
+  if (!normalized) return;
+  if (playerId) {
+    upsertAccountPlayer(accountId, display, playerId);
+    return;
   }
-  if (state.player2Name) {
-    upsertAccountPlayer(accountId, state.player2Name, state.player2Id || null);
+  const byName = getDb().prepare(
+    `SELECT id FROM account_players
+     WHERE account_id = ? AND name_normalized = ?
+     ORDER BY last_seen_at DESC
+     LIMIT 1`
+  ).get(accountId, normalized);
+  if (byName?.id) {
+    getDb().prepare(
+      `UPDATE account_players
+       SET name = ?, last_seen_at = datetime('now')
+       WHERE id = ?`
+    ).run(display, byName.id);
   }
 }
 

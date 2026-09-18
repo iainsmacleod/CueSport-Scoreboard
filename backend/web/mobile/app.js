@@ -2386,17 +2386,35 @@ function pickPlayer(slot, player) {
 }
 
 async function createAndPickPlayer(slot, name) {
-  const token = localStorage.getItem(TOKEN_KEY);
-  if (!token) {
-    pickPlayer(slot, { name });
-    return;
+  const state = playerAutocompleteState[slot];
+  if (state?.createInflight) return;
+  if (state) {
+    state.createInflight = true;
+    state.createNewName = null;
   }
+  const list = document.getElementById(slot === '1' ? 'p1Autocomplete' : 'p2Autocomplete');
+  if (list) {
+    list.classList.add('hidden');
+    list.querySelectorAll('.autocomplete-new').forEach((el) => {
+      el.style.pointerEvents = 'none';
+      el.setAttribute('aria-disabled', 'true');
+    });
+  }
+  const token = localStorage.getItem(TOKEN_KEY);
   try {
+    if (!token) {
+      pickPlayer(slot, { name });
+      return;
+    }
     const player = await createAccountPlayer(window.location.origin, token, truncatePlayerName(name));
     if (player) pickPlayer(slot, player);
   } catch (err) {
     console.error('Create player error:', err);
     window.alert(`Could not create player: ${err.message || 'Unknown error'}`);
+  } finally {
+    if (playerAutocompleteState[slot]) {
+      playerAutocompleteState[slot].createInflight = false;
+    }
   }
 }
 
@@ -2405,7 +2423,12 @@ function initPlayerAutocompleteForSlot(slot, inputId, listId) {
   const list = document.getElementById(listId);
   if (!input || !list) return;
 
-  playerAutocompleteState[slot] = { activeIndex: -1, results: [], createNewName: null };
+  playerAutocompleteState[slot] = {
+    activeIndex: -1,
+    results: [],
+    createNewName: null,
+    createInflight: false,
+  };
   let debounceTimer = null;
 
   const hideList = () => list.classList.add('hidden');

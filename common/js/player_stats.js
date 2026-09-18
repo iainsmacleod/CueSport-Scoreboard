@@ -2062,12 +2062,33 @@
         return promisifyRequest(store.getAll());
     }
 
+    const playerEnsureInflight = {};
+
     /** Always create a new player row (allows duplicate display names). */
     async function createPlayer(name) {
         const displayName = truncateName(name);
         const normalized = normalizeName(displayName);
         if (!normalized) {
             return null;
+        }
+        if (skipLocalCareerWrites()) {
+            if (cloudCanManagePlayers()) {
+                try {
+                    const data = await cloudApiFetch('/api/players', {
+                        method: 'POST',
+                        body: { name: displayName }
+                    });
+                    invalidateCloudStatsCache();
+                    const created = shapeCloudRosterPlayer(data && data.player);
+                    if (created) {
+                        return created;
+                    }
+                } catch (err) {
+                    // Fall through to a client UUID; state publish with this id still
+                    // creates exactly one roster row.
+                    console.warn('Cloud create player via API failed, using local id:', err);
+                }
+            }
         }
         const now = new Date().toISOString();
         const player = {
@@ -2089,18 +2110,28 @@
         if (!normalized) {
             return null;
         }
-        if (skipLocalCareerWrites()) {
-            const cloud = await findCloudRosterPlayer(displayName);
-            if (cloud) {
-                return cloud;
+        if (playerEnsureInflight[normalized]) {
+            return playerEnsureInflight[normalized];
+        }
+        playerEnsureInflight[normalized] = (async function () {
+            if (skipLocalCareerWrites()) {
+                const cloud = await findCloudRosterPlayer(displayName);
+                if (cloud) {
+                    return cloud;
+                }
+                return createPlayer(displayName);
+            }
+            let player = await findPlayerByNormalizedName(normalized);
+            if (player) {
+                return player;
             }
             return createPlayer(displayName);
+        })();
+        try {
+            return await playerEnsureInflight[normalized];
+        } finally {
+            delete playerEnsureInflight[normalized];
         }
-        let player = await findPlayerByNormalizedName(normalized);
-        if (player) {
-            return player;
-        }
-        return createPlayer(displayName);
     }
 
     async function searchPlayers(query, limit) {
@@ -2226,7 +2257,15 @@
         if (createIfMissing) {
             return ensurePlayer(name);
         }
-        return null;
+        // Name typed but not yet an explicit Create / roster pick — keep session
+        // name-only until the user creates/selects or local scoring materializes.
+        return {
+            id: null,
+            name: truncateName(name),
+            nameNormalized: normalizeName(truncateName(name)),
+            stats: createEmptyStats(),
+            _ephemeral: true
+        };
     }
 
     function sessionNeedsReset(p1Name, p2Name, context) {
@@ -2258,23 +2297,27 @@
     }
 
     async function createNewMatchSession(p1Name, p2Name, context) {
-        const p1 = await resolvePlayerForSlot('1', p1Name, true);
-        const p2 = await resolvePlayerForSlot('2', p2Name, true);
+        // Never auto-create roster rows from naming alone — that duplicated cloud
+        // players when blur/state races minted multiple UUIDs for the same name.
+        // Explicit autocomplete "Create new player" (or local first-score materialize)
+        // is what adds a roster identity.
+        const p1 = await resolvePlayerForSlot('1', p1Name, false);
+        const p2 = await resolvePlayerForSlot('2', p2Name, false);
         if (!p1 || !p2) {
             return false;
         }
-        setPlayerIdOnInput('1', p1.id);
-        setPlayerIdOnInput('2', p2.id);
+        setPlayerIdOnInput('1', p1.id || null);
+        setPlayerIdOnInput('2', p2.id || null);
 
-        const duplicateNames = p1.id === p2.id;
+        const duplicateNames = !!(p1.id && p2.id && p1.id === p2.id);
         const now = new Date().toISOString();
         const match = {
             id: generateId(),
             status: 'active',
             startedAt: now,
             completedAt: null,
-            player1Id: p1.id,
-            player2Id: p2.id,
+            player1Id: p1.id || null,
+            player2Id: p2.id || null,
             player1Name: truncateName(p1Name),
             player2Name: truncateName(p2Name),
             gameType: context.gameType,
@@ -2287,8 +2330,8 @@
         };
         activeMatchSession.pendingMatch = match;
         activeMatchSession.matchId = match.id;
-        activeMatchSession.player1Id = p1.id;
-        activeMatchSession.player2Id = p2.id;
+        activeMatchSession.player1Id = p1.id || null;
+        activeMatchSession.player2Id = p2.id || null;
         activeMatchSession.player1Name = match.player1Name;
         activeMatchSession.player2Name = match.player2Name;
         activeMatchSession.gameType = context.gameType;
@@ -2306,6 +2349,51 @@
         await persistPendingSession();
         // Do not emit cloud session:start yet — wait for breaker pick or first score/pot.
         return true;
+    }
+
+    /**
+     * Local IndexedDB: create/bind roster players before career writes.
+     * Cloud: leave name-only slots unbound — server upserts on session:start by name
+     * (or by id after an explicit Create / pick).
+     */
+    async function materializeSessionPlayersIfNeeded() {
+        if (skipLocalCareerWrites()) {
+            return;
+        }
+        const bind = async function (slot) {
+            const existingId = getPlayerIdFromInput(slot) ||
+                (slot === '1' ? activeMatchSession.player1Id : activeMatchSession.player2Id);
+            const name = slot === '1' ? activeMatchSession.player1Name : activeMatchSession.player2Name;
+            if (existingId || !name) {
+                if (existingId) {
+                    setPlayerIdOnInput(slot, existingId);
+                }
+                return;
+            }
+            const player = await ensurePlayer(name);
+            if (!player || !player.id) {
+                return;
+            }
+            setPlayerIdOnInput(slot, player.id);
+            if (slot === '1') {
+                activeMatchSession.player1Id = player.id;
+                if (activeMatchSession.pendingMatch) {
+                    activeMatchSession.pendingMatch.player1Id = player.id;
+                }
+            } else {
+                activeMatchSession.player2Id = player.id;
+                if (activeMatchSession.pendingMatch) {
+                    activeMatchSession.pendingMatch.player2Id = player.id;
+                }
+            }
+        };
+        await bind('1');
+        await bind('2');
+        if (activeMatchSession.player1Id && activeMatchSession.player2Id &&
+            activeMatchSession.player1Id === activeMatchSession.player2Id) {
+            activeMatchSession.duplicateNames = true;
+        }
+        queuePersistPendingSession();
     }
 
     /**
@@ -2340,18 +2428,25 @@
 
     /** Breaking Player chosen — match is no longer idle setup. */
     function onBreakerSelected() {
+        const start = function () {
+            return materializeSessionPlayersIfNeeded().then(function () {
+                ensureCloudMatchStarted('breaker');
+            });
+        };
         if (!activeMatchSession.matchId) {
             // Names may not have created a session yet; ensure then mark started.
             ensureActiveSession().then(function (ready) {
                 if (ready) {
-                    ensureCloudMatchStarted('breaker');
+                    return start();
                 }
             }).catch(function (err) {
                 console.error('PlayerStats onBreakerSelected error:', err);
             });
             return;
         }
-        ensureCloudMatchStarted('breaker');
+        start().catch(function (err) {
+            console.error('PlayerStats onBreakerSelected error:', err);
+        });
     }
 
     /**
@@ -2585,6 +2680,7 @@
         if (!ready || activeMatchSession.duplicateNames) {
             return;
         }
+        await materializeSessionPlayersIfNeeded();
         ensureCloudMatchStarted('rack');
 
         const ids = getSlotPlayerIds(playerSlot);
@@ -2867,6 +2963,7 @@
         if (!ready || activeMatchSession.duplicateNames) {
             return;
         }
+        await materializeSessionPlayersIfNeeded();
         ensureCloudMatchStarted('snooker_frame');
 
         const match = getActivePendingMatch();
@@ -3036,6 +3133,7 @@
         if (!showsBallStats(context.gameType)) {
             return;
         }
+        await materializeSessionPlayersIfNeeded();
         ensureCloudMatchStarted('ball');
 
         const ids = getSlotPlayerIds(playerSlot);
@@ -3431,6 +3529,17 @@
                 ? await findCloudRosterPlayer(existingId)
                 : await getPlayer(existingId);
             if (!player) {
+                if (skipLocalCareerWrites()) {
+                    // Fresh Create may not be in the stats cache yet — keep the binding.
+                    return {
+                        id: existingId,
+                        name: name,
+                        nameNormalized: normalizeName(name),
+                        stats: createEmptyStats(),
+                        _cloud: true,
+                        _pending: true
+                    };
+                }
                 setPlayerIdOnInput(slot, null);
                 return null;
             }
@@ -5491,7 +5600,12 @@
             return;
         }
 
-        autocompleteState[slot] = { activeIndex: -1, results: [], createNewName: null };
+        autocompleteState[slot] = {
+            activeIndex: -1,
+            results: [],
+            createNewName: null,
+            createInflight: false
+        };
         let debounceTimer = null;
 
         input.addEventListener('input', function () {
@@ -5597,16 +5711,32 @@
     }
 
     async function createAndSelectAutocompletePlayer(slot, name, input, list) {
+        const state = autocompleteState[slot];
+        if (!state || state.createInflight) {
+            return;
+        }
+        state.createInflight = true;
+        state.createNewName = null;
+        if (list) {
+            list.classList.add('noShow');
+            list.querySelectorAll('.autocomplete-new').forEach(function (el) {
+                el.style.pointerEvents = 'none';
+                el.setAttribute('aria-disabled', 'true');
+            });
+        }
         try {
             const player = await createPlayer(name);
             if (!player) {
                 return;
             }
-            autocompleteState[slot].createNewName = null;
             selectAutocompletePlayer(slot, player, input, list);
         } catch (err) {
             console.error('Create player error:', err);
             alert('Could not create player: ' + err.message);
+        } finally {
+            if (autocompleteState[slot]) {
+                autocompleteState[slot].createInflight = false;
+            }
         }
     }
 
