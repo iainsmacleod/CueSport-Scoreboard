@@ -26,9 +26,9 @@ From `docs/release-notes/` (self-contained for **8.2.0+**; no separate static se
 cd docs/release-notes
 npm install
 npx playwright install chromium
-node capture-screenshots.mjs --version 8.2.0
-git add 8.2.0/images/
-git commit -m "Update 8.2.0 release note screenshots"
+node capture-screenshots.mjs --version 8.2.2
+git add 8.2.2/images/
+git commit -m "Update 8.2.2 release note screenshots"
 ```
 
 For **7.x** captures, also serve the repo root on port 8765:
@@ -41,7 +41,7 @@ python -m http.server 8765
 Optional live Cloud backend for 8.2.0+:
 
 ```bash
-node capture-screenshots.mjs --version 8.2.0 --cloud http://localhost:4003
+node capture-screenshots.mjs --version 8.2.2 --cloud http://localhost:4003
 ```
 
 Output: `docs/release-notes/<version>/images/*.png`
@@ -51,16 +51,16 @@ Output: `docs/release-notes/<version>/images/*.png`
 Requires [GitHub CLI](https://cli.github.com/) (`gh`) authenticated.
 
 ```powershell
-.\docs\release-notes\create-release.ps1 -Version 8.2.0
+.\docs\release-notes\create-release.ps1 -Version 8.2.2
 ```
 
 Or manually:
 
 ```bash
-gh release create v8.2.0 \
+gh release create v8.2.2 \
   --draft \
-  --title "CueSport Scoreboard 8.2.0" \
-  --notes-file docs/release-notes/8.2.0/GITHUB_RELEASE_DRAFT.md
+  --title "CueSport Scoreboard 8.2.2" \
+  --notes-file docs/release-notes/8.2.2/GITHUB_RELEASE_DRAFT.md
 ```
 
 Screenshots in the repo render in `RELEASE_NOTES.md` on GitHub. Optionally upload the same PNGs as release assets for the Releases page gallery.

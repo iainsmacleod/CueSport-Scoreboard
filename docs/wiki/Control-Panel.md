@@ -2,7 +2,7 @@
 
 The control panel (`control_panel.html`) is the OBS Custom Browser Dock. Header shows the version (links to this wiki), dock zoom (− / RESET / +, saved per `instance`), and a support link.
 
-## Tabs (as of 8.2.0)
+## Tabs (as of 8.2.2)
 
 | Tab | Use it for |
 |-----|------------|
