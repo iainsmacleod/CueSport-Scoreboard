@@ -1343,12 +1343,17 @@ function updateRackFoulDisplay() {
     }
     const period = isSnooker() ? "frame" : "rack";
     counter.title = "Fouls this " + period;
+    const foulsP1 = getRackFouls("1");
+    const foulsP2 = getRackFouls("2");
+    const showFoulRow = foulsP1 > 0 || foulsP2 > 0;
     const p1Name = document.getElementById("rackFoulP1Name");
     const p2Name = document.getElementById("rackFoulP2Name");
     const p1Count = document.getElementById("rackFoulP1");
     const p2Count = document.getElementById("rackFoulP2");
     const p1Wrap = document.getElementById("rackFoulP1Wrap");
     const p2Wrap = document.getElementById("rackFoulP2Wrap");
+    const foulRow = document.getElementById("rackFoulRow");
+    const foulSep = document.getElementById("rackFoulSep");
     if (p1Name) {
         p1Name.textContent = shortPlayerLabel("1");
     }
@@ -1356,45 +1361,81 @@ function updateRackFoulDisplay() {
         p2Name.textContent = shortPlayerLabel("2");
     }
     if (p1Count) {
-        p1Count.textContent = String(getRackFouls("1"));
+        p1Count.textContent = String(foulsP1);
     }
     if (p2Count) {
-        p2Count.textContent = String(getRackFouls("2"));
+        p2Count.textContent = String(foulsP2);
     }
     const active = getActivePlayerSlot();
     if (p1Wrap) {
         p1Wrap.classList.toggle("is-active", active === "1");
+        p1Wrap.classList.toggle("noShow", !showFoulRow);
     }
     if (p2Wrap) {
         p2Wrap.classList.toggle("is-active", active === "2");
+        p2Wrap.classList.toggle("noShow", !showFoulRow);
+    }
+    if (foulSep) {
+        foulSep.classList.toggle("noShow", !showFoulRow);
+    }
+    if (foulRow) {
+        foulRow.classList.toggle("noShow", !showFoulRow);
     }
 
     const snookerLive = show && isSnookerBallMode();
     const statsRow = document.getElementById("rackSnookerStatsRow");
     const breakGroup = document.getElementById("rackBreakGroup");
-    const statsSep = document.getElementById("rackSnookerStatsSep");
+    const remainingGroup = document.getElementById("rackRemainingGroup");
+    const diffGroup = document.getElementById("rackDiffGroup");
+    const marginLine = document.getElementById("rackSnookerMarginLine");
+    const marginSep = document.getElementById("rackSnookerMarginSep");
     const ptsValue = document.getElementById("rackPointsRemainingValue");
+    const marginValue = document.getElementById("rackScoreMarginValue");
     const breakLabel = document.getElementById("rackCurrentBreakLabel");
     const breakBallsEl = document.getElementById("rackBreakBalls");
     const currentBreak = snookerLive ? getSnookerCurrentBreak() : 0;
     const breakBalls = snookerLive ? getSnookerBreakBallsForPublish() : [];
-    const showBreak = snookerLive && currentBreak > 0;
+    const scoreMargin = snookerLive ? getSnookerScoreMargin(active) : null;
+    const pointsRemaining = snookerLive
+        ? (scoreMargin && scoreMargin.remaining != null
+            ? scoreMargin.remaining
+            : getSnookerPointsRemainingOnTable())
+        : 0;
+    const marginDiff = scoreMargin ? scoreMargin.diff : 0;
+    // Hide Remaining while tied (esp. 0–0 full-table 147); only useful with a lead/deficit.
+    const showDiff = snookerLive && marginDiff !== 0;
+    const showRemaining = showDiff && pointsRemaining > 0;
+    const showMarginLine = showRemaining || showDiff;
     if (statsRow) {
         statsRow.classList.toggle("noShow", !snookerLive);
     }
     if (breakGroup) {
-        breakGroup.classList.toggle("noShow", !showBreak);
+        breakGroup.classList.remove("noShow");
     }
-    if (statsSep) {
-        statsSep.classList.toggle("noShow", !showBreak);
+    if (remainingGroup) {
+        remainingGroup.classList.toggle("noShow", !showRemaining);
     }
-    if (ptsValue && snookerLive) {
-        ptsValue.textContent = String(getSnookerPointsRemainingOnTable());
+    if (diffGroup) {
+        diffGroup.classList.toggle("noShow", !showDiff);
+    }
+    if (marginSep) {
+        marginSep.classList.toggle("noShow", !(showRemaining && showDiff));
+    }
+    if (marginLine) {
+        marginLine.classList.toggle("noShow", !showMarginLine);
+    }
+    if (ptsValue && showRemaining) {
+        ptsValue.textContent = String(pointsRemaining);
+    }
+    if (marginValue) {
+        marginValue.textContent = scoreMargin ? scoreMargin.display : "0";
+        marginValue.classList.toggle("is-ahead", showDiff && marginDiff > 0);
+        marginValue.classList.toggle("is-behind", showDiff && marginDiff < 0);
     }
     if (breakLabel) {
         breakLabel.textContent = "Break " + currentBreak;
     }
-    renderRackBreakBallCircles(breakBallsEl, showBreak ? breakBalls : []);
+    renderRackBreakBallCircles(breakBallsEl, snookerLive && currentBreak > 0 ? breakBalls : []);
     syncBallTrackerActionRowVisibility();
 }
 
@@ -2887,6 +2928,8 @@ function getSnookerScoreMargin(playerSlot) {
         showMargin: showMargin
     };
 }
+
+window.getSnookerScoreMargin = getSnookerScoreMargin;
 
 function updateSnookerBallAvailability() {
     if (!isSnookerBallMode()) {

@@ -79,16 +79,24 @@
             <p id="ballGridHint" class="ball-grid-hint hidden"></p>
             <div id="ballGrid" class="ball-grid ball-grid-live"></div>
             <div id="rackFoulCounter" class="rack-foul-counter hidden" aria-live="polite" title="Fouls this rack or frame">
-              <div class="rack-stat-row hidden" id="rackSnookerStatsRow">
-                <span class="rack-break-group" id="rackBreakGroup">
-                  <span class="rack-foul-heading" id="rackCurrentBreakLabel">Break 0</span>
-                  <div class="rack-break-balls" id="rackBreakBalls" aria-label="Balls in current break"></div>
-                </span>
-                <span class="rack-foul-sep" id="rackSnookerStatsSep" aria-hidden="true">|</span>
-                <span class="rack-remaining-group">
-                  <span class="rack-foul-heading">Remaining</span>
-                  <span class="rack-stat-value" id="rackPointsRemainingValue">0</span>
-                </span>
+              <div class="rack-stat-row rack-snooker-stats hidden" id="rackSnookerStatsRow">
+                <div class="rack-snooker-break-line">
+                  <span class="rack-break-group" id="rackBreakGroup">
+                    <span class="rack-foul-heading" id="rackCurrentBreakLabel">Break 0</span>
+                    <div class="rack-break-balls" id="rackBreakBalls" aria-label="Balls in current break"></div>
+                  </span>
+                </div>
+                <div class="rack-snooker-margin-line" id="rackSnookerMarginLine">
+                  <span class="rack-remaining-group" id="rackRemainingGroup">
+                    <span class="rack-foul-heading">Remaining</span>
+                    <span class="rack-stat-value" id="rackPointsRemainingValue">0</span>
+                  </span>
+                  <span class="rack-foul-sep" id="rackSnookerMarginSep" aria-hidden="true">·</span>
+                  <span class="rack-diff-group" id="rackDiffGroup">
+                    <span class="rack-foul-heading">Difference</span>
+                    <span class="rack-stat-value" id="rackScoreMarginValue">0</span>
+                  </span>
+                </div>
               </div>
               <div class="rack-stat-row" id="rackFoulRow">
                 <span class="rack-foul-heading">Fouls</span>
@@ -96,7 +104,7 @@
                   <span class="rack-foul-name" id="rackFoulP1Name">P1</span>
                   <span class="rack-foul-count" id="rackFoulP1">0</span>
                 </span>
-                <span class="rack-foul-sep" aria-hidden="true">·</span>
+                <span class="rack-foul-sep" id="rackFoulSep" aria-hidden="true">·</span>
                 <span class="rack-foul-player" id="rackFoulP2Wrap">
                   <span class="rack-foul-name" id="rackFoulP2Name">P2</span>
                   <span class="rack-foul-count" id="rackFoulP2">0</span>

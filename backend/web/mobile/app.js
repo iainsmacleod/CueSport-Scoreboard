@@ -1353,12 +1353,15 @@ function updateMobileRackFoulDisplay(state) {
   const foulsP2 = Number(
     snapshot && snapshot.foulsP2 != null ? snapshot.foulsP2 : state.foulsP2
   ) || 0;
+  const showFoulRow = foulsP1 > 0 || foulsP2 > 0;
   const p1NameEl = document.getElementById('rackFoulP1Name');
   const p2NameEl = document.getElementById('rackFoulP2Name');
   const p1Count = document.getElementById('rackFoulP1');
   const p2Count = document.getElementById('rackFoulP2');
   const p1Wrap = document.getElementById('rackFoulP1Wrap');
   const p2Wrap = document.getElementById('rackFoulP2Wrap');
+  const foulRow = document.getElementById('rackFoulRow');
+  const foulSep = document.getElementById('rackFoulSep');
   // Same 20-char limit as Setup name fields (not a shorter first-name clip).
   if (p1NameEl) {
     p1NameEl.textContent = foulCounterPlayerLabel(state.player1Name, 'P1');
@@ -1369,16 +1372,28 @@ function updateMobileRackFoulDisplay(state) {
   if (p1Count) p1Count.textContent = String(foulsP1);
   if (p2Count) p2Count.textContent = String(foulsP2);
   const active = String(state.activePlayer || '1');
-  if (p1Wrap) p1Wrap.classList.toggle('is-active', active === '1');
-  if (p2Wrap) p2Wrap.classList.toggle('is-active', active === '2');
+  if (p1Wrap) {
+    p1Wrap.classList.toggle('is-active', active === '1');
+    p1Wrap.classList.toggle('hidden', !showFoulRow);
+  }
+  if (p2Wrap) {
+    p2Wrap.classList.toggle('is-active', active === '2');
+    p2Wrap.classList.toggle('hidden', !showFoulRow);
+  }
+  if (foulSep) foulSep.classList.toggle('hidden', !showFoulRow);
+  if (foulRow) foulRow.classList.toggle('hidden', !showFoulRow);
   const snooker = !!(snapshot && snapshot.snooker) || state.gameType === 'game8';
   const period = snooker ? 'frame' : 'rack';
   counter.title = `Fouls this ${period}`;
 
   const statsRow = document.getElementById('rackSnookerStatsRow');
   const breakGroup = document.getElementById('rackBreakGroup');
-  const statsSep = document.getElementById('rackSnookerStatsSep');
+  const remainingGroup = document.getElementById('rackRemainingGroup');
+  const diffGroup = document.getElementById('rackDiffGroup');
+  const marginLine = document.getElementById('rackSnookerMarginLine');
+  const marginSep = document.getElementById('rackSnookerMarginSep');
   const ptsValue = document.getElementById('rackPointsRemainingValue');
+  const marginValue = document.getElementById('rackScoreMarginValue');
   const breakLabel = document.getElementById('rackCurrentBreakLabel');
   const breakBallsEl = document.getElementById('rackBreakBalls');
   const currentBreak = Number(
@@ -1386,25 +1401,47 @@ function updateMobileRackFoulDisplay(state) {
       ? snapshot.snookerCurrentBreak
       : state.snookerCurrentBreak
   ) || 0;
+  const scoreMargin = (
+    snapshot && snapshot.snookerScoreMargin
+      ? snapshot.snookerScoreMargin
+      : (state.snookerScoreMargin || null)
+  );
   const pointsRemaining = Number(
-    snapshot && snapshot.snookerPointsRemaining != null
-      ? snapshot.snookerPointsRemaining
-      : state.snookerPointsRemaining
+    scoreMargin && scoreMargin.remaining != null
+      ? scoreMargin.remaining
+      : (snapshot && snapshot.snookerPointsRemaining != null
+        ? snapshot.snookerPointsRemaining
+        : state.snookerPointsRemaining)
   ) || 0;
+  const marginDiff = Number(scoreMargin && scoreMargin.diff != null ? scoreMargin.diff : 0) || 0;
+  const marginDisplay = scoreMargin && scoreMargin.display != null
+    ? String(scoreMargin.display)
+    : (marginDiff > 0 ? `+${marginDiff}` : String(marginDiff));
+  // Hide Remaining while tied (esp. 0–0 full-table 147); only useful with a lead/deficit.
+  const showDiff = snooker && marginDiff !== 0;
+  const showRemaining = showDiff && pointsRemaining > 0;
+  const showMarginLine = showRemaining || showDiff;
   const breakBalls = (
     snapshot && Array.isArray(snapshot.snookerBreakBalls)
       ? snapshot.snookerBreakBalls
       : (Array.isArray(state.snookerBreakBalls) ? state.snookerBreakBalls : [])
   );
-  const showBreak = snooker && currentBreak > 0;
   if (statsRow) statsRow.classList.toggle('hidden', !snooker);
-  if (breakGroup) breakGroup.classList.toggle('hidden', !showBreak);
-  if (statsSep) statsSep.classList.toggle('hidden', !showBreak);
-  if (ptsValue && snooker) ptsValue.textContent = String(pointsRemaining);
+  if (breakGroup) breakGroup.classList.remove('hidden');
+  if (remainingGroup) remainingGroup.classList.toggle('hidden', !showRemaining);
+  if (diffGroup) diffGroup.classList.toggle('hidden', !showDiff);
+  if (marginSep) marginSep.classList.toggle('hidden', !(showRemaining && showDiff));
+  if (marginLine) marginLine.classList.toggle('hidden', !showMarginLine);
+  if (ptsValue && showRemaining) ptsValue.textContent = String(pointsRemaining);
+  if (marginValue) {
+    marginValue.textContent = showDiff ? marginDisplay : '0';
+    marginValue.classList.toggle('is-ahead', showDiff && marginDiff > 0);
+    marginValue.classList.toggle('is-behind', showDiff && marginDiff < 0);
+  }
   if (breakLabel) breakLabel.textContent = `Break ${currentBreak}`;
   if (breakBallsEl) {
     breakBallsEl.innerHTML = '';
-    if (showBreak) {
+    if (snooker && currentBreak > 0) {
       breakBalls.forEach((ball) => {
         if (!ball || !(ball.count > 0)) return;
         const el = document.createElement('span');

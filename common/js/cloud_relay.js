@@ -480,6 +480,18 @@
             snookerPointsRemaining: snooker && typeof window.getSnookerPointsRemainingOnTable === 'function'
                 ? window.getSnookerPointsRemainingOnTable()
                 : 0,
+            snookerScoreMargin: (function () {
+                if (!snooker || typeof window.getSnookerScoreMargin !== 'function') {
+                    return { diff: 0, remaining: 0, display: '0' };
+                }
+                const activeSlot = dockStorage('activePlayer', '1') || '1';
+                const margin = window.getSnookerScoreMargin(activeSlot) || {};
+                return {
+                    diff: Number(margin.diff) || 0,
+                    remaining: Number(margin.remaining) || 0,
+                    display: margin.display != null ? String(margin.display) : '0'
+                };
+            })(),
             snookerBreakBalls: snooker && typeof window.getSnookerBreakBallsForPublish === 'function'
                 ? window.getSnookerBreakBallsForPublish()
                 : [],

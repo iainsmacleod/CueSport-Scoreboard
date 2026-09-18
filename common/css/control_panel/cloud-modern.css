@@ -205,3 +205,47 @@ select:disabled,
 	opacity: 0.42 !important;
 	box-shadow: none !important;
 }
+
+/* Active player is intentionally disabled (no re-select); keep it visually selected. */
+.rack-breaker-btn.rack-breaker-current,
+.rack-breaker-btn.rack-breaker-current:disabled {
+	opacity: 1 !important;
+	background: linear-gradient(135deg, rgba(47, 128, 255, 0.55), rgba(155, 92, 255, 0.42)) !important;
+	border-color: var(--cs-blue) !important;
+	color: #fff !important;
+	font-weight: 800 !important;
+	box-shadow:
+		0 0 0 1px rgba(47, 128, 255, 0.45),
+		0 0 18px rgba(47, 128, 255, 0.28),
+		0 6px 16px rgba(0, 0, 0, 0.28) !important;
+	filter: none !important;
+}
+
+.rack-breaker-btn.rack-breaker-inactive {
+	opacity: 0.38 !important;
+	background: rgba(18, 29, 51, 0.55) !important;
+	border-color: rgba(38, 53, 82, 0.7) !important;
+	color: var(--cs-muted) !important;
+	box-shadow: none !important;
+	font-weight: 600 !important;
+}
+
+.rack-breaker-btn.rack-breaker-inactive:hover {
+	opacity: 0.72 !important;
+	border-color: var(--cs-blue) !important;
+	color: var(--cs-text) !important;
+	filter: none !important;
+}
+
+.rack-foul-player.is-active .rack-foul-name,
+.rack-foul-player.is-active .rack-foul-count {
+	opacity: 1 !important;
+	color: #fff !important;
+	font-weight: 800;
+	text-shadow: 0 0 10px rgba(47, 128, 255, 0.35);
+}
+
+.rack-foul-player:not(.is-active) {
+	opacity: 0.4 !important;
+	color: var(--cs-muted) !important;
+}

@@ -274,16 +274,24 @@ for more information about Salotto please visit https://salotto.app
                 <div class="ball-tracker-row ball-tracker-foul-row" id="ballTrackerFoulRow">
                 <div class="rack-foul-counter noShow" id="rackFoulCounter" aria-live="polite"
                     title="Fouls this rack or frame">
-                    <div class="rack-stat-row noShow" id="rackSnookerStatsRow">
-                        <span class="rack-break-group" id="rackBreakGroup">
-                            <span class="rack-foul-heading" id="rackCurrentBreakLabel">Break 0</span>
-                            <div class="rack-break-balls" id="rackBreakBalls" aria-label="Balls in current break"></div>
-                        </span>
-                        <span class="rack-foul-sep" id="rackSnookerStatsSep" aria-hidden="true">|</span>
-                        <span class="rack-remaining-group">
-                            <span class="rack-foul-heading">Remaining</span>
-                            <span class="rack-stat-value" id="rackPointsRemainingValue">0</span>
-                        </span>
+                    <div class="rack-stat-row rack-snooker-stats noShow" id="rackSnookerStatsRow">
+                        <div class="rack-snooker-break-line">
+                            <span class="rack-break-group" id="rackBreakGroup">
+                                <span class="rack-foul-heading" id="rackCurrentBreakLabel">Break 0</span>
+                                <div class="rack-break-balls" id="rackBreakBalls" aria-label="Balls in current break"></div>
+                            </span>
+                        </div>
+                        <div class="rack-snooker-margin-line" id="rackSnookerMarginLine">
+                            <span class="rack-remaining-group" id="rackRemainingGroup">
+                                <span class="rack-foul-heading">Remaining</span>
+                                <span class="rack-stat-value" id="rackPointsRemainingValue">0</span>
+                            </span>
+                            <span class="rack-foul-sep" id="rackSnookerMarginSep" aria-hidden="true">&#183;</span>
+                            <span class="rack-diff-group" id="rackDiffGroup">
+                                <span class="rack-foul-heading">Difference</span>
+                                <span class="rack-stat-value" id="rackScoreMarginValue">0</span>
+                            </span>
+                        </div>
                     </div>
                     <div class="rack-stat-row" id="rackFoulRow">
                         <span class="rack-foul-heading" id="rackFoulHeading">Fouls</span>
@@ -291,7 +299,7 @@ for more information about Salotto please visit https://salotto.app
                             <span class="rack-foul-name" id="rackFoulP1Name">P1</span>
                             <span class="rack-foul-count" id="rackFoulP1">0</span>
                         </span>
-                        <span class="rack-foul-sep" aria-hidden="true">&#183;</span>
+                        <span class="rack-foul-sep" id="rackFoulSep" aria-hidden="true">&#183;</span>
                         <span class="rack-foul-player" id="rackFoulP2Wrap">
                             <span class="rack-foul-name" id="rackFoulP2Name">P2</span>
                             <span class="rack-foul-count" id="rackFoulP2">0</span>

@@ -864,18 +864,41 @@ select.dropdown option,
 	white-space: nowrap;
 }
 
+.rack-stat-row.rack-snooker-stats {
+	flex-direction: column;
+	align-items: center;
+	flex-wrap: nowrap;
+	gap: 2px;
+	white-space: normal;
+}
+
+.rack-snooker-break-line,
+.rack-snooker-margin-line {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-wrap: wrap;
+	gap: 8px;
+	white-space: nowrap;
+}
+
 .rack-stat-row.noShow {
 	display: none;
 }
 
 .rack-break-group,
-.rack-remaining-group {
+.rack-remaining-group,
+.rack-diff-group {
 	display: inline-flex;
 	align-items: center;
 	gap: 6px;
 }
 
 .rack-break-group.noShow,
+.rack-remaining-group.noShow,
+.rack-diff-group.noShow,
+.rack-snooker-margin-line.noShow,
+.rack-foul-player.noShow,
 .rack-foul-sep.noShow {
 	display: none;
 }
@@ -883,6 +906,14 @@ select.dropdown option,
 .rack-stat-value {
 	font-weight: 700;
 	font-variant-numeric: tabular-nums;
+}
+
+.rack-stat-value.is-ahead {
+	color: #43a047;
+}
+
+.rack-stat-value.is-behind {
+	color: #e53935;
 }
 
 .rack-break-balls {

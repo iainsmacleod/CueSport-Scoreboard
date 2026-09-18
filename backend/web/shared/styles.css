@@ -558,18 +558,43 @@ input, select {
   flex-wrap: wrap;
   gap: 0.4rem 0.55rem;
 }
+.rack-stat-row.rack-snooker-stats {
+  flex-direction: column;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 0.15rem;
+}
+.rack-snooker-break-line,
+.rack-snooker-margin-line {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.55rem;
+}
 .rack-stat-row.hidden { display: none; }
 .rack-break-group,
-.rack-remaining-group {
+.rack-remaining-group,
+.rack-diff-group {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
 }
 .rack-break-group.hidden,
+.rack-remaining-group.hidden,
+.rack-diff-group.hidden,
+.rack-snooker-margin-line.hidden,
+.rack-foul-player.hidden,
 .rack-foul-sep.hidden { display: none; }
 .rack-stat-value {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+.rack-stat-value.is-ahead {
+  color: #43a047;
+}
+.rack-stat-value.is-behind {
+  color: #e53935;
 }
 .rack-break-balls {
   display: inline-flex;

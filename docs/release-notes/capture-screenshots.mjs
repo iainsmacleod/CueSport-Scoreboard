@@ -652,11 +652,16 @@ async function capture820(version, cloudBaseArg) {
       counter?.classList.remove('hidden');
       document.getElementById('rackSnookerStatsRow')?.classList.remove('hidden');
       document.getElementById('rackBreakGroup')?.classList.remove('hidden');
-      document.getElementById('rackSnookerStatsSep')?.classList.remove('hidden');
       const breakLabel = document.getElementById('rackCurrentBreakLabel');
       if (breakLabel) breakLabel.textContent = 'Break 32';
       const pts = document.getElementById('rackPointsRemainingValue');
       if (pts) pts.textContent = '91';
+      const margin = document.getElementById('rackScoreMarginValue');
+      if (margin) {
+        margin.textContent = '+14';
+        margin.classList.add('is-ahead');
+        margin.classList.remove('is-behind');
+      }
       const breakBalls = document.getElementById('rackBreakBalls');
       if (breakBalls) {
         breakBalls.innerHTML = '';
