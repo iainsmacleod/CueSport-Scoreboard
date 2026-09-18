@@ -284,7 +284,7 @@ Refresh the dock after updating local scoreboard files so it picks up script/con
 Use the helper script (preserves SQLite + `.env`, then rebuilds Compose):
 
 ```bash
-# Interactive branch prompt (default: stripe-integration)
+# Interactive branch prompt (default: main)
 sudo bash /opt/cuesport/backend/deploy/update-vps.sh
 
 # Or pass a branch
@@ -296,8 +296,8 @@ Equivalent manual steps:
 ```bash
 cd /opt/cuesport
 git fetch origin
-git checkout -B stripe-integration origin/stripe-integration
-git reset --hard origin/stripe-integration
+git checkout -B main origin/main
+git reset --hard origin/main
 cd /opt/cuesport/backend
 docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml up -d --build --force-recreate
 ```
