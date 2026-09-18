@@ -112,13 +112,41 @@
             );
         }
         (match.balls || []).forEach(function (b) {
-            if (b.winnerId === p1Id) {
+            const slot = resolveBallWinnerSlot(b, p1Id, p2Id);
+            if (slot === '1') {
                 extras.ballsP1 += 1;
-            } else if (b.winnerId === p2Id) {
+            } else if (slot === '2') {
                 extras.ballsP2 += 1;
             }
         });
         return extras;
+    }
+
+    /**
+     * Attribute a pot to P1/P2. Prefer winnerSlot; never treat null===null as P1.
+     * @returns {'1'|'2'|null}
+     */
+    function resolveBallWinnerSlot(ball, p1Id, p2Id) {
+        if (!ball) {
+            return null;
+        }
+        if (ball.winnerSlot === '1' || ball.winnerSlot === 1) {
+            return '1';
+        }
+        if (ball.winnerSlot === '2' || ball.winnerSlot === 2) {
+            return '2';
+        }
+        const wid = ball.winnerId;
+        if (wid == null || wid === '') {
+            return null;
+        }
+        if (p1Id != null && p1Id !== '' && wid === p1Id) {
+            return '1';
+        }
+        if (p2Id != null && p2Id !== '' && wid === p2Id) {
+            return '2';
+        }
+        return null;
     }
 
     /** Portable rack/frame rows for cloud session:end (winnerSlot, not local player ids). */
@@ -187,6 +215,27 @@
         const payload = Object.assign({}, base || {}, buildCloudMatchExtras(match));
         if (match && match.id && !payload.matchId) {
             payload.matchId = match.id;
+        }
+        // Prefer live session ids (Create/choose / eager materialize) over stale start nulls.
+        const p1Id = (match && match.player1Id) || activeMatchSession.player1Id ||
+            getPlayerIdFromInput('1') || null;
+        const p2Id = (match && match.player2Id) || activeMatchSession.player2Id ||
+            getPlayerIdFromInput('2') || null;
+        if (p1Id) {
+            payload.player1Id = p1Id;
+        }
+        if (p2Id) {
+            payload.player2Id = p2Id;
+        }
+        if (match && match.player1Name) {
+            payload.player1 = match.player1Name;
+        } else if (activeMatchSession.player1Name) {
+            payload.player1 = activeMatchSession.player1Name;
+        }
+        if (match && match.player2Name) {
+            payload.player2 = match.player2Name;
+        } else if (activeMatchSession.player2Name) {
+            payload.player2 = activeMatchSession.player2Name;
         }
         if (match && match.finalScore && !payload.scores) {
             payload.scores = {
@@ -1564,6 +1613,22 @@
         return slot === '1' || slot === '2' ? slot : null;
     }
 
+    /**
+     * Set last rack winner immediately (before async recordRackWin finishes)
+     * so dock underline + Cloud publish stay in sync with mobile.
+     */
+    function noteLastRackWinnerSlot(slot) {
+        if (slot === '1' || slot === '2') {
+            activeMatchSession.lastRackWinnerSlot = slot;
+            return slot;
+        }
+        if (slot == null || slot === '') {
+            activeMatchSession.lastRackWinnerSlot = null;
+            return null;
+        }
+        return getLastRackWinnerSlot();
+    }
+
     async function abandonActivePendingMatch(options) {
         const match = getActivePendingMatch();
         if (!match || activeMatchSession.matchCompletedRecorded) {
@@ -2352,40 +2417,79 @@
     }
 
     /**
-     * Local IndexedDB: create/bind roster players before career writes.
-     * Cloud: leave name-only slots unbound — server upserts on session:start by name
-     * (or by id after an explicit Create / pick).
+     * Bind a roster UUID into the live match session (Create / choose / materialize).
+     * Does not abandon an in-progress match — only attaches identity to the open session.
+     */
+    function bindSessionPlayerId(slot, playerId, displayName) {
+        const id = playerId != null ? String(playerId).trim() : '';
+        if ((slot !== '1' && slot !== '2') || !id) {
+            return false;
+        }
+        const name = truncateName(displayName ||
+            (slot === '1' ? activeMatchSession.player1Name : activeMatchSession.player2Name) ||
+            '');
+        setPlayerIdOnInput(slot, id);
+        if (slot === '1') {
+            activeMatchSession.player1Id = id;
+            if (name) {
+                activeMatchSession.player1Name = name;
+            }
+            if (activeMatchSession.pendingMatch) {
+                activeMatchSession.pendingMatch.player1Id = id;
+                if (name) {
+                    activeMatchSession.pendingMatch.player1Name = name;
+                }
+            }
+        } else {
+            activeMatchSession.player2Id = id;
+            if (name) {
+                activeMatchSession.player2Name = name;
+            }
+            if (activeMatchSession.pendingMatch) {
+                activeMatchSession.pendingMatch.player2Id = id;
+                if (name) {
+                    activeMatchSession.pendingMatch.player2Name = name;
+                }
+            }
+        }
+        if (activeMatchSession.player1Id && activeMatchSession.player2Id &&
+            activeMatchSession.player1Id === activeMatchSession.player2Id) {
+            activeMatchSession.duplicateNames = true;
+        } else if (activeMatchSession.player1Id && activeMatchSession.player2Id) {
+            activeMatchSession.duplicateNames = false;
+        }
+        queuePersistPendingSession();
+        return true;
+    }
+
+    /**
+     * Ensure each named slot has a roster UUID before pots/racks are attributed.
+     * Primary call: onNamesUpdated when both names are set. Also a safety net at the
+     * start of ball/rack/frame writes and breaker selection.
+     * Cloud + local: lookup-or-create once via ensurePlayer (playerEnsureInflight).
      */
     async function materializeSessionPlayersIfNeeded() {
-        if (skipLocalCareerWrites()) {
-            return;
-        }
         const bind = async function (slot) {
             const existingId = getPlayerIdFromInput(slot) ||
                 (slot === '1' ? activeMatchSession.player1Id : activeMatchSession.player2Id);
             const name = slot === '1' ? activeMatchSession.player1Name : activeMatchSession.player2Name;
-            if (existingId || !name) {
-                if (existingId) {
+            if (existingId) {
+                // Input may already have Create/choose id while session is still null.
+                if (!(slot === '1' ? activeMatchSession.player1Id : activeMatchSession.player2Id)) {
+                    bindSessionPlayerId(slot, existingId, name);
+                } else {
                     setPlayerIdOnInput(slot, existingId);
                 }
+                return;
+            }
+            if (!name) {
                 return;
             }
             const player = await ensurePlayer(name);
             if (!player || !player.id) {
                 return;
             }
-            setPlayerIdOnInput(slot, player.id);
-            if (slot === '1') {
-                activeMatchSession.player1Id = player.id;
-                if (activeMatchSession.pendingMatch) {
-                    activeMatchSession.pendingMatch.player1Id = player.id;
-                }
-            } else {
-                activeMatchSession.player2Id = player.id;
-                if (activeMatchSession.pendingMatch) {
-                    activeMatchSession.pendingMatch.player2Id = player.id;
-                }
-            }
+            bindSessionPlayerId(slot, player.id, player.name || name);
         };
         await bind('1');
         await bind('2');
@@ -2399,6 +2503,7 @@
     /**
      * Publish session:start once the match has real activity (breaker or scoring).
      * Naming both players alone must not create an idle "In progress" cloud match.
+     * Callers should materialize UUIDs first so start carries bound player ids.
      */
     function ensureCloudMatchStarted(reason) {
         if (activeMatchSession.cloudSessionStarted || activeMatchSession.matchCompletedRecorded) {
@@ -2411,15 +2516,26 @@
         if (activeMatchSession.duplicateNames) {
             return false;
         }
+        // Keep pendingMatch ids aligned with session / inputs before emit.
+        const p1Id = activeMatchSession.player1Id || match.player1Id || getPlayerIdFromInput('1') || null;
+        const p2Id = activeMatchSession.player2Id || match.player2Id || getPlayerIdFromInput('2') || null;
+        if (p1Id) {
+            activeMatchSession.player1Id = p1Id;
+            match.player1Id = p1Id;
+        }
+        if (p2Id) {
+            activeMatchSession.player2Id = p2Id;
+            match.player2Id = p2Id;
+        }
         activeMatchSession.cloudSessionStarted = true;
         emitCloudSession('start', {
             sessionId: match.id,
             gameType: match.gameType || activeMatchSession.gameType,
             gameInfo: match.gameInfo || activeMatchSession.gameInfo || '',
-            player1: match.player1Name,
-            player2: match.player2Name,
-            player1Id: match.player1Id || activeMatchSession.player1Id || null,
-            player2Id: match.player2Id || activeMatchSession.player2Id || null,
+            player1: match.player1Name || activeMatchSession.player1Name,
+            player2: match.player2Name || activeMatchSession.player2Name,
+            player1Id: p1Id,
+            player2Id: p2Id,
             reason: reason || 'activity'
         });
         queuePersistPendingSession();
@@ -2651,10 +2767,12 @@
     }
 
     function getSlotPlayerIds(slot) {
+        const p1 = activeMatchSession.player1Id || getPlayerIdFromInput('1');
+        const p2 = activeMatchSession.player2Id || getPlayerIdFromInput('2');
         if (slot === '1') {
-            return { winnerId: activeMatchSession.player1Id, loserId: activeMatchSession.player2Id };
+            return { winnerId: p1, loserId: p2 };
         }
-        return { winnerId: activeMatchSession.player2Id, loserId: activeMatchSession.player1Id };
+        return { winnerId: p2, loserId: p1 };
     }
 
     // Serialize career/match writes so concurrent ball pots and rack wins cannot
@@ -2886,19 +3004,21 @@
         const slotStr = String(slot);
         const playerId = slotStr === '2' ? activeMatchSession.player2Id : activeMatchSession.player1Id;
         const empty = { ballsPotted: 0, highestBreak: 0, highestRun: 0, fouls: 0 };
-        if (!match || !playerId) {
+        if (!match) {
             return empty;
         }
 
         let ballsPotted = 0;
+        const p1Id = match.player1Id || activeMatchSession.player1Id;
+        const p2Id = match.player2Id || activeMatchSession.player2Id;
         (match.balls || []).forEach(function (b) {
-            if (b.winnerId === playerId) {
+            if (resolveBallWinnerSlot(b, p1Id, p2Id) === slotStr) {
                 ballsPotted += 1;
             }
         });
 
-        let highestBreak = highestBreakFromMatchForPlayer(match, playerId);
-        let highestRun = highestRunFromMatchForPlayer(match, playerId);
+        let highestBreak = playerId ? highestBreakFromMatchForPlayer(match, playerId) : 0;
+        let highestRun = playerId ? highestRunFromMatchForPlayer(match, playerId) : 0;
         let fouls = 0;
         (match.racks || []).forEach(function (r) {
             if (slotStr === '2') {
@@ -3147,6 +3267,7 @@
         }
         match.balls.push({
             winnerId: ids.winnerId,
+            winnerSlot: playerSlot === '1' || playerSlot === '2' ? playerSlot : null,
             timestamp: new Date().toISOString()
         });
         await applyBallDelta(ids.winnerId, ids.loserId, context.gameType, 1);
@@ -3201,18 +3322,24 @@
         }
 
         const playerId = playerSlot === '1'
-            ? activeMatchSession.player1Id
-            : activeMatchSession.player2Id;
-        if (!playerId) {
-            return;
-        }
+            ? (activeMatchSession.player1Id || getPlayerIdFromInput('1'))
+            : (activeMatchSession.player2Id || getPlayerIdFromInput('2'));
+        const p1Id = match.player1Id || activeMatchSession.player1Id;
+        const p2Id = match.player2Id || activeMatchSession.player2Id;
 
         // Remove this player's most recent pot — not only when they were last overall.
-        // Re-enabling a faded ball (Bank / One Pocket) can debit an earlier pot after
-        // the opponent (or the same player) has potted again.
+        // Prefer winnerSlot so Cloud name-only / unbound rows still undo correctly.
         let idx = -1;
         for (let i = match.balls.length - 1; i >= 0; i--) {
-            if (match.balls[i] && match.balls[i].winnerId === playerId) {
+            const ball = match.balls[i];
+            if (!ball) {
+                continue;
+            }
+            if (resolveBallWinnerSlot(ball, p1Id, p2Id) === playerSlot) {
+                idx = i;
+                break;
+            }
+            if (playerId && ball.winnerId === playerId) {
                 idx = i;
                 break;
             }
@@ -3228,12 +3355,16 @@
             ? activeMatchSession.player2Id
             : activeMatchSession.player1Id;
 
-        await applyBallDelta(winnerId, loserId, context.gameType, -1);
+        if (winnerId && loserId) {
+            await applyBallDelta(winnerId, loserId, context.gameType, -1);
+        }
         if (match.balls.length > 0) {
             const last = match.balls[match.balls.length - 1];
-            activeMatchSession.lastBallWinnerSlot = last.winnerId === activeMatchSession.player1Id
-                ? '1'
-                : (last.winnerId === activeMatchSession.player2Id ? '2' : null);
+            activeMatchSession.lastBallWinnerSlot = resolveBallWinnerSlot(
+                last,
+                match.player1Id || activeMatchSession.player1Id,
+                match.player2Id || activeMatchSession.player2Id
+            );
         } else {
             activeMatchSession.lastBallWinnerSlot = null;
         }
@@ -3420,6 +3551,7 @@
                 scores: scores,
                 reason: 'race_complete',
             }));
+            invalidateCloudStatsCache();
         }
         broadcastOverlayStatsIfEnabled();
     }
@@ -3486,6 +3618,7 @@
                     scores: scores,
                     winnerSlot: 'draw',
                 }));
+                invalidateCloudStatsCache();
             }
             broadcastOverlayStatsIfEnabled();
         }
@@ -3589,10 +3722,22 @@
             return;
         }
 
+        // Create/choose may set data-player-id while an open session still has null ids.
+        ['1', '2'].forEach(function (slot) {
+            const inputId = getPlayerIdFromInput(slot);
+            const sessionId = slot === '1' ? activeMatchSession.player1Id : activeMatchSession.player2Id;
+            if (inputId && String(inputId) !== String(sessionId || '')) {
+                const name = slot === '1' ? p1Name : p2Name;
+                bindSessionPlayerId(slot, inputId, name);
+            }
+        });
+
         if (p1Name && p2Name) {
             const context = getCurrentContext();
             if (isPlayerSlotEnabled('1') && isPlayerSlotEnabled('2')) {
                 await ensureActiveSession();
+                // Bind UUIDs before any scoring — not as a side effect of the first pot.
+                await materializeSessionPlayersIfNeeded();
             } else if (sessionNeedsReset(p1Name, p2Name, context)) {
                 await abandonActivePendingMatch();
                 await resetSessionState();
@@ -3619,6 +3764,7 @@
             const match = getActivePendingMatch();
             if (activeMatchSession.cloudSessionStarted) {
                 emitCloudSession('end', buildCloudMatchEndPayload(match, { reason: 'end_match' }));
+                invalidateCloudStatsCache();
             }
             await resetSessionState();
             await ensureActiveSession();
@@ -4059,19 +4205,33 @@
         const countP1 = clampScore(ballsP1);
         const countP2 = clampScore(ballsP2);
         for (let i = 0; i < countP1; i++) {
-            balls.push({ winnerId: match.player1Id, timestamp: timestamp });
+            balls.push({ winnerId: match.player1Id, winnerSlot: '1', timestamp: timestamp });
         }
         for (let i = 0; i < countP2; i++) {
-            balls.push({ winnerId: match.player2Id, timestamp: timestamp });
+            balls.push({ winnerId: match.player2Id, winnerSlot: '2', timestamp: timestamp });
         }
         return balls;
     }
 
     function countBallsForPlayer(match, playerId) {
-        if (!match.balls) {
+        if (!match.balls || !playerId) {
             return 0;
         }
-        return match.balls.filter(function (b) { return b.winnerId === playerId; }).length;
+        const p1Id = match.player1Id;
+        const p2Id = match.player2Id;
+        return match.balls.filter(function (b) {
+            if (b.winnerId === playerId) {
+                return true;
+            }
+            const slot = resolveBallWinnerSlot(b, p1Id, p2Id);
+            if (slot === '1' && playerId === p1Id) {
+                return true;
+            }
+            if (slot === '2' && playerId === p2Id) {
+                return true;
+            }
+            return false;
+        }).length;
     }
 
     async function recomputePlayerStats(playerId) {
@@ -4505,7 +4665,11 @@
             activeMatchSession.straightPoolRunLength = 0;
         }
         activeMatchSession.lastBallWinnerSlot = match.balls && match.balls.length > 0
-            ? (match.balls[match.balls.length - 1].winnerId === match.player1Id ? '1' : '2')
+            ? resolveBallWinnerSlot(
+                match.balls[match.balls.length - 1],
+                match.player1Id,
+                match.player2Id
+            )
             : null;
 
         syncLiveScoreboardFromMatch(match);
@@ -4968,12 +5132,12 @@
         const gameType = getActiveGameType();
 
         if (!name) {
-            return { visible: visible, mode: mode, title: 'Player ' + slot, emptyMessage: 'First tracked game' };
+            return { visible: visible, mode: mode, title: 'Player ' + slot, emptyMessage: 'No stats recorded for this game' };
         }
 
         const playerId = await resolvePlayerIdForSlot(slot);
         if (!playerId) {
-            return { visible: visible, mode: mode, title: name, emptyMessage: 'First tracked game' };
+            return { visible: visible, mode: mode, title: name, emptyMessage: 'No stats recorded for this game' };
         }
 
         const player = await getPlayer(playerId);
@@ -4989,7 +5153,7 @@
                 visible: visible,
                 mode: mode,
                 title: player ? player.name : name,
-                emptyMessage: 'First tracked ' + (GAME_TYPE_LABELS[gameType] || 'game')
+                emptyMessage: 'No stats recorded for this game'
             };
         }
 
@@ -5006,15 +5170,22 @@
         const visible = getOverlayStatsMode() === mode;
         const gameType = getActiveGameType();
         if (!name) {
-            return { visible: visible, mode: mode, title: 'Player ' + slot, emptyMessage: 'First tracked game' };
+            return { visible: visible, mode: mode, title: 'Player ' + slot, emptyMessage: 'No stats recorded for this game' };
         }
         const data = await fetchCloudStats();
         const boundId = getPlayerIdFromInput(slot);
-        const cloudPlayer = (data.players || []).find(function (p) {
-            return cloudPlayerKey(p.name) === cloudPlayerKey(name) ||
-                String(p.id || '') === String(boundId || '') ||
-                cloudPlayerKey(p.id) === cloudPlayerKey(name);
+        const players = data.players || [];
+        // Prefer UUID match, then display-name key — so Create UUID still resolves when
+        // career was briefly keyed by name (null start ids) until end ids align.
+        let cloudPlayer = players.find(function (p) {
+            return String(p.id || '') === String(boundId || '');
         });
+        if (!cloudPlayer) {
+            cloudPlayer = players.find(function (p) {
+                return cloudPlayerKey(p.name) === cloudPlayerKey(name) ||
+                    cloudPlayerKey(p.id) === cloudPlayerKey(name);
+            });
+        }
         const playerId = cloudPlayer
             ? (String(cloudPlayer.id || '').trim() || cloudPlayerKey(cloudPlayer.name))
             : (boundId || null);
@@ -5030,16 +5201,62 @@
                     visible: visible,
                     mode: mode,
                     title: name,
-                    emptyMessage: 'First tracked ' + (GAME_TYPE_LABELS[gameType] || 'game')
+                    emptyMessage: 'No stats recorded for this game'
                 };
             }
             return finishPlayerOverlayPayload(slot, mode, visible, gameType, name, playerId || name, createEmptyTypeStats(), []);
         }
-        const rawMatches = (data.matches || []).filter(function (m) {
+        let rawMatches = (data.matches || []).filter(function (m) {
             return m && m.status === 'completed' && cloudMatchInvolvesPlayer(m, playerId);
         });
-        const player = buildCloudPlayerDetailShape(cloudPlayer, rawMatches);
-        const typeStats = readTypeStats(player, gameType);
+        // Defense: UUID roster row with no type activity — retry by display name / name-key.
+        let player = buildCloudPlayerDetailShape(cloudPlayer, rawMatches);
+        let typeStats = readTypeStats(player, gameType);
+        if (!typeStatsHaveActivity(typeStats) && boundId &&
+            cloudPlayerKey(cloudPlayer.id) !== cloudPlayerKey(name)) {
+            const nameKeyPlayer = players.find(function (p) {
+                return p !== cloudPlayer && (
+                    cloudPlayerKey(p.name) === cloudPlayerKey(name) ||
+                    cloudPlayerKey(p.id) === cloudPlayerKey(name)
+                );
+            });
+            if (nameKeyPlayer) {
+                const nameKeyId = String(nameKeyPlayer.id || '').trim() || cloudPlayerKey(nameKeyPlayer.name);
+                const nameMatches = (data.matches || []).filter(function (m) {
+                    return m && m.status === 'completed' && (
+                        cloudMatchInvolvesPlayer(m, nameKeyId) ||
+                        cloudMatchInvolvesPlayer(m, name) ||
+                        cloudMatchInvolvesPlayer(m, boundId)
+                    );
+                });
+                const namePlayer = buildCloudPlayerDetailShape(nameKeyPlayer, nameMatches);
+                const nameTypeStats = readTypeStats(namePlayer, gameType);
+                if (typeStatsHaveActivity(nameTypeStats) || nameMatches.length > rawMatches.length) {
+                    cloudPlayer = nameKeyPlayer;
+                    rawMatches = nameMatches;
+                    player = namePlayer;
+                    typeStats = nameTypeStats;
+                } else if (nameMatches.length) {
+                    // Merge involvement under the Create UUID for display.
+                    rawMatches = nameMatches;
+                    player = buildCloudPlayerDetailShape(cloudPlayer, rawMatches);
+                    typeStats = readTypeStats(player, gameType);
+                }
+            } else {
+                // No separate name-keyed player — still match history by name.
+                const byName = (data.matches || []).filter(function (m) {
+                    return m && m.status === 'completed' && (
+                        cloudMatchInvolvesPlayer(m, name) ||
+                        cloudMatchInvolvesPlayer(m, boundId)
+                    );
+                });
+                if (byName.length > rawMatches.length) {
+                    rawMatches = byName;
+                    player = buildCloudPlayerDetailShape(cloudPlayer, rawMatches);
+                    typeStats = readTypeStats(player, gameType);
+                }
+            }
+        }
         if (!typeStatsHaveActivity(typeStats) &&
             readLiveCurrentBreakForSlot(slot) <= 0 &&
             readLivePossibleBreakForSlot(slot) <= 0 &&
@@ -5051,7 +5268,7 @@
                 visible: visible,
                 mode: mode,
                 title: player.name,
-                emptyMessage: 'First tracked ' + (GAME_TYPE_LABELS[gameType] || 'game')
+                emptyMessage: 'No stats recorded for this game'
             };
         }
         const matches = rawMatches.map(adaptCloudMatchForUi).filter(function (m) {
@@ -5242,14 +5459,14 @@
         const gameType = getActiveGameType();
 
         if (!p1Name || !p2Name) {
-            return { visible: visible, mode: 'h2h', title: 'Head to Head', emptyMessage: 'First match-up' };
+            return { visible: visible, mode: 'h2h', title: 'Head to Head', emptyMessage: 'No stats recorded for this match-up' };
         }
 
         const p1Id = await resolvePlayerIdForSlot('1');
         const p2Id = await resolvePlayerIdForSlot('2');
 
         if (!p1Id || !p2Id) {
-            return { visible: visible, mode: 'h2h', title: 'Head to Head', emptyMessage: 'First match-up' };
+            return { visible: visible, mode: 'h2h', title: 'Head to Head', emptyMessage: 'No stats recorded for this match-up' };
         }
 
         const hasLiveMatch = hasLiveH2HMatch(p1Id, p2Id, gameType);
@@ -5270,7 +5487,7 @@
             };
         }
         if (!h2h) {
-            return { visible: visible, mode: 'h2h', title: 'Head to Head', emptyMessage: 'First match-up' };
+            return { visible: visible, mode: 'h2h', title: 'Head to Head', emptyMessage: 'No stats recorded for this match-up' };
         }
         const lookupId1 = h2h.player1 && h2h.player1.id ? h2h.player1.id : p1Id;
         const lookupId2 = h2h.player2 && h2h.player2.id ? h2h.player2.id : p2Id;
@@ -5279,7 +5496,7 @@
                 visible: visible,
                 mode: 'h2h',
                 title: 'Head to Head',
-                emptyMessage: 'First ' + (GAME_TYPE_LABELS[gameType] || 'game') + ' match-up'
+                emptyMessage: 'No stats recorded for this match-up'
             };
         }
 
@@ -5842,7 +6059,7 @@
 
     function selectAutocompletePlayer(slot, player, input, list) {
         input.value = player.name;
-        setPlayerIdOnInput(slot, player.id);
+        bindSessionPlayerId(slot, player.id, player.name);
         list.classList.add('noShow');
         if (typeof postNames === 'function') {
             postNames();
@@ -5942,9 +6159,10 @@
             if (Number.isFinite(endMs) && Number.isFinite(ts) && ts > endMs) {
                 return;
             }
-            if (b.winnerId === p1Id) {
+            const slot = resolveBallWinnerSlot(b, p1Id, p2Id);
+            if (slot === '1') {
                 p1 += 1;
-            } else if (b.winnerId === p2Id) {
+            } else if (slot === '2') {
                 p2 += 1;
             }
         });
@@ -6470,6 +6688,13 @@
                     p1 += 1;
                 } else if (b.winnerId === match.player2Id) {
                     p2 += 1;
+                } else {
+                    const slot = resolveBallWinnerSlot(b, match.player1Id, match.player2Id);
+                    if (slot === '1') {
+                        p1 += 1;
+                    } else if (slot === '2') {
+                        p2 += 1;
+                    }
                 }
             });
             return { p1: p1, p2: p2 };
@@ -8366,7 +8591,12 @@
         renderMatchRackBreakdown: renderMatchRackBreakdown,
         getActivePendingMatch: getActivePendingMatch,
         getLastRackWinnerSlot: getLastRackWinnerSlot,
+        noteLastRackWinnerSlot: noteLastRackWinnerSlot,
         buildCloudMatchExtras: buildCloudMatchExtras,
+        buildCloudMatchEndPayload: buildCloudMatchEndPayload,
+        resolveBallWinnerSlot: resolveBallWinnerSlot,
+        bindSessionPlayerId: bindSessionPlayerId,
+        materializeSessionPlayersIfNeeded: materializeSessionPlayersIfNeeded,
         cloudMatchesForPlayer: cloudMatchesForPlayer,
         buildCloudHeadToHead: buildCloudHeadToHead,
         syncActiveMatchGameInfoFromUI: captureActiveMatchGameInfo,
@@ -8380,6 +8610,7 @@
 
     window.openStatsModal = openStatsModal;
     window.getLastRackWinnerSlot = getLastRackWinnerSlot;
+    window.noteLastRackWinnerSlot = noteLastRackWinnerSlot;
     window.isStatsTabAvailable = isStatsTabAvailable;
     window.updateStatsTabAvailability = updateStatsTabAvailability;
     window.closeStatsModal = closeStatsModal;

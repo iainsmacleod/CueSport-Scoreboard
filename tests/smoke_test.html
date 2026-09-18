@@ -2290,6 +2290,69 @@
             assert('Ball Stats', 'H2H overlay scoped to Bank game type',
                 h2hPayload.gameType === 'game5');
 
+            // Null-id / winnerSlot attribution (Cloud name-only defense)
+            if (typeof cp.PlayerStats.resolveBallWinnerSlot === 'function' &&
+                typeof cp.PlayerStats.buildCloudMatchExtras === 'function') {
+                const nullIdMatch = {
+                    player1Id: null,
+                    player2Id: null,
+                    gameType: 'game1',
+                    racks: [],
+                    balls: [
+                        { winnerId: null, winnerSlot: '1', timestamp: new Date().toISOString() },
+                        { winnerId: null, winnerSlot: '2', timestamp: new Date().toISOString() },
+                        { winnerId: null, winnerSlot: '2', timestamp: new Date().toISOString() }
+                    ]
+                };
+                assert('Ball Stats', 'resolveBallWinnerSlot prefers winnerSlot over null ids',
+                    cp.PlayerStats.resolveBallWinnerSlot(nullIdMatch.balls[1], null, null) === '2');
+                const nullExtras = cp.PlayerStats.buildCloudMatchExtras(nullIdMatch);
+                assert('Ball Stats', 'Null-id pots with winnerSlot count per slot (not all P1)',
+                    nullExtras.ballsP1 === 1 && nullExtras.ballsP2 === 2,
+                    JSON.stringify(nullExtras));
+                const legacyNullPot = { winnerId: null, timestamp: new Date().toISOString() };
+                assert('Ball Stats', 'Legacy null===null pot is not attributed to P1',
+                    cp.PlayerStats.resolveBallWinnerSlot(legacyNullPot, null, null) === null);
+            }
+            if (typeof cp.PlayerStats.bindSessionPlayerId === 'function') {
+                const bindId = 'smoke-bind-' + Date.now();
+                cp.PlayerStats.bindSessionPlayerId('2', bindId, 'SmokeBindP2');
+                const sess = cp.PlayerStats.activeMatchSession;
+                assert('Ball Stats', 'bindSessionPlayerId writes session player2Id',
+                    sess && sess.player2Id === bindId,
+                    sess && String(sess.player2Id));
+                assert('Ball Stats', 'bindSessionPlayerId writes data-player-id on input',
+                    cp.document.getElementById('p2Name').getAttribute('data-player-id') === bindId);
+                if (typeof cp.PlayerStats.buildCloudMatchEndPayload === 'function') {
+                    const endPayload = cp.PlayerStats.buildCloudMatchEndPayload(
+                        cp.PlayerStats.getActivePendingMatch && cp.PlayerStats.getActivePendingMatch(),
+                        { reason: 'smoke_end_ids' }
+                    );
+                    assert('Ball Stats', 'session:end payload includes late-bound player2Id',
+                        endPayload && endPayload.player2Id === bindId,
+                        endPayload && String(endPayload.player2Id));
+                }
+            }
+            if (typeof cp.PlayerStats.materializeSessionPlayersIfNeeded === 'function' &&
+                typeof cp.PlayerStats.ensurePlayer === 'function') {
+                const eagerP1 = await cp.PlayerStats.ensurePlayer(tag + '_Eager1');
+                const eagerP2 = await cp.PlayerStats.ensurePlayer(tag + '_Eager2');
+                cp.document.getElementById('p1Name').value = eagerP1.name;
+                cp.document.getElementById('p2Name').value = eagerP2.name;
+                cp.document.getElementById('p1Name').removeAttribute('data-player-id');
+                cp.document.getElementById('p2Name').removeAttribute('data-player-id');
+                cp.PlayerStats.activeMatchSession.player1Id = null;
+                cp.PlayerStats.activeMatchSession.player2Id = null;
+                cp.PlayerStats.activeMatchSession.player1Name = eagerP1.name;
+                cp.PlayerStats.activeMatchSession.player2Name = eagerP2.name;
+                await cp.PlayerStats.materializeSessionPlayersIfNeeded();
+                const eagerSess = cp.PlayerStats.activeMatchSession;
+                assert('Ball Stats', 'Eager materialize binds both slot UUIDs before scoring',
+                    !!eagerSess.player1Id && !!eagerSess.player2Id &&
+                    eagerSess.player1Id === eagerP1.id && eagerSess.player2Id === eagerP2.id,
+                    eagerSess.player1Id + '/' + eagerSess.player2Id);
+            }
+
             // Straight Pool longest run — points are not racks
             cp.document.getElementById('gameTypeSelect').value = 'game4';
             await cp.gameType('game4');

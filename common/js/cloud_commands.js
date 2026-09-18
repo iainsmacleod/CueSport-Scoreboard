@@ -103,17 +103,21 @@
     function runCommand(action, payload) {
         switch (action) {
             case 'score_add':
-                if (payload && payload.player) postScore('add', String(payload.player));
-                return Promise.resolve().then(publishAfterScoring);
+                return Promise.resolve(
+                    payload && payload.player ? postScore('add', String(payload.player)) : null
+                ).then(publishAfterScoring);
             case 'score_sub':
-                if (payload && payload.player) postScore('sub', String(payload.player));
-                return Promise.resolve().then(publishAfterScoring);
+                return Promise.resolve(
+                    payload && payload.player ? postScore('sub', String(payload.player)) : null
+                ).then(publishAfterScoring);
             case 'balls_add':
-                if (payload && payload.player) postBalls('add', String(payload.player));
-                return Promise.resolve().then(publishAfterScoring);
+                return Promise.resolve(
+                    payload && payload.player ? postBalls('add', String(payload.player)) : null
+                ).then(publishAfterScoring);
             case 'balls_sub':
-                if (payload && payload.player) postBalls('sub', String(payload.player));
-                return Promise.resolve().then(publishAfterScoring);
+                return Promise.resolve(
+                    payload && payload.player ? postBalls('sub', String(payload.player)) : null
+                ).then(publishAfterScoring);
             case 'select_breaker':
                 if (payload && payload.slot && typeof onPlayerSlotButton === 'function') {
                     onPlayerSlotButton(String(payload.slot));
@@ -260,8 +264,7 @@
                     typeof handleSnookerBallClick === 'function') {
                     return Promise.resolve(handleSnookerBallClick(el)).then(publishAfterScoring);
                 }
-                togglePot(el);
-                return Promise.resolve().then(publishAfterScoring);
+                return Promise.resolve(togglePot(el)).then(publishAfterScoring);
             }
             case 'snooker_foul': {
                 if (!payload || !payload.foulKey) return Promise.resolve();

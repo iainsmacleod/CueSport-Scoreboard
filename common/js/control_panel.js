@@ -637,6 +637,13 @@ function onPlayerSlotButton(slot) {
     syncPlayerSlotPickerUI();
 }
 
+/** Re-read last rack winner underline after async PlayerStats writes settle. */
+function refreshLastRackWinnerUi() {
+    if (typeof syncPlayerSlotPickerUI === 'function') {
+        syncPlayerSlotPickerUI();
+    }
+}
+
 function syncPlayerSlotPickerUI() {
     const question = document.getElementById("playerSlotQuestion");
     const btn1 = document.getElementById("rackBreakerP1Btn");
@@ -3377,37 +3384,31 @@ function resolveTrackerGameBallPot(ballId) {
 
     if (type === "game2" || type === "game3") {
         if (isEarlyGameBallEnabled() || arePrecedingObjectBallsPotted()) {
-            creditTrackerRackWin(ballId);
-        } else {
-            rejectTrackerEarlyGameBall(ballId);
+            return creditTrackerRackWin(ballId);
         }
-        return;
+        return rejectTrackerEarlyGameBall(ballId);
     }
 
     if (type === "game1") {
         const othersDown = countFadedObjectBalls();
         if (othersDown === 0) {
             if (isEarlyGameBallEnabled()) {
-                creditTrackerRackWin(ballId);
-            } else {
-                rejectTrackerEarlyGameBall(ballId);
+                return creditTrackerRackWin(ballId);
             }
-            return;
+            return rejectTrackerEarlyGameBall(ballId);
         }
         // Legal win: Active Player cleared their assigned group, or (no group tracked)
         // one full group / whole table is down, or every object ball is down.
         if (areActivePlayerEightBallGroupPotted() ||
             isUnassignedEightBallClearForWin() ||
             areAllEightBallObjectBallsPotted()) {
-            creditTrackerRackWin(ballId);
-            return;
+            return creditTrackerRackWin(ballId);
         }
         // 8 potted with own group (or neither group while Open) still up — loss of rack.
-        creditTrackerRackLoss(ballId);
-        return;
+        return creditTrackerRackLoss(ballId);
     }
 
-    creditTrackerRackWin(ballId);
+    return creditTrackerRackWin(ballId);
 }
 
 function applySnookerTrackerLayout() {
@@ -4705,17 +4706,16 @@ function toggleBallSelection() {
 
 function togglePot(element) {
     if (isGameScoringLocked()) {
-        return;
+        return Promise.resolve();
     }
     if (isRackBreakerBallGridLockEnabled() && !getRackBreakerSlot()) {
-        return;
+        return Promise.resolve();
     }
     if (element.classList.contains("ball-win-cooldown")) {
-        return;
+        return Promise.resolve();
     }
     if (isSnookerBallMode()) {
-        handleSnookerBallClick(element);
-        return;
+        return Promise.resolve(handleSnookerBallClick(element));
     }
 
     const wasFaded = element.classList.contains('faded');
@@ -4738,7 +4738,7 @@ function togglePot(element) {
     console.log(`Toggle pot state of`, element.id);
 
     if (nowFaded === wasFaded) {
-        return;
+        return Promise.resolve();
     }
 
     // 8-Ball / Custom: while Open, assign Chosen Ball from Active Player
@@ -4761,7 +4761,7 @@ function togglePot(element) {
         }
         updatePoolRespotButton();
         publishCloudStateAfterTrackerChange();
-        return;
+        return Promise.resolve();
     }
 
     // 8 / 9 / 10-Ball: potting the game ball awards a rack (or 8-ball out-of-sequence loss);
@@ -4785,8 +4785,10 @@ function togglePot(element) {
         }
         if (element.id === winningId) {
             if (nowFaded) {
-                resolveTrackerGameBallPot(element.id);
-            } else if (getStorageItem("trackerRackWinBall") === element.id) {
+                // Await rack-win stats so Cloud publish includes lastRackWinnerSlot.
+                return Promise.resolve(resolveTrackerGameBallPot(element.id));
+            }
+            if (getStorageItem("trackerRackWinBall") === element.id) {
                 const discarded = discardLastScoringUndoIf(function (e) {
                     return (e.type === "rackWin" || e.type === "rackLoss") && e.ballId === element.id;
                 });
@@ -4804,9 +4806,9 @@ function togglePot(element) {
                 }
             }
         }
-        // Object-ball fades (and rejects) must reach mobile; rack-win paths also publish.
+        // Object-ball fades (and rejects) must reach mobile; rack-win paths publish themselves.
         publishCloudStateAfterTrackerChange();
-        return;
+        return Promise.resolve();
     }
 
     // Straight Pool: every pot +1 primary Balls; unclick −1; 14.1 re-rack at one ball left.
@@ -4821,7 +4823,10 @@ function togglePot(element) {
             debitStraightPoolUnpot(element.id);
         }
         publishCloudStateAfterTrackerChange();
+        return Promise.resolve();
     }
+
+    return Promise.resolve();
 }
 
 /**
@@ -5012,16 +5017,26 @@ function creditTrackerRackWin(ballId) {
         clearRackBreakerState();
         updateRackBreakerBallLock();
     }
+    // Note winner before async recordRackWin so Cloud/mobile underline matches dock immediately.
+    if (typeof window.noteLastRackWinnerSlot === 'function') {
+        window.noteLastRackWinnerSlot(player);
+    } else if (window.PlayerStats && typeof window.PlayerStats.noteLastRackWinnerSlot === 'function') {
+        window.PlayerStats.noteLastRackWinnerSlot(player);
+    }
     // Record the game-ball pot before the rack write so per-rack ball counts include it.
     recordTrackerBallPot(player);
-    postScore("add", player, { skipTrackerReset: true, rackRunClass: rackRunClass });
+    const scorePromise = postScore("add", player, { skipTrackerReset: true, rackRunClass: rackRunClass });
     resetBallTrackerKeepingBall(ballId, player);
     setStorageItem("trackerRackWinBall", ballId);
     startTrackerRackWinCooldown(ballId);
     // Commit in-rack undo history; Breaking Player prompt also clears (idempotent).
     commitScoringHistoryForBreakerPrompt();
     maybeShowRackBreakerPickerAfterRackChange();
-    publishCloudStateAfterTrackerChange();
+    refreshLastRackWinnerUi();
+    return Promise.resolve(scorePromise).then(function () {
+        refreshLastRackWinnerUi();
+        publishCloudStateAfterTrackerChange();
+    });
 }
 
 /**
@@ -5046,16 +5061,25 @@ function creditTrackerRackLoss(ballId) {
         clearRackBreakerState();
         updateRackBreakerBallLock();
     }
+    if (typeof window.noteLastRackWinnerSlot === 'function') {
+        window.noteLastRackWinnerSlot(opponent);
+    } else if (window.PlayerStats && typeof window.PlayerStats.noteLastRackWinnerSlot === 'function') {
+        window.PlayerStats.noteLastRackWinnerSlot(opponent);
+    }
     // Shooter's illegal/early 8 still counts as a pot before the rack write.
     recordTrackerBallPot(active);
-    postScore("add", opponent, { skipTrackerReset: true, rackRunClass: rackRunClass });
+    const scorePromise = postScore("add", opponent, { skipTrackerReset: true, rackRunClass: rackRunClass });
     resetBallTrackerKeepingBall(ballId, opponent);
     setStorageItem("trackerRackWinBall", ballId);
     startTrackerRackWinCooldown(ballId);
     // Commit in-rack undo history; Breaking Player prompt also clears (idempotent).
     commitScoringHistoryForBreakerPrompt();
     maybeShowRackBreakerPickerAfterRackChange();
-    publishCloudStateAfterTrackerChange();
+    refreshLastRackWinnerUi();
+    return Promise.resolve(scorePromise).then(function () {
+        refreshLastRackWinnerUi();
+        publishCloudStateAfterTrackerChange();
+    });
 }
 
 /**
@@ -5140,6 +5164,7 @@ function rejectTrackerEarlyGameBall(ballId) {
         recordedBall: true
     });
     startEarlyGameBallRejectCooldown(ballId);
+    return Promise.resolve();
 }
 
 /**
@@ -5375,12 +5400,12 @@ function maybeStraightPoolRerack() {
  */
 function maybeAwardPocketRack(player) {
     if (!isPocketScoreGame() || (player !== "1" && player !== "2")) {
-        return;
+        return Promise.resolve();
     }
     const balls = parseInt(getStorageItem("p" + player + "BallsCtrlPanel"), 10) || 0;
     if (balls >= POCKET_RACK_BALL_TARGET) {
         console.log(`Pocket game: player ${player} reached ${POCKET_RACK_BALL_TARGET} — awarding rack`);
-        // Capture B&R / TR before breaker state is cleared for the next-rack prompt.
+        // Capture B&R / TR before breaker state is cleared for next rack prompt.
         const rackRunClass = isRackBreakerPromptEnabled()
             ? getRackRunClassification(player)
             : null;
@@ -5388,7 +5413,7 @@ function maybeAwardPocketRack(player) {
             clearRackBreakerState();
             updateRackBreakerBallLock();
         }
-        postScore("add", player, { skipTrackerReset: true, rackRunClass: rackRunClass });
+        const scorePromise = postScore("add", player, { skipTrackerReset: true, rackRunClass: rackRunClass });
         if (typeof resetBallTracker === "function") {
             resetBallTracker();
         }
@@ -5397,7 +5422,9 @@ function maybeAwardPocketRack(player) {
         }
         commitScoringHistoryForBreakerPrompt();
         maybeShowRackBreakerPickerAfterRackChange();
+        return scorePromise;
     }
+    return Promise.resolve();
 }
 
 function applySavedBallStates() {
@@ -6163,7 +6190,7 @@ function pushScores() {
 
 function postBalls(opt1, player) {
     if (isGameScoringLocked()) {
-        return;
+        return Promise.resolve();
     }
     let p1BallsValue = parseInt(getStorageItem("p1BallsCtrlPanel"), 10) || 0;
     let p2BallsValue = parseInt(getStorageItem("p2BallsCtrlPanel"), 10) || 0;
@@ -6212,20 +6239,23 @@ function postBalls(opt1, player) {
         window.streamSharing.sendUpdate();
     }
 
+    let statsPromise = Promise.resolve();
     if (window.PlayerStats && ballsChanged && !isSnooker()) {
         if (opt1 === 'add') {
-            window.PlayerStats.recordBallWin(player).catch(function (err) {
+            statsPromise = window.PlayerStats.recordBallWin(player).catch(function (err) {
                 console.error('PlayerStats recordBallWin error:', err);
             });
         } else if (hadRecordedBallToUndo) {
-            window.PlayerStats.undoLastBall(player).catch(function (err) {
+            statsPromise = window.PlayerStats.undoLastBall(player).catch(function (err) {
                 console.error('PlayerStats undoLastBall error:', err);
             });
         }
     }
 
     if (ballsChanged && opt1 === 'add') {
-        maybeAwardPocketRack(player);
+        statsPromise = statsPromise.then(function () {
+            return maybeAwardPocketRack(player);
+        });
     }
 
     if (ballsChanged && isSnooker()) {
@@ -6234,6 +6264,7 @@ function postBalls(opt1, player) {
     if (ballsChanged) {
         clearScoreFieldsDirty();
     }
+    return statsPromise;
 }
 
 function resetPlayerBalls(player) {
@@ -6281,11 +6312,11 @@ function postScore(opt1, player, options) {
 
     if (raceLocked && !isWinner) {
         updateScoreControlAvailability();
-        return;
+        return Promise.resolve();
     }
     if (raceLocked && opt1 === "add") {
         updateScoreControlAvailability();
-        return;
+        return Promise.resolve();
     }
 
     // Capture in-frame points/breaks before they are cleared on frame award
@@ -6295,7 +6326,7 @@ function postScore(opt1, player, options) {
     }
 
     if (player !== "1" && player !== "2") {
-        return;
+        return Promise.resolve();
     }
 
     let scoreValue = player === "1" ? p1ScoreValue : p2ScoreValue;
@@ -6304,7 +6335,7 @@ function postScore(opt1, player, options) {
             scoreValue = raceTarget;
             document.getElementById("p" + player + "Score").value = scoreValue;
             updateScoreControlAvailability();
-            return;
+            return Promise.resolve();
         }
 
         if (scoreValue < 999) {
@@ -6349,20 +6380,40 @@ function postScore(opt1, player, options) {
     }
     updateScoreControlAvailability();
 
+    // Pin last-winner before async stats write so Cloud state / underline match immediately.
+    if (scoreChanged && opt1 === 'add') {
+        if (typeof window.noteLastRackWinnerSlot === 'function') {
+            window.noteLastRackWinnerSlot(player);
+        } else if (window.PlayerStats && typeof window.PlayerStats.noteLastRackWinnerSlot === 'function') {
+            window.PlayerStats.noteLastRackWinnerSlot(player);
+        }
+        refreshLastRackWinnerUi();
+    }
+
+    let statsPromise = Promise.resolve();
     if (window.PlayerStats && scoreChanged) {
         if (opt1 === 'add') {
             if (isSnooker() && snookerFrameSnapshot && typeof window.PlayerStats.recordSnookerFrame === "function") {
-                window.PlayerStats.recordSnookerFrame(snookerFrameSnapshot).then(function () {
+                statsPromise = window.PlayerStats.recordSnookerFrame(snookerFrameSnapshot).then(function () {
                     updateCallGameButton();
+                    refreshLastRackWinnerUi();
+                    if (typeof publishCloudStateAfterTrackerChange === 'function') {
+                        publishCloudStateAfterTrackerChange();
+                    }
                 }).catch(function (err) {
                     console.error('PlayerStats recordSnookerFrame error:', err);
                 });
             } else {
-                window.PlayerStats.recordRackWin(player, rackRunClass ? { rackRunClass: rackRunClass } : undefined).then(function () {
+                statsPromise = window.PlayerStats.recordRackWin(player, rackRunClass ? { rackRunClass: rackRunClass } : undefined).then(function () {
                     return window.PlayerStats.checkMatchCompletion();
                 }).then(function () {
                     updateCallGameButton();
                     updateScoreControlAvailability();
+                    // Always refresh last-winner underline after async write (incl. skipTrackerReset).
+                    refreshLastRackWinnerUi();
+                    if (typeof publishCloudStateAfterTrackerChange === 'function') {
+                        publishCloudStateAfterTrackerChange();
+                    }
                     // Tracker rack win/loss already prompted for the next breaker; skipping
                     // avoids re-prompting after a rack that was already committed.
                     if (!skipTrackerReset) {
@@ -6373,9 +6424,13 @@ function postScore(opt1, player, options) {
                 });
             }
         } else {
-            window.PlayerStats.undoLastRack(player).then(function () {
+            statsPromise = window.PlayerStats.undoLastRack(player).then(function () {
                 updateCallGameButton();
                 updateScoreControlAvailability();
+                refreshLastRackWinnerUi();
+                if (typeof publishCloudStateAfterTrackerChange === 'function') {
+                    publishCloudStateAfterTrackerChange();
+                }
                 if (!skipTrackerReset) {
                     maybeShowRackBreakerPickerAfterRackChange();
                 }
@@ -6387,6 +6442,7 @@ function postScore(opt1, player, options) {
     if (scoreChanged) {
         clearScoreFieldsDirty();
     }
+    return statsPromise;
 }
 
 function shotClock(timex) {

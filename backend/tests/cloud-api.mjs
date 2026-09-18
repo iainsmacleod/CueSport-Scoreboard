@@ -11,7 +11,7 @@ import { fileURLToPath } from 'url';
 import WebSocket from 'ws';
 import Database from 'better-sqlite3';
 import bcrypt from 'bcryptjs';
-import { pairSessionEvents } from '../src/stats/account-stats.js';
+import { pairSessionEvents, summarizeAccountStats } from '../src/stats/account-stats.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
@@ -195,6 +195,58 @@ async function run() {
       'pairSessionEvents: cross-room end does not steal later LIFO end',
       s2.end?.id === 'end-s2-cross-room',
       s2.end ? `s2 end overwritten to ${s2.end.id}` : 'missing'
+    );
+  }
+
+  // Unit: career keys prefer session:end player ids when start had nulls (Create late-bind).
+  {
+    const createUuid = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    const events = [
+      {
+        id: 'end-late-id',
+        room_id: 'room-eager',
+        event_type: 'session:end',
+        session_id: 'sess-eager',
+        created_at: '2026-01-02T12:00:00.000Z',
+        payload: {
+          player1Id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          player2Id: createUuid,
+          player1: 'Alice',
+          player2: 'Bob',
+          scores: { p1: 1, p2: 0 },
+          winnerSlot: '1',
+          ballsP1: 2,
+          ballsP2: 5,
+          racks: [{ winnerSlot: '1' }],
+        },
+      },
+      {
+        id: 'start-null-ids',
+        room_id: 'room-eager',
+        event_type: 'session:start',
+        session_id: 'sess-eager',
+        created_at: '2026-01-02T11:00:00.000Z',
+        payload: {
+          player1: 'Alice',
+          player2: 'Bob',
+          player1Id: null,
+          player2Id: null,
+          gameType: 'game1',
+        },
+      },
+    ];
+    const summary = summarizeAccountStats(events);
+    const bob = (summary.players || []).find((p) => p.id === createUuid || p.name === 'Bob');
+    const match = (summary.matches || []).find((m) => m.id === 'sess-eager' || m.startEventId === 'start-null-ids');
+    assert(
+      'summarizeAccountStats: prefers end player2Id over null start id',
+      !!bob && bob.id === createUuid && bob.ballsPotted === 5,
+      bob ? `${bob.id} balls=${bob.ballsPotted}` : 'Bob missing'
+    );
+    assert(
+      'summarizeAccountStats: match stores end-bound player2Id',
+      !!match && match.player2Id === createUuid,
+      match ? String(match.player2Id) : 'match missing'
     );
   }
 

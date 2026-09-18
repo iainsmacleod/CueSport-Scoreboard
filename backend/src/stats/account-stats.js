@@ -131,10 +131,11 @@ export function summarizeAccountStats(events) {
     const sp = start.payload || {};
     const end = pair.end;
     const ep = end ? (end.payload || {}) : {};
-    const p1Name = sp.player1 || '';
-    const p2Name = sp.player2 || '';
-    const p1Id = String(sp.player1Id || '').trim() || null;
-    const p2Id = String(sp.player2Id || '').trim() || null;
+    const p1Name = String(ep.player1 || sp.player1 || '').trim();
+    const p2Name = String(ep.player2 || sp.player2 || '').trim();
+    // Prefer end ids (Create/choose / late bind) over start ids that may have been null.
+    const p1Id = String(ep.player1Id || sp.player1Id || '').trim() || null;
+    const p2Id = String(ep.player2Id || sp.player2Id || '').trim() || null;
     if (!p1Name || !p2Name) continue;
 
     const label = tableLabel(start);
