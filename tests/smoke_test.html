@@ -479,6 +479,44 @@
                 !cp.document.getElementById('ballTrackerBalls'));
             assert('Core', 'Replay clip delete note',
                 (cp.document.querySelector('#savedPathNote')?.textContent || '').indexOf('manual cleanup required') !== -1);
+            assert('Core', 'Player name inputs enforce 20 character max',
+                cp.document.getElementById('p1Name').getAttribute('maxlength') === '20' &&
+                cp.document.getElementById('p2Name').getAttribute('maxlength') === '20' &&
+                cp.document.getElementById('statsPlayerRenameInput').getAttribute('maxlength') === '20');
+            assert('Core', 'Replay clip rename controls on dock',
+                cp.document.querySelectorAll('.clip-edit-btn').length === 5 &&
+                typeof cp.renameClip === 'function' &&
+                typeof cp.getReplayClipDisplayLabel === 'function' &&
+                typeof cp.loadReplayHistory === 'function');
+            // Labels ride with path entries through delete (no OBS required).
+            const priorReplayHistory = cp.localStorage.getItem('replayHistory');
+            cp.localStorage.setItem('replayHistory', JSON.stringify([
+                { path: 'C:\\smoke\\clip-a.mp4', label: 'Break' },
+                { path: 'C:\\smoke\\clip-b.mp4', label: '' }
+            ]));
+            cp.updateReplayButtonsVisibility();
+            const clip1Label = cp.document.querySelector('#prvReplayClip1 .clip-label');
+            const clip2Label = cp.document.querySelector('#prvReplayClip2 .clip-label');
+            assert('Core', 'Replay clip custom label displayed',
+                clip1Label && clip1Label.textContent === 'Break',
+                clip1Label && clip1Label.textContent);
+            assert('Core', 'Replay clip default label for empty custom name',
+                clip2Label && clip2Label.textContent === 'Clip 2',
+                clip2Label && clip2Label.textContent);
+            cp.deleteClip(0, null, { skipConfirm: true });
+            const afterDelete = cp.loadReplayHistory();
+            const clip1After = cp.document.querySelector('#prvReplayClip1 .clip-label');
+            assert('Core', 'Replay clip label follows entry after delete',
+                afterDelete.length === 1 &&
+                afterDelete[0].path.indexOf('clip-b') !== -1 &&
+                clip1After && clip1After.textContent === 'Clip 1',
+                JSON.stringify(afterDelete) + ' / ' + (clip1After && clip1After.textContent));
+            if (priorReplayHistory == null) {
+                cp.localStorage.removeItem('replayHistory');
+            } else {
+                cp.localStorage.setItem('replayHistory', priorReplayHistory);
+            }
+            cp.updateReplayButtonsVisibility();
             assert('Core', 'Setup Name and Color labels',
                 (cp.document.getElementById('p1NameLabel').textContent || '').trim() === 'Name:' &&
                 (cp.document.getElementById('p1ColorLabel').textContent || '').trim() === 'Color:');
@@ -608,22 +646,28 @@
                     fetchRepoText('../backend/web/mobile/modern.css'),
                     fetchRepoText('../backend/web/shared/cloud-client.js'),
                     fetchRepoText('../common/js/cloud_commands.js'),
-                    fetchRepoText('../backend/web/mobile/app.js')
+                    fetchRepoText('../backend/web/mobile/app.js'),
+                    fetchRepoText('../backend/src/ws/room-hub.js')
                 ]);
-                const landingSource = sourceFiles[0];
-                const dashboardSource = sourceFiles[1];
-                const dashboardAppSource = sourceFiles[2];
-                const mobileSource = sourceFiles[3];
-                const sharedStyles = sourceFiles[4];
-                const mobileModernStyles = sourceFiles[5];
-                const cloudClientSource = sourceFiles[6];
-                const cloudCommandsSource = sourceFiles[7];
-                const mobileAppSource = sourceFiles[8];
+                const landingSource = sourceFiles[0].replace(/\r\n/g, '\n');
+                const dashboardSource = sourceFiles[1].replace(/\r\n/g, '\n');
+                const dashboardAppSource = sourceFiles[2].replace(/\r\n/g, '\n');
+                const mobileSource = sourceFiles[3].replace(/\r\n/g, '\n');
+                const sharedStyles = sourceFiles[4].replace(/\r\n/g, '\n');
+                const mobileModernStyles = sourceFiles[5].replace(/\r\n/g, '\n');
+                const cloudClientSource = sourceFiles[6].replace(/\r\n/g, '\n');
+                const cloudCommandsSource = sourceFiles[7].replace(/\r\n/g, '\n');
+                const mobileAppSource = sourceFiles[8].replace(/\r\n/g, '\n');
+                const roomHubSource = sourceFiles[9].replace(/\r\n/g, '\n');
                 const parser = new DOMParser();
                 const landingDoc = parser.parseFromString(landingSource, 'text/html');
                 const dashboardDoc = parser.parseFromString(dashboardSource, 'text/html');
                 const mobileDoc = parser.parseFromString(mobileSource, 'text/html');
                 const slides = landingDoc.querySelectorAll('#marketingCarouselTrack .marketing-slide');
+                const guestAllowedMatch = roomHubSource.match(/GUEST_ALLOWED_COMMANDS\s*=\s*new Set\(\[([\s\S]*?)\]\)/);
+                const guestAllowedBlock = guestAllowedMatch ? guestAllowedMatch[1] : '';
+                const ownerCommandsMatch = roomHubSource.match(/ACCOUNT_OWNER_COMMANDS\s*=\s*new Set\(\[([\s\S]*?)\]\)/);
+                const ownerCommandsBlock = ownerCommandsMatch ? ownerCommandsMatch[1] : '';
 
                 assert('Cloud Website', 'Public brand links home without version text',
                     landingDoc.querySelector('.site-brand')?.getAttribute('href') === '/' &&
@@ -727,14 +771,17 @@
                     sharedStyles.indexOf('.mobile-bottom-nav-inner') !== -1 &&
                     sharedStyles.indexOf('max-width: var(--content-max, 720px);') !== -1);
                 assert('Cloud Mobile', 'Header, scrolling main, and footer use dashboard shell layout',
-                    sharedStyles.indexOf('body.mobile {\n  --content-max: 720px;') !== -1 &&
+                    sharedStyles.indexOf('body.mobile {') !== -1 &&
+                    sharedStyles.indexOf('--content-max: 720px;') !== -1 &&
                     sharedStyles.indexOf('body.mobile > header .mobile-header-row') !== -1 &&
                     sharedStyles.indexOf('body.mobile > main#app') !== -1 &&
                     sharedStyles.indexOf('height: 100dvh;') !== -1 &&
                     sharedStyles.indexOf('position: static;') !== -1);
                 assert('Cloud Mobile', 'Desktop header and footer widen without stretching mobile-first main',
-                    sharedStyles.indexOf('body.mobile .mobile-bottom-nav-inner {\n    max-width: 1440px;') !== -1 &&
-                    sharedStyles.indexOf('body.mobile > main#app {\n  flex: 1 1 auto;') !== -1 &&
+                    sharedStyles.indexOf('body.mobile .mobile-bottom-nav-inner') !== -1 &&
+                    sharedStyles.indexOf('max-width: 1440px;') !== -1 &&
+                    sharedStyles.indexOf('body.mobile > main#app') !== -1 &&
+                    sharedStyles.indexOf('flex: 1 1 auto;') !== -1 &&
                     sharedStyles.indexOf('max-width: var(--content-max);') !== -1);
                 assert('Cloud Website', 'Public navigation and carousel buttons use purple-first styling',
                     sharedStyles.indexOf('body.landing-home .btn.primary') !== -1 &&
@@ -746,7 +793,9 @@
                     mobileModernStyles.indexOf('body.mobile .btn.secondary') !== -1 &&
                     mobileModernStyles.indexOf('body.mobile .btn.save') !== -1);
                 assert('Cloud Mobile', 'Stream cards keep controls clear of their borders',
-                    sharedStyles.indexOf('.stream-section {\n  margin-top: 0.35rem;\n  padding: 0.75rem;') !== -1);
+                    sharedStyles.indexOf('.stream-section {') !== -1 &&
+                    sharedStyles.indexOf('margin-top: 0.35rem;') !== -1 &&
+                    sharedStyles.indexOf('padding: 0.75rem;') !== -1);
                 assert('Cloud Mobile', 'Same-name players can be created and selected by UUID',
                     mobileAppSource.indexOf('Create another player:') !== -1 &&
                     mobileAppSource.indexOf('Player ID ${shortId}') !== -1 &&
@@ -756,6 +805,36 @@
                     cloudCommandsSource.indexOf("el.setAttribute('data-player-id', playerId)") !== -1 &&
                     cloudCommandsSource.indexOf("el.removeAttribute('data-player-id')") !== -1 &&
                     cloudCommandsSource.indexOf('invalidateCloudStatsCache') !== -1);
+                assert('Cloud Dock', 'Remote set_player_name clamps to 20 characters',
+                    cloudCommandsSource.indexOf("el.value = name.substring(0, 20)") !== -1);
+                assert('Cloud Dock', 'Guests cannot set player names remotely',
+                    !!guestAllowedMatch &&
+                    guestAllowedBlock.indexOf('set_player_name') === -1 &&
+                    guestAllowedBlock.indexOf('score_add') !== -1 &&
+                    guestAllowedBlock.indexOf('reset_scores') !== -1);
+                assert('Cloud Dock', 'Account-owner stream/replay commands require owner auth',
+                    !!ownerCommandsMatch &&
+                    ownerCommandsBlock.indexOf('toggle_streaming') !== -1 &&
+                    ownerCommandsBlock.indexOf('set_stream_monitoring') !== -1 &&
+                    ownerCommandsBlock.indexOf('set_replay_controls') !== -1);
+                assert('Cloud Dock', 'rename_clip and set_stream_monitoring command handlers exist',
+                    cloudCommandsSource.indexOf("case 'rename_clip':") !== -1 &&
+                    cloudCommandsSource.indexOf("case 'set_stream_monitoring':") !== -1 &&
+                    cloudCommandsSource.indexOf('renameClip(') !== -1);
+                assert('Cloud Mobile', 'Instant Replay Control exposes monitoring and clip rename',
+                    !!mobileDoc.getElementById('streamReplaySection') &&
+                    !mobileDoc.getElementById('streamReplayUnlockSection') &&
+                    !!mobileDoc.getElementById('monitorBtn') &&
+                    !!mobileDoc.getElementById('instantReplayBtn') &&
+                    mobileDoc.querySelectorAll('.clip-edit[data-rename-index]').length === 5 &&
+                    !!mobileDoc.getElementById('renameClipModal') &&
+                    !!mobileDoc.getElementById('renameClipModalInput') &&
+                    mobileDoc.getElementById('renameClipModalInput').getAttribute('maxlength') === '20');
+                assert('Cloud Mobile', 'Placeholder player names force Setup view',
+                    mobileAppSource.indexOf('function isDefaultPlayerName') !== -1 &&
+                    mobileAppSource.indexOf("n === 'player 1'") !== -1 &&
+                    mobileAppSource.indexOf("n === 'player 2'") !== -1 &&
+                    mobileAppSource.indexOf("needsMatchSetup(state) ? 'setup' : 'control'") !== -1);
                 assert('Cloud Website', 'Mobile header uses logo, title, then connection status',
                     (function () {
                         const row = mobileDoc.querySelector('.mobile-header-row');
@@ -770,7 +849,9 @@
                     sharedStyles.indexOf('font-size: clamp(0.72rem, 3.8vw, 1.35rem);') !== -1 &&
                     sharedStyles.indexOf('white-space: nowrap;') !== -1 &&
                     sharedStyles.indexOf('text-overflow: ellipsis;') !== -1 &&
-                    sharedStyles.indexOf('.conn-status {\n  position: relative;\n  flex-shrink: 0;') !== -1);
+                    sharedStyles.indexOf('.conn-status {') !== -1 &&
+                    sharedStyles.indexOf('position: relative;') !== -1 &&
+                    sharedStyles.indexOf('flex-shrink: 0;') !== -1);
                 assert('Cloud Admin', 'Account deletion supports typed email, signup block, and trial reset',
                     dashboardAppSource.indexOf('adminDeleteConfirmEmail') !== -1 &&
                     dashboardAppSource.indexOf('adminDeleteBlockEmail') !== -1 &&
@@ -792,9 +873,10 @@
                     dashboardSource.indexOf('Browser Source') !== -1 &&
                     dashboardSource.indexOf('companion OBS product') !== -1);
                 assert('Cloud Dashboard', 'Table cards use a centered responsive capped grid',
+                    sharedStyles.indexOf('.table-cards {') !== -1 &&
                     sharedStyles.indexOf('repeat(auto-fit, minmax(min(100%, 18rem), 22rem))') !== -1 &&
                     sharedStyles.indexOf('justify-content: center;') !== -1 &&
-                    sharedStyles.indexOf('.table-cards {\n    grid-template-columns: minmax(0, 1fr);') !== -1);
+                    sharedStyles.indexOf('grid-template-columns: minmax(0, 1fr);') !== -1);
                 assert('Cloud Dashboard', 'Setup guide covers managed and self-hosted Cloud',
                     dashboardSource.indexOf('managed service for the simplest setup') !== -1 &&
                     dashboardSource.indexOf('choose <strong>Self-hosting</strong>') !== -1 &&
@@ -1280,6 +1362,105 @@
             p1Input.value = '';
             p1Input.removeAttribute('data-player-id');
 
+            // --- Player name conditions (empty, truncate, clear binding, same-UUID block) ---
+            assert('PlayerStats API', 'Empty name createPlayer returns null',
+                (await cp.PlayerStats.createPlayer('')) === null);
+            assert('PlayerStats API', 'Whitespace-only createPlayer returns null',
+                (await cp.PlayerStats.createPlayer('   \t  ')) === null);
+            assert('PlayerStats API', 'Whitespace-only ensurePlayer returns null',
+                (await cp.PlayerStats.ensurePlayer('  ')) === null);
+            let emptyRenameThrew = false;
+            try {
+                await cp.PlayerStats.updatePlayerName(player.id, '   ');
+            } catch (err) {
+                emptyRenameThrew = !!(err && String(err.message || '').indexOf('empty') !== -1);
+            }
+            assert('PlayerStats API', 'Empty rename throws Name cannot be empty',
+                emptyRenameThrew);
+            const longRawName = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+            const truncatedPlayer = await cp.PlayerStats.createPlayer(longRawName);
+            assert('PlayerStats API', 'Create player truncates to 20 characters',
+                truncatedPlayer &&
+                truncatedPlayer.name.length === 20 &&
+                truncatedPlayer.name === longRawName.substring(0, 20),
+                truncatedPlayer && truncatedPlayer.name);
+            await cp.PlayerStats.updatePlayerName(truncatedPlayer.id, 'Z'.repeat(30));
+            const renamedTruncated = await cp.PlayerStats.getPlayer(truncatedPlayer.id);
+            assert('PlayerStats API', 'Rename truncates to 20 characters',
+                renamedTruncated && renamedTruncated.name.length === 20 &&
+                renamedTruncated.name === 'Z'.repeat(20),
+                renamedTruncated && renamedTruncated.name);
+
+            const clearBindPlayer = await cp.PlayerStats.createPlayer(tag + '_ClearBind');
+            p1Input.value = clearBindPlayer.name;
+            p1Input.setAttribute('data-player-id', clearBindPlayer.id);
+            cp.postNames();
+            await sleep(150);
+            assert('PlayerStats API', 'Named input keeps data-player-id binding',
+                p1Input.getAttribute('data-player-id') === clearBindPlayer.id);
+            p1Input.value = '';
+            cp.postNames();
+            await sleep(150);
+            assert('PlayerStats API', 'Clearing name clears data-player-id',
+                !p1Input.getAttribute('data-player-id'),
+                p1Input.getAttribute('data-player-id'));
+
+            const sameUuidPlayer = await cp.PlayerStats.createPlayer(tag + '_SameUuid');
+            const p2Input = cp.document.getElementById('p2Name');
+            p1Input.value = sameUuidPlayer.name;
+            p2Input.value = sameUuidPlayer.name;
+            p1Input.setAttribute('data-player-id', sameUuidPlayer.id);
+            p2Input.setAttribute('data-player-id', sameUuidPlayer.id);
+            cp.PlayerStats.bindSessionPlayerId('1', sameUuidPlayer.id, sameUuidPlayer.name);
+            cp.PlayerStats.bindSessionPlayerId('2', sameUuidPlayer.id, sameUuidPlayer.name);
+            assert('PlayerStats API', 'Same UUID in both slots sets duplicateNames',
+                cp.PlayerStats.activeMatchSession.duplicateNames === true &&
+                cp.PlayerStats.activeMatchSession.player1Id === sameUuidPlayer.id &&
+                cp.PlayerStats.activeMatchSession.player2Id === sameUuidPlayer.id);
+            // Force an active pending session so recordRackWin reaches the duplicateNames guard.
+            cp.postNames();
+            await sleep(200);
+            assert('PlayerStats API', 'Same UUID both slots keeps duplicateNames after postNames',
+                cp.PlayerStats.activeMatchSession.duplicateNames === true);
+            const gamesBeforeDup = (await cp.PlayerStats.getPlayer(sameUuidPlayer.id)).stats.gamesWon || 0;
+            const racksBeforeDup = (await cp.PlayerStats.getPlayer(sameUuidPlayer.id)).stats.racksWon || 0;
+            await cp.PlayerStats.recordRackWin('1');
+            await cp.PlayerStats.flushRackRecordQueue();
+            const afterDupPlayer = await cp.PlayerStats.getPlayer(sameUuidPlayer.id);
+            assert('PlayerStats API', 'Same UUID both slots blocks career rack writes',
+                (afterDupPlayer.stats.gamesWon || 0) === gamesBeforeDup &&
+                (afterDupPlayer.stats.racksWon || 0) === racksBeforeDup,
+                JSON.stringify({
+                    games: [gamesBeforeDup, afterDupPlayer.stats.gamesWon],
+                    racks: [racksBeforeDup, afterDupPlayer.stats.racksWon]
+                }));
+
+            const dupNameA = await cp.PlayerStats.createPlayer(tag + '_TwinName');
+            const dupNameB = await cp.PlayerStats.createPlayer(tag + '_TwinName');
+            assert('PlayerStats API', 'Same display name creates distinct UUIDs',
+                dupNameA && dupNameB && dupNameA.id !== dupNameB.id &&
+                dupNameA.nameNormalized === dupNameB.nameNormalized);
+            p1Input.value = dupNameA.name;
+            p2Input.value = dupNameB.name;
+            p1Input.setAttribute('data-player-id', dupNameA.id);
+            p2Input.setAttribute('data-player-id', dupNameB.id);
+            cp.PlayerStats.bindSessionPlayerId('1', dupNameA.id, dupNameA.name);
+            cp.PlayerStats.bindSessionPlayerId('2', dupNameB.id, dupNameB.name);
+            assert('PlayerStats API', 'Distinct UUIDs with same display name clear duplicateNames',
+                cp.PlayerStats.activeMatchSession.duplicateNames === false &&
+                cp.PlayerStats.activeMatchSession.player1Id === dupNameA.id &&
+                cp.PlayerStats.activeMatchSession.player2Id === dupNameB.id);
+            p1Input.value = '';
+            p2Input.value = '';
+            p1Input.removeAttribute('data-player-id');
+            p2Input.removeAttribute('data-player-id');
+            // Clear any pending match left by name-binding checks before scoring suites.
+            if (typeof cp.PlayerStats.onClearGame === 'function') {
+                await cp.PlayerStats.onClearGame({ skipCloudDiscard: true });
+            }
+            cp.performResetScores({ endMatch: true });
+            await sleep(100);
+
             const opp = await cp.PlayerStats.ensurePlayer(tag + '_P2');
             testOpponentId = opp.id;
             await cp.PlayerStats.saveMatch({
@@ -1710,11 +1891,15 @@
             cp.postScore('add', '1');
             cp.postScore('add', '2');
             cp.postScore('add', '1');
-            // No sleep — reproduce race that previously saved 3–2 with one rack
+            // No sleep between scores — callGame flushes the rack queue itself.
+            const pendingBeforeEarly = cp.PlayerStats.getActivePendingMatch();
             const earlySaved = await cp.PlayerStats.callGame();
             assert('Match History', 'Call Match Early saves with pending racks', earlySaved === true);
             const earlyMatches = await cp.PlayerStats.getMatchesForPlayer(histP1.id);
-            const earlyMatch = earlyMatches.find(function (m) {
+            const earlyMatchId = pendingBeforeEarly && pendingBeforeEarly.id;
+            const earlyMatch = (earlyMatchId && earlyMatches.find(function (m) {
+                return m.id === earlyMatchId;
+            })) || earlyMatches.find(function (m) {
                 return m.status === 'completed' && m.finalScore &&
                     m.finalScore.p1 === 3 && m.finalScore.p2 === 2;
             });
@@ -1722,7 +1907,7 @@
                 !!earlyMatch, earlyMatch && JSON.stringify(earlyMatch.finalScore));
             assert('Match History', 'Call Match Early racks length matches score',
                 earlyMatch && earlyMatch.racks && earlyMatch.racks.length === 5,
-                earlyMatch && earlyMatch.racks && earlyMatch.racks.length);
+                earlyMatch && earlyMatch.racks && String(earlyMatch.racks.length));
             cp.performResetScores({ endMatch: true });
             await sleep(200);
 

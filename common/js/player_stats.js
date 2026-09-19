@@ -2831,7 +2831,8 @@
 
         const rackEntry = {
             rackNumber: match.racks.length + 1,
-            winnerId: ids.winnerId
+            winnerId: ids.winnerId,
+            winnerSlot: playerSlot === '1' || playerSlot === '2' ? playerSlot : null
         };
         applyRackTiming(match, rackEntry);
         if (isTrackerRackWinGameType(context.gameType)) {
@@ -3439,9 +3440,62 @@
     }
 
     /**
+     * If rack rows exceed the scoreboard total (duplicate reconcile / race), trim and
+     * reassign winners so history matches finalScore.
+     */
+    function trimMatchRacksToScoreline(match, scores) {
+        if (!match || !scores) {
+            return;
+        }
+        if (!match.racks) {
+            match.racks = [];
+        }
+        const wantP1 = clampScore(scores.p1);
+        const wantP2 = clampScore(scores.p2);
+        const wantTotal = wantP1 + wantP2;
+        if (wantTotal <= 0) {
+            match.racks = [];
+            match.finalScore = { p1: 0, p2: 0 };
+            return;
+        }
+        const p1Id = match.player1Id;
+        const p2Id = match.player2Id;
+        if (match.racks.length > wantTotal) {
+            match.racks = match.racks.slice(0, wantTotal);
+        }
+        let leftP1 = wantP1;
+        let leftP2 = wantP2;
+        for (let i = 0; i < match.racks.length; i++) {
+            const row = match.racks[i];
+            const prefer2 = String(row.winnerSlot) === '2' || row.winnerId === p2Id;
+            const prefer1 = String(row.winnerSlot) === '1' || row.winnerId === p1Id;
+            if (prefer2 && leftP2 > 0) {
+                row.winnerId = p2Id;
+                row.winnerSlot = '2';
+                leftP2 -= 1;
+            } else if (prefer1 && leftP1 > 0) {
+                row.winnerId = p1Id;
+                row.winnerSlot = '1';
+                leftP1 -= 1;
+            } else if (leftP1 > 0) {
+                row.winnerId = p1Id;
+                row.winnerSlot = '1';
+                leftP1 -= 1;
+            } else {
+                row.winnerId = p2Id;
+                row.winnerSlot = '2';
+                leftP2 -= 1;
+            }
+            row.rackNumber = i + 1;
+        }
+        match.finalScore = { p1: wantP1, p2: wantP2 };
+    }
+
+    /**
      * Append any missing rack rows so match.racks counts match the live scoreboard.
      * Used before Call Match Early / End Match so async recordRackWin cannot under-count.
      * Straight Pool skips this — points are not racks.
+     * Also remaps existing rows when winnerId was stale but enough rack rows already exist.
      */
     async function reconcileMatchRacksWithScores(match, scores) {
         if (!match || !scores) {
@@ -3459,12 +3513,48 @@
         }
         const p1Id = match.player1Id;
         const p2Id = match.player2Id;
-        let p1Have = match.racks.filter(function (r) { return r.winnerId === p1Id; }).length;
-        let p2Have = match.racks.filter(function (r) { return r.winnerId === p2Id; }).length;
+        let p1Have = match.racks.filter(function (r) {
+            return r.winnerId === p1Id || String(r.winnerSlot) === '1';
+        }).length;
+        let p2Have = match.racks.filter(function (r) {
+            return r.winnerId === p2Id || String(r.winnerSlot) === '2';
+        }).length;
         const now = new Date().toISOString();
         const missingP1 = wantP1 - p1Have;
         const missingP2 = wantP2 - p2Have;
+        // Already have enough rack rows for the scoreline — do not duplicate when
+        // winnerId was missing/stale but winnerSlot (or row count) already accounts for them.
         if (missingP1 <= 0 && missingP2 <= 0) {
+            match.finalScore = { p1: wantP1, p2: wantP2 };
+            return;
+        }
+        if (match.racks.length >= (wantP1 + wantP2) && (missingP1 > 0 || missingP2 > 0)) {
+            // Remap existing rows to the bound player ids instead of appending duplicates.
+            let assignP1 = wantP1;
+            let assignP2 = wantP2;
+            for (let i = 0; i < match.racks.length; i++) {
+                const row = match.racks[i];
+                const slot = String(row.winnerSlot || '') === '2' ? '2'
+                    : (String(row.winnerSlot || '') === '1' ? '1'
+                        : (row.winnerId === p2Id ? '2' : (row.winnerId === p1Id ? '1' : '')));
+                if (slot === '1' && assignP1 > 0) {
+                    row.winnerId = p1Id;
+                    row.winnerSlot = '1';
+                    assignP1 -= 1;
+                } else if (slot === '2' && assignP2 > 0) {
+                    row.winnerId = p2Id;
+                    row.winnerSlot = '2';
+                    assignP2 -= 1;
+                } else if (assignP1 > 0) {
+                    row.winnerId = p1Id;
+                    row.winnerSlot = '1';
+                    assignP1 -= 1;
+                } else if (assignP2 > 0) {
+                    row.winnerId = p2Id;
+                    row.winnerSlot = '2';
+                    assignP2 -= 1;
+                }
+            }
             match.finalScore = { p1: wantP1, p2: wantP2 };
             return;
         }
@@ -3474,6 +3564,7 @@
             const entry = {
                 rackNumber: match.racks.length + 1,
                 winnerId: p1Id,
+                winnerSlot: '1',
                 timestamp: now
             };
             match.racks.push(entry);
@@ -3486,6 +3577,7 @@
             const entry = {
                 rackNumber: match.racks.length + 1,
                 winnerId: p2Id,
+                winnerSlot: '2',
                 timestamp: now
             };
             match.racks.push(entry);
@@ -3517,7 +3609,7 @@
         return gameInfo;
     }
 
-    async function finalizeMatchCompletion(winnerSlot, scores) {
+    async function finalizeMatchCompletion(winnerSlot, scores, options) {
         if (activeMatchSession.matchCompletedRecorded || activeMatchSession.duplicateNames) {
             return;
         }
@@ -3528,7 +3620,9 @@
         }
 
         // Do not flushRackRecordQueue here — this may run inside the queue (deadlock).
-        await reconcileMatchRacksWithScores(match, scores);
+        if (!(options && options.skipReconcile)) {
+            await reconcileMatchRacksWithScores(match, scores);
+        }
 
         const ids = getSlotPlayerIds(winnerSlot);
         const now = new Date().toISOString();
@@ -3591,6 +3685,7 @@
         }
 
         await reconcileMatchRacksWithScores(match, scores);
+        trimMatchRacksToScoreline(match, scores);
 
         let winnerSlot = null;
         if (scores.p1 > scores.p2) {
@@ -3600,7 +3695,9 @@
         }
 
         if (winnerSlot) {
-            await finalizeMatchCompletion(winnerSlot, scores);
+            // Racks already reconciled above — finalize without a second reconcile pass
+            // (which would duplicate rows when existing racks lacked matching winnerIds).
+            await finalizeMatchCompletion(winnerSlot, scores, { skipReconcile: true });
         } else {
             const now = new Date().toISOString();
             match.status = 'completed';
