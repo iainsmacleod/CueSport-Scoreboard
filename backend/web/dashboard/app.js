@@ -22,15 +22,23 @@ import {
   openBillingPortal,
   setSimulatedPlan,
   GAME_TYPES,
-} from '../shared/cloud-client.js?v=8.2.4';
+} from '../shared/cloud-client.js?v=8.2.4.1';
 import {
   computeDurationSeconds,
   formatDurationSeconds,
   enrichRacksWithDuration,
   sumRackDurationSeconds,
 } from '../shared/match-racks.js?v=8.0.0';
+import {
+  getStoredAccessToken,
+  setStoredAccessToken,
+  ensureSupabaseAuth,
+  signInWithGoogleIdToken,
+  adoptOAuthHashSession,
+  getFreshAccessToken,
+  signOutSupabaseSession,
+} from '../shared/supabase-session.js?v=8.2.4.1';
 
-const TOKEN_KEY = 'cuesport_token';
 const SERVER_KEY = 'cuesport_server';
 const DASH_TAB_KEY = 'cuesport_dashboard_tab';
 const DASH_TABS = new Set(['tables', 'stats', 'settings', 'account', 'admin']);
@@ -434,12 +442,16 @@ function getServerUrl() {
 }
 
 function getToken() {
-  return localStorage.getItem(TOKEN_KEY) || '';
+  return getStoredAccessToken();
 }
 
 /** Clear the local dashboard session; optionally return to the public homepage. */
 function localSignOut({ clearServer = false, redirectHome = false } = {}) {
-  localStorage.removeItem(TOKEN_KEY);
+  setStoredAccessToken('');
+  const config = dashPublicConfigCache;
+  if (config) {
+    signOutSupabaseSession(config).catch(() => {});
+  }
   if (clearServer) localStorage.removeItem(SERVER_KEY);
   wantLiveFeed = false;
   stopLiveFeed();
@@ -2298,7 +2310,9 @@ async function adminInvalidateSelectedSessions() {
   if (!adminSelectedId || isOwnAdminAccount(adminSelectedId)) return;
   const ok = await confirmDashAction({
     title: 'Invalidate sessions',
-    message: 'Sign this account out everywhere (dashboard and account mobile sessions)?',
+    message:
+      'Sign this account out everywhere (dashboard and account mobile sessions)?\n\n' +
+      'All guest links will also be revoked and guest devices disconnected. OBS Dock Keys are not revoked.',
     confirmLabel: 'Invalidate',
     danger: true,
   });
@@ -2306,7 +2320,7 @@ async function adminInvalidateSelectedSessions() {
   await adminFetchJson(`/api/admin/accounts/${encodeURIComponent(adminSelectedId)}/invalidate-sessions`, {
     method: 'POST',
   });
-  setAdminStatus('Sessions invalidated');
+  setAdminStatus('Sessions invalidated (guests revoked)');
 }
 
 async function adminDeleteSelectedAccount(
@@ -4187,8 +4201,12 @@ function ensureLiveFeed(options = {}) {
 }
 
 async function connectLiveFeed() {
-  const token = getToken();
+  let token = getToken();
   if (!wantLiveFeed || !token) return;
+  if (dashPublicConfigCache) {
+    token = await getFreshAccessToken(dashPublicConfigCache) || token;
+  }
+  if (!token) return;
 
   if (dashClient) {
     try { dashClient.disconnect(); } catch (_) { /* ignore */ }
@@ -4239,8 +4257,39 @@ async function connectLiveFeed() {
   }
 }
 
+async function applyDashboardMe(me) {
+  lastAccount = me.account || null;
+  const emailEl = document.getElementById('userEmail');
+  if (emailEl) emailEl.textContent = me.account.email;
+  setPlatformAdminUi(!!me.is_platform_admin);
+  setActiveDashTab(localStorage.getItem(DASH_TAB_KEY) || 'tables');
+  renderQuota(me.quota, me.account);
+  syncSimulatedPlanSelect(me);
+  renderApiKeys(me.api_keys);
+  await refreshBillingUi(me.account, me.billing);
+  ownDashboardRooms = me.rooms || [];
+  if (isViewingOtherAccount()) {
+    await refreshTablesForCurrentView();
+  } else {
+    lastDashboardRooms = me.rooms || [];
+    renderTableCards(me.rooms);
+    renderDebugRooms(me.rooms);
+  }
+  if (isPlatformAdminUser) {
+    await loadPlatformAccountFilterOptions().catch(() => {});
+  }
+  show('loginSection', false);
+  show('dashboardSection', true);
+  finishDashboardBoot();
+  wantLiveFeed = true;
+  clearReconnect();
+  connectLiveFeed().catch(() => {});
+  syncPlatformTablesPolling();
+  await consumeSubscribeIntent(me.account);
+}
+
 async function renderDashboard() {
-  const token = getToken();
+  let token = getToken();
   if (!token) {
     stopLiveFeed();
     lastTablesFingerprint = '';
@@ -4252,38 +4301,28 @@ async function renderDashboard() {
     return;
   }
   try {
+    if (dashPublicConfigCache) {
+      token = await getFreshAccessToken(dashPublicConfigCache) || token;
+    }
     const me = await fetchMe(getServerUrl(), token);
-    lastAccount = me.account || null;
-    const emailEl = document.getElementById('userEmail');
-    if (emailEl) emailEl.textContent = me.account.email;
-    setPlatformAdminUi(!!me.is_platform_admin);
-    setActiveDashTab(localStorage.getItem(DASH_TAB_KEY) || 'tables');
-    renderQuota(me.quota, me.account);
-    syncSimulatedPlanSelect(me);
-    renderApiKeys(me.api_keys);
-    await refreshBillingUi(me.account, me.billing);
-    ownDashboardRooms = me.rooms || [];
-    if (isViewingOtherAccount()) {
-      await refreshTablesForCurrentView();
-    } else {
-      lastDashboardRooms = me.rooms || [];
-      renderTableCards(me.rooms);
-      renderDebugRooms(me.rooms);
-    }
-    if (isPlatformAdminUser) {
-      await loadPlatformAccountFilterOptions().catch(() => {});
-    }
-    show('loginSection', false);
-    show('dashboardSection', true);
-    finishDashboardBoot();
-    wantLiveFeed = true;
-    clearReconnect();
-    connectLiveFeed().catch(() => {});
-    syncPlatformTablesPolling();
-    await consumeSubscribeIntent(me.account);
+    await applyDashboardMe(me);
   } catch (err) {
+    const msg = String(err?.message || '');
+    if (dashPublicConfigCache && /unauthorized|invalid|expired|token|session/i.test(msg)) {
+      try {
+        const refreshed = await getFreshAccessToken(dashPublicConfigCache);
+        if (refreshed) {
+          const me = await fetchMe(getServerUrl(), refreshed);
+          await applyDashboardMe(me);
+          return;
+        }
+      } catch (_) { /* fall through */ }
+    }
     stopLiveFeed();
-    localStorage.removeItem(TOKEN_KEY);
+    setStoredAccessToken('');
+    if (dashPublicConfigCache) {
+      signOutSupabaseSession(dashPublicConfigCache).catch(() => {});
+    }
     statsData = null;
     statsLoaded = false;
     lastAccount = null;
@@ -4777,10 +4816,13 @@ async function submitDevLogin() {
   if (btn) btn.disabled = true;
   try {
     // Drop any prior session so a half-broken token cannot fight the new login.
-    localStorage.removeItem(TOKEN_KEY);
+    setStoredAccessToken('');
+    if (dashPublicConfigCache) {
+      await signOutSupabaseSession(dashPublicConfigCache).catch(() => {});
+    }
     stopLiveFeed();
     const data = await devLogin(getServerUrl(), secret);
-    localStorage.setItem(TOKEN_KEY, data.access_token);
+    setStoredAccessToken(data.access_token);
     localStorage.setItem(SERVER_KEY, getServerUrl());
     lastTablesFingerprint = '';
     await renderDashboard();
@@ -4937,7 +4979,9 @@ document.getElementById('invalidateSessionsBtn')?.addEventListener('click', asyn
     message:
       'Clear every saved login and sign out all devices?\n\n' +
       'This dashboard, other admin browsers, and admin mobile control will be signed out and disconnected. ' +
-      'Guest links are not affected.',
+      'All guest links will be revoked and anyone using them will be disconnected ' +
+      '(including each table’s default OBS Dock Owner link — those are recreated when needed). ' +
+      'OBS Dock Keys are not revoked.',
     confirmLabel: 'Clear All Logins',
     danger: true,
   });
@@ -5058,20 +5102,8 @@ async function handleGoogleCredentialResponse(response) {
     return;
   }
   try {
-    const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/+esm');
-    const supabase = createClient(config.supabaseUrl, config.supabasePublishableKey, {
-      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-    });
-    const { data, error } = await supabase.auth.signInWithIdToken({
-      provider: 'google',
-      token: response.credential,
-    });
-    if (error) throw error;
-    const accessToken = data?.session?.access_token;
-    if (!accessToken) throw new Error('No session returned from Google sign-in');
-    localStorage.removeItem(TOKEN_KEY);
     stopLiveFeed();
-    localStorage.setItem(TOKEN_KEY, accessToken);
+    await signInWithGoogleIdToken(config, response.credential);
     localStorage.setItem(SERVER_KEY, getServerUrl());
     lastTablesFingerprint = '';
     window.history.replaceState({}, '', window.location.pathname + window.location.search);
@@ -5260,7 +5292,12 @@ document.getElementById('dashShowManagedLink')?.addEventListener('click', (event
 });
 
 fetchPublicConfig(getServerUrl())
-  .then((config) => applyDashLoginCapabilities(config))
+  .then(async (config) => {
+    applyDashLoginCapabilities(config);
+    if (config?.supabaseUrl && config?.supabasePublishableKey) {
+      await ensureSupabaseAuth(config);
+    }
+  })
   .catch(() => {
     // Keep panes hidden until config loads; show unavailable if request fails.
     applyDashLoginCapabilities({});
@@ -5297,13 +5334,19 @@ window.addEventListener('online', () => {
 });
 
 if (window.location.search.includes('auth=callback') || window.location.hash.includes('access_token')) {
-  const hash = window.location.hash.slice(1);
-  const params = new URLSearchParams(hash);
-  const token = params.get('access_token');
-  if (token) {
-    localStorage.setItem(TOKEN_KEY, token);
-    history.replaceState({}, '', window.location.pathname);
-  }
+  (async () => {
+    try {
+      const config = dashPublicConfigCache || await fetchPublicConfig(getServerUrl());
+      dashPublicConfigCache = config;
+      await adoptOAuthHashSession(config);
+    } catch (_) {
+      const hash = window.location.hash.slice(1);
+      const params = new URLSearchParams(hash);
+      const token = params.get('access_token');
+      if (token) setStoredAccessToken(token);
+    }
+    history.replaceState({}, '', window.location.pathname + window.location.search);
+  })();
 }
 
 function initMatchPlayerAutocomplete() {

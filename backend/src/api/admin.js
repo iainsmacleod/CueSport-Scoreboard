@@ -6,6 +6,7 @@ import { getAccountQuota, getPaidSelfServeTier, normalizeTierName } from '../quo
 import { getAccountStats, getAllAccountsStats, namespaceAccountStats } from '../stats/account-stats.js';
 import {
   kickAccountAdminClients,
+  kickAccountGuestClients,
   kickAccountClientsForDeletion,
   revokeApiKeySeat,
   roomHasConnectedDock,
@@ -278,6 +279,8 @@ export async function registerAdminRoutes(app) {
     const account = sqlite.getAccountById(request.params.id);
     if (!account) return reply.code(404).send({ error: 'Account not found' });
     if (rejectSelfAccountAdminMutation(auth, account.id, reply)) return;
+    const guestsRevoked = sqlite.revokeAllGuestTokens(account.id);
+    const guestsKicked = kickAccountGuestClients(account.id);
     const updated = sqlite.invalidateAllSessions(account.id);
     const kicked = kickAccountAdminClients(account.id);
     return {
@@ -285,6 +288,8 @@ export async function registerAdminRoutes(app) {
       session_epoch: updated.session_epoch,
       sessions_invalid_after: updated.sessions_invalid_after,
       kicked,
+      guests_revoked: guestsRevoked,
+      guests_kicked: guestsKicked,
     };
   });
 

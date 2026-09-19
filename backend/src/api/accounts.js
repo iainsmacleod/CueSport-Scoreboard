@@ -491,12 +491,18 @@ export async function registerAccountRoutes(app) {
     if (!isAccountAdminAuth(auth)) {
       return reply.code(403).send({ error: 'Account sign-in required' });
     }
-    const updated = sqlite.invalidateAllSessions(auth.account.id);
-    kickAccountAdminClients(auth.account.id);
+    const accountId = auth.account.id;
+    const guestsRevoked = sqlite.revokeAllGuestTokens(accountId);
+    const guestsKicked = kickAccountGuestClients(accountId);
+    const updated = sqlite.invalidateAllSessions(accountId);
+    const adminsKicked = kickAccountAdminClients(accountId);
     return {
       ok: true,
       session_epoch: updated.session_epoch,
       sessions_invalid_after: updated.sessions_invalid_after,
+      guests_revoked: guestsRevoked,
+      guests_kicked: guestsKicked,
+      admins_kicked: adminsKicked,
     };
   });
 

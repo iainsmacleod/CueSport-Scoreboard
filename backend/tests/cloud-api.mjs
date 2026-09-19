@@ -866,6 +866,11 @@ async function run() {
     });
     assert('POST /api/sessions/invalidate-all', invalidated.ok);
     assert('Sign Out Everywhere does not keep this session', !invalidated.body.access_token);
+    assert(
+      'Sign Out Everywhere reports guests_revoked count',
+      typeof invalidated.body.guests_revoked === 'number',
+      String(invalidated.body.guests_revoked)
+    );
     const staleMe = await fetchJson('/api/me', { headers: { Authorization: `Bearer ${token}` } });
     assert('Old token rejected after invalidate', staleMe.status === 401);
     const relogin = await fetchJson('/api/auth/dev-login', {

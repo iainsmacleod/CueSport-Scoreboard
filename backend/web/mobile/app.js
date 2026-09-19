@@ -6,16 +6,23 @@ import {
   revokeGuestLink,
   fetchPlayers,
   createAccountPlayer,
+  fetchPublicConfig,
   GAME_TYPES,
-} from '../shared/cloud-client.js?v=8.2.4';
+} from '../shared/cloud-client.js?v=8.2.4.1';
 import {
   parseRaceTarget,
   isRaceLocked,
   normalizePlayerName,
   truncatePlayerName,
 } from '../shared/scoreboard-helpers.js?v=8.0.0';
+import {
+  getStoredAccessToken,
+  setStoredAccessToken,
+  ensureSupabaseAuth,
+  getFreshAccessToken,
+  signOutSupabaseSession,
+} from '../shared/supabase-session.js?v=8.2.4.1';
 
-const TOKEN_KEY = 'cuesport_token';
 let client = null;
 let roomId = '';
 let lastState = {};
@@ -49,6 +56,8 @@ let cachedGuestShareToken = '';
 let cachedGuestShareLabel = '';
 let guestShareRevealed = false;
 let guestSharePromise = null;
+/** Cached /api/config/public for Supabase session refresh. */
+let mobilePublicConfigCache = null;
 
 function pathContext() {
   const parts = window.location.pathname.split('/').filter(Boolean);
@@ -60,7 +69,7 @@ function pathContext() {
 }
 
 function hasSavedLogin() {
-  return !!localStorage.getItem(TOKEN_KEY);
+  return !!getStoredAccessToken();
 }
 
 function syncLoginPanel() {
@@ -93,7 +102,7 @@ function shareAuthHeaders() {
 
 function shareAuthToken() {
   if (isDockOwnerGuest) return '';
-  return localStorage.getItem(TOKEN_KEY) || '';
+  return getStoredAccessToken();
 }
 
 function applyGuestUI() {
@@ -855,7 +864,10 @@ function forceRelogin(reason, { clearToken = true } = {}) {
   wantConnection = false;
   clearReconnectTimer();
   setReconnectBanner(false);
-  if (clearToken) localStorage.removeItem(TOKEN_KEY);
+  if (clearToken) {
+    setStoredAccessToken('');
+    signOutSupabaseSession(mobilePublicConfigCache || {}).catch(() => {});
+  }
   if (client) {
     try { client.disconnect(); } catch (_) { /* ignore */ }
     client = null;
@@ -871,7 +883,10 @@ function leaveTableForHome({ clearToken = false } = {}) {
   wantConnection = false;
   clearReconnectTimer();
   setReconnectBanner(false);
-  if (clearToken) localStorage.removeItem(TOKEN_KEY);
+  if (clearToken) {
+    setStoredAccessToken('');
+    signOutSupabaseSession(mobilePublicConfigCache || {}).catch(() => {});
+  }
   if (client) {
     try { client.disconnect(); } catch (_) { /* ignore */ }
     client = null;
@@ -2359,7 +2374,7 @@ function formatPlayerPreview(lastSeenAt) {
 const playerAutocompleteState = {};
 
 async function searchCloudPlayers(query, limit) {
-  const token = localStorage.getItem(TOKEN_KEY);
+  const token = getStoredAccessToken();
   if (!token) return [];
   return fetchPlayers(window.location.origin, token, query, limit);
 }
@@ -2412,7 +2427,7 @@ async function createAndPickPlayer(slot, name) {
       el.setAttribute('aria-disabled', 'true');
     });
   }
-  const token = localStorage.getItem(TOKEN_KEY);
+  const token = getStoredAccessToken();
   try {
     if (!token) {
       pickPlayer(slot, { name });
@@ -3063,7 +3078,7 @@ async function connectAuthenticatedSession({ quiet, isCurrent }) {
   isViewOnly = false;
   applyViewOnlyUI();
 
-  let token = localStorage.getItem(TOKEN_KEY);
+  let token = getStoredAccessToken();
   const secretEl = document.getElementById('devSecret');
   const secret = secretEl ? secretEl.value.trim() : '';
 
@@ -3072,7 +3087,7 @@ async function connectAuthenticatedSession({ quiet, isCurrent }) {
       const data = await devLogin(window.location.origin, secret);
       if (!isCurrent()) return;
       token = data.access_token;
-      localStorage.setItem(TOKEN_KEY, token);
+      setStoredAccessToken(token);
       syncLoginPanel();
     } catch (err) {
       if (!isCurrent()) return;
@@ -3084,6 +3099,13 @@ async function connectAuthenticatedSession({ quiet, isCurrent }) {
     showLogin();
     setError('Sign in on the dashboard first, or enter the dev auth secret.');
     return;
+  } else {
+    try {
+      if (!mobilePublicConfigCache) {
+        mobilePublicConfigCache = await fetchPublicConfig(window.location.origin);
+      }
+      token = await getFreshAccessToken(mobilePublicConfigCache) || token;
+    } catch (_) { /* keep stored token */ }
   }
 
   if (client) {
@@ -3175,7 +3197,7 @@ async function connectAuthenticatedSession({ quiet, isCurrent }) {
       throw err;
     }
     // Network blips: keep token and offer Reconnect (do not bounce to login).
-    if (isTransientConnectError(err) && localStorage.getItem(TOKEN_KEY)) {
+    if (isTransientConnectError(err) && getStoredAccessToken()) {
       stayConnectedWithRetry('Connection lost — tap Reconnect');
       return;
     }
@@ -3301,9 +3323,18 @@ function startBootConnect(message) {
 }
 
 const boot = pathContext();
+fetchPublicConfig(window.location.origin)
+  .then(async (config) => {
+    mobilePublicConfigCache = config;
+    if (config?.supabaseUrl && config?.supabasePublishableKey) {
+      await ensureSupabaseAuth(config);
+    }
+  })
+  .catch(() => { /* optional — admin mobile still works with stored token / guest */ });
+
 if (boot.guestToken) {
   startBootConnect('Connecting…');
-} else if (localStorage.getItem(TOKEN_KEY) && boot.roomId) {
+} else if (getStoredAccessToken() && boot.roomId) {
   // Single entry point — avoids racing pageshow against a parallel quiet connect.
   startBootConnect('Connecting…');
 } else {

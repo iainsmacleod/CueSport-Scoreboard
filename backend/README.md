@@ -200,7 +200,7 @@ This backend is GPL-licensed alongside the scoreboard. You may run your own inst
 | GET | `/api/admin/accounts/:id/players` | Platform admin: player search for a tenant |
 | POST | `/api/admin/accounts/:id/trial` | Platform admin: give complimentary access `{ days: 1–90, tier }` |
 | DELETE | `/api/admin/accounts/:id/trial` | Platform admin: revoke complimentary access (also revokes Dock Keys if no Stripe access remains) |
-| POST | `/api/admin/accounts/:id/invalidate-sessions` | Platform admin: sign out everywhere for tenant |
+| POST | `/api/admin/accounts/:id/invalidate-sessions` | Platform admin: sign out everywhere for tenant (also revokes guest links) |
 | POST | `/api/admin/accounts/:id/api-keys/:keyId/revoke` | Platform admin: revoke dock key |
 | POST | `/api/admin/accounts/:id/delete` | Platform admin: permanently delete account; `{ confirmEmail, blockFutureSignups, allowAnotherTrial, confirmActiveSubscription }` |
 | POST | `/api/admin/account-blocks/unblock` | Platform admin: allow a previously blocked exact email `{ email }` |
@@ -214,7 +214,7 @@ This backend is GPL-licensed alongside the scoreboard. You may run your own inst
 | GET | `/api/guest-links` | List guest scorer links for the account |
 | DELETE | `/api/guest-links/:token` | Revoke guest link |
 | POST | `/api/guest-links/revoke-all` | Revoke all guest links and disconnect guests |
-| POST | `/api/sessions/invalidate-all` | Sign out everywhere (invalidate + disconnect admin dashboard and mobile) |
+| POST | `/api/sessions/invalidate-all` | Sign out everywhere (invalidate + disconnect admin dashboard/mobile; revoke guest links and disconnect guests; Dock Keys kept) |
 | GET | `/api/rooms/:roomId/events` | Match event log |
 | GET | `/api/stats` | Account match stats (players, matches, summary) |
 | PATCH | `/api/stats/matches/:startEventId` | Edit a completed match (scores, names, extras; winner derived from scores) |

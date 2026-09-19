@@ -9,7 +9,7 @@ Day-to-day use after Cloud is connected ([Hosted](Cloud-Hosted-Setup) or [Self-h
 | **Tables** | Live cards for connected docks (players, game, race, score). First-time onboarding carousel when no dock is online. |
 | **Stats** | Account leaderboard, recent matches (including Live / in progress), player detail, rename, edit/delete matches, **Kill** unfinished matches. |
 | **Settings** | OBS Dock Keys — create, rename, change role, copy, revoke one, **Revoke All**. |
-| **Account** | Plan / billing (hosted), manage sessions, sign out, account deletion. |
+| **Account** | Plan / billing (hosted), manage sessions (**Clear All Logins** also revokes guest links), sign out, account deletion. |
 
 Hosted Platform Admins also get an **Admin** tab for customer support (not shown on self-host).
 
