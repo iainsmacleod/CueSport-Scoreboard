@@ -4,10 +4,10 @@
  * Usage (from docs/release-notes/):
  *   npm install
  *   npx playwright install chromium
- *   node capture-screenshots.mjs --version 8.2.3
+ *   node capture-screenshots.mjs --version 8.2.4
  *
  * Optional live backend:
- *   node capture-screenshots.mjs --version 8.2.3 --cloud http://localhost:4003
+ *   node capture-screenshots.mjs --version 8.2.4 --cloud http://localhost:4003
  *
  * Older versions (7.x) still expect a repo-root static server on :8765.
  */
@@ -702,7 +702,7 @@ async function capture820(version, cloudBaseArg) {
 }
 
 async function main() {
-  const version = parseArg(process.argv, '--version', '8.2.3');
+  const version = parseArg(process.argv, '--version', '8.2.4');
   const cloudBase = parseArg(process.argv, '--cloud', null);
   const major = Number(String(version).split('.')[0]);
 
