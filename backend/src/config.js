@@ -52,6 +52,8 @@ export const config = {
   roomCleanupGraceMs: parseEnvMs(process.env.ROOM_CLEANUP_GRACE_MS, 45 * 60 * 1000),
   /** Delete mapped rooms whose last_seen_at is older than this (even if grace already passed). */
   roomIdleTtlMs: parseEnvMs(process.env.ROOM_IDLE_TTL_MS, 14 * 24 * 60 * 60 * 1000),
+  /** Delete abandoned impromptu rooms with no session activity older than this. */
+  impromptuAbandonedTtlMs: parseEnvMs(process.env.IMPROMPTU_ABANDONED_TTL_MS, 24 * 60 * 60 * 1000),
   /** How often the sweeper looks for rooms to prune. */
   roomCleanupSweeperMs: parseEnvMs(process.env.ROOM_CLEANUP_SWEEPER_MS, 10 * 60 * 1000),
   /** Stripe (managed cloud billing). Leave empty on self-host. */

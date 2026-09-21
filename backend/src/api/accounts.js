@@ -8,6 +8,8 @@ import {
 } from '../dev-auth.js';
 import {
   roomHasConnectedDock,
+  roomHasConnectedAuthority,
+  roomHasConnectedGuest,
   guestConnectionCounts,
   kickGuestToken,
   kickAccountAdminClients,
@@ -17,10 +19,12 @@ import {
   performDeleteRoom,
   getRoomCleanupAfter,
   resolveRoomApiKeyId,
+  notifyAccountTables,
 } from '../ws/room-hub.js';
 import { config } from '../config.js';
 import {
   assertCanCreateApiKey,
+  assertCanCreateImpromptuTable,
   getAccountQuota,
   getSimulatedPlanOptions,
   getTierDisplayName,
@@ -40,19 +44,29 @@ import { hasCloudSubscriptionAccess, isAdminSupportTrialActive } from '../lib/su
 import { getSubscriptionBillingSummary, isStripeConfigured } from '../lib/stripe-billing.js';
 
 function enrichRoom(room) {
-  const cleanupMs = getRoomCleanupAfter(room.id);
-  const apiKeyId = resolveRoomApiKeyId(room.id, room.api_key_id);
+  const kind = room.kind === 'impromptu' ? 'impromptu' : 'dock';
+  const cleanupMs = kind === 'dock' ? getRoomCleanupAfter(room.id) : null;
+  const apiKeyId = kind === 'dock' ? resolveRoomApiKeyId(room.id, room.api_key_id) : null;
   const apiKey = apiKeyId ? sqlite.getApiKeyById(apiKeyId) : null;
   const apiKeyLabel = apiKey?.label || room.api_key_label || null;
+  const authorityConnected = roomHasConnectedAuthority(room.id);
+  const dockConnected = kind === 'dock' ? roomHasConnectedDock(room.id) : false;
+  const guestConnected = roomHasConnectedGuest(room.id);
   return {
     ...room,
+    kind,
     api_key_id: apiKeyId || null,
     api_key_label: apiKeyLabel,
     // Title is the seat name (OBS Dock Key N), never instance nicknames like "Main table".
-    dock_label: apiKeyLabel || (room.dock_label !== 'Main table' && room.dock_label !== 'Default Room'
-      ? room.dock_label
-      : null) || apiKeyLabel || 'Connection',
-    dock_connected: roomHasConnectedDock(room.id),
+    dock_label: kind === 'impromptu'
+      ? (room.label || 'Impromptu Table')
+      : (apiKeyLabel || (room.dock_label !== 'Main table' && room.dock_label !== 'Default Room'
+        ? room.dock_label
+        : null) || apiKeyLabel || 'Connection'),
+    dock_connected: dockConnected,
+    authority_connected: authorityConnected,
+    guest_connected: guestConnected,
+    live: kind === 'impromptu' ? authorityConnected : dockConnected,
     cleanup_after: cleanupMs ? new Date(cleanupMs).toISOString() : null,
   };
 }
@@ -305,13 +319,52 @@ export async function registerAccountRoutes(app) {
     return { ok: true, revoked };
   });
 
-  // Manual room create disabled — rooms are created when an OBS dock connects.
-  app.post('/api/rooms', async (_request, reply) => {
-    return reply.code(410).send({
-      error: 'Table creation via API is disabled',
-      code: 'rooms_created_on_dock_join',
-      message: 'Tables are created automatically when an OBS dock connects with an OBS Dock Key.',
-    });
+  // Impromptu (dockless) tables only — dock rooms are still created on OBS dock join.
+  app.post('/api/rooms', async (request, reply) => {
+    const auth = await resolveAuthFromRequest(request);
+    if (!auth?.account) return reply.code(401).send({ error: 'Unauthorized' });
+    if (!isAccountAdminAuth(auth)) {
+      return reply.code(403).send({ error: 'Account sign-in required' });
+    }
+    const kind = String(request.body?.kind || '').trim().toLowerCase();
+    if (kind !== 'impromptu') {
+      return reply.code(410).send({
+        error: 'Table creation via API is disabled for OBS dock seats',
+        code: 'rooms_created_on_dock_join',
+        message: 'OBS tables are created automatically when a dock connects with an OBS Dock Key. Use kind=impromptu for dockless tables.',
+      });
+    }
+    if (!hasCloudSubscriptionAccess(auth.account)) {
+      return reply.code(403).send({
+        error: 'An active subscription or trial is required to create impromptu tables. Choose a plan to continue.',
+        code: 'subscription_required',
+      });
+    }
+    const check = assertCanCreateImpromptuTable(auth.account);
+    if (!check.ok) {
+      return reply.code(403).send({
+        error: check.message,
+        code: check.code,
+        quota: check.quota,
+      });
+    }
+    const label = String(request.body?.label || 'Impromptu Table').trim().slice(0, 60) || 'Impromptu Table';
+    const room = sqlite.createImpromptuRoom(auth.account.id, label);
+    if (!room) {
+      return reply.code(500).send({ error: 'Could not create impromptu table' });
+    }
+    sqlite.createGuestToken(room.id, auth.account.id, 'Guest scorer');
+    const sessionState = sqlite.getRoomSessionState(room.id);
+    notifyAccountTables(auth.account.id, { immediate: true });
+    return {
+      room: enrichRoom({
+        ...room,
+        kind: 'impromptu',
+        live_state: sessionState.state || {},
+        guest_link_count: sqlite.countActiveGuestTokensForRoom(room.id),
+      }),
+      quota: getAccountQuota(auth.account),
+    };
   });
 
   app.post('/api/api-keys', async (request, reply) => {

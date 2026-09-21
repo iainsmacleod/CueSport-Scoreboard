@@ -582,7 +582,208 @@ async function run() {
       },
       body: JSON.stringify({ label: 'should-fail' }),
     });
-    assert('POST /api/rooms disabled (410)', postRoomsGone.status === 410);
+    assert('POST /api/rooms without kind=impromptu is 410', postRoomsGone.status === 410);
+
+    const postImpromptu = await fetchJson('/api/rooms', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ kind: 'impromptu', label: 'Smoke Impromptu' }),
+    });
+    assert(
+      'POST /api/rooms kind=impromptu creates table',
+      postImpromptu.ok && postImpromptu.body.room?.kind === 'impromptu' && !!postImpromptu.body.room?.id,
+      JSON.stringify(postImpromptu.body),
+    );
+    const impromptuRoomId = postImpromptu.body.room?.id;
+    if (impromptuRoomId) {
+      const impGuestLinks = await fetchJson(`/api/rooms/${impromptuRoomId}/guest-links`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const impGuests = impGuestLinks.body.guest_links || [];
+      assert(
+        'impromptu auto-creates Guest scorer link',
+        impGuests.some((g) => g.label === 'Guest scorer'),
+        JSON.stringify(impGuests.map((g) => g.label)),
+      );
+      assert(
+        'impromptu does not create OBS Dock Owner link',
+        !impGuests.some((g) => g.label === 'OBS Dock Owner'),
+        JSON.stringify(impGuests.map((g) => g.label)),
+      );
+      const authJoin = await wsJoin({
+        roomId: impromptuRoomId,
+        client: 'mobile',
+        accessToken: token,
+      });
+      assert(
+        'impromptu mobile join claims authority',
+        authJoin.data?.is_authority === true && authJoin.data?.room_kind === 'impromptu',
+        JSON.stringify(authJoin.data),
+      );
+      authJoin.ws.send(JSON.stringify({
+        type: 'state',
+        room_id: impromptuRoomId,
+        state: {
+          player1Name: 'Alice',
+          player2Name: 'Bob',
+          p1Score: 1,
+          p2Score: 0,
+          gameType: 'game1',
+        },
+      }));
+      await new Promise((r) => setTimeout(r, 200));
+      authJoin.ws.send(JSON.stringify({
+        type: 'session',
+        room_id: impromptuRoomId,
+        action: 'start',
+        payload: {
+          sessionId: 'smoke-imp-1',
+          player1: 'Alice',
+          player2: 'Bob',
+          gameType: 'game1',
+        },
+      }));
+      await new Promise((r) => setTimeout(r, 150));
+      authJoin.ws.send(JSON.stringify({
+        type: 'session',
+        room_id: impromptuRoomId,
+        action: 'end',
+        payload: {
+          matchId: 'smoke-imp-1',
+          sessionId: 'smoke-imp-1',
+          reason: 'end_match',
+          winnerSlot: '1',
+          scores: { p1: 1, p2: 0 },
+          player1: 'Alice',
+          player2: 'Bob',
+          gameType: 'game1',
+        },
+      }));
+      await waitForWsErrorThenClose(authJoin.ws, 5000).catch(() => null);
+      try { authJoin.ws.close(); } catch { /* ignore */ }
+      const gone = await fetchJson('/api/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const stillThere = (gone.body.rooms || []).some((r) => r.id === impromptuRoomId);
+      assert('impromptu room deleted after session end', !stillThere);
+    }
+
+    // Destroy Table path: discard with abandon_match frees the seat (no history end).
+    const postDestroy = await fetchJson('/api/rooms', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ kind: 'impromptu', label: 'Smoke Destroy' }),
+    });
+    assert(
+      'POST /api/rooms creates destroy-smoke table',
+      postDestroy.ok && !!postDestroy.body.room?.id,
+      JSON.stringify(postDestroy.body),
+    );
+    const destroyRoomId = postDestroy.body.room?.id;
+    if (destroyRoomId) {
+      const destroyJoin = await wsJoin({
+        roomId: destroyRoomId,
+        client: 'mobile',
+        accessToken: token,
+      });
+      assert(
+        'destroy-smoke join claims authority',
+        destroyJoin.data?.is_authority === true,
+        JSON.stringify(destroyJoin.data),
+      );
+      // Empty table: discard without a prior session start (Destroy Table on fresh seat).
+      destroyJoin.ws.send(JSON.stringify({
+        type: 'session',
+        room_id: destroyRoomId,
+        action: 'discard',
+        payload: {
+          matchId: 'smoke-destroy-empty',
+          sessionId: 'smoke-destroy-empty',
+          reason: 'abandon_match',
+        },
+      }));
+      await waitForWsErrorThenClose(destroyJoin.ws, 5000).catch(() => null);
+      try { destroyJoin.ws.close(); } catch { /* ignore */ }
+      const afterEmpty = await fetchJson('/api/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      assert(
+        'impromptu room deleted after empty discard',
+        !(afterEmpty.body.rooms || []).some((r) => r.id === destroyRoomId),
+      );
+    }
+
+    // Destroy after an in-progress session start (discard, not end).
+    const postDestroyLive = await fetchJson('/api/rooms', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ kind: 'impromptu', label: 'Smoke Destroy Live' }),
+    });
+    const destroyLiveId = postDestroyLive.body.room?.id;
+    if (destroyLiveId) {
+      const liveJoin = await wsJoin({
+        roomId: destroyLiveId,
+        client: 'mobile',
+        accessToken: token,
+      });
+      liveJoin.ws.send(JSON.stringify({
+        type: 'session',
+        room_id: destroyLiveId,
+        action: 'start',
+        payload: {
+          sessionId: 'smoke-destroy-live',
+          player1: 'Alice',
+          player2: 'Bob',
+          gameType: 'game1',
+        },
+      }));
+      await new Promise((r) => setTimeout(r, 150));
+      liveJoin.ws.send(JSON.stringify({
+        type: 'session',
+        room_id: destroyLiveId,
+        action: 'discard',
+        payload: {
+          matchId: 'smoke-destroy-live',
+          sessionId: 'smoke-destroy-live',
+          reason: 'abandon_match',
+        },
+      }));
+      await waitForWsErrorThenClose(liveJoin.ws, 5000).catch(() => null);
+      try { liveJoin.ws.close(); } catch { /* ignore */ }
+      const afterLive = await fetchJson('/api/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      assert(
+        'impromptu room deleted after in-progress discard',
+        !(afterLive.body.rooms || []).some((r) => r.id === destroyLiveId),
+      );
+      // Restart-match discard must NOT free the seat — covered implicitly by dock tests;
+      // here assert abandon freed and a fresh create still works under quota.
+      const recreate = await fetchJson('/api/rooms', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ kind: 'impromptu', label: 'After Destroy' }),
+      });
+      assert('can create impromptu after destroy frees seat', recreate.ok && !!recreate.body.room?.id);
+      if (recreate.body.room?.id) {
+        await fetchJson(`/api/rooms/${recreate.body.room.id}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        }).catch(() => null);
+      }
+    }
 
     // Create named OBS Dock Key (required label; default role trusted_operator)
     let apiKey = null;

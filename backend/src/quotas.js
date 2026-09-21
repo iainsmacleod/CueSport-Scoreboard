@@ -5,7 +5,8 @@ import { config } from './config.js';
 /** Built-in subscription tier caps — override via TIER_LIMITS_JSON or TIER_{TIER}_MAX_* env.
  *  Option A: 1 OBS Dock Key = 1 table (room) + 1 dock connection (seat).
  *  maxApiKeys = how many docks/tables you can connect (create one key per table)
- *  maxRooms = safety ceiling on room rows (should track keys); not a user-facing meter
+ *  maxRooms = safety ceiling on dock room rows (should track keys); not a user-facing meter
+ *  maxImpromptuTables = dockless scoring tables (separate from Dock Key seats)
  *  maxControlConnectionsPerRoom = mobile + guest connections per table (dock not counted)
  *
  *  Paid / managed ids: streamer, tournament_organizer, league_director, network_organization
@@ -23,26 +24,31 @@ const BUILTIN_TIERS = {
   streamer: {
     maxApiKeys: 2,
     maxRooms: 2,
+    maxImpromptuTables: 2,
     maxControlConnectionsPerRoom: 5,
   },
   tournament_organizer: {
     maxApiKeys: 5,
     maxRooms: 5,
+    maxImpromptuTables: 5,
     maxControlConnectionsPerRoom: 5,
   },
   league_director: {
     maxApiKeys: 10,
     maxRooms: 10,
+    maxImpromptuTables: 10,
     maxControlConnectionsPerRoom: 5,
   },
   network_organization: {
     maxApiKeys: 25,
     maxRooms: 25,
+    maxImpromptuTables: 25,
     maxControlConnectionsPerRoom: 10,
   },
   selfhost: {
     maxApiKeys: 2,
     maxRooms: 2,
+    maxImpromptuTables: 2,
     maxControlConnectionsPerRoom: 5,
   },
 };
@@ -50,6 +56,7 @@ const BUILTIN_TIERS = {
 const ENV_FIELD_MAP = {
   MAX_API_KEYS: 'maxApiKeys',
   MAX_ROOMS: 'maxRooms',
+  MAX_IMPROMPTU_TABLES: 'maxImpromptuTables',
   MAX_CONTROL_CONNECTIONS: 'maxControlConnectionsPerRoom',
 };
 
@@ -85,6 +92,7 @@ function loadTierCatalog() {
         tiers[id] = {
           maxApiKeys: parseEnvInt(limits.maxApiKeys, base.maxApiKeys),
           maxRooms: parseEnvInt(limits.maxRooms, base.maxRooms),
+          maxImpromptuTables: parseEnvInt(limits.maxImpromptuTables, base.maxImpromptuTables),
           maxControlConnectionsPerRoom: parseEnvInt(
             limits.maxControlConnectionsPerRoom,
             base.maxControlConnectionsPerRoom
@@ -149,7 +157,8 @@ export function getTierLimits(accountOrTier) {
 export function getAccountUsage(accountId) {
   return {
     apiKeys: sqlite.countActiveApiKeys(accountId),
-    rooms: sqlite.countRoomsForAccount(accountId),
+    rooms: sqlite.countDockRoomsForAccount(accountId),
+    impromptuTables: sqlite.countImpromptuRoomsForAccount(accountId),
   };
 }
 
@@ -170,17 +179,31 @@ export function getSimulatedPlanOptions() {
   ];
 }
 
+function unrestrictedLimits() {
+  return {
+    maxApiKeys: null,
+    maxRooms: null,
+    maxImpromptuTables: null,
+    maxControlConnectionsPerRoom: null,
+  };
+}
+
+function limitsPayload(limits) {
+  return {
+    maxApiKeys: limits.maxApiKeys,
+    maxRooms: limits.maxRooms,
+    maxImpromptuTables: limits.maxImpromptuTables,
+    maxControlConnectionsPerRoom: limits.maxControlConnectionsPerRoom,
+  };
+}
+
 export function getAccountQuota(account) {
   const usage = getAccountUsage(account.id);
   if (config.allowDevAuth) {
     return {
       tier: 'selfhost',
       tierDisplayName: 'Self-host (unrestricted)',
-      limits: {
-        maxApiKeys: null,
-        maxRooms: null,
-        maxControlConnectionsPerRoom: null,
-      },
+      limits: unrestrictedLimits(),
       usage,
       self_host_unrestricted: true,
     };
@@ -191,11 +214,7 @@ export function getAccountQuota(account) {
       return {
         tier: 'platform_admin',
         tierDisplayName: 'Platform admin (unrestricted)',
-        limits: {
-          maxApiKeys: null,
-          maxRooms: null,
-          maxControlConnectionsPerRoom: null,
-        },
+        limits: unrestrictedLimits(),
         usage,
         platform_admin_unlimited: true,
         simulated_plan: 'unrestricted',
@@ -205,11 +224,7 @@ export function getAccountQuota(account) {
     return {
       tier: limits.tier,
       tierDisplayName: `${getTierDisplayName(limits.tier)} (simulated)`,
-      limits: {
-        maxApiKeys: limits.maxApiKeys,
-        maxRooms: limits.maxRooms,
-        maxControlConnectionsPerRoom: limits.maxControlConnectionsPerRoom,
-      },
+      limits: limitsPayload(limits),
       usage,
       platform_admin_unlimited: false,
       simulated_plan: limits.tier,
@@ -219,11 +234,7 @@ export function getAccountQuota(account) {
   return {
     tier: limits.tier,
     tierDisplayName: getTierDisplayName(limits.tier),
-    limits: {
-      maxApiKeys: limits.maxApiKeys,
-      maxRooms: limits.maxRooms,
-      maxControlConnectionsPerRoom: limits.maxControlConnectionsPerRoom,
-    },
+    limits: limitsPayload(limits),
     usage,
   };
 }
@@ -254,6 +265,22 @@ export function assertCanCreateRoom(account) {
       ok: false,
       code: 'room_limit',
       message: `Table limit reached (${quota.limits.maxRooms} on ${quota.tierDisplayName} plan). Upgrade for more tables.`,
+      quota,
+    };
+  }
+  return { ok: true, quota };
+}
+
+export function assertCanCreateImpromptuTable(account) {
+  const quota = getAccountQuota(account);
+  if (quota.limits.maxImpromptuTables == null) {
+    return { ok: true, quota };
+  }
+  if (quota.usage.impromptuTables >= quota.limits.maxImpromptuTables) {
+    return {
+      ok: false,
+      code: 'impromptu_table_limit',
+      message: `Impromptu table limit reached (${quota.limits.maxImpromptuTables} on ${quota.tierDisplayName} plan). End a match to free a seat, or upgrade your plan.`,
       quota,
     };
   }

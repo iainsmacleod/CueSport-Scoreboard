@@ -6,7 +6,7 @@ Day-to-day use after Cloud is connected ([Hosted](Cloud-Hosted-Setup) or [Self-h
 
 | Tab | Purpose |
 |-----|---------|
-| **Tables** | Live cards for connected docks (players, game, race, score). First-time onboarding carousel when no dock is online. |
+| **Tables** | Live cards for connected docks **and** open impromptu tables. First-time onboarding carousel when no dock is online. **Create Impromptu Table** for dockless scoring. |
 | **Stats** | Account leaderboard, recent matches (including Live / in progress), player detail, rename, edit/delete matches, **Kill** unfinished matches. |
 | **Settings** | OBS Dock Keys — create, rename, change role, copy, revoke one, **Revoke All**. |
 | **Account** | Plan / billing (hosted), manage sessions (**Clear All Logins** also revokes guest links), sign out, account deletion. |
@@ -15,9 +15,16 @@ Hosted Platform Admins also get an **Admin** tab for customer support (not shown
 
 ### Live table cards
 
-- Appear when `dock_connected` is true for that Dock Key’s room.
-- Open the card to jump to mobile control for that table.
+- **Dock tables** appear when `dock_connected` is true for that Dock Key’s room.
+- **Impromptu tables** appear while the room exists (badge + owner online/offline). Open the card to jump to mobile Setup/Control.
 - Updates push over WebSocket (no polling).
+
+### Impromptu tables
+
+- Create from **Tables → Create Impromptu Table** (quota separate from OBS Dock Keys).
+- Mobile shows Dashboard / Setup / Control / Share — no Stream.
+- End or Call Match saves history and closes the table (frees the seat).
+- See [Multiple Tables](Multiple-Tables).
 
 ### OBS Dock Keys
 

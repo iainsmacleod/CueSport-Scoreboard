@@ -10,7 +10,8 @@
     "migrate": "node src/db/migrate.js",
     "test": "node tests/cloud-api.mjs",
     "test:cloud": "node tests/cloud-api.mjs",
-    "test:account-deletion": "node tests/account-deletion-unit.mjs"
+    "test:account-deletion": "node tests/account-deletion-unit.mjs",
+    "test:impromptu": "node tests/impromptu-unit.mjs"
   },
   "engines": {
     "node": ">=18"

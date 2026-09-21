@@ -10,6 +10,7 @@ import {
   renameAccountPlayer,
   deleteAccountPlayer,
   createApiKey,
+  createImpromptuRoom,
   fetchApiKey,
   revokeApiKey,
   patchApiKey,
@@ -22,7 +23,7 @@ import {
   openBillingPortal,
   setSimulatedPlan,
   GAME_TYPES,
-} from '../shared/cloud-client.js?v=8.2.4.1';
+} from '../shared/cloud-client.js?v=8.3.0';
 import {
   computeDurationSeconds,
   formatDurationSeconds,
@@ -37,7 +38,7 @@ import {
   adoptOAuthHashSession,
   getFreshAccessToken,
   signOutSupabaseSession,
-} from '../shared/supabase-session.js?v=8.2.4.1';
+} from '../shared/supabase-session.js?v=8.3.0';
 
 const SERVER_KEY = 'cuesport_server';
 const DASH_TAB_KEY = 'cuesport_dashboard_tab';
@@ -483,6 +484,24 @@ function gameTypeLabel(id) {
   return g ? g.label : (id || '—');
 }
 
+/** Match mobile Setup gate — placeholders mean the table still needs names. */
+function isDefaultPlayerName(name) {
+  const n = String(name || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!n) return true;
+  return (
+    n === 'player 1' ||
+    n === 'player 2' ||
+    n === 'player1' ||
+    n === 'player2' ||
+    n === 'p1' ||
+    n === 'p2' ||
+    n === 'player/team 1' ||
+    n === 'player/team 2' ||
+    n === 'player / team 1' ||
+    n === 'player / team 2'
+  );
+}
+
 function formatTableCard(room, serverUrl) {
   const st = room.live_state || {};
   const p1 = st.player1Name || 'P1';
@@ -497,22 +516,49 @@ function formatTableCard(room, serverUrl) {
     ? `<p class="table-score table-score-current">${st.p1Balls ?? 0} – ${st.p2Balls ?? 0} ${secondaryLabel}</p>` +
       `<p class="table-score table-score-primary">${st.p1Score ?? 0}–${st.p2Score ?? 0} ${primaryLabel}</p>`
     : `<p class="table-score">${st.p1Score ?? 0} – ${st.p2Score ?? 0}</p>`;
+  const isImpromptu = room.kind === 'impromptu';
   const matchTitle = [
     gameTypeLabel(st.gameType),
     st.raceInfo ? `${st.raceLabel || 'Race'} ${st.raceInfo}` : null,
     st.gameInfo || null,
-  ].filter(Boolean).join(' · ') || 'Match in progress';
-  const controlUrl = `${serverUrl.replace(/\/$/, '')}/m/${room.id}`;
+  ].filter(Boolean).join(' · ') || (isImpromptu && !st.gameType ? 'Ready to set up' : 'Match in progress');
+  const controlUrl = (() => {
+    const base = `${serverUrl.replace(/\/$/, '')}/m/${room.id}`;
+    if (!isImpromptu) return base;
+    // Only force Setup when names are still placeholders; otherwise open Control.
+    const needsSetup = isDefaultPlayerName(st.player1Name) || isDefaultPlayerName(st.player2Name);
+    return needsSetup ? `${base}?tab=setup` : base;
+  })();
 
-  const connectionName = String(room.api_key_label || room.dock_label || '').trim()
-    || 'OBS Dock Connected';
+  const connectionName = isImpromptu
+    ? (String(room.dock_label || room.label || '').trim() || 'Impromptu Table')
+    : (String(room.api_key_label || room.dock_label || '').trim() || 'OBS Dock Connected');
   const accountEmail = String(room.account_email || room.accountEmail || '').trim();
+  const adminOnline = !!(room.authority_connected || room.live);
+  const guestOnline = !!room.guest_connected;
+  let statusClass = 'offline';
+  let statusLabel = connectionName;
+  if (isImpromptu) {
+    // Owner (Admin) wins over Guest when both are present — guests relay to authority.
+    if (adminOnline) {
+      statusClass = 'online';
+      statusLabel = 'Impromptu · Admin';
+    } else if (guestOnline) {
+      statusClass = 'guest';
+      statusLabel = 'Impromptu · Guest';
+    } else {
+      statusClass = 'offline';
+      statusLabel = 'Impromptu · Ready';
+    }
+  } else {
+    statusClass = room.dock_connected ? 'online' : 'offline';
+  }
 
   const card = document.createElement('a');
-  card.className = 'table-card panel';
+  card.className = 'table-card panel' + (isImpromptu ? ' table-card-impromptu' : '');
   card.href = controlUrl;
   card.innerHTML = `
-    <p class="table-status online">${escapeHtml(connectionName)}</p>
+    <p class="table-status ${statusClass}">${escapeHtml(statusLabel)}</p>
     ${accountEmail ? `<p class="table-account-email">${escapeHtml(accountEmail)}</p>` : ''}
     <h3>${matchTitle}</h3>
     <p class="table-players">${p1} vs ${p2}</p>
@@ -522,14 +568,19 @@ function formatTableCard(room, serverUrl) {
 }
 
 function tablesFingerprint(rooms) {
-  const active = (rooms || []).filter((room) => room.dock_connected);
+  const active = (rooms || []).filter((room) => (
+    room.kind === 'impromptu' || room.dock_connected || room.live
+  ));
   return JSON.stringify(active.map((room) => ({
     id: room.id,
+    kind: room.kind || 'dock',
     account_id: room.account_id || room.accountId || null,
     account_email: room.account_email || room.accountEmail || null,
     instance_key: room.instance_key || null,
     dock_label: room.dock_label || null,
     api_key_label: room.api_key_label || null,
+    authority_connected: !!room.authority_connected,
+    guest_connected: !!room.guest_connected,
     live_state: room.live_state || {},
   })));
 }
@@ -566,8 +617,8 @@ function stopTablesSetupTimer() {
 
 function startTablesSetupTimer() {
   stopTablesSetupTimer();
-  const onboarding = document.getElementById('tablesOnboarding');
-  if (tablesSetupPaused || !onboarding || onboarding.classList.contains('hidden')) return;
+  const startRow = document.getElementById('tablesStartRow');
+  if (tablesSetupPaused || !startRow || startRow.classList.contains('hidden')) return;
   tablesSetupTimer = setInterval(() => {
     tablesSetupIndex += 1;
     renderTablesSetupCarousel();
@@ -594,15 +645,50 @@ function goToTablesSetupSlide(index) {
 }
 
 function setTablesOnboardingVisible(visible) {
-  const onboarding = document.getElementById('tablesOnboarding');
-  if (!onboarding) return;
-  onboarding.classList.toggle('hidden', !visible);
+  const startRow = document.getElementById('tablesStartRow');
+  if (startRow) startRow.classList.toggle('hidden', !visible);
   if (visible) {
     renderTablesSetupCarousel();
     startTablesSetupTimer();
   } else {
     stopTablesSetupTimer();
   }
+  syncCreateImpromptuCardState();
+}
+
+function formatCreateImpromptuCard() {
+  const card = document.createElement('button');
+  card.type = 'button';
+  card.className = 'table-card table-card-create panel';
+  card.title = 'Create a dockless table for scoring without OBS';
+  card.setAttribute('aria-label', 'Create Impromptu Table');
+  card.dataset.action = 'create-impromptu';
+  card.innerHTML = `
+    <span class="table-card-create-plus" aria-hidden="true">+</span>
+    <span class="table-card-create-label">Create Impromptu Table</span>
+    <span class="table-card-create-hint">Score without OBS</span>
+  `;
+  return card;
+}
+
+function canCreateImpromptuTable() {
+  if (isViewingOtherAccount()) return false;
+  const needsPlan = !!(lastAccount && lastAccount.needs_plan);
+  if (!isPlatformAdminUser && needsPlan) return false;
+  if (!lastQuota) return true;
+  const limits = lastQuota.limits || {};
+  const usage = lastQuota.usage || {};
+  if (lastQuota.platform_admin_unlimited || lastQuota.self_host_unrestricted) return true;
+  if (limits.maxImpromptuTables == null) return true;
+  return (usage.impromptuTables || 0) < limits.maxImpromptuTables;
+}
+
+function syncCreateImpromptuCardState() {
+  const blocked = !canCreateImpromptuTable();
+  document.querySelectorAll('.table-card-create').forEach((btn) => {
+    btn.disabled = blocked;
+    btn.classList.toggle('is-disabled', blocked);
+  });
 }
 
 function initTablesSetupCarousel() {
@@ -663,19 +749,26 @@ function renderTableCards(rooms) {
 
   const container = document.getElementById('tableCards');
   container.innerHTML = '';
-  const activeRooms = (rooms || []).filter((room) => room.dock_connected);
+  const activeRooms = (rooms || []).filter((room) => (
+    room.kind === 'impromptu' || room.dock_connected || room.live
+  ));
   if (!activeRooms.length) {
     const viewingAnotherAccount = isViewingOtherAccount();
     setTablesOnboardingVisible(!viewingAnotherAccount);
     if (viewingAnotherAccount) {
-      container.innerHTML = '<p class="hint">No docks are currently online for this account.</p>';
+      container.innerHTML = '<p class="hint">No docks or impromptu tables are currently active for this account.</p>';
     }
+    syncCreateImpromptuCardState();
     return;
   }
   setTablesOnboardingVisible(false);
   activeRooms.forEach((room) => {
     container.appendChild(formatTableCard(room, getServerUrl()));
   });
+  if (!isViewingOtherAccount()) {
+    container.appendChild(formatCreateImpromptuCard());
+  }
+  syncCreateImpromptuCardState();
 }
 
 function formatComplimentaryUntil(trialEndsAt) {
@@ -777,6 +870,7 @@ function renderQuota(quota, account = null) {
     if (planLine) planLine.textContent = '';
     if (hint) hint.classList.add('hidden');
     if (createBtn) createBtn.disabled = false;
+    syncCreateImpromptuCardState();
     return;
   }
   const { tier, tierDisplayName, limits, usage } = quota;
@@ -791,18 +885,37 @@ function renderQuota(quota, account = null) {
     if (needsPlan) {
       el.textContent = '';
     } else if (platformUnlimited || limits.maxApiKeys == null) {
-      el.textContent = `Dock seats (keys) ${usage.apiKeys} · Mobile/guest unrestricted per table`;
+      el.textContent =
+        `Dock seats (keys) ${usage.apiKeys} · Impromptu ${usage.impromptuTables || 0} · Mobile/guest unrestricted per table`;
     } else {
       el.textContent =
         `Dock seats (keys) ${usage.apiKeys}/${limits.maxApiKeys} · ` +
+        `Impromptu ${usage.impromptuTables || 0}/${limits.maxImpromptuTables ?? '—'} · ` +
         `Mobile/guest up to ${limits.maxControlConnectionsPerRoom} per table`;
     }
   }
   const atKeyLimit = !platformUnlimited
     && limits.maxApiKeys != null
     && usage.apiKeys >= limits.maxApiKeys;
+  const atImpromptuLimit = !platformUnlimited
+    && limits.maxImpromptuTables != null
+    && (usage.impromptuTables || 0) >= limits.maxImpromptuTables;
   const blocked = (!isPlatformAdminUser && needsPlan) || atKeyLimit;
   if (createBtn) createBtn.disabled = blocked;
+  const impromptuHint = document.getElementById('impromptuQuotaHint');
+  if (impromptuHint) {
+    if (needsPlan && !isPlatformAdminUser) {
+      impromptuHint.textContent = 'Choose a plan to create impromptu tables.';
+    } else if (atImpromptuLimit) {
+      impromptuHint.textContent = 'Impromptu seat limit reached — end a match to free a seat.';
+    } else if (limits.maxImpromptuTables != null) {
+      impromptuHint.textContent =
+        `${(usage.impromptuTables || 0)}/${limits.maxImpromptuTables} impromptu seats in use`;
+    } else {
+      impromptuHint.textContent = '';
+    }
+  }
+  syncCreateImpromptuCardState();
   if (hint) {
     if (isPlatformAdminUser && !atKeyLimit) {
       hint.classList.add('hidden');
@@ -1175,14 +1288,22 @@ async function refreshBillingUi(account, billingMeta) {
 }
 
 function roomCleanupStatus(room) {
+  if (room.kind === 'impromptu') {
+    if (room.authority_connected || room.live) return 'admin';
+    if (room.guest_connected) return 'guest';
+    return 'ready';
+  }
   if (room.dock_connected) return 'active';
   if (room.cleanup_after) return 'grace';
   if (!room.instance_key) return 'unmapped';
   return 'idle';
 }
 
-/** Title is the seat currently mapped to this table (OBS Dock Key N). */
+/** Title is the seat currently mapped to this table (OBS Dock Key N), or impromptu label. */
 function connectionDisplayTitle(room) {
+  if (room.kind === 'impromptu') {
+    return String(room.dock_label || room.label || '').trim() || 'Impromptu Table';
+  }
   const candidates = [
     room.api_key_label,
     room.dock_label,
@@ -1210,6 +1331,7 @@ function renderDebugRooms(rooms) {
   rows.forEach((room) => {
     const li = document.createElement('li');
     li.className = 'token-list-item debug-room-item';
+    const isImpromptu = room.kind === 'impromptu';
     const status = roomCleanupStatus(room);
     const title = connectionDisplayTitle(room);
     const st = room.live_state || {};
@@ -1227,15 +1349,24 @@ function renderDebugRooms(rooms) {
 
     const details = document.createElement('div');
     details.className = 'debug-room-details';
-    details.innerHTML =
-      `<span class="hint">OBS Dock UUID: ${escapeHtml(room.id)}</span>` +
-      (gameInfo ? `<span>event: ${escapeHtml(gameInfo)}</span>` : '') +
-      `<span>instance: ${escapeHtml(room.instance_key || '—')}</span>` +
-      `<span>dock: ${room.dock_connected ? 'online' : 'offline'}</span>` +
-      `<span>status: ${escapeHtml(status)}</span>` +
-      `<span>last seen: ${escapeHtml(formatLocalDateTime(room.last_seen_at) || '—')}</span>` +
-      (room.cleanup_after ? `<span>cleanup after: ${escapeHtml(formatLocalDateTime(room.cleanup_after))}</span>` : '') +
-      `<span>guest links: ${Number(room.guest_link_count) || 0}</span>`;
+    if (isImpromptu) {
+      details.innerHTML =
+        `<span class="hint">Table UUID: ${escapeHtml(room.id)}</span>` +
+        (gameInfo ? `<span>event: ${escapeHtml(gameInfo)}</span>` : '') +
+        `<span>connection: impromptu</span>` +
+        `<span>status: ${escapeHtml(status)}</span>` +
+        `<span>guest links: ${Number(room.guest_link_count) || 0}</span>`;
+    } else {
+      details.innerHTML =
+        `<span class="hint">OBS Dock UUID: ${escapeHtml(room.id)}</span>` +
+        (gameInfo ? `<span>event: ${escapeHtml(gameInfo)}</span>` : '') +
+        `<span>instance: ${escapeHtml(room.instance_key || '—')}</span>` +
+        `<span>dock: ${room.dock_connected ? 'online' : 'offline'}</span>` +
+        `<span>status: ${escapeHtml(status)}</span>` +
+        `<span>last seen: ${escapeHtml(formatLocalDateTime(room.last_seen_at) || '—')}</span>` +
+        (room.cleanup_after ? `<span>cleanup after: ${escapeHtml(formatLocalDateTime(room.cleanup_after))}</span>` : '') +
+        `<span>guest links: ${Number(room.guest_link_count) || 0}</span>`;
+    }
     meta.appendChild(details);
 
     const actions = document.createElement('div');
@@ -1244,15 +1375,19 @@ function renderDebugRooms(rooms) {
       className: 'danger',
       icon: 'kick',
       label: 'Kick',
-      title: 'Disconnect dock and remove from this list',
+      title: isImpromptu
+        ? 'Remove this impromptu table from the list'
+        : 'Disconnect dock and remove from this list',
     });
     kickBtn.addEventListener('click', async () => {
       const ok = await confirmDashAction({
-        title: 'Kick Connection',
-        message:
-          `Kick “${title}”?\n\n` +
-          'Clients disconnect and this connection is removed from the list. Completed match history is kept.',
-        confirmLabel: 'Kick',
+        title: isImpromptu ? 'Remove Impromptu Table' : 'Kick Connection',
+        message: isImpromptu
+          ? `Remove “${title}”?\n\n` +
+            'The impromptu seat is freed. Completed match history is kept.'
+          : `Kick “${title}”?\n\n` +
+            'Clients disconnect and this connection is removed from the list. Completed match history is kept.',
+        confirmLabel: isImpromptu ? 'Remove' : 'Kick',
         danger: true,
       });
       if (!ok) return;
@@ -1264,7 +1399,9 @@ function renderDebugRooms(rooms) {
         renderTableCards(result.rooms || []);
         const notice = document.getElementById('debugRoomsNotice');
         if (notice) {
-          notice.textContent = 'Connection kicked. Completed match history was kept.';
+          notice.textContent = isImpromptu
+            ? 'Impromptu table removed. Completed match history was kept.'
+            : 'Connection kicked. Completed match history was kept.';
           notice.classList.remove('hidden');
         }
       } catch (err) {
@@ -4873,6 +5010,40 @@ document.getElementById('devSecret')?.addEventListener('keydown', (event) => {
 document.getElementById('createKeyBtn').addEventListener('click', () => {
   openDockKeyModal({ mode: 'create' });
 });
+
+async function createImpromptuTableFromDashboard() {
+  if (!canCreateImpromptuTable()) {
+    setError('Impromptu tables are unavailable — check your plan or seat limit.');
+    return;
+  }
+  const buttons = Array.from(document.querySelectorAll('.table-card-create'));
+  const hint = document.getElementById('impromptuQuotaHint');
+  buttons.forEach((btn) => { btn.disabled = true; });
+  try {
+    setError('');
+    const result = await createImpromptuRoom(getServerUrl(), getToken(), 'Impromptu Table');
+    if (result.quota) renderQuota(result.quota, lastAccount);
+    const roomId = result.room?.id;
+    if (!roomId) throw new Error('Table created but no id returned');
+    window.location.href = `${getServerUrl().replace(/\/$/, '')}/m/${roomId}?tab=setup`;
+  } catch (err) {
+    if (hint) hint.textContent = err.message || 'Could not create impromptu table';
+    setError(err.message || 'Could not create impromptu table');
+    if (lastQuota) renderQuota(lastQuota, lastAccount);
+    else syncCreateImpromptuCardState();
+  }
+}
+
+document.getElementById('createImpromptuCard')?.addEventListener('click', () => {
+  createImpromptuTableFromDashboard();
+});
+document.getElementById('tableCards')?.addEventListener('click', (event) => {
+  const btn = event.target.closest('[data-action="create-impromptu"]');
+  if (!btn) return;
+  event.preventDefault();
+  createImpromptuTableFromDashboard();
+});
+
 document.getElementById('revokeAllDockKeysBtn')?.addEventListener('click', async () => {
   const revokeAllBtn = document.getElementById('revokeAllDockKeysBtn');
   const notice = document.getElementById('keyRevokeNotice');
@@ -5184,6 +5355,21 @@ document.getElementById('manageBillingBtn')?.addEventListener('click', () => {
     try {
       sessionStorage.setItem('cuesport_subscribe_tier', subscribeEarly);
     } catch { /* ignore */ }
+  }
+  if (params.get('impromptu') === 'closed') {
+    setError('');
+    const notice = document.getElementById('impromptuQuotaHint');
+    if (notice) notice.textContent = 'Match saved — impromptu table closed and seat freed.';
+    params.delete('impromptu');
+    const next = `${window.location.pathname}${params.toString() ? `?${params}` : ''}${window.location.hash || ''}`;
+    window.history.replaceState({}, '', next);
+  } else if (params.get('impromptu') === 'destroyed') {
+    setError('');
+    const notice = document.getElementById('impromptuQuotaHint');
+    if (notice) notice.textContent = 'Impromptu table destroyed — seat freed.';
+    params.delete('impromptu');
+    const next = `${window.location.pathname}${params.toString() ? `?${params}` : ''}${window.location.hash || ''}`;
+    window.history.replaceState({}, '', next);
   }
   if (billing === 'success') {
     setBillingNotice('Checkout complete — subscription status updates when Stripe confirms (usually a few seconds).');

@@ -11,6 +11,7 @@ export class CloudClient {
     this.handlers = {
       state: [],
       command: [],
+      session: [],
       joined: [],
       error: [],
       presence: [],
@@ -205,6 +206,14 @@ export class CloudClient {
           }
         } else if (data.type === 'presence') {
           this.handlers.presence.forEach((fn) => fn(data.clients || []));
+        } else if (data.type === 'command') {
+          (this.handlers.command || []).forEach((fn) => {
+            try { fn(data.action, data.payload || {}, data); } catch (_) { /* ignore */ }
+          });
+        } else if (data.type === 'session') {
+          (this.handlers.session || []).forEach((fn) => {
+            try { fn(data); } catch (_) { /* ignore */ }
+          });
         }
       };
       this.ws.onerror = () => {
@@ -251,6 +260,31 @@ export class CloudClient {
       return true;
     }
     return false;
+  }
+
+  /** Publish authoritative live state (dock or impromptu authority only). */
+  sendState(state = {}) {
+    if (!this.isOpen()) return false;
+    this.ws.send(JSON.stringify({
+      type: 'state',
+      room_id: this.roomId,
+      state: state || {},
+      ts: new Date().toISOString(),
+    }));
+    return true;
+  }
+
+  /** Match session start / end / discard (authority only). */
+  sendSession(action, payload = {}) {
+    if (!this.isOpen()) return false;
+    this.ws.send(JSON.stringify({
+      type: 'session',
+      room_id: this.roomId,
+      action,
+      payload: payload || {},
+      ts: new Date().toISOString(),
+    }));
+    return true;
   }
 
   disconnect() {
@@ -517,6 +551,27 @@ export async function createGuestLink(serverUrl, token, roomId, label, extraHead
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || err.message || 'Failed to create guest link');
+  }
+  return res.json();
+}
+
+/** Create a dockless impromptu scoring table. */
+export async function createImpromptuRoom(serverUrl, token, label = 'Impromptu Table') {
+  const base = serverUrl.replace(/\/$/, '');
+  const res = await fetch(`${base}/api/rooms`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ kind: 'impromptu', label }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const error = new Error(err.error || err.message || 'Failed to create impromptu table');
+    error.code = err.code || null;
+    error.quota = err.quota || null;
+    throw error;
   }
   return res.json();
 }

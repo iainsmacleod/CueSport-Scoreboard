@@ -8,7 +8,7 @@ import {
   createAccountPlayer,
   fetchPublicConfig,
   GAME_TYPES,
-} from '../shared/cloud-client.js?v=8.2.4.1';
+} from '../shared/cloud-client.js?v=8.3.0';
 import {
   parseRaceTarget,
   isRaceLocked,
@@ -21,7 +21,12 @@ import {
   ensureSupabaseAuth,
   getFreshAccessToken,
   signOutSupabaseSession,
-} from '../shared/supabase-session.js?v=8.2.4.1';
+} from '../shared/supabase-session.js?v=8.3.0';
+import {
+  applyImpromptuCommand,
+  hydrateAuthorityState,
+  createDefaultImpromptuState,
+} from '../shared/impromptu-authority.js?v=8.3.0';
 
 let client = null;
 let roomId = '';
@@ -29,8 +34,17 @@ let lastState = {};
 let raceDirty = false;
 let gameInfoDirty = false;
 let dockPresent = false;
+/** Impromptu tables: scoring authority (owner mobile) is present. */
+let authorityPresent = false;
+/** This session is the impromptu scoring authority. */
+let isAuthority = false;
+/** Room kind from join: dock | impromptu */
+let roomKind = 'dock';
+/** Private authority engine state (includes undo stacks). */
+let authorityPrivateState = null;
 /** Last known dock presence — kept during soft reconnect grace so controls can queue. */
 let softDockPresent = false;
+let softAuthorityPresent = false;
 /** Keep trying to stay joined (admin or guest) until sign-out / revoke. */
 let wantConnection = false;
 let reconnectTimer = null;
@@ -168,6 +182,11 @@ function isReplayEnabled(state = lastState) {
 }
 
 function syncReplayNavVisibility(state = lastState) {
+  if (isImpromptuTable()) {
+    document.getElementById('navReplayBtn')?.classList.add('hidden');
+    if (activeView === 'replay') setActiveView('control');
+    return;
+  }
   if (isGuestMode && !isDockOwnerGuest && !isViewOnly) return;
   const enabled = isReplayEnabled(state);
   const replayBtn = document.getElementById('navReplayBtn');
@@ -374,6 +393,27 @@ async function ensureGuestShareLink({ refreshList = false, forceHide = true } = 
   if (forceHide) hideGuestShareDetails();
   guestSharePromise = (async () => {
     let links = await fetchGuestLinks(window.location.origin, token, roomId, headers);
+    // Dock tables: keep a default elevated OBS Dock Owner link.
+    // Impromptu: owner is logged-in authority — only scoring guest links (no Dock Owner).
+    if (isImpromptuTable()) {
+      if (!(links || []).length) {
+        const created = await createGuestLink(window.location.origin, token, roomId, 'Guest scorer', headers);
+        links = await fetchGuestLinks(window.location.origin, token, roomId, headers);
+        if (!links.length) {
+          links = [{ token: created.token, path: created.path, url: created.url, label: created.label, connected: 0 }];
+        }
+      }
+      // Drop accidental Dock Owner tokens from the default selection (do not auto-recreate).
+      const scoringLinks = links.filter((g) => g.label !== 'OBS Dock Owner');
+      const pickFrom = scoringLinks.length ? scoringLinks : links;
+      const chosen = pickFrom.find((g) => g.token === cachedGuestShareToken)
+        || pickFrom.find((g) => g.label === 'Guest scorer')
+        || pickFrom[0];
+      selectGuestShareLink(chosen, { keepReveal: !forceHide });
+      renderGuestLinks(links);
+      return cachedGuestShareUrl;
+    }
+
     const owner = (links || []).find((g) => g.label === 'OBS Dock Owner');
     if (!links.length || !owner) {
       const created = await createGuestLink(window.location.origin, token, roomId, 'OBS Dock Owner', headers);
@@ -408,7 +448,9 @@ function renderGuestLinks(links) {
     li.className = 'token-list-item guest-link-item';
     li.dataset.token = g.token || '';
     const isOwner = g.label === 'OBS Dock Owner';
+    const isImpromptuDefault = isImpromptuTable() && g.label === 'Guest scorer';
     if (isOwner) li.classList.add('is-owner');
+    if (isImpromptuDefault) li.classList.add('is-owner');
     const n = Number(g.connected) || 0;
     const label = document.createElement('span');
     const status = n > 0 ? `${n} connected` : 'Offline';
@@ -417,7 +459,7 @@ function renderGuestLinks(links) {
 
     const actions = document.createElement('div');
     actions.className = 'token-list-actions';
-    if (isOwner) {
+    if (isOwner || isImpromptuDefault) {
       const badge = document.createElement('span');
       badge.className = 'dash-guest-owner-badge';
       badge.textContent = 'Default';
@@ -662,13 +704,76 @@ function ensureConnection(options = {}) {
   reconnectQuiet({ force: true }).catch(() => {});
 }
 
-/** Controls require a live cloud socket AND a dock in the room.
- *  During soft reconnect grace, allow queuing when the dock was recently present.
+function isImpromptuTable() {
+  return roomKind === 'impromptu';
+}
+
+function scoringHostPresent() {
+  if (isImpromptuTable()) return authorityPresent || isAuthority;
+  return dockPresent;
+}
+
+function softScoringHostPresent() {
+  if (isImpromptuTable()) return softAuthorityPresent || isAuthority;
+  return softDockPresent;
+}
+
+function applyImpromptuChrome() {
+  if (!isImpromptuTable()) {
+    document.getElementById('destroyTableBtn')?.classList.add('hidden');
+    return;
+  }
+  document.getElementById('navReplayBtn')?.classList.add('hidden');
+  show('viewReplay', false);
+  const title = document.getElementById('pageTitle');
+  if (title && !isGuestMode && !isViewOnly) {
+    title.textContent = 'CueSport Scoreboard — Impromptu';
+  }
+  const destroyBtn = document.getElementById('destroyTableBtn');
+  if (destroyBtn) {
+    // Owners only — guests cannot tear down the seat.
+    const showDestroy = !isGuestMode && !isViewOnly;
+    destroyBtn.classList.toggle('hidden', !showDestroy);
+    destroyBtn.disabled = !controlsEnabled();
+  }
+}
+
+function publishAuthorityResult(result) {
+  if (!result || !client) return;
+  authorityPrivateState = result._private || hydrateAuthorityState(result.state);
+  if (result.publish !== false) {
+    applyState(result.state);
+    client.sendState(result.state);
+  }
+  for (const ev of result.sessionEvents || []) {
+    client.sendSession(ev.action, ev.payload || {});
+  }
+  if (result.closeTable) {
+    wantConnection = false;
+    try { client.disconnect(); } catch (_) { /* ignore */ }
+    const reason = (result.sessionEvents || []).some((ev) => ev.action === 'end')
+      ? 'closed'
+      : 'destroyed';
+    const dash = `${window.location.origin}/web/dashboard/?impromptu=${reason}`;
+    window.location.href = dash;
+  }
+}
+
+function runAuthorityCommand(action, payload) {
+  if (!isAuthority || !isImpromptuTable()) return false;
+  const base = authorityPrivateState || hydrateAuthorityState(lastState);
+  const result = applyImpromptuCommand(base, action, payload || {});
+  publishAuthorityResult(result);
+  return true;
+}
+
+/** Controls require a live cloud socket AND a scoring host (dock or impromptu authority).
+ *  During soft reconnect grace, allow queuing when the host was recently present.
  *  Platform admin foreign-table view is always locked. */
 function controlsEnabled() {
   if (isViewOnly) return false;
-  if (connectionIsOpen() && dockPresent) return true;
-  if (connectionIsReconnecting() && softDockPresent) return true;
+  if (connectionIsOpen() && scoringHostPresent()) return true;
+  if (connectionIsReconnecting() && softScoringHostPresent()) return true;
   return false;
 }
 
@@ -685,14 +790,26 @@ function updateControlsLock() {
     else live.removeAttribute('title');
   }
   syncSaveIcons();
+  const destroyBtn = document.getElementById('destroyTableBtn');
+  if (destroyBtn && isImpromptuTable() && !isGuestMode && !isViewOnly) {
+    destroyBtn.disabled = locked;
+  }
 }
 
 function wireClientLifecycle(c) {
   c.on('presence', (clients) => {
     if (client !== c) return;
     dockPresent = (clients || []).includes('dock');
+    authorityPresent = (clients || []).includes('authority');
     softDockPresent = dockPresent;
-    setConnectionStatus(dockPresent ? 'connected' : 'waiting');
+    softAuthorityPresent = authorityPresent;
+    setConnectionStatus(scoringHostPresent() ? 'connected' : 'waiting');
+    updateControlsLock();
+  });
+  c.on('command', (action, payload) => {
+    if (client !== c) return;
+    if (!isAuthority || !isImpromptuTable()) return;
+    runAuthorityCommand(action, payload);
   });
   c.on('connection', (detail) => {
     if (client !== c) return;
@@ -704,12 +821,13 @@ function wireClientLifecycle(c) {
     }
     if (detail && detail.connected) {
       setReconnectBanner(false);
-      setConnectionStatus(dockPresent || softDockPresent ? 'connected' : 'waiting');
+      setConnectionStatus(scoringHostPresent() || softScoringHostPresent() ? 'connected' : 'waiting');
       updateControlsLock();
       return;
     }
     if (detail && !detail.usable) {
       softDockPresent = false;
+      softAuthorityPresent = false;
       if (!connectionIsOpen()) {
         setConnectionStatus('disconnected');
         if (wantConnection) {
@@ -722,6 +840,7 @@ function wireClientLifecycle(c) {
   c.on('close', (info) => {
     if (client !== c) return;
     dockPresent = false;
+    authorityPresent = false;
     const reconnecting = !!(info && info.reconnecting) || connectionIsReconnecting();
     if (reconnecting && wantConnection) {
       setConnectionStatus('reconnecting');
@@ -731,11 +850,13 @@ function wireClientLifecycle(c) {
       return;
     }
     softDockPresent = false;
+    softAuthorityPresent = false;
     setConnectionStatus('disconnected');
     if (wantConnection) {
       setReconnectBanner(true, 'Connection lost — tap Reconnect');
       scheduleReconnect();
     }
+    updateControlsLock();
   });
 }
 
@@ -890,6 +1011,11 @@ function leaveTableForHome({ clearToken = false } = {}) {
   if (client) {
     try { client.disconnect(); } catch (_) { /* ignore */ }
     client = null;
+  }
+  if (!clearToken && !isGuestMode) {
+    const q = isImpromptuTable() ? '?impromptu=closed' : '';
+    window.location.replace(`${window.location.origin}/web/dashboard/${q}`);
+    return;
   }
   window.location.replace('/');
 }
@@ -1887,6 +2013,13 @@ function syncMatchActionButtons(state) {
     callBtn.classList.toggle('hidden', !canCall);
     callBtn.disabled = !canCall;
   }
+
+  const destroyBtn = document.getElementById('destroyTableBtn');
+  if (destroyBtn) {
+    const showDestroy = isImpromptuTable() && !isGuestMode && !isViewOnly;
+    destroyBtn.classList.toggle('hidden', !showDestroy);
+    destroyBtn.disabled = !showDestroy || !controlsEnabled();
+  }
 }
 
 /**
@@ -2202,7 +2335,7 @@ function syncStreamStatsPanel(state) {
   }
 }
 
-const MATCH_CONFIRM_CMDS = new Set(['reset_scores', 'end_match', 'call_match_early']);
+const MATCH_CONFIRM_CMDS = new Set(['reset_scores', 'end_match', 'call_match_early', 'destroy_table']);
 let pendingMatchConfirm = null;
 
 function getMatchActionConfirmCopy(cmd, opts = {}) {
@@ -2224,6 +2357,11 @@ function getMatchActionConfirmCopy(cmd, opts = {}) {
       title: 'Call Match Early',
       message: 'End this match early and keep completed racks/frames in match history? Scores will clear after saving. Please note, this is not ending the frame, this is the entire match — to complete a frame, score it for the appropriate player.',
       confirm: 'Call Match Early',
+    },
+    destroy_table: {
+      title: 'Destroy Table',
+      message: 'Remove this impromptu table and free the seat? Any in-progress match will be discarded (not saved to history). This cannot be undone.',
+      confirm: 'Destroy Table',
     },
     delete_clip: {
       title: `Clear ${clipName}`,
@@ -2299,6 +2437,9 @@ function controlLockMessage() {
   if (isViewOnly) return 'Platform admin view — game controls are disabled';
   if (connectionIsReconnecting()) return 'Cloud reconnecting — commands will queue briefly';
   if (!connectionIsOpen()) return 'Not connected to cloud — controls are paused';
+  if (isImpromptuTable() && !scoringHostPresent()) {
+    return 'Waiting for table owner — controls are paused';
+  }
   if (!dockPresent) return 'Waiting for dock — controls are paused';
   return 'Controls are paused';
 }
@@ -2307,6 +2448,12 @@ function sendCmd(action, payload) {
   if (!controlsEnabled()) {
     setError(controlLockMessage());
     return false;
+  }
+  // Impromptu authority applies locally (same command vocabulary as the dock).
+  if (isAuthority && isImpromptuTable()) {
+    const ok = runAuthorityCommand(action, payload);
+    if (!ok) setError('Failed to apply command');
+    return ok;
   }
   const sent = client.sendCommand(action, payload);
   if (!sent) {
@@ -3028,9 +3175,16 @@ async function connectGuestSession({ quiet, isCurrent }) {
     if (!isCurrent()) return;
     isDockOwnerGuest = !!joined.is_dock_owner;
     if (joined.room_id) roomId = joined.room_id;
+    roomKind = joined.room_kind === 'impromptu' ? 'impromptu' : 'dock';
+    isAuthority = false;
+    authorityPresent = !!joined.authority_connected
+      || (joined.clients || []).includes('authority');
+    softAuthorityPresent = authorityPresent;
     applyGuestUI();
+    applyImpromptuChrome();
     showControl();
     dockPresent = (joined.clients || []).includes('dock');
+    softDockPresent = dockPresent;
     if (joined.state && Object.keys(joined.state).length) {
       applyState(joined.state);
     } else {
@@ -3038,7 +3192,8 @@ async function connectGuestSession({ quiet, isCurrent }) {
       initialViewChosen = false;
     }
     syncReplayNavVisibility(joined.state || lastState || {});
-    setConnectionStatus(dockPresent ? 'connected' : 'waiting');
+    setConnectionStatus(scoringHostPresent() ? 'connected' : 'waiting');
+    updateControlsLock();
     reconnectAttempt = 0;
     setReconnectBanner(false);
     setError('');
@@ -3148,9 +3303,25 @@ async function connectAuthenticatedSession({ quiet, isCurrent }) {
     const joined = await client.connect();
     if (!isCurrent()) return;
     isViewOnly = !!(joined.view_only || joined.permissions?.viewOnly);
+    roomKind = joined.room_kind === 'impromptu' ? 'impromptu' : 'dock';
+    isAuthority = !!joined.is_authority;
+    authorityPresent = !!joined.authority_connected || isAuthority
+      || (joined.clients || []).includes('authority');
+    softAuthorityPresent = authorityPresent;
     showControl();
+    applyImpromptuChrome();
     if (isViewOnly) applyViewOnlyUI();
     dockPresent = (joined.clients || []).includes('dock');
+    softDockPresent = dockPresent;
+    if (isAuthority && isImpromptuTable()) {
+      const seed = (joined.state && Object.keys(joined.state).length)
+        ? joined.state
+        : createDefaultImpromptuState();
+      authorityPrivateState = hydrateAuthorityState(seed);
+      if (!(joined.state && Object.keys(joined.state).length)) {
+        client.sendState(createDefaultImpromptuState());
+      }
+    }
     if (joined.state && Object.keys(joined.state).length) {
       applyState(joined.state);
     } else if (!quiet && !isViewOnly) {
@@ -3160,7 +3331,13 @@ async function connectAuthenticatedSession({ quiet, isCurrent }) {
     } else if (!quiet && isViewOnly) {
       setActiveView('control');
     }
-    setConnectionStatus(dockPresent ? 'connected' : 'waiting');
+    const preferSetup = new URLSearchParams(window.location.search).get('tab') === 'setup';
+    if (preferSetup && !isViewOnly) {
+      setActiveView('setup');
+      initialViewChosen = true;
+    }
+    setConnectionStatus(scoringHostPresent() ? 'connected' : 'waiting');
+    updateControlsLock();
     reconnectAttempt = 0;
     setReconnectBanner(false);
     setError('');

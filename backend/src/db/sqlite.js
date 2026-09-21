@@ -62,6 +62,7 @@ CREATE TABLE IF NOT EXISTS rooms (
   id TEXT PRIMARY KEY,
   account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
   label TEXT NOT NULL DEFAULT 'Default Room',
+  kind TEXT NOT NULL DEFAULT 'dock',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -319,6 +320,14 @@ function ensureAccountPlayerColumns(database) {
   }
 }
 
+function ensureRoomKindColumn(database) {
+  const cols = new Set(tableColumns(database, 'rooms'));
+  if (!cols.has('kind')) {
+    database.exec(`ALTER TABLE rooms ADD COLUMN kind TEXT NOT NULL DEFAULT 'dock'`);
+  }
+  database.exec(`UPDATE rooms SET kind = 'dock' WHERE kind IS NULL OR kind = ''`);
+}
+
 export function getDb() {
   if (!db) {
     const dir = path.dirname(config.sqlitePath);
@@ -337,6 +346,7 @@ export function getDb() {
     ensureMatchEventColumns(db);
     ensureAccountPlayersUuid(db);
     ensureAccountPlayerColumns(db);
+    ensureRoomKindColumn(db);
     db.exec(MATCH_EVENTS_INDEXES);
     db.prepare(
       `DELETE FROM account_identity_records
@@ -626,13 +636,26 @@ export function updateAccountSubscription(accountId, {
   return getAccountById(accountId);
 }
 
-/** Rooms with no room_docks mapping (junk from legacy signup / disabled POST). */
+/** Dock rooms with no room_docks mapping (junk from legacy signup). Impromptu rooms are intentionally unmapped. */
 export function listUnmappedRooms() {
   return getDb().prepare(`
     SELECT r.* FROM rooms r
-    WHERE NOT EXISTS (SELECT 1 FROM room_docks d WHERE d.room_id = r.id)
+    WHERE COALESCE(r.kind, 'dock') = 'dock'
+      AND NOT EXISTS (SELECT 1 FROM room_docks d WHERE d.room_id = r.id)
     ORDER BY r.created_at ASC
   `).all();
+}
+
+/** Impromptu rooms with no authority activity older than cutoff (created_at / session updated_at). */
+export function listAbandonedImpromptuRooms(cutoffSqlite) {
+  return getDb().prepare(`
+    SELECT r.*
+    FROM rooms r
+    LEFT JOIN room_sessions s ON s.room_id = r.id
+    WHERE COALESCE(r.kind, 'dock') = 'impromptu'
+      AND COALESCE(s.updated_at, r.created_at) < ?
+    ORDER BY COALESCE(s.updated_at, r.created_at) ASC
+  `).all(cutoffSqlite);
 }
 
 /**
@@ -801,6 +824,34 @@ export function countRoomsForAccount(accountId) {
   return getDb().prepare(
     `SELECT COUNT(*) AS n FROM rooms WHERE account_id = ?`
   ).get(accountId)?.n || 0;
+}
+
+export function countDockRoomsForAccount(accountId) {
+  return getDb().prepare(
+    `SELECT COUNT(*) AS n FROM rooms WHERE account_id = ? AND COALESCE(kind, 'dock') = 'dock'`
+  ).get(accountId)?.n || 0;
+}
+
+export function countImpromptuRoomsForAccount(accountId) {
+  return getDb().prepare(
+    `SELECT COUNT(*) AS n FROM rooms WHERE account_id = ? AND kind = 'impromptu'`
+  ).get(accountId)?.n || 0;
+}
+
+/** Create a dockless scoring table (no OBS Dock Key / room_docks row). */
+export function createImpromptuRoom(accountId, label = 'Impromptu Table') {
+  if (!accountId) return null;
+  const roomId = uuidv4();
+  const roomLabel = String(label || 'Impromptu Table').trim().slice(0, 60) || 'Impromptu Table';
+  const database = getDb();
+  database.prepare(
+    `INSERT INTO rooms (id, account_id, label, kind) VALUES (?, ?, ?, 'impromptu')`
+  ).run(roomId, accountId, roomLabel);
+  database.prepare(
+    `INSERT INTO room_sessions (room_id, session_id, state, updated_at)
+     VALUES (?, NULL, '{}', datetime('now'))`
+  ).run(roomId);
+  return getRoom(roomId);
 }
 
 export function revokeApiKey(keyId, accountId) {
@@ -1248,7 +1299,9 @@ export function ensureRoomForApiKey(accountId, apiKeyId, { instanceKey, label } 
 
   const roomId = uuidv4();
   const roomLabel = resolvedLabel || defaultInstanceLabel(key);
-  database.prepare('INSERT INTO rooms (id, account_id, label) VALUES (?, ?, ?)').run(roomId, accountId, roomLabel);
+  database.prepare(
+    `INSERT INTO rooms (id, account_id, label, kind) VALUES (?, ?, ?, 'dock')`
+  ).run(roomId, accountId, roomLabel);
   database.prepare(
     `INSERT INTO room_docks (room_id, account_id, api_key_id, instance_key, label, last_seen_at)
      VALUES (?, ?, ?, ?, ?, datetime('now'))`
@@ -1306,20 +1359,24 @@ export function touchRoomDock(accountId, instanceKey) {
 export function getRoomsWithLiveState(accountId) {
   const rooms = getRoomsForAccount(accountId);
   return rooms.map((room) => {
+    const kind = room.kind === 'impromptu' ? 'impromptu' : 'dock';
     const dock = getDb().prepare('SELECT * FROM room_docks WHERE room_id = ?').get(room.id);
     const session = getRoomSessionState(room.id);
     const apiKey = dock?.api_key_id ? getApiKeyById(dock.api_key_id) : null;
     const apiKeyLabel = apiKey?.label || null;
-    const connectionLabel = apiKeyLabel
-      || (dock?.label && dock.label !== 'Main table' && dock.label !== 'Default Room' && dock.label !== 'Table'
-        ? dock.label
-        : null)
-      || (room.label && room.label !== 'Main table' && room.label !== 'Default Room'
-        ? room.label
-        : null)
-      || 'Unassigned connection';
+    const connectionLabel = kind === 'impromptu'
+      ? (room.label && room.label !== 'Default Room' ? room.label : 'Impromptu Table')
+      : (apiKeyLabel
+        || (dock?.label && dock.label !== 'Main table' && dock.label !== 'Default Room' && dock.label !== 'Table'
+          ? dock.label
+          : null)
+        || (room.label && room.label !== 'Main table' && room.label !== 'Default Room'
+          ? room.label
+          : null)
+        || 'Unassigned connection');
     return {
       ...room,
+      kind,
       instance_key: dock?.instance_key || null,
       dock_label: connectionLabel,
       api_key_id: dock?.api_key_id || null,

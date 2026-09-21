@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
   <title>CueSport Scoreboard Cloud</title>
   <link rel="icon" type="image/png" href="/web/images/brand/logo.png?v=1" />
-  <link rel="stylesheet" href="/web/shared/styles.css?v=8.2.4" />
-  <link rel="stylesheet" href="/web/mobile/modern.css?v=8.2.4" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.3.0" />
+  <link rel="stylesheet" href="/web/mobile/modern.css?v=8.3.0" />
 </head>
 <body class="mobile">
   <header>
@@ -157,6 +157,7 @@
           <div class="panel live-inline-panel" id="matchPanel">
             <div class="row equal">
               <button class="btn danger" id="resetScoresBtn" data-cmd="reset_scores">Restart Match</button>
+              <button class="btn danger hidden" id="destroyTableBtn" data-cmd="destroy_table">Destroy Table</button>
               <button class="btn danger hidden" id="callMatchBtn" data-cmd="call_match_early">Call Match</button>
             </div>
           </div>
@@ -427,6 +428,6 @@
       <div id="poolRespotTargets" class="snooker-foul-targets"></div>
     </div>
   </div>
-  <script type="module" src="/web/mobile/app.js?v=8.2.4.1"></script>
+  <script type="module" src="/web/mobile/app.js?v=8.3.0"></script>
 </body>
 </html>

@@ -26,17 +26,28 @@ Cloud tables are **not** created by `?instance=`.
 
 | Concept | Meaning |
 |---------|---------|
-| **OBS Dock Key** | One seat = one cloud table |
-| Room identity | Keyed by Dock Key (`api_key_id`) |
+| **OBS Dock Key** | One seat = one **dock** cloud table (streaming) |
+| **Impromptu table** | Dockless scoring seat from the Dashboard — no OBS dock or overlay |
+| Room identity (dock) | Keyed by Dock Key (`api_key_id`) |
 | Local `?instance=` | Still isolates localStorage / BroadcastChannel on that machine |
 
-Practical rules:
+### Dock (streaming) tables
 
 1. Create a **separate named Dock Key** for each table/operator in the dashboard.
 2. Paste each key into that table’s dock (**Settings → CueSport Scoreboard Cloud → ⚙**).
 3. Each key may only be connected on **one dock at a time**.
 4. Two docks with different keys are two cloud tables — even if they use the same local `instance` string.
 5. One key with two docks fighting for it will not work reliably (one-live-dock-per-key).
+
+### Impromptu (dockless) tables
+
+Use these to track league / tournament / side games when you are **not** streaming.
+
+1. On the Dashboard **Tables** tab, choose **Create Impromptu Table** (tier-limited; separate from Dock Key seats).
+2. You are taken to mobile **Setup** for that table.
+3. Score from **Control**; share **scoring-only guest links** from **Share** (a default **Guest scorer** link is created with the table). There is no Stream tab and no OBS Dock Owner guest link — the signed-in owner is already the authority. Table cards show **Ready** (nobody connected), **Admin** (owner controlling), or **Guest** (guest link open; scoring still needs Admin authority).
+4. The signed-in owner phone is the scoring authority (same command vocabulary as the dock). Guests relay commands to that authority over Cloud WebSocket — not OBS BroadcastChannel / `browser_source.html`.
+5. **End Match** or **Call Match** logs history and **deletes the table**, freeing an impromptu seat. Restart Match keeps the seat.
 
 ## Recommended multi-table layout
 

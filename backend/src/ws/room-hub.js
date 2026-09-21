@@ -65,8 +65,39 @@ function listClientTypes(roomId) {
   const types = new Set();
   for (const conn of getRoomClients(roomId)) {
     types.add(conn.client);
+    if (conn.isAuthority) types.add('authority');
   }
   return [...types];
+}
+
+function isImpromptuRoom(roomOrId) {
+  const room = typeof roomOrId === 'string' ? sqlite.getRoom(roomOrId) : roomOrId;
+  return !!(room && room.kind === 'impromptu');
+}
+
+function findRoomAuthority(roomId, excludeWs = null) {
+  if (!roomId) return null;
+  for (const conn of getRoomClients(roomId)) {
+    if (excludeWs && conn.ws === excludeWs) continue;
+    if (!conn.isAuthority) continue;
+    if (conn.ws.readyState === 1) return conn;
+  }
+  return null;
+}
+
+/** True when an authority client (dock or impromptu mobile owner) is live for scoring. */
+export function roomHasConnectedAuthority(roomId) {
+  if (!roomId) return false;
+  if (roomHasConnectedDock(roomId)) return true;
+  return !!findRoomAuthority(roomId);
+}
+
+function canClaimImpromptuAuthority(meta, client) {
+  if (client !== 'mobile') return false;
+  if (meta.guestToken) return false;
+  if (meta.platformAdminView) return false;
+  // Account JWT/dev owners (not Dock Key remotes) host scoring for dockless tables.
+  return meta.authMethod === 'jwt' || meta.authMethod === 'dev';
 }
 
 function send(ws, message) {
@@ -149,16 +180,26 @@ export function resolveRoomApiKeyId(roomId, existingApiKeyId = null) {
 
 function buildDashboardRooms(accountId) {
   return sqlite.getRoomsWithLiveState(accountId).map((room) => {
-    const keyId = resolveRoomApiKeyId(room.id, room.api_key_id);
+    const kind = room.kind === 'impromptu' ? 'impromptu' : 'dock';
+    const keyId = kind === 'dock' ? resolveRoomApiKeyId(room.id, room.api_key_id) : null;
     const apiKey = keyId ? sqlite.getApiKeyById(keyId) : null;
     const keyLabel = apiKey?.label || room.api_key_label || null;
+    const dockConnected = kind === 'dock' ? roomHasConnectedDock(room.id) : false;
+    const authorityConnected = roomHasConnectedAuthority(room.id);
+    const guestConnected = roomHasConnectedGuest(room.id);
     return {
       ...room,
+      kind,
       api_key_id: keyId || null,
       api_key_label: keyLabel,
-      dock_label: keyLabel || room.dock_label,
-      dock_connected: roomHasConnectedDock(room.id),
-      cleanup_after: roomCleanupAfter.get(room.id)
+      dock_label: kind === 'impromptu'
+        ? (room.label || 'Impromptu Table')
+        : (keyLabel || room.dock_label),
+      dock_connected: dockConnected,
+      authority_connected: authorityConnected,
+      guest_connected: guestConnected,
+      live: kind === 'impromptu' ? authorityConnected : dockConnected,
+      cleanup_after: kind === 'dock' && roomCleanupAfter.get(room.id)
         ? new Date(roomCleanupAfter.get(room.id)).toISOString()
         : null,
     };
@@ -238,8 +279,11 @@ export function handleConnection(ws) {
 
     if (meta.roomId) {
       const wasDock = meta.client === 'dock';
+      const wasAuthority = !!meta.isAuthority;
+      const wasGuest = meta.client === 'mobile_guest';
       const accountId = meta.accountId;
       const roomId = meta.roomId;
+      const roomKind = meta.roomKind || (isImpromptuRoom(roomId) ? 'impromptu' : 'dock');
       const clients = getRoomClients(roomId);
       removeRoomClientByWs(clients, ws);
       broadcast(roomId, {
@@ -252,6 +296,8 @@ export function handleConnection(ws) {
         if (!roomsBeingDeleted.has(roomId) && !accountsBeingDeleted.has(accountId) && !roomHasConnectedDock(roomId)) {
           scheduleRoomCleanup(roomId);
         }
+      } else if (accountId && (wasAuthority || (wasGuest && roomKind === 'impromptu'))) {
+        notifyAccountTables(accountId, { immediate: true });
       }
     }
     connections.delete(ws);
@@ -568,6 +614,15 @@ async function handleRoomClientJoin(ws, meta, msg, authenticateJoin) {
     send(ws, { type: 'error', code: 'room_not_found', message: 'Table not found' });
     return;
   }
+  const roomKind = room.kind === 'impromptu' ? 'impromptu' : 'dock';
+  if (roomKind === 'impromptu' && client === 'dock') {
+    send(ws, {
+      type: 'error',
+      code: 'impromptu_no_dock',
+      message: 'This is an impromptu table — connect from mobile or the dashboard, not an OBS dock.',
+    });
+    return;
+  }
   const foreignRoom = !!(accountId && room.account_id && room.account_id !== accountId);
   if (foreignRoom) {
     // Only platform-admin mobile (flagged in authenticateJoin) may spectate foreign rooms.
@@ -604,6 +659,12 @@ async function handleRoomClientJoin(ws, meta, msg, authenticateJoin) {
 
   meta.roomId = roomId;
   meta.client = client;
+  meta.isAuthority = false;
+  meta.roomKind = roomKind;
+
+  if (roomKind === 'impromptu' && canClaimImpromptuAuthority(meta, client) && !findRoomAuthority(roomId)) {
+    meta.isAuthority = true;
+  }
 
   getRoomClients(roomId).add({
     ws,
@@ -613,6 +674,7 @@ async function handleRoomClientJoin(ws, meta, msg, authenticateJoin) {
     guestToken: meta.guestToken || null,
     apiKeyId: meta.apiKeyId || null,
     platformAdminView: !!meta.platformAdminView,
+    isAuthority: !!meta.isAuthority,
   });
 
   const { state, sessionId } = sqlite.getRoomSessionState(roomId);
@@ -631,6 +693,9 @@ async function handleRoomClientJoin(ws, meta, msg, authenticateJoin) {
     session_id: sessionId,
     state,
     role: meta.role || null,
+    room_kind: roomKind,
+    is_authority: !!meta.isAuthority,
+    authority_connected: roomHasConnectedAuthority(roomId),
     view_only: !!meta.platformAdminView,
     permissions: {
       ...basePermissions,
@@ -654,6 +719,8 @@ async function handleRoomClientJoin(ws, meta, msg, authenticateJoin) {
   if (client === 'dock') {
     sqlite.ensureDefaultDockOwnerGuestToken(roomId, accountId || room.account_id);
     cancelRoomCleanup(roomId);
+    notifyAccountTables(accountId || room.account_id, { immediate: true });
+  } else if (roomKind === 'impromptu' && (meta.isAuthority || client === 'mobile_guest')) {
     notifyAccountTables(accountId || room.account_id, { immediate: true });
   }
 }
@@ -709,6 +776,15 @@ const ACCOUNT_OWNER_COMMANDS = new Set([
   'set_stream_monitoring',
 ]);
 
+function isAuthorityPublisher(meta) {
+  if (!meta?.roomId) return false;
+  if (meta.roomKind === 'impromptu' || isImpromptuRoom(meta.roomId)) {
+    return !!meta.isAuthority;
+  }
+  // Dock tables: dock remains scoring authority.
+  return meta.client === 'dock';
+}
+
 function handleCommand(ws, meta, msg) {
   if (!requireJoined(ws, meta)) return;
   if (rejectViewOnly(ws, meta)) return;
@@ -731,6 +807,18 @@ function handleCommand(ws, meta, msg) {
       return;
     }
   }
+  const impromptu = meta.roomKind === 'impromptu' || isImpromptuRoom(meta.roomId);
+  if (impromptu && !roomHasConnectedAuthority(meta.roomId)) {
+    send(ws, {
+      type: 'error',
+      code: 'waiting_for_authority',
+      message: 'Waiting for the table owner to reconnect — controls are paused',
+    });
+    return;
+  }
+  if (!impromptu && !roomHasConnectedDock(meta.roomId)) {
+    // Soft: still relay (dock may reconnect); mobile UI already gates. Keep prior behavior.
+  }
   const envelope = {
     type: 'command',
     room_id: meta.roomId,
@@ -741,13 +829,21 @@ function handleCommand(ws, meta, msg) {
     ts: msg.ts || new Date().toISOString(),
   };
   persistEvent(meta, `command:${msg.action}`, envelope.payload, envelope.source);
-  // Relay to other room members. Dock executes; mobile CloudClient ignores command messages.
+  // Relay to other room members. Dock or impromptu authority executes; thin remotes ignore.
   broadcast(meta.roomId, envelope, ws);
 }
 
 function handleState(ws, meta, msg) {
   if (!requireJoined(ws, meta)) return;
   if (rejectViewOnly(ws, meta)) return;
+  if (!isAuthorityPublisher(meta)) {
+    send(ws, {
+      type: 'error',
+      code: 'not_authority',
+      message: 'Only the scoring authority can publish table state',
+    });
+    return;
+  }
   const state = msg.state || {};
   sqlite.setRoomSessionState(meta.roomId, sqlite.getRoomSessionState(meta.roomId).sessionId, state);
   const listed = state.streamPromotionListed === true &&
@@ -778,9 +874,18 @@ function handleState(ws, meta, msg) {
 function handleSession(ws, meta, msg) {
   if (!requireJoined(ws, meta)) return;
   if (rejectViewOnly(ws, meta)) return;
+  if (!isAuthorityPublisher(meta)) {
+    send(ws, {
+      type: 'error',
+      code: 'not_authority',
+      message: 'Only the scoring authority can update the match session',
+    });
+    return;
+  }
   const action = msg.action;
   let sessionId = sqlite.getRoomSessionState(meta.roomId).sessionId;
   const payload = msg.payload || {};
+  const impromptu = meta.roomKind === 'impromptu' || isImpromptuRoom(meta.roomId);
 
   if (action === 'start') {
     sessionId = uuidv4();
@@ -807,6 +912,14 @@ function handleSession(ws, meta, msg) {
     if (meta.accountId) {
       notifyAccountTables(meta.accountId, { immediate: true });
     }
+    if (impromptu) {
+      const reason = String(payload.reason || '');
+      // Restart keeps the seat; clear/abandon/kill frees it.
+      const freeSeat = reason !== 'restart_match' && reason !== 'undo_to_start';
+      if (freeSeat) {
+        performDeleteRoom(meta.roomId);
+      }
+    }
     return;
   }
 
@@ -828,6 +941,11 @@ function handleSession(ws, meta, msg) {
 
   if (meta.accountId && (action === 'start' || action === 'end')) {
     notifyAccountTables(meta.accountId, { immediate: true });
+  }
+
+  if (impromptu && action === 'end') {
+    // Match saved — remove table and free the impromptu seat.
+    performDeleteRoom(meta.roomId);
   }
 }
 
@@ -894,6 +1012,16 @@ export function getConnectedDockPromotedStreams() {
     });
   }
   return out;
+}
+
+/** True when any guest scorer socket is live for the room. */
+export function roomHasConnectedGuest(roomId) {
+  if (!roomId) return false;
+  for (const conn of getRoomClients(roomId)) {
+    if (conn.client !== 'mobile_guest') continue;
+    if (conn.ws.readyState === 1) return true;
+  }
+  return false;
 }
 
 /** Live guest sockets keyed by guest token for a room. */
@@ -1077,6 +1205,7 @@ export function cancelRoomCleanup(roomId) {
 
 export function scheduleRoomCleanup(roomId, graceMs = config.roomCleanupGraceMs) {
   if (!roomId) return;
+  if (isImpromptuRoom(roomId)) return;
   cancelRoomCleanup(roomId);
   const due = Date.now() + Math.max(0, graceMs);
   roomCleanupAfter.set(roomId, due);
@@ -1127,7 +1256,7 @@ function sqliteCutoffFromMsAgo(msAgo) {
   return d.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, '');
 }
 
-/** Prune unmapped rooms, idle TTL rooms, and rooms whose grace already fired offline. */
+/** Prune unmapped dock rooms, idle dock TTL rooms, and abandoned impromptu tables. */
 export function sweepStaleRooms() {
   let deleted = 0;
 
@@ -1144,12 +1273,20 @@ export function sweepStaleRooms() {
     }
   }
 
-  // Grace timers that were lost on restart: rooms with no dock and last_seen older than grace.
+  // Grace timers that were lost on restart: dock rooms with no dock and last_seen older than grace.
   if (config.roomCleanupGraceMs > 0) {
     const graceCutoff = sqliteCutoffFromMsAgo(config.roomCleanupGraceMs);
     for (const room of sqlite.listRoomsIdleBefore(graceCutoff)) {
       if (roomHasConnectedDock(room.id)) continue;
       if (roomCleanupTimers.has(room.id)) continue;
+      if (performDeleteRoom(room.id).ok) deleted += 1;
+    }
+  }
+
+  if (config.impromptuAbandonedTtlMs > 0) {
+    const cutoff = sqliteCutoffFromMsAgo(config.impromptuAbandonedTtlMs);
+    for (const room of sqlite.listAbandonedImpromptuRooms(cutoff)) {
+      if (roomHasConnectedAuthority(room.id)) continue;
       if (performDeleteRoom(room.id).ok) deleted += 1;
     }
   }

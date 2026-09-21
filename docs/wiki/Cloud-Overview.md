@@ -41,7 +41,8 @@ Also: cloud match history and player statistics, guest link create/revoke, and c
 
 ## Core concepts
 
-- **One OBS Dock Key = one cloud table.** Rooms are created when the dock connects.
+- **One OBS Dock Key = one dock cloud table.** Rooms for streaming are created when the dock connects.
+- **Impromptu tables** are dockless seats created from the Dashboard for scoring without OBS (see [Multiple Tables](Multiple-Tables)).
 - Local `?instance=` still isolates the dock/overlay on that PC; it does **not** create separate cloud tables. See [Multiple Tables](Multiple-Tables).
 - **Dock Key roles** (Administrator / Trusted Operator / Operator) control how much dashboard/history power that seat has — not who owns the Cloud account.
 - **Guest links** are for temporary scorers. Standard guests cannot edit names or use Stream/Share. An **OBS Dock Owner** guest link is elevated (Stream + Share). One active device per guest link.
