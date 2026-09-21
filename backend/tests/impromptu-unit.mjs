@@ -121,7 +121,7 @@ try {
   assert('yellow stays cleared', yellowDown && yellowDown.faded && yellowDown.disabled);
   assert('green next in clearance', greenNext && !greenNext.disabled && !greenNext.faded);
 
-  // Snooker free ball only after foul + player change.
+  // Snooker free ball after foul (dock switches player + offers Free Ball in one step).
   let free = createDefaultImpromptuState({
     player1Name: 'A', player2Name: 'B', gameType: 'game8', ballSelection: 'snooker',
   });
@@ -130,16 +130,19 @@ try {
   assert('free ball disabled initially', freeBefore && freeBefore.disabled);
   const rejectFree = applyImpromptuCommand(free, 'snooker_ball', { ballId: 'ball 10' });
   assert('free ball rejected without foul', rejectFree.publish === false && rejectFree.state.p1Balls === 0);
-  const afterFoul = applyImpromptuCommand(free, 'snooker_foul', { foulKey: 'ball_7' });
-  assert('snooker foul awards min 4 / black 7', afterFoul.state.p2Balls === 7 && afterFoul.state.foulsP1 === 1);
-  const freeAfterFoul = (afterFoul.state.ballGrid?.balls || []).find((b) => b.id === 'ball 10');
-  assert('free ball still disabled until player change', freeAfterFoul && freeAfterFoul.disabled);
-  assert('free ball not offered yet', afterFoul.state.snookerFreeBallOffered !== true);
-  const afterSwitch = applyImpromptuCommand(afterFoul._private, 'toggle_active_player', { isP1: false });
-  assert('free ball offered after switch', afterSwitch.state.snookerFreeBallOffered === true);
-  const freeReady = (afterSwitch.state.ballGrid?.balls || []).find((b) => b.id === 'ball 10');
-  assert('free ball enabled after switch', freeReady && !freeReady.disabled);
-  const afterFree = applyImpromptuCommand(afterSwitch._private, 'snooker_ball', { ballId: 'ball 10' });
+  const foulTargets = free.ballGrid?.snookerFoulTargets || [];
+  assert(
+    'foul picker targets use dock keys',
+    foulTargets.some((t) => t.key === 'black') && foulTargets.every((t) => !String(t.key).startsWith('ball')),
+    JSON.stringify(foulTargets.map((t) => t.key)),
+  );
+  const afterFoul = applyImpromptuCommand(free, 'snooker_foul', { foulKey: 'black' });
+  assert('snooker foul awards black 7', afterFoul.state.p2Balls === 7 && afterFoul.state.foulsP1 === 1);
+  assert('snooker foul switches active player', afterFoul.state.activePlayer === '2');
+  assert('free ball offered after foul', afterFoul.state.snookerFreeBallOffered === true);
+  const freeReady = (afterFoul.state.ballGrid?.balls || []).find((b) => b.id === 'ball 10');
+  assert('free ball enabled after foul', freeReady && !freeReady.disabled);
+  const afterFree = applyImpromptuCommand(afterFoul._private, 'snooker_ball', { ballId: 'ball 10' });
   assert('free ball scores 1 in reds', afterFree.state.p2Balls === 8 && afterFree.state.snookerPhase === 'color');
   assert('free ball cleared after pot', afterFree.state.snookerFreeBallOffered !== true);
 
@@ -382,12 +385,76 @@ try {
   for (let n = 1; n <= 14; n += 1) {
     straight141 = applyImpromptuCommand(straight141, 'toggle_pot', { ballId: `ball ${n}` })._private;
   }
-  assert(
-    '14.1 re-rack restores pocketed balls',
+  assert('14.1 re-rack restores pocketed balls',
     straight141.p1Score === 14
       && straight141.rackBreakerSlot === '1'
       && !(straight141._potted && Object.values(straight141._potted).some(Boolean)),
     `score=${straight141.p1Score} potted=${JSON.stringify(straight141._potted)}`,
+  );
+
+  // Ball art filenames match dock/mobile assets.
+  const unity = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game1', ballSelection: 'unity',
+  });
+  assert(
+    'unity ball file name',
+    (unity.ballGrid?.balls || []).find((b) => b.id === 'ball 1')?.file === '1-ball-unity-small.png',
+  );
+  const ultimate = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game1', ballSelection: 'ultimate',
+  });
+  assert(
+    'ultimate ball file name',
+    (ultimate.ballGrid?.balls || []).find((b) => b.id === 'ball 3')?.file === 'ultimate-3ball-small.png',
+  );
+  const intl = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game1', ballSelection: 'international',
+  });
+  assert(
+    'international solids file',
+    (intl.ballGrid?.balls || []).find((b) => b.id === 'ball 2')?.file === 'yellow-international-small-ball.png',
+  );
+  assert(
+    'international 8 file',
+    (intl.ballGrid?.balls || []).find((b) => b.id === 'ball 8')?.file === 'international-8-small-ball.png',
+  );
+
+  // Golden Ball: hidden until option; enabled after black cleared + 147; pot awards 20.
+  let goldOff = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game8', ballSelection: 'snooker', snookerGoldEnabled: false,
+  });
+  assert(
+    'gold hidden when option off',
+    (goldOff.ballGrid?.balls || []).find((b) => b.id === 'ball 8')?.hidden === true,
+  );
+  let gold = createDefaultImpromptuState({
+    player1Name: 'A',
+    player2Name: 'B',
+    gameType: 'game8',
+    ballSelection: 'snooker',
+    snookerGoldEnabled: true,
+    p1Balls: 147,
+    rackBreakerSlot: '1',
+    activePlayer: '1',
+    _snookerRedsPotted: 15,
+    _snookerPhase: 'red',
+    _snookerCleared: {
+      'ball 2': true, 'ball 3': true, 'ball 4': true,
+      'ball 5': true, 'ball 6': true, 'ball 7': true,
+    },
+  });
+  const goldReady = (gold.ballGrid?.balls || []).find((b) => b.id === 'ball 8');
+  assert(
+    'gold enabled at 147 after black',
+    goldReady && !goldReady.hidden && !goldReady.disabled,
+    `hidden=${goldReady?.hidden} disabled=${goldReady?.disabled}`,
+  );
+  const goldPot = applyImpromptuCommand(gold, 'snooker_ball', { ballId: 'ball 8' });
+  assert(
+    'gold pot awards 20 and removes ball',
+    goldPot.state.p1Balls === 167
+      && (goldPot.state.ballGrid?.balls || []).find((b) => b.id === 'ball 8')?.hidden === true,
+    `pts=${goldPot.state.p1Balls}`,
   );
 
   // Simulated paid tier: assertCanCreateImpromptuTable respects maxImpromptuTables

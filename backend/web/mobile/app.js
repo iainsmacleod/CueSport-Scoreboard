@@ -26,7 +26,7 @@ import {
   applyImpromptuCommand,
   hydrateAuthorityState,
   createDefaultImpromptuState,
-} from '../shared/impromptu-authority.js?v=8.3.0.4';
+} from '../shared/impromptu-authority.js?v=8.3.0.6';
 
 let client = null;
 let roomId = '';
@@ -1847,9 +1847,12 @@ function openSnookerFoulPicker() {
   const fromDock = snapshot && Array.isArray(snapshot.snookerFoulTargets) && snapshot.snookerFoulTargets.length
     ? snapshot.snookerFoulTargets
     : defaultSnookerFoulTargets();
+  // Prefer dock/impromptu targets that match known foul keys; fall back if keys are stale (e.g. ball_N).
+  const usable = fromDock.filter((t) => t && SNOOKER_FOUL_POINTS[t.key]);
+  const targets = usable.length ? usable : defaultSnookerFoulTargets();
 
   container.innerHTML = '';
-  fromDock.forEach((target) => {
+  targets.forEach((target) => {
     const key = target.key;
     const points = SNOOKER_FOUL_POINTS[key];
     if (!points) return;

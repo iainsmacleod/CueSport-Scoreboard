@@ -812,11 +812,14 @@ async function run() {
         'smoke snooker black re-spots',
         sn.snookerPhase === 'red' && sn.p1Balls === 8 && !faded(sn, 'ball 7'),
       );
-      sn = applyImpromptuCommand(sn, 'snooker_foul', { foulKey: 'ball_4' })._private;
-      sn = applyImpromptuCommand(sn, 'toggle_active_player', { isP1: false })._private;
-      assert('smoke snooker free ball offered', sn.snookerFreeBallOffered === true);
+      sn = applyImpromptuCommand(sn, 'snooker_foul', { foulKey: 'brown' })._private;
+      assert('smoke snooker free ball offered', sn.snookerFreeBallOffered === true && sn.activePlayer === '2');
       sn = applyImpromptuCommand(sn, 'snooker_ball', { ballId: 'ball 10' })._private;
       assert('smoke snooker free ball scores', sn.p2Balls === 5);
+      assert(
+        'smoke snooker foul picker keys',
+        (sn.ballGrid?.snookerFoulTargets || []).some((t) => t.key === 'black'),
+      );
       sn._snookerRedsPotted = 15;
       sn._snookerPhase = 'red';
       sn._snookerCleared = { 'ball 2': true };
@@ -916,6 +919,24 @@ async function run() {
       // Grid sizes
       assert('smoke 9-ball grid size', (start('game2').ballGrid?.balls || []).filter((b) => /^ball \d+$/.test(b.id)).length === 9);
       assert('smoke 10-ball grid size', (start('game3').ballGrid?.balls || []).filter((b) => /^ball \d+$/.test(b.id)).length === 10);
+      assert(
+        'smoke unity ball file',
+        (start('game1', { ballSelection: 'unity' }).ballGrid?.balls || [])
+          .find((b) => b.id === 'ball 1')?.file === '1-ball-unity-small.png',
+      );
+      const goldSmoke = createDefaultImpromptuState({
+        player1Name: 'A', player2Name: 'B', gameType: 'game8', ballSelection: 'snooker',
+        snookerGoldEnabled: true, p1Balls: 147, rackBreakerSlot: '1', activePlayer: '1',
+        _snookerRedsPotted: 15, _snookerPhase: 'red',
+        _snookerCleared: {
+          'ball 2': true, 'ball 3': true, 'ball 4': true,
+          'ball 5': true, 'ball 6': true, 'ball 7': true,
+        },
+      });
+      assert(
+        'smoke gold ball available at 147',
+        ((goldSmoke.ballGrid?.balls || []).find((b) => b.id === 'ball 8') || {}).disabled === false,
+      );
     }
 
     // Create named OBS Dock Key (required label; default role trusted_operator)

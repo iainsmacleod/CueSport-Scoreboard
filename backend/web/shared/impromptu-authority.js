@@ -18,8 +18,47 @@ const POOL_BALL_COUNTS = {
 
 const SNOOKER_POINTS = {
   'ball 1': 1, 'ball 2': 2, 'ball 3': 3, 'ball 4': 4,
-  'ball 5': 5, 'ball 6': 6, 'ball 7': 7,
+  'ball 5': 5, 'ball 6': 6, 'ball 7': 7, 'ball 8': 20,
 };
+
+/** Dock foul picker keys (control_panel data-foul) — mobile SNOOKER_FOUL_POINTS uses these. */
+const SNOOKER_FOUL_BY_KEY = {
+  white: 4,
+  yellow: 4,
+  green: 4,
+  brown: 4,
+  blue: 5,
+  pink: 6,
+  black: 7,
+  gold: 20,
+};
+
+const SNOOKER_FOUL_TARGET_DEFS = [
+  { key: 'white', file: 'snooker-white-small.png', alt: 'White' },
+  { key: 'yellow', file: 'snooker-yellow-small.png', alt: 'Yellow' },
+  { key: 'green', file: 'snooker-green-small.png', alt: 'Green' },
+  { key: 'brown', file: 'snooker-brown-small.png', alt: 'Brown' },
+  { key: 'blue', file: 'snooker-blue-small.png', alt: 'Blue' },
+  { key: 'pink', file: 'snooker-pink-small.png', alt: 'Pink' },
+  { key: 'black', file: 'snooker-black-small.png', alt: 'Black' },
+  { key: 'gold', file: 'snooker-gold-small.png', alt: 'Gold' },
+];
+
+function buildSnookerFoulTargets(state) {
+  return SNOOKER_FOUL_TARGET_DEFS
+    .filter((t) => t.key !== 'gold' || state.snookerGoldEnabled === true)
+    .map((t) => ({ key: t.key, file: t.file, alt: t.alt }));
+}
+
+function resolveSnookerFoulPoints(foulKey) {
+  const key = String(foulKey || '').trim().toLowerCase();
+  if (SNOOKER_FOUL_BY_KEY[key] != null) return SNOOKER_FOUL_BY_KEY[key];
+  // Legacy ball_N / ball N keys from early impromptu publishes.
+  const n = parseInt(key.replace(/\D/g, ''), 10);
+  if (Number.isFinite(n) && n >= 1 && n <= 7) return Math.max(4, n);
+  if (n === 8) return 20;
+  return 4;
+}
 
 /** Yellow → black clearance order (dock parity). */
 const SNOOKER_CLEARANCE_ORDER = [2, 3, 4, 5, 6, 7];
@@ -40,6 +79,7 @@ function ensureSnookerFrameState(state) {
   }
   state._snookerFreeBallOffered = !!state._snookerFreeBallOffered;
   state._snookerFoulAwaitingPlayerChange = !!state._snookerFoulAwaitingPlayerChange;
+  state._snookerGoldenBallFouled = !!state._snookerGoldenBallFouled;
 }
 
 function isSnookerColorCleared(state, num) {
@@ -65,6 +105,17 @@ function resetSnookerFrame(state) {
   state._snookerBreak = 0;
   state._snookerFreeBallOffered = false;
   state._snookerFoulAwaitingPlayerChange = false;
+  state._snookerGoldenBallFouled = false;
+}
+
+function isSnookerGoldenBallAvailable(state) {
+  if (state.snookerGoldEnabled !== true || state.gameType !== 'game8') return false;
+  if (state._snookerGoldenBallFouled || isSnookerColorCleared(state, 8)) return false;
+  if (!isSnookerColorCleared(state, 7)) return false;
+  const pts = state.activePlayer === '2'
+    ? (Number(state.p2Balls) || 0)
+    : (Number(state.p1Balls) || 0);
+  return pts >= 147;
 }
 
 const POCKET_RACK_TARGET = 8;
@@ -366,14 +417,20 @@ function ballFile(n, style) {
       5: 'snooker-blue-small.png',
       6: 'snooker-pink-small.png',
       7: 'snooker-black-small.png',
+      8: 'snooker-gold-small.png',
       10: 'snooker-freeball-small.png',
       11: 'foul-small.png',
     };
     return map[n] || 'snooker-red-small.png';
   }
-  if (style === 'international') return `${n}ball_international_small.png`;
-  if (style === 'unity') return `${n}ball_unity_small.png`;
-  if (style === 'ultimate') return `${n}ball_ultimate_small.png`;
+  // Match mobile ballImageFile / dock updateControlPanelBallImages.
+  if (style === 'international') {
+    if (n >= 1 && n <= 7) return 'yellow-international-small-ball.png';
+    if (n === 8) return 'international-8-small-ball.png';
+    return 'red-international-small-ball.png';
+  }
+  if (style === 'unity') return `${n}-ball-unity-small.png`;
+  if (style === 'ultimate') return `ultimate-${n}ball-small.png`;
   return `${n}ball_small.png`;
 }
 
@@ -459,6 +516,22 @@ function buildBallGrid(state) {
   }
 
   if (snooker) {
+    // Golden Ball: option on → show until fouled/potted; enabled only after black + 147.
+    const goldOnTable = state.snookerGoldEnabled === true
+      && !state._snookerGoldenBallFouled
+      && !isSnookerColorCleared(state, 8);
+    balls.push({
+      id: 'ball 8',
+      file: ballFile(8, 'snooker'),
+      title: 'Golden Ball (20-point)',
+      hidden: !goldOnTable,
+      faded: false,
+      disabled: locked || !isSnookerGoldenBallAvailable(state),
+      cooldown: false,
+      foul: false,
+      respot: false,
+      freeball: false,
+    });
     // Free Ball only after a foul and then an Active Player change (dock parity).
     const freeOffered = !!state._snookerFreeBallOffered;
     const freeBallOk = !locked && freeOffered && !expectColor && !allColorsCleared;
@@ -496,13 +569,7 @@ function buildBallGrid(state) {
     locked: !!state.gameScoringLocked,
     canUndo: (state._undo || []).length > 0 && !state.awaitingBreaker,
     balls,
-    snookerFoulTargets: snooker
-      ? [1, 2, 3, 4, 5, 6, 7].map((n) => ({
-        key: `ball_${n}`,
-        file: ballFile(n, 'snooker'),
-        alt: String(n),
-      }))
-      : [],
+    snookerFoulTargets: snooker ? buildSnookerFoulTargets(state) : [],
     foulsP1: Number(state.foulsP1) || 0,
     foulsP2: Number(state.foulsP2) || 0,
     snookerCurrentBreak: Number(state._snookerBreak) || 0,
@@ -605,6 +672,7 @@ function snapshotForUndo(state) {
     _snookerCleared: { ...(state._snookerCleared || {}) },
     _snookerFreeBallOffered: !!state._snookerFreeBallOffered,
     _snookerFoulAwaitingPlayerChange: !!state._snookerFoulAwaitingPlayerChange,
+    _snookerGoldenBallFouled: !!state._snookerGoldenBallFouled,
     rackBreakerSlot: state.rackBreakerSlot,
     awaitingBreaker: state.awaitingBreaker,
   };
@@ -627,6 +695,7 @@ function publicState(state) {
   delete cleaned._snookerCleared;
   delete cleaned._snookerFreeBallOffered;
   delete cleaned._snookerFoulAwaitingPlayerChange;
+  delete cleaned._snookerGoldenBallFouled;
   delete cleaned._pocketOwners;
   delete cleaned._cooldown;
   delete cleaned._ballSetOpenLastPotSlot;
@@ -670,6 +739,7 @@ export function createDefaultImpromptuState(overrides = {}) {
     _snookerCleared: {},
     _snookerFreeBallOffered: false,
     _snookerFoulAwaitingPlayerChange: false,
+    _snookerGoldenBallFouled: false,
     _pocketOwners: {},
     _cooldown: null,
     _ballSetOpenLastPotSlot: '',
@@ -977,6 +1047,24 @@ export function applyImpromptuCommand(stateIn, action, payload = {}) {
         const isRed = num === 1;
         const isFreeball = num === 10;
         const isColor = num >= 2 && num <= 7;
+        const isGold = num === 8;
+
+        if (isGold) {
+          if (!isSnookerGoldenBallAvailable(state)) {
+            publish = false;
+            break;
+          }
+          pushUndo(state);
+          const pts = SNOOKER_POINTS['ball 8'] || 20;
+          if (state.activePlayer === '2') state.p2Balls = clampScore((Number(state.p2Balls) || 0) + pts);
+          else state.p1Balls = clampScore((Number(state.p1Balls) || 0) + pts);
+          state._snookerBreak = (Number(state._snookerBreak) || 0) + pts;
+          markSnookerColorCleared(state, 8);
+          state._snookerFreeBallOffered = false;
+          state._snookerFoulAwaitingPlayerChange = false;
+          bumpActivity();
+          break;
+        }
 
         if (isRed) {
           if (expectColor || redsDone) {
@@ -1148,20 +1236,24 @@ export function applyImpromptuCommand(stateIn, action, payload = {}) {
     case 'snooker_foul': {
       pushUndo(state);
       const key = String(payload.foulKey || '');
-      const n = parseInt(key.replace(/\D/g, ''), 10);
-      const pts = Number.isFinite(n) && n >= 1 && n <= 7 ? Math.max(4, n) : 4;
-      if (state.activePlayer === '2') {
-        state.p1Balls = clampScore((Number(state.p1Balls) || 0) + pts);
-        state.foulsP2 = (Number(state.foulsP2) || 0) + 1;
-      } else {
-        state.p2Balls = clampScore((Number(state.p2Balls) || 0) + pts);
-        state.foulsP1 = (Number(state.foulsP1) || 0) + 1;
-      }
+      const pts = resolveSnookerFoulPoints(key);
+      const fouler = state.activePlayer === '2' ? '2' : '1';
+      const opponent = fouler === '2' ? '1' : '2';
+      if (opponent === '2') state.p2Balls = clampScore((Number(state.p2Balls) || 0) + pts);
+      else state.p1Balls = clampScore((Number(state.p1Balls) || 0) + pts);
+      if (fouler === '2') state.foulsP2 = (Number(state.foulsP2) || 0) + 1;
+      else state.foulsP1 = (Number(state.foulsP1) || 0) + 1;
       ensureSnookerFrameState(state);
       state._snookerBreak = 0;
-      state._snookerFreeBallOffered = false;
-      state._snookerFoulAwaitingPlayerChange = true;
       state._snookerPhase = 'red';
+      // Dock applies foul then switches Active Player — Free Ball is offered on that visit.
+      state.activePlayer = opponent;
+      state._snookerFoulAwaitingPlayerChange = false;
+      state._snookerFreeBallOffered = true;
+      if (key === 'gold') {
+        state._snookerGoldenBallFouled = true;
+        markSnookerColorCleared(state, 8);
+      }
       bumpActivity();
       break;
     }
