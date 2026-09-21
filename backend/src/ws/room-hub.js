@@ -888,12 +888,39 @@ function handleSession(ws, meta, msg) {
   const impromptu = meta.roomKind === 'impromptu' || isImpromptuRoom(meta.roomId);
 
   if (action === 'start') {
-    sessionId = uuidv4();
+    const existing = sqlite.getRoomSessionState(meta.roomId).sessionId;
+    const clientKey = payload.sessionId || payload.matchId || null;
+    if (existing) {
+      // Idempotent: reconnect / duplicate start must not create another unpaired live match.
+      sessionId = existing;
+      if (meta.accountId) {
+        sqlite.upsertAccountPlayer(meta.accountId, payload.player1, payload.player1Id || null);
+        sqlite.upsertAccountPlayer(meta.accountId, payload.player2, payload.player2Id || null);
+      }
+      broadcast(meta.roomId, {
+        type: 'session',
+        room_id: meta.roomId,
+        action: 'start',
+        session_id: sessionId,
+        payload: Object.assign({}, payload, {
+          sessionId,
+          matchId: payload.matchId || sessionId,
+          resumed: true,
+        }),
+        source: meta.client,
+        ts: new Date().toISOString(),
+      }, ws);
+      return;
+    }
+    sessionId = clientKey || uuidv4();
     sqlite.setRoomSessionId(meta.roomId, sessionId);
     if (meta.accountId) {
       sqlite.upsertAccountPlayer(meta.accountId, payload.player1, payload.player1Id || null);
       sqlite.upsertAccountPlayer(meta.accountId, payload.player2, payload.player2Id || null);
     }
+    // Keep payload session keys aligned with the room session for pairing.
+    payload.sessionId = sessionId;
+    if (!payload.matchId) payload.matchId = sessionId;
   } else if (action === 'discard') {
     // Clear Game / abandon: remove the open cloud match from history (not a completed end).
     const matchKey = payload.matchId || payload.sessionId || sessionId || null;

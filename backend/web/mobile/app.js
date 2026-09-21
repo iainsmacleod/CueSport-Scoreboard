@@ -26,7 +26,7 @@ import {
   applyImpromptuCommand,
   hydrateAuthorityState,
   createDefaultImpromptuState,
-} from '../shared/impromptu-authority.js?v=8.3.0.6';
+} from '../shared/impromptu-authority.js?v=8.3.0.9';
 
 let client = null;
 let roomId = '';
@@ -3338,7 +3338,11 @@ async function connectAuthenticatedSession({ quiet, isCurrent }) {
       const seed = (joined.state && Object.keys(joined.state).length)
         ? joined.state
         : createDefaultImpromptuState();
-      authorityPrivateState = hydrateAuthorityState(seed);
+      // Soft reconnect: keep prior _cloudStarted/_matchId so we do not emit a second live match.
+      authorityPrivateState = hydrateAuthorityState(seed, {
+        sessionId: joined.session_id || null,
+        previous: authorityPrivateState,
+      });
       if (!(joined.state && Object.keys(joined.state).length)) {
         client.sendState(createDefaultImpromptuState());
       }

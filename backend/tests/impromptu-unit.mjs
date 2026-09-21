@@ -55,7 +55,7 @@ try {
   assert('guest tokens cascaded', sqlite.countActiveGuestTokensForRoom(room.id) === 0);
 
   // Authority command: destroy_table discards and closes (frees seat via session discard).
-  const { applyImpromptuCommand, createDefaultImpromptuState } = await import('../web/shared/impromptu-authority.js');
+  const { applyImpromptuCommand, createDefaultImpromptuState, hydrateAuthorityState } = await import('../web/shared/impromptu-authority.js');
   const base = createDefaultImpromptuState({ player1Name: 'A', player2Name: 'B' });
   const destroyed = applyImpromptuCommand(base, 'destroy_table', {});
   assert('destroy_table closes table', destroyed.closeTable === true);
@@ -95,6 +95,29 @@ try {
   const afterBlack = applyImpromptuCommand(afterRed._private, 'snooker_ball', { ballId: 'ball 7' });
   assert('color returns to red phase', afterBlack.state.snookerPhase === 'red');
   assert('points for red+black', afterBlack.state.p1Balls === 8);
+  assert(
+    'snooker current break after red+black',
+    afterBlack.state.snookerCurrentBreak === 8
+      && afterBlack.state.ballGrid?.snookerCurrentBreak === 8,
+    `break=${afterBlack.state.snookerCurrentBreak}`,
+  );
+  const breakBalls = afterBlack.state.snookerBreakBalls || [];
+  assert(
+    'snooker break ball chips',
+    breakBalls.length === 2
+      && breakBalls[0]?.key === 'red' && breakBalls[0]?.count === 1
+      && breakBalls[1]?.key === 'black' && breakBalls[1]?.count === 1,
+    JSON.stringify(breakBalls),
+  );
+  // Full table remaining at start of frame: 15×8 + 27 = 147; after red+black still 14 reds → 14×8+27=139.
+  assert(
+    'snooker points remaining after red+black',
+    afterBlack.state.snookerPointsRemaining === 139
+      && afterBlack.state.snookerScoreMargin?.remaining === 139
+      && afterBlack.state.snookerScoreMargin?.diff === 8
+      && afterBlack.state.snookerScoreMargin?.display === '+8',
+    `remaining=${afterBlack.state.snookerPointsRemaining} margin=${JSON.stringify(afterBlack.state.snookerScoreMargin)}`,
+  );
   const blackRespot = (afterBlack.state.ballGrid?.balls || []).find((b) => b.id === 'ball 7');
   assert(
     'black re-enabled after color pot',
@@ -140,11 +163,23 @@ try {
   assert('snooker foul awards black 7', afterFoul.state.p2Balls === 7 && afterFoul.state.foulsP1 === 1);
   assert('snooker foul switches active player', afterFoul.state.activePlayer === '2');
   assert('free ball offered after foul', afterFoul.state.snookerFreeBallOffered === true);
+  assert(
+    'snooker foul clears break chips',
+    afterFoul.state.snookerCurrentBreak === 0
+      && Array.isArray(afterFoul.state.snookerBreakBalls)
+      && afterFoul.state.snookerBreakBalls.length === 0,
+  );
   const freeReady = (afterFoul.state.ballGrid?.balls || []).find((b) => b.id === 'ball 10');
   assert('free ball enabled after foul', freeReady && !freeReady.disabled);
   const afterFree = applyImpromptuCommand(afterFoul._private, 'snooker_ball', { ballId: 'ball 10' });
   assert('free ball scores 1 in reds', afterFree.state.p2Balls === 8 && afterFree.state.snookerPhase === 'color');
   assert('free ball cleared after pot', afterFree.state.snookerFreeBallOffered !== true);
+  assert(
+    'free ball appears in break chips',
+    afterFree.state.snookerCurrentBreak === 1
+      && afterFree.state.snookerBreakBalls?.some((b) => b.key === 'freeball' && b.count === 1),
+    JSON.stringify(afterFree.state.snookerBreakBalls),
+  );
 
   // Undo restores snooker phase.
   const undone = applyImpromptuCommand(afterBlack._private, 'undo', {});
@@ -456,6 +491,136 @@ try {
       && (goldPot.state.ballGrid?.balls || []).find((b) => b.id === 'ball 8')?.hidden === true,
     `pts=${goldPot.state.p1Balls}`,
   );
+
+  // Match stats → session:end (rack breakdown + Straight longest run).
+  let stats8 = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game1', raceInfo: '3',
+  });
+  stats8 = applyImpromptuCommand(stats8, 'select_breaker', { slot: '1' })._private;
+  // B&R: breaker wins without opponent visit.
+  stats8 = applyImpromptuCommand(stats8, 'score_add', { player: '1' })._private;
+  assert(
+    'rack row recorded on score_add',
+    Array.isArray(stats8._matchRacks) && stats8._matchRacks.length === 1
+      && stats8._matchRacks[0].winnerSlot === '1'
+      && stats8._matchRacks[0].breakAndRun === true,
+    JSON.stringify(stats8._matchRacks),
+  );
+  // Second rack after opponent visit → not B&R.
+  stats8 = applyImpromptuCommand(stats8, 'select_breaker', { slot: '1' })._private;
+  stats8 = applyImpromptuCommand(stats8, 'toggle_active_player', { isP1: false })._private;
+  stats8 = applyImpromptuCommand(stats8, 'score_add', { player: '2' })._private;
+  assert(
+    'second rack after visit is not B&R',
+    stats8._matchRacks.length === 2
+      && stats8._matchRacks[1].winnerSlot === '2'
+      && !stats8._matchRacks[1].breakAndRun,
+    JSON.stringify(stats8._matchRacks[1]),
+  );
+  const end8 = applyImpromptuCommand(stats8, 'end_match', {});
+  const end8Payload = (end8.sessionEvents || []).find((ev) => ev.action === 'end')?.payload;
+  assert(
+    'session:end includes racks',
+    Array.isArray(end8Payload?.racks) && end8Payload.racks.length === 2
+      && end8Payload.breakAndRunsP1 === 1
+      && end8Payload.scores?.p1 === 1 && end8Payload.scores?.p2 === 1,
+    JSON.stringify(end8Payload),
+  );
+
+  // Snooker frame row with high break.
+  let statsSn = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game8', ballSelection: 'snooker',
+  });
+  statsSn = applyImpromptuCommand(statsSn, 'select_breaker', { slot: '1' })._private;
+  statsSn = applyImpromptuCommand(statsSn, 'snooker_ball', { ballId: 'ball 1' })._private;
+  statsSn = applyImpromptuCommand(statsSn, 'snooker_ball', { ballId: 'ball 7' })._private;
+  assert('frame high break tracks visit', statsSn._frameHighBreakP1 === 8, `hb=${statsSn._frameHighBreakP1}`);
+  statsSn = applyImpromptuCommand(statsSn, 'score_add', { player: '1' })._private;
+  const endSn = applyImpromptuCommand(statsSn, 'end_match', {});
+  const endSnPayload = (endSn.sessionEvents || []).find((ev) => ev.action === 'end')?.payload;
+  assert(
+    'snooker session:end has frame racks + HB',
+    endSnPayload?.racks?.length === 1
+      && endSnPayload.racks[0].frameScore?.p1 === 8
+      && endSnPayload.racks[0].highestBreakP1 === 8
+      && endSnPayload.highestBreakP1 === 8,
+    JSON.stringify(endSnPayload),
+  );
+
+  // Straight: longest run across visits.
+  let statsSt = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game4', raceInfo: '50',
+  });
+  statsSt = applyImpromptuCommand(statsSt, 'select_breaker', { slot: '1' })._private;
+  for (const n of [1, 2, 3]) {
+    statsSt = applyImpromptuCommand(statsSt, 'toggle_pot', { ballId: `ball ${n}` })._private;
+  }
+  assert('straight run length 3', statsSt._straightRunLength === 3 && statsSt._highestRunP1 === 3);
+  statsSt = applyImpromptuCommand(statsSt, 'toggle_active_player', { isP1: false })._private;
+  statsSt = applyImpromptuCommand(statsSt, 'toggle_pot', { ballId: 'ball 4' })._private;
+  statsSt = applyImpromptuCommand(statsSt, 'toggle_pot', { ballId: 'ball 5' })._private;
+  assert(
+    'straight opponent run resets then tracks',
+    statsSt._highestRunP1 === 3 && statsSt._highestRunP2 === 2 && statsSt._straightRunSlot === '2',
+    `p1=${statsSt._highestRunP1} p2=${statsSt._highestRunP2} slot=${statsSt._straightRunSlot}`,
+  );
+  const endSt = applyImpromptuCommand(statsSt, 'end_match', {});
+  const endStPayload = (endSt.sessionEvents || []).find((ev) => ev.action === 'end')?.payload;
+  assert(
+    'straight session:end has highestRun, empty racks',
+    Array.isArray(endStPayload?.racks) && endStPayload.racks.length === 0
+      && endStPayload.highestRunP1 === 3
+      && endStPayload.highestRunP2 === 2
+      && endStPayload.scores?.p1 === 3 && endStPayload.scores?.p2 === 2,
+    JSON.stringify(endStPayload),
+  );
+
+  // Bank first-to-8 records a rack.
+  let statsBank = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game5',
+  });
+  statsBank = applyImpromptuCommand(statsBank, 'select_breaker', { slot: '1' })._private;
+  for (let i = 1; i <= 8; i += 1) {
+    statsBank = applyImpromptuCommand(statsBank, 'toggle_pot', { ballId: `ball ${i}` })._private;
+  }
+  assert(
+    'bank rack recorded on first-to-8',
+    statsBank.p1Score === 1 && statsBank._matchRacks?.length === 1
+      && statsBank._matchRacks[0].winnerSlot === '1'
+      && statsBank._matchRacks[0].breakAndRun === true,
+    JSON.stringify(statsBank._matchRacks),
+  );
+
+  // Hydrate restores matchStats for reconnect.
+  const pubBank = applyImpromptuCommand(statsBank, 'select_breaker', { slot: '2' });
+  assert('public matchStats has racks', (pubBank.state.matchStats?.racks || []).length === 1);
+  const hydratedStats = hydrateAuthorityState(pubBank.state, { sessionId: pubBank.state.matchId });
+  assert(
+    'hydrate restores match racks',
+    hydratedStats._matchRacks?.length === 1 && hydratedStats._matchRacks[0].winnerSlot === '1',
+    JSON.stringify(hydratedStats._matchRacks),
+  );
+
+  // Reconnect must not emit a second session:start (stale live games).
+  let liveMatch = createDefaultImpromptuState({ player1Name: 'A', player2Name: 'B' });
+  liveMatch = applyImpromptuCommand(liveMatch, 'select_breaker', { slot: '1' });
+  assert(
+    'breaker emits session start',
+    (liveMatch.sessionEvents || []).some((ev) => ev.action === 'start'),
+  );
+  const matchId = liveMatch._private._matchId;
+  assert('match id assigned', !!matchId);
+  liveMatch = applyImpromptuCommand(liveMatch._private, 'score_add', { player: '1' });
+  assert('public state carries session markers', liveMatch.state.cloudSessionStarted === true && liveMatch.state.matchId === matchId);
+  const rehydrated = hydrateAuthorityState(liveMatch.state, { sessionId: matchId });
+  assert('hydrate marks cloud started', rehydrated._cloudStarted === true && rehydrated._matchId === matchId);
+  const afterReconnect = applyImpromptuCommand(rehydrated, 'score_add', { player: '1' });
+  assert(
+    'reconnect score does not emit second start',
+    !(afterReconnect.sessionEvents || []).some((ev) => ev.action === 'start'),
+    JSON.stringify(afterReconnect.sessionEvents),
+  );
+  assert('reconnect keeps same match id', afterReconnect._private._matchId === matchId);
 
   // Simulated paid tier: assertCanCreateImpromptuTable respects maxImpromptuTables
   process.env.ALLOW_DEV_AUTH = 'false';

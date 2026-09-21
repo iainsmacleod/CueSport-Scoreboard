@@ -937,6 +937,55 @@ async function run() {
         'smoke gold ball available at 147',
         ((goldSmoke.ballGrid?.balls || []).find((b) => b.id === 'ball 8') || {}).disabled === false,
       );
+
+      // Stats smoke: rack breakdown + Straight longest run on session:end.
+      let statsPool = start('game1');
+      statsPool = applyImpromptuCommand(statsPool, 'score_add', { player: '1' })._private;
+      statsPool = applyImpromptuCommand(statsPool, 'select_breaker', { slot: '1' })._private;
+      statsPool = applyImpromptuCommand(statsPool, 'toggle_active_player', { isP1: false })._private;
+      statsPool = applyImpromptuCommand(statsPool, 'score_add', { player: '2' })._private;
+      const poolEnd = applyImpromptuCommand(statsPool, 'end_match', {});
+      const poolEndPayload = (poolEnd.sessionEvents || []).find((ev) => ev.action === 'end')?.payload;
+      assert(
+        'smoke session:end racks + B&R',
+        poolEndPayload?.racks?.length === 2
+          && poolEndPayload.racks[0].breakAndRun === true
+          && poolEndPayload.breakAndRunsP1 === 1
+          && poolEndPayload.scores?.p1 === 1
+          && poolEndPayload.scores?.p2 === 1,
+        JSON.stringify(poolEndPayload),
+      );
+
+      let statsStraight = start('game4');
+      for (const n of [1, 2, 3, 4]) {
+        statsStraight = applyImpromptuCommand(statsStraight, 'toggle_pot', { ballId: `ball ${n}` })._private;
+      }
+      statsStraight = applyImpromptuCommand(statsStraight, 'toggle_active_player', { isP1: false })._private;
+      statsStraight = applyImpromptuCommand(statsStraight, 'toggle_pot', { ballId: 'ball 6' })._private;
+      const stEnd = applyImpromptuCommand(statsStraight, 'end_match', {});
+      const stEndPayload = (stEnd.sessionEvents || []).find((ev) => ev.action === 'end')?.payload;
+      assert(
+        'smoke straight highestRun on session:end',
+        stEndPayload?.highestRunP1 === 4
+          && stEndPayload?.highestRunP2 === 1
+          && Array.isArray(stEndPayload?.racks)
+          && stEndPayload.racks.length === 0,
+        JSON.stringify(stEndPayload),
+      );
+
+      let statsFrame = start('game8', { ballSelection: 'snooker' });
+      statsFrame = applyImpromptuCommand(statsFrame, 'snooker_ball', { ballId: 'ball 1' })._private;
+      statsFrame = applyImpromptuCommand(statsFrame, 'snooker_ball', { ballId: 'ball 7' })._private;
+      statsFrame = applyImpromptuCommand(statsFrame, 'score_add', { player: '1' })._private;
+      const snEnd = applyImpromptuCommand(statsFrame, 'end_match', {});
+      const snEndPayload = (snEnd.sessionEvents || []).find((ev) => ev.action === 'end')?.payload;
+      assert(
+        'smoke snooker frame racks + HB on session:end',
+        snEndPayload?.racks?.length === 1
+          && snEndPayload.racks[0].highestBreakP1 === 8
+          && snEndPayload.highestBreakP1 === 8,
+        JSON.stringify(snEndPayload),
+      );
     }
 
     // Create named OBS Dock Key (required label; default role trusted_operator)
