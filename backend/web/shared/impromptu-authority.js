@@ -21,6 +21,105 @@ const SNOOKER_POINTS = {
   'ball 5': 5, 'ball 6': 6, 'ball 7': 7,
 };
 
+/** Yellow → black clearance order (dock parity). */
+const SNOOKER_CLEARANCE_ORDER = [2, 3, 4, 5, 6, 7];
+
+function snookerBallNum(ballId) {
+  const m = String(ballId || '').match(/^ball\s+(\d+)$/i);
+  return m ? parseInt(m[1], 10) : NaN;
+}
+
+function ensureSnookerFrameState(state) {
+  if (state._snookerPhase !== 'color') state._snookerPhase = 'red';
+  const reds = Number(state._snookerRedsPotted);
+  state._snookerRedsPotted = Number.isFinite(reds)
+    ? Math.min(15, Math.max(0, reds))
+    : 0;
+  if (!state._snookerCleared || typeof state._snookerCleared !== 'object') {
+    state._snookerCleared = {};
+  }
+  state._snookerFreeBallOffered = !!state._snookerFreeBallOffered;
+  state._snookerFoulAwaitingPlayerChange = !!state._snookerFoulAwaitingPlayerChange;
+}
+
+function isSnookerColorCleared(state, num) {
+  return !!(state._snookerCleared && state._snookerCleared[`ball ${num}`]);
+}
+
+function markSnookerColorCleared(state, num) {
+  if (!state._snookerCleared) state._snookerCleared = {};
+  state._snookerCleared[`ball ${num}`] = true;
+}
+
+function getNextSnookerClearanceColor(state) {
+  for (const n of SNOOKER_CLEARANCE_ORDER) {
+    if (!isSnookerColorCleared(state, n)) return n;
+  }
+  return null;
+}
+
+function resetSnookerFrame(state) {
+  state._snookerPhase = 'red';
+  state._snookerRedsPotted = 0;
+  state._snookerCleared = {};
+  state._snookerBreak = 0;
+  state._snookerFreeBallOffered = false;
+  state._snookerFoulAwaitingPlayerChange = false;
+}
+
+const POCKET_RACK_TARGET = 8;
+
+function isPocketScoreGame(state) {
+  return state.gameType === 'game5' || state.gameType === 'game6';
+}
+
+function isStraightPool(state) {
+  return state.gameType === 'game4';
+}
+
+function isBallFoulPenaltyGame(state) {
+  return state.gameType === 'game4' || state.gameType === 'game5' || state.gameType === 'game6';
+}
+
+/** Dock allows ball counters below zero on foul; keep the same range. */
+function clampSignedScore(value) {
+  const n = parseInt(value, 10);
+  if (!Number.isFinite(n)) return 0;
+  return Math.min(999, Math.max(-999, n));
+}
+
+function objectBallCount(state) {
+  const snooker = state.gameType === 'game8';
+  return snooker ? 7 : (POOL_BALL_COUNTS[state.gameType || 'game1'] || 15);
+}
+
+function hasFadedObjectBalls(state) {
+  const faded = state._potted || {};
+  const count = objectBallCount(state);
+  for (let n = 1; n <= count; n += 1) {
+    if (faded[`ball ${n}`]) return true;
+  }
+  return false;
+}
+
+function maybeAwardPocketRack(state) {
+  const slot = state.activePlayer === '2' ? '2' : '1';
+  const balls = Number(slot === '2' ? state.p2Balls : state.p1Balls) || 0;
+  if (balls < POCKET_RACK_TARGET) return false;
+  if (slot === '2') state.p2Score = clampScore((Number(state.p2Score) || 0) + 1);
+  else state.p1Score = clampScore((Number(state.p1Score) || 0) + 1);
+  state.p1Balls = 0;
+  state.p2Balls = 0;
+  state._potted = {};
+  state._pocketOwners = {};
+  const raceTo = parseRaceTarget(state.raceInfo, state.gameType);
+  if (isBreakerPromptEnabled(state) && !isRaceLocked(state.p1Score, state.p2Score, raceTo)) {
+    state.rackBreakerSlot = '';
+    state.lastRackWinnerSlot = slot;
+  }
+  return true;
+}
+
 const BREAKER_PROMPT_GAMES = new Set([
   'game1', 'game2', 'game3', 'game4', 'game5', 'game6', 'game7', 'game8',
 ]);
@@ -77,16 +176,47 @@ function buildBallGrid(state) {
   const balls = [];
   const faded = state._potted || {};
   const count = snooker ? 7 : (POOL_BALL_COUNTS[gt] || 15);
+  const locked = !!state.gameScoringLocked || !!state.awaitingBreaker;
+
+  if (snooker) ensureSnookerFrameState(state);
+  const phase = snooker && state._snookerPhase === 'color' ? 'color' : 'red';
+  const reds = snooker ? (Number(state._snookerRedsPotted) || 0) : 0;
+  const redsDone = reds >= 15;
+  const expectColor = phase === 'color';
+  const clearance = snooker && redsDone && !expectColor;
+  const nextClearance = clearance ? getNextSnookerClearanceColor(state) : null;
+  const allColorsCleared = snooker
+    && SNOOKER_CLEARANCE_ORDER.every((n) => isSnookerColorCleared(state, n));
 
   for (let n = 1; n <= count; n += 1) {
     const id = `ball ${n}`;
+    let ballFaded = !!faded[id];
+    let ballDisabled = locked;
+
+    if (snooker) {
+      if (n === 1) {
+        // Reds are counted, not individually faded — disable when a color is owed or reds are gone.
+        ballFaded = false;
+        ballDisabled = locked || expectColor || redsDone;
+      } else if (n >= 2 && n <= 7) {
+        if (clearance) {
+          ballFaded = isSnookerColorCleared(state, n);
+          ballDisabled = locked || ballFaded || n !== nextClearance;
+        } else {
+          // Reds / color-after-red: colors re-spot — never permanently fade.
+          ballFaded = false;
+          ballDisabled = locked || !expectColor;
+        }
+      }
+    }
+
     balls.push({
       id,
       file: ballFile(n, style),
       title: snooker ? `Ball ${n}` : String(n),
       hidden: false,
-      faded: !!faded[id],
-      disabled: !!state.gameScoringLocked || !!state.awaitingBreaker,
+      faded: ballFaded,
+      disabled: ballDisabled,
       foul: false,
       respot: false,
       freeball: false,
@@ -94,17 +224,21 @@ function buildBallGrid(state) {
   }
 
   if (snooker) {
+    // Free Ball only after a foul and then an Active Player change (dock parity).
+    const freeOffered = !!state._snookerFreeBallOffered;
+    const freeBallOk = !locked && freeOffered && !expectColor && !allColorsCleared;
     balls.push({
       id: 'ball 10', file: ballFile(10, 'snooker'), title: 'Free Ball',
-      hidden: false, faded: false, disabled: !!state.gameScoringLocked,
+      hidden: false, faded: false, disabled: !freeBallOk,
       foul: false, respot: false, freeball: true,
     });
     balls.push({
       id: 'ball 11', file: ballFile(11, 'snooker'), title: 'Foul',
-      hidden: false, faded: false, disabled: !!state.gameScoringLocked,
+      hidden: false, faded: false, disabled: locked || allColorsCleared,
       foul: true, respot: false, freeball: false,
     });
   } else {
+    const pocket = isPocketScoreGame(state);
     balls.push({
       id: 'poolFoulBtn', file: 'foul-small.png', title: 'Foul',
       hidden: false, faded: false,
@@ -113,7 +247,9 @@ function buildBallGrid(state) {
     });
     balls.push({
       id: 'poolRespotBtn', file: 'respot-small.png', title: 'Respot',
-      hidden: false, faded: false, disabled: !!state.gameScoringLocked,
+      hidden: !pocket,
+      faded: false,
+      disabled: !!state.gameScoringLocked || !!state.awaitingBreaker || !pocket || !hasFadedObjectBalls(state),
       foul: false, respot: true, freeball: false,
     });
   }
@@ -183,6 +319,8 @@ function refreshDerived(state) {
     || (Number(state.p1Balls) || 0) > 0
     || (Number(state.p2Balls) || 0) > 0
     || Object.keys(state._potted || {}).some((k) => state._potted[k])
+    || (Number(state._snookerRedsPotted) || 0) > 0
+    || Object.keys(state._snookerCleared || {}).some((k) => state._snookerCleared[k])
   );
   state.canResetScores = true;
   state.matchInProgress = !!(
@@ -191,6 +329,16 @@ function refreshDerived(state) {
     || (Number(state.p1Score) || 0) > 0 || (Number(state.p2Score) || 0) > 0
     || (Number(state.p1Balls) || 0) > 0 || (Number(state.p2Balls) || 0) > 0
   );
+  if (state.gameType === 'game8') {
+    ensureSnookerFrameState(state);
+    state.snookerPhase = state._snookerPhase;
+    state.snookerRedsPotted = state._snookerRedsPotted;
+    state.snookerFreeBallOffered = !!state._snookerFreeBallOffered;
+  } else {
+    state.snookerPhase = 'red';
+    state.snookerRedsPotted = 0;
+    state.snookerFreeBallOffered = false;
+  }
   state.ballGrid = buildBallGrid(state);
   state.timestamp = new Date().toISOString();
   state.streamPublicListed = false;
@@ -212,7 +360,13 @@ function snapshotForUndo(state) {
     foulsP2: state.foulsP2,
     activePlayer: state.activePlayer,
     _potted: { ...(state._potted || {}) },
+    _pocketOwners: { ...(state._pocketOwners || {}) },
     _snookerBreak: state._snookerBreak,
+    _snookerPhase: state._snookerPhase || 'red',
+    _snookerRedsPotted: Number(state._snookerRedsPotted) || 0,
+    _snookerCleared: { ...(state._snookerCleared || {}) },
+    _snookerFreeBallOffered: !!state._snookerFreeBallOffered,
+    _snookerFoulAwaitingPlayerChange: !!state._snookerFoulAwaitingPlayerChange,
     rackBreakerSlot: state.rackBreakerSlot,
     awaitingBreaker: state.awaitingBreaker,
   };
@@ -230,6 +384,12 @@ function publicState(state) {
   delete cleaned._undo;
   delete cleaned._potted;
   delete cleaned._snookerBreak;
+  delete cleaned._snookerPhase;
+  delete cleaned._snookerRedsPotted;
+  delete cleaned._snookerCleared;
+  delete cleaned._snookerFreeBallOffered;
+  delete cleaned._snookerFoulAwaitingPlayerChange;
+  delete cleaned._pocketOwners;
   delete cleaned._matchId;
   delete cleaned._cloudStarted;
   delete cleaned._internal;
@@ -264,6 +424,12 @@ export function createDefaultImpromptuState(overrides = {}) {
     _potted: {},
     _undo: [],
     _snookerBreak: 0,
+    _snookerPhase: 'red',
+    _snookerRedsPotted: 0,
+    _snookerCleared: {},
+    _snookerFreeBallOffered: false,
+    _snookerFoulAwaitingPlayerChange: false,
+    _pocketOwners: {},
     _matchId: null,
     _cloudStarted: false,
     ...overrides,
@@ -275,9 +441,20 @@ export function hydrateAuthorityState(liveState) {
   const base = createDefaultImpromptuState(liveState || {});
   base._potted = {};
   base._undo = [];
+  base._snookerCleared = {};
+  base._snookerPhase = liveState?.snookerPhase === 'color' ? 'color' : 'red';
+  base._snookerRedsPotted = Number(liveState?.snookerRedsPotted) || 0;
   if (liveState?.ballGrid?.balls) {
     for (const b of liveState.ballGrid.balls) {
-      if (b?.id && b.faded) base._potted[b.id] = true;
+      if (!b?.id) continue;
+      if (b.faded) {
+        const n = snookerBallNum(b.id);
+        if (base.gameType === 'game8' && n >= 2 && n <= 7) {
+          base._snookerCleared[b.id] = true;
+        } else {
+          base._potted[b.id] = true;
+        }
+      }
     }
   }
   return refreshDerived(base);
@@ -288,8 +465,12 @@ export function hydrateAuthorityState(liveState) {
  */
 export function applyImpromptuCommand(stateIn, action, payload = {}) {
   const state = refreshDerived({ ...(stateIn || createDefaultImpromptuState()) });
-  if (!state._potted) state._potted = {};
+  // Clone mutable frame maps so callers keep a stable prior snapshot.
+  state._potted = { ...(state._potted || {}) };
+  state._snookerCleared = { ...(state._snookerCleared || {}) };
+  state._pocketOwners = { ...(state._pocketOwners || {}) };
   if (!state._undo) state._undo = [];
+  else state._undo = state._undo.slice();
   const sessionEvents = [];
   let closeTable = false;
   let publish = true;
@@ -414,7 +595,19 @@ export function applyImpromptuCommand(stateIn, action, payload = {}) {
         state.rackBreakerSlot = slot;
         state.activePlayer = slot;
       } else {
+        const prev = state.activePlayer;
         state.activePlayer = slot;
+        if (state.gameType === 'game8' && prev !== slot) {
+          ensureSnookerFrameState(state);
+          state._snookerBreak = 0;
+          if (state._snookerFoulAwaitingPlayerChange) {
+            state._snookerFoulAwaitingPlayerChange = false;
+            state._snookerFreeBallOffered = true;
+            state._snookerPhase = 'red';
+          } else {
+            state._snookerFreeBallOffered = false;
+          }
+        }
       }
       bumpActivity();
       break;
@@ -427,6 +620,17 @@ export function applyImpromptuCommand(stateIn, action, payload = {}) {
       }
       pushUndo(state);
       state.activePlayer = target;
+      if (state.gameType === 'game8') {
+        ensureSnookerFrameState(state);
+        state._snookerBreak = 0;
+        if (state._snookerFoulAwaitingPlayerChange) {
+          state._snookerFoulAwaitingPlayerChange = false;
+          state._snookerFreeBallOffered = true;
+          state._snookerPhase = 'red';
+        } else {
+          state._snookerFreeBallOffered = false;
+        }
+      }
       bumpActivity();
       break;
     }
@@ -452,7 +656,9 @@ export function applyImpromptuCommand(stateIn, action, payload = {}) {
     case 'set_game_type': {
       state.gameType = String(payload.gameType || 'game1');
       state._potted = {};
+      state._pocketOwners = {};
       state._undo = [];
+      resetSnookerFrame(state);
       state.rackBreakerSlot = '';
       if (state.gameType === 'game8') state.ballSelection = 'snooker';
       break;
@@ -480,9 +686,21 @@ export function applyImpromptuCommand(stateIn, action, payload = {}) {
       const ballId = payload.ballId ? String(payload.ballId) : '';
       if (!ballId) break;
       if (ballId === 'poolFoulBtn') {
+        // Same path as pool_foul (mobile may send either).
         pushUndo(state);
-        if (state.activePlayer === '2') state.foulsP2 = (Number(state.foulsP2) || 0) + 1;
+        const fouler = state.activePlayer === '2' ? '2' : '1';
+        if (fouler === '2') state.foulsP2 = (Number(state.foulsP2) || 0) + 1;
         else state.foulsP1 = (Number(state.foulsP1) || 0) + 1;
+        if (isBallFoulPenaltyGame(state)) {
+          if (isStraightPool(state)) {
+            if (fouler === '2') state.p2Score = clampSignedScore((Number(state.p2Score) || 0) - 1);
+            else state.p1Score = clampSignedScore((Number(state.p1Score) || 0) - 1);
+          } else {
+            if (fouler === '2') state.p2Balls = clampSignedScore((Number(state.p2Balls) || 0) - 1);
+            else state.p1Balls = clampSignedScore((Number(state.p1Balls) || 0) - 1);
+          }
+        }
+        state.activePlayer = fouler === '2' ? '1' : '2';
         bumpActivity();
         break;
       }
@@ -490,31 +708,157 @@ export function applyImpromptuCommand(stateIn, action, payload = {}) {
         publish = false;
         break;
       }
-      if (ballId === 'ball 10') {
+
+      // Snooker: dock-parity red ↔ color respot, then yellow→black clearance.
+      if (state.gameType === 'game8') {
+        ensureSnookerFrameState(state);
+        const num = snookerBallNum(ballId);
+        const phase = state._snookerPhase === 'color' ? 'color' : 'red';
+        const reds = Number(state._snookerRedsPotted) || 0;
+        const redsDone = reds >= 15;
+        const expectColor = phase === 'color';
+        const clearance = redsDone && !expectColor;
+        const isRed = num === 1;
+        const isFreeball = num === 10;
+        const isColor = num >= 2 && num <= 7;
+
+        if (isRed) {
+          if (expectColor || redsDone) {
+            publish = false;
+            break;
+          }
+          pushUndo(state);
+          if (state.activePlayer === '2') state.p2Balls = clampScore((Number(state.p2Balls) || 0) + 1);
+          else state.p1Balls = clampScore((Number(state.p1Balls) || 0) + 1);
+          state._snookerBreak = (Number(state._snookerBreak) || 0) + 1;
+          state._snookerRedsPotted = reds + 1;
+          state._snookerPhase = 'color';
+          state._snookerFreeBallOffered = false;
+          state._snookerFoulAwaitingPlayerChange = false;
+          bumpActivity();
+          break;
+        }
+
+        if (isFreeball) {
+          if (!state._snookerFreeBallOffered || expectColor
+            || SNOOKER_CLEARANCE_ORDER.every((n) => isSnookerColorCleared(state, n))) {
+            publish = false;
+            break;
+          }
+          pushUndo(state);
+          // Lowest remaining ball points (dock free-ball value).
+          let freePts = 1;
+          if (redsDone) {
+            const next = getNextSnookerClearanceColor(state);
+            freePts = next ? (SNOOKER_POINTS[`ball ${next}`] || 1) : 1;
+          }
+          if (state.activePlayer === '2') state.p2Balls = clampScore((Number(state.p2Balls) || 0) + freePts);
+          else state.p1Balls = clampScore((Number(state.p1Balls) || 0) + freePts);
+          state._snookerBreak = (Number(state._snookerBreak) || 0) + freePts;
+          state._snookerFreeBallOffered = false;
+          state._snookerFoulAwaitingPlayerChange = false;
+          if (!redsDone) state._snookerPhase = 'color';
+          bumpActivity();
+          break;
+        }
+
+        if (isColor) {
+          if (!expectColor && !clearance) {
+            publish = false;
+            break;
+          }
+          if (clearance) {
+            const nextColor = getNextSnookerClearanceColor(state);
+            if (num !== nextColor || isSnookerColorCleared(state, num)) {
+              publish = false;
+              break;
+            }
+          }
+          const pts = SNOOKER_POINTS[ballId] || 0;
+          pushUndo(state);
+          if (state.activePlayer === '2') state.p2Balls = clampScore((Number(state.p2Balls) || 0) + pts);
+          else state.p1Balls = clampScore((Number(state.p1Balls) || 0) + pts);
+          state._snookerBreak = (Number(state._snookerBreak) || 0) + pts;
+          if (clearance) {
+            // Colors stay down only during final clearance.
+            markSnookerColorCleared(state, num);
+          }
+          // Re-spot after color-on-red; after 15th red's color, phase=red starts clearance.
+          state._snookerPhase = 'red';
+          bumpActivity();
+          break;
+        }
+
+        publish = false;
+        break;
+      }
+
+      // Bank / One Pocket: fade awards a ball; unfade debits the credited owner.
+      if (isPocketScoreGame(state)) {
+        const nowFaded = !state._potted[ballId];
         pushUndo(state);
-        if (state.activePlayer === '2') state.p2Balls = clampScore((Number(state.p2Balls) || 0) + 1);
-        else state.p1Balls = clampScore((Number(state.p1Balls) || 0) + 1);
-        state._snookerBreak = (Number(state._snookerBreak) || 0) + 1;
+        if (nowFaded) {
+          const slot = state.activePlayer === '2' ? '2' : '1';
+          state._potted[ballId] = true;
+          state._pocketOwners[ballId] = slot;
+          if (slot === '2') state.p2Balls = clampSignedScore((Number(state.p2Balls) || 0) + 1);
+          else state.p1Balls = clampSignedScore((Number(state.p1Balls) || 0) + 1);
+          maybeAwardPocketRack(state);
+        } else {
+          const owner = state._pocketOwners[ballId] || (state.activePlayer === '2' ? '2' : '1');
+          state._potted[ballId] = false;
+          delete state._pocketOwners[ballId];
+          if (owner === '2') {
+            const cur = Number(state.p2Balls) || 0;
+            if (cur > 0) state.p2Balls = clampSignedScore(cur - 1);
+          } else {
+            const cur = Number(state.p1Balls) || 0;
+            if (cur > 0) state.p1Balls = clampSignedScore(cur - 1);
+          }
+        }
         bumpActivity();
         break;
       }
-      pushUndo(state);
-      if (state.gameType === 'game8' && SNOOKER_POINTS[ballId] != null) {
-        const pts = SNOOKER_POINTS[ballId];
-        if (state.activePlayer === '2') state.p2Balls = clampScore((Number(state.p2Balls) || 0) + pts);
-        else state.p1Balls = clampScore((Number(state.p1Balls) || 0) + pts);
-        state._snookerBreak = (Number(state._snookerBreak) || 0) + pts;
-        if (ballId !== 'ball 1') state._potted[ballId] = true;
-      } else {
-        state._potted[ballId] = !state._potted[ballId];
+
+      // Straight Pool: every pot +1 primary; unclick −1.
+      if (isStraightPool(state)) {
+        const nowFaded = !state._potted[ballId];
+        pushUndo(state);
+        state._potted[ballId] = nowFaded;
+        const slot = state.activePlayer === '2' ? '2' : '1';
+        if (nowFaded) {
+          if (slot === '2') state.p2Score = clampScore((Number(state.p2Score) || 0) + 1);
+          else state.p1Score = clampScore((Number(state.p1Score) || 0) + 1);
+        } else if (slot === '2') {
+          state.p2Score = clampScore((Number(state.p2Score) || 0) - 1);
+        } else {
+          state.p1Score = clampScore((Number(state.p1Score) || 0) - 1);
+        }
+        bumpActivity();
+        break;
       }
+
+      pushUndo(state);
+      state._potted[ballId] = !state._potted[ballId];
       bumpActivity();
       break;
     }
     case 'pool_foul': {
       pushUndo(state);
-      if (state.activePlayer === '2') state.foulsP2 = (Number(state.foulsP2) || 0) + 1;
+      const fouler = state.activePlayer === '2' ? '2' : '1';
+      if (fouler === '2') state.foulsP2 = (Number(state.foulsP2) || 0) + 1;
       else state.foulsP1 = (Number(state.foulsP1) || 0) + 1;
+      if (isBallFoulPenaltyGame(state)) {
+        if (isStraightPool(state)) {
+          if (fouler === '2') state.p2Score = clampSignedScore((Number(state.p2Score) || 0) - 1);
+          else state.p1Score = clampSignedScore((Number(state.p1Score) || 0) - 1);
+        } else {
+          if (fouler === '2') state.p2Balls = clampSignedScore((Number(state.p2Balls) || 0) - 1);
+          else state.p1Balls = clampSignedScore((Number(state.p1Balls) || 0) - 1);
+        }
+      }
+      // Foul hands the table to the opponent (dock parity).
+      state.activePlayer = fouler === '2' ? '1' : '2';
       bumpActivity();
       break;
     }
@@ -530,15 +874,23 @@ export function applyImpromptuCommand(stateIn, action, payload = {}) {
         state.p2Balls = clampScore((Number(state.p2Balls) || 0) + pts);
         state.foulsP1 = (Number(state.foulsP1) || 0) + 1;
       }
+      ensureSnookerFrameState(state);
       state._snookerBreak = 0;
+      state._snookerFreeBallOffered = false;
+      state._snookerFoulAwaitingPlayerChange = true;
+      state._snookerPhase = 'red';
       bumpActivity();
       break;
     }
     case 'respot_ball': {
       const ballId = payload.ballId ? String(payload.ballId) : '';
-      if (!ballId) break;
+      if (!ballId || !isPocketScoreGame(state) || !state._potted[ballId]) {
+        publish = false;
+        break;
+      }
       pushUndo(state);
       state._potted[ballId] = false;
+      delete state._pocketOwners[ballId];
       bumpActivity();
       break;
     }
@@ -561,8 +913,9 @@ export function applyImpromptuCommand(stateIn, action, payload = {}) {
       state.foulsP1 = 0;
       state.foulsP2 = 0;
       state._potted = {};
+      state._pocketOwners = {};
       state._undo = [];
-      state._snookerBreak = 0;
+      resetSnookerFrame(state);
       state.rackBreakerSlot = '';
       state._cloudStarted = false;
       state._matchId = null;
