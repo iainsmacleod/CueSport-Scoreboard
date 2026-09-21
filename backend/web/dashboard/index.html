@@ -6,7 +6,7 @@
   <title>CueSport Scoreboard Cloud — Dashboard</title>
   <link rel="icon" type="image/png" href="/web/images/brand/logo.png?v=1" />
   <link rel="apple-touch-icon" href="/web/images/balls/8ball_small.png" />
-  <link rel="stylesheet" href="/web/shared/styles.css?v=8.3.0" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.3.0.1" />
 </head>
 <body class="dashboard-page">
   <header class="site-header">
@@ -234,12 +234,13 @@
             type="button"
             id="createImpromptuCard"
             class="table-card table-card-create panel"
-            title="Create a dockless table for scoring without OBS"
+            title="Create a dockless table for scoring without OBS — league nights, side tables, and multi-table events"
             aria-label="Create Impromptu Table"
           >
             <span class="table-card-create-plus" aria-hidden="true">+</span>
             <span class="table-card-create-label">Create Impromptu Table</span>
-            <span class="table-card-create-hint">Score without OBS</span>
+            <span class="table-card-create-hint">No stream? Still track the match</span>
+            <span class="table-card-create-detail">League nights, side tables, and multi-table events — score from phone without OBS.</span>
           </button>
         </div>
         <p id="impromptuQuotaHint" class="hint tables-impromptu-hint" aria-live="polite"></p>
@@ -677,6 +678,6 @@
       </div>
     </div>
   </div>
-  <script type="module" src="/web/dashboard/app.js?v=8.3.0.1"></script>
+  <script type="module" src="/web/dashboard/app.js?v=8.3.0.2"></script>
 </body>
 </html>

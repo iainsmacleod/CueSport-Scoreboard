@@ -1462,6 +1462,9 @@ body.has-dash-nav .dash-tabs[hidden] {
   line-height: 1.45;
   opacity: 0.9;
 }
+.marketing-slide-caption p + p {
+  margin-top: 0.55rem;
+}
 @media (min-width: 900px) {
   .marketing-slide {
     flex-basis: 52%;
@@ -2160,6 +2163,14 @@ button.table-card-create:disabled {
   margin-top: 0.35rem;
   font-size: 0.78rem;
   opacity: 0.7;
+}
+.table-card-create-detail {
+  display: block;
+  margin-top: 0.65rem;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  opacity: 0.78;
+  max-width: 14rem;
 }
 .table-card h3 {
   margin: 0.2rem 0 0.45rem;

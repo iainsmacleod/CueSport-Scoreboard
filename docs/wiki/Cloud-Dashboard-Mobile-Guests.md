@@ -16,14 +16,17 @@ Hosted Platform Admins also get an **Admin** tab for customer support (not shown
 ### Live table cards
 
 - **Dock tables** appear when `dock_connected` is true for that Dock Key’s room.
-- **Impromptu tables** appear while the room exists (badge + owner online/offline). Open the card to jump to mobile Setup/Control.
+- **Impromptu tables** appear while the room exists. Status shows **Ready** / **Admin** / **Guest**. Open the card for Control (or Setup if names are still placeholders).
 - Updates push over WebSocket (no polling).
 
 ### Impromptu tables
 
+Use for **league nights, friendly games, and multi-table events** where you are not streaming every table (or any table).
+
 - Create from **Tables → Create Impromptu Table** (quota separate from OBS Dock Keys).
 - Mobile shows Dashboard / Setup / Control / Share — no Stream.
-- End or Call Match saves history and closes the table (frees the seat).
+- Default **Guest scorer** link only (no OBS Dock Owner elevated link).
+- **Destroy Table** frees the seat without history; End or Call Match saves history and closes the table.
 - See [Multiple Tables](Multiple-Tables).
 
 ### OBS Dock Keys

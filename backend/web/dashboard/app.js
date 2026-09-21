@@ -660,13 +660,14 @@ function formatCreateImpromptuCard() {
   const card = document.createElement('button');
   card.type = 'button';
   card.className = 'table-card table-card-create panel';
-  card.title = 'Create a dockless table for scoring without OBS';
+  card.title = 'Create a dockless table for scoring without OBS — league nights, side tables, and multi-table events';
   card.setAttribute('aria-label', 'Create Impromptu Table');
   card.dataset.action = 'create-impromptu';
   card.innerHTML = `
     <span class="table-card-create-plus" aria-hidden="true">+</span>
     <span class="table-card-create-label">Create Impromptu Table</span>
-    <span class="table-card-create-hint">Score without OBS</span>
+    <span class="table-card-create-hint">No stream? Still track the match</span>
+    <span class="table-card-create-detail">League nights, side tables, and multi-table events — score from phone without OBS.</span>
   `;
   return card;
 }

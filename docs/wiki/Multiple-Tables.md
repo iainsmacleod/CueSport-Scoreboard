@@ -41,13 +41,13 @@ Cloud tables are **not** created by `?instance=`.
 
 ### Impromptu (dockless) tables
 
-Use these to track league / tournament / side games when you are **not** streaming.
+Use these when you are **not** streaming — league nights, friendly games, side tables, or large events where you cannot put every table on OBS.
 
 1. On the Dashboard **Tables** tab, choose **Create Impromptu Table** (tier-limited; separate from Dock Key seats).
-2. You are taken to mobile **Setup** for that table.
+2. New tables open mobile **Setup**; after names are set, the card opens **Control**.
 3. Score from **Control**; share **scoring-only guest links** from **Share** (a default **Guest scorer** link is created with the table). There is no Stream tab and no OBS Dock Owner guest link — the signed-in owner is already the authority. Table cards show **Ready** (nobody connected), **Admin** (owner controlling), or **Guest** (guest link open; scoring still needs Admin authority).
 4. The signed-in owner phone is the scoring authority (same command vocabulary as the dock). Guests relay commands to that authority over Cloud WebSocket — not OBS BroadcastChannel / `browser_source.html`.
-5. **End Match** or **Call Match** logs history and **deletes the table**, freeing an impromptu seat. Restart Match keeps the seat.
+5. **Destroy Table** discards the seat without history. **End Match** or **Call Match** logs history and **deletes the table**, freeing an impromptu seat. Restart Match keeps the seat.
 
 ## Recommended multi-table layout
 
