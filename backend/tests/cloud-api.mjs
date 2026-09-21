@@ -785,6 +785,139 @@ async function run() {
       }
     }
 
+    // Impromptu scoring authority smoke — same module mobile hosts as dockless scoring.
+    // Covers dock-parity gaps that lifecycle WS smoke does not exercise.
+    {
+      const { applyImpromptuCommand, createDefaultImpromptuState } = await import(
+        '../web/shared/impromptu-authority.js'
+      );
+      const start = (gameType, extra = {}) => {
+        const base = createDefaultImpromptuState({
+          player1Name: 'A',
+          player2Name: 'B',
+          gameType,
+          ...extra,
+        });
+        return applyImpromptuCommand(base, 'select_breaker', { slot: '1' })._private;
+      };
+      const faded = (state, id) => !!(state.ballGrid?.balls || []).find((b) => b.id === id)?.faded;
+      const anyFaded = (state) => (state.ballGrid?.balls || []).some((b) => b.faded);
+
+      // Snooker: red → color re-spot, free ball after foul+switch, frame reset on score_add.
+      let sn = start('game8', { ballSelection: 'snooker' });
+      sn = applyImpromptuCommand(sn, 'snooker_ball', { ballId: 'ball 1' })._private;
+      assert('smoke snooker red → color phase', sn.snookerPhase === 'color');
+      sn = applyImpromptuCommand(sn, 'snooker_ball', { ballId: 'ball 7' })._private;
+      assert(
+        'smoke snooker black re-spots',
+        sn.snookerPhase === 'red' && sn.p1Balls === 8 && !faded(sn, 'ball 7'),
+      );
+      sn = applyImpromptuCommand(sn, 'snooker_foul', { foulKey: 'ball_4' })._private;
+      sn = applyImpromptuCommand(sn, 'toggle_active_player', { isP1: false })._private;
+      assert('smoke snooker free ball offered', sn.snookerFreeBallOffered === true);
+      sn = applyImpromptuCommand(sn, 'snooker_ball', { ballId: 'ball 10' })._private;
+      assert('smoke snooker free ball scores', sn.p2Balls === 5);
+      sn._snookerRedsPotted = 15;
+      sn._snookerPhase = 'red';
+      sn._snookerCleared = { 'ball 2': true };
+      sn = applyImpromptuCommand(sn, 'score_add', { player: '1' })._private;
+      assert(
+        'smoke snooker score_add resets frame',
+        sn.snookerRedsPotted === 0 && sn.snookerPhase === 'red' && sn.p1Balls === 0 && !anyFaded(sn),
+      );
+
+      // Bank: pot awards, respot keeps score, first-to-8 clears table.
+      let bank = start('game5');
+      bank = applyImpromptuCommand(bank, 'toggle_pot', { ballId: 'ball 1' })._private;
+      assert('smoke bank pot awards ball', bank.p1Balls === 1 && faded(bank, 'ball 1'));
+      const bankAfterRespot = applyImpromptuCommand(bank, 'respot_ball', { ballId: 'ball 1' });
+      assert(
+        'smoke bank respot keeps score',
+        bankAfterRespot.state.p1Balls === 1 && !faded(bankAfterRespot.state, 'ball 1'),
+      );
+      // First-to-8 from a clean rack (respot path already asserted above).
+      bank = start('game5');
+      for (let i = 1; i <= 8; i += 1) {
+        bank = applyImpromptuCommand(bank, 'toggle_pot', { ballId: `ball ${i}` })._private;
+      }
+      assert(
+        'smoke bank first-to-8 awards rack + clears',
+        bank.p1Score === 1 && bank.p1Balls === 0 && bank.awaitingBreaker === true && !anyFaded(bank),
+      );
+
+      // One Pocket foul: −1 balls + switch.
+      let op = start('game6');
+      op = applyImpromptuCommand(op, 'toggle_pot', { ballId: 'ball 2' })._private;
+      op = applyImpromptuCommand(op, 'pool_foul', {})._private;
+      assert(
+        'smoke one-pocket foul deducts and switches',
+        op.p1Balls === 0 && op.activePlayer === '2' && op.foulsP1 === 1,
+      );
+
+      // Straight: pot +1; 14.1 re-rack at one left.
+      let st = start('game4');
+      st = applyImpromptuCommand(st, 'toggle_pot', { ballId: 'ball 5' })._private;
+      assert('smoke straight pot +1', st.p1Score === 1);
+      for (let n = 1; n <= 14; n += 1) {
+        if (n === 5) continue;
+        st = applyImpromptuCommand(st, 'toggle_pot', { ballId: `ball ${n}` })._private;
+      }
+      assert(
+        'smoke straight 14.1 re-rack',
+        st.p1Score === 14 && st.rackBreakerSlot === '1' && !anyFaded(st),
+        `score=${st.p1Score} potted=${JSON.stringify(st._potted)}`,
+      );
+
+      // Manual score_add clears tracker for next rack.
+      let rack = start('game1');
+      rack = applyImpromptuCommand(rack, 'toggle_pot', { ballId: 'ball 1' })._private;
+      rack = applyImpromptuCommand(rack, 'score_add', { player: '1' })._private;
+      assert(
+        'smoke score_add clears balls',
+        rack.p1Score === 1 && rack.awaitingBreaker === true && !anyFaded(rack),
+      );
+
+      // 9-ball early option / reject / in-order win + cooldown clear.
+      let nineEarly = start('game2', { earlyGameBallEnabled: false });
+      nineEarly = applyImpromptuCommand(nineEarly, 'toggle_pot', { ballId: 'ball 9' })._private;
+      assert(
+        'smoke early-9 rejected',
+        nineEarly.p1Score === 0 && nineEarly._cooldown?.mode === 'early_reject',
+      );
+      nineEarly = applyImpromptuCommand(nineEarly, 'clear_tracker_cooldown', {})._private;
+      assert('smoke early-9 revive', !faded(nineEarly, 'ball 9'));
+
+      let nineWin = start('game2', { earlyGameBallEnabled: true });
+      nineWin = applyImpromptuCommand(nineWin, 'toggle_pot', { ballId: 'ball 9' })._private;
+      assert('smoke early-9 option awards', nineWin.p1Score === 1 && nineWin._cooldown?.mode === 'rack_win');
+      nineWin = applyImpromptuCommand(nineWin, 'clear_tracker_cooldown', {})._private;
+      assert('smoke game-ball cooldown clears', !anyFaded(nineWin));
+
+      // 8-ball: illegal → opponent; ball-set + legal 8 → active.
+      let bad8 = start('game1');
+      bad8 = applyImpromptuCommand(bad8, 'toggle_pot', { ballId: 'ball 1' })._private;
+      bad8 = applyImpromptuCommand(bad8, 'toggle_pot', { ballId: 'ball 8' })._private;
+      assert(
+        'smoke illegal 8 → opponent rack',
+        bad8.p1Score === 0 && bad8.p2Score === 1,
+        `p1=${bad8.p1Score} p2=${bad8.p2Score}`,
+      );
+
+      let set8 = start('game1', { useBallSet: true, playerBallSet: 'p1Open' });
+      set8 = applyImpromptuCommand(set8, 'toggle_pot', { ballId: 'ball 3' })._private;
+      set8 = applyImpromptuCommand(set8, 'toggle_pot', { ballId: 'ball 5' })._private;
+      assert('smoke ball-set assigns on 2nd pot', set8.playerBallSet === 'p1red/smalls');
+      for (const n of [1, 2, 4, 6, 7]) {
+        set8 = applyImpromptuCommand(set8, 'toggle_pot', { ballId: `ball ${n}` })._private;
+      }
+      set8 = applyImpromptuCommand(set8, 'toggle_pot', { ballId: 'ball 8' })._private;
+      assert('smoke legal 8 awards active', set8.p1Score === 1 && set8.p2Score === 0);
+
+      // Grid sizes
+      assert('smoke 9-ball grid size', (start('game2').ballGrid?.balls || []).filter((b) => /^ball \d+$/.test(b.id)).length === 9);
+      assert('smoke 10-ball grid size', (start('game3').ballGrid?.balls || []).filter((b) => /^ball \d+$/.test(b.id)).length === 10);
+    }
+
     // Create named OBS Dock Key (required label; default role trusted_operator)
     let apiKey = null;
     let apiKeyId = null;

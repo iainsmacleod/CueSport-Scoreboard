@@ -216,16 +216,178 @@ try {
   const eightRespot = (eight.ballGrid?.balls || []).find((b) => b.id === 'poolRespotBtn');
   assert('8-ball hides respot', eightRespot && eightRespot.hidden);
 
-  // Pool fade toggle (no auto rack on game ball for impromptu — documented).
+  // Pool fade toggle + game-ball rack win resets the table (game ball held through cooldown).
   let nine = createDefaultImpromptuState({
     player1Name: 'A', player2Name: 'B', gameType: 'game2',
   });
   nine = applyImpromptuCommand(nine, 'select_breaker', { slot: '1' })._private;
-  const ninePot = applyImpromptuCommand(nine, 'toggle_pot', { ballId: 'ball 9' });
+  nine = applyImpromptuCommand(nine, 'toggle_pot', { ballId: 'ball 1' })._private;
+  assert('9-ball object ball fades', !!(nine._potted && nine._potted['ball 1']));
+  // Early 9 rejected when preceding balls not down and early option off.
+  const earlyNine = applyImpromptuCommand(
+    createDefaultImpromptuState({ player1Name: 'A', player2Name: 'B', gameType: 'game2', earlyGameBallEnabled: false }),
+    'select_breaker',
+    { slot: '1' },
+  );
+  const earlyNinePot = applyImpromptuCommand(earlyNine._private, 'toggle_pot', { ballId: 'ball 9' });
   assert(
-    '9-ball game-ball fade does not auto-rack',
-    ninePot.state.p1Score === 0
-      && (ninePot.state.ballGrid?.balls || []).find((b) => b.id === 'ball 9')?.faded === true,
+    'early 9 rejected with cooldown',
+    earlyNinePot.state.p1Score === 0
+      && earlyNinePot._private._cooldown?.mode === 'early_reject'
+      && earlyNinePot._private._cooldown?.ballId === 'ball 9',
+  );
+  const earlyNineClear = applyImpromptuCommand(earlyNinePot._private, 'clear_tracker_cooldown', {});
+  assert(
+    'early 9 revive after cooldown',
+    !(earlyNineClear.state.ballGrid?.balls || []).find((b) => b.id === 'ball 9')?.faded
+      && !earlyNineClear._private._cooldown,
+  );
+
+  // Early option on: 9 wins immediately.
+  let nineEarlyOn = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game2', earlyGameBallEnabled: true,
+  });
+  nineEarlyOn = applyImpromptuCommand(nineEarlyOn, 'select_breaker', { slot: '1' })._private;
+  const nineWin = applyImpromptuCommand(nineEarlyOn, 'toggle_pot', { ballId: 'ball 9' });
+  assert(
+    'early-9 option awards rack',
+    nineWin.state.p1Score === 1
+      && nineWin.state.awaitingBreaker === true
+      && nineWin._private._cooldown?.mode === 'rack_win',
+  );
+  const nineCleared = applyImpromptuCommand(nineWin._private, 'clear_tracker_cooldown', {});
+  assert(
+    '9-ball cooldown clears game ball for next rack',
+    !(nineCleared.state.ballGrid?.balls || []).some((b) => b.faded),
+  );
+
+  // Preceding balls down: 9 wins without early option.
+  let nineClear = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game2', earlyGameBallEnabled: false,
+  });
+  nineClear = applyImpromptuCommand(nineClear, 'select_breaker', { slot: '1' })._private;
+  for (let n = 1; n <= 8; n += 1) {
+    nineClear = applyImpromptuCommand(nineClear, 'toggle_pot', { ballId: `ball ${n}` })._private;
+  }
+  const nineInOrder = applyImpromptuCommand(nineClear, 'toggle_pot', { ballId: 'ball 9' });
+  assert('9-ball in-order awards rack', nineInOrder.state.p1Score === 1);
+
+  // Manual score_add must reset tracker / snooker frame (dock postScore parity).
+  let rack = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game1',
+  });
+  rack = applyImpromptuCommand(rack, 'select_breaker', { slot: '1' })._private;
+  rack = applyImpromptuCommand(rack, 'toggle_pot', { ballId: 'ball 1' })._private;
+  rack = applyImpromptuCommand(rack, 'toggle_pot', { ballId: 'ball 2' })._private;
+  const afterManualRack = applyImpromptuCommand(rack, 'score_add', { player: '1' });
+  assert(
+    'score_add clears faded balls for next rack',
+    afterManualRack.state.p1Score === 1
+      && afterManualRack.state.awaitingBreaker === true
+      && !(afterManualRack.state.ballGrid?.balls || []).some((b) => b.faded),
+  );
+
+  let frame = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game8', ballSelection: 'snooker',
+  });
+  frame = applyImpromptuCommand(frame, 'select_breaker', { slot: '1' })._private;
+  // Drive into clearance yellow-down state quickly via private fields after a few pots.
+  frame = applyImpromptuCommand(frame, 'snooker_ball', { ballId: 'ball 1' })._private;
+  frame = applyImpromptuCommand(frame, 'snooker_ball', { ballId: 'ball 7' })._private;
+  frame._snookerRedsPotted = 15;
+  frame._snookerPhase = 'red';
+  frame._snookerCleared = { 'ball 2': true, 'ball 3': true };
+  frame = applyImpromptuCommand(frame, 'score_add', { player: '1' })._private;
+  assert(
+    'snooker score_add resets frame sequence',
+    frame.snookerRedsPotted === 0
+      && frame.snookerPhase === 'red'
+      && frame.p1Balls === 0
+      && !(frame.ballGrid?.balls || []).some((b) => b.faded)
+      && frame.awaitingBreaker === true,
+    `reds=${frame.snookerRedsPotted} phase=${frame.snookerPhase} balls=${frame.p1Balls}`,
+  );
+
+  // balls_add to 8 also awards Bank rack and clears tracker.
+  let bankBalls = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game5',
+  });
+  bankBalls = applyImpromptuCommand(bankBalls, 'select_breaker', { slot: '1' })._private;
+  bankBalls = applyImpromptuCommand(bankBalls, 'toggle_pot', { ballId: 'ball 1' })._private;
+  for (let i = 0; i < 7; i += 1) {
+    bankBalls = applyImpromptuCommand(bankBalls, 'balls_add', { player: '1' })._private;
+  }
+  assert(
+    'balls_add to 8 awards bank rack and clears pots',
+    bankBalls.p1Score === 1
+      && bankBalls.p1Balls === 0
+      && !(bankBalls.ballGrid?.balls || []).some((b) => b.faded)
+      && bankBalls.awaitingBreaker === true,
+  );
+
+  // Win-on-break off: first-ball 8 is early_reject (cooldown), not a loss.
+  let earlyEight = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game1', earlyGameBallEnabled: false,
+  });
+  earlyEight = applyImpromptuCommand(earlyEight, 'select_breaker', { slot: '1' })._private;
+  const early8 = applyImpromptuCommand(earlyEight, 'toggle_pot', { ballId: 'ball 8' });
+  assert(
+    'win-on-break off rejects bare 8',
+    early8.state.p1Score === 0
+      && early8.state.p2Score === 0
+      && early8._private._cooldown?.mode === 'early_reject',
+  );
+
+  // Illegal 8 with some (but not a full group) down → opponent rack.
+  let illegal8 = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game1', useBallSet: false,
+  });
+  illegal8 = applyImpromptuCommand(illegal8, 'select_breaker', { slot: '1' })._private;
+  illegal8 = applyImpromptuCommand(illegal8, 'toggle_pot', { ballId: 'ball 1' })._private;
+  illegal8 = applyImpromptuCommand(illegal8, 'toggle_pot', { ballId: 'ball 2' })._private;
+  const loss8 = applyImpromptuCommand(illegal8, 'toggle_pot', { ballId: 'ball 8' });
+  assert(
+    'illegal 8 awards opponent rack',
+    loss8.state.p1Score === 0
+      && loss8.state.p2Score === 1
+      && loss8.state.lastRackWinnerSlot === '2',
+    `p1=${loss8.state.p1Score} p2=${loss8.state.p2Score} last=${loss8.state.lastRackWinnerSlot}`,
+  );
+
+  // Ball-set: second object pot on break assigns group.
+  let ballSet = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game1', useBallSet: true, playerBallSet: 'p1Open',
+  });
+  ballSet = applyImpromptuCommand(ballSet, 'select_breaker', { slot: '1' })._private;
+  ballSet = applyImpromptuCommand(ballSet, 'toggle_pot', { ballId: 'ball 3' })._private;
+  assert('first break pot keeps Open', ballSet.playerBallSet === 'p1Open');
+  ballSet = applyImpromptuCommand(ballSet, 'toggle_pot', { ballId: 'ball 5' })._private;
+  assert('second break pot assigns solids', ballSet.playerBallSet === 'p1red/smalls');
+
+  // Legal 8 after clearing assigned group.
+  for (const n of [1, 2, 4, 6, 7]) {
+    ballSet = applyImpromptuCommand(ballSet, 'toggle_pot', { ballId: `ball ${n}` })._private;
+  }
+  const legal8 = applyImpromptuCommand(ballSet, 'toggle_pot', { ballId: 'ball 8' });
+  assert(
+    'legal 8 after group awards active rack',
+    legal8.state.p1Score === 1 && legal8.state.p2Score === 0,
+  );
+
+  // Straight 14.1 re-rack when one ball left.
+  let straight141 = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game4',
+  });
+  straight141 = applyImpromptuCommand(straight141, 'select_breaker', { slot: '1' })._private;
+  for (let n = 1; n <= 14; n += 1) {
+    straight141 = applyImpromptuCommand(straight141, 'toggle_pot', { ballId: `ball ${n}` })._private;
+  }
+  assert(
+    '14.1 re-rack restores pocketed balls',
+    straight141.p1Score === 14
+      && straight141.rackBreakerSlot === '1'
+      && !(straight141._potted && Object.values(straight141._potted).some(Boolean)),
+    `score=${straight141.p1Score} potted=${JSON.stringify(straight141._potted)}`,
   );
 
   // Simulated paid tier: assertCanCreateImpromptuTable respects maxImpromptuTables

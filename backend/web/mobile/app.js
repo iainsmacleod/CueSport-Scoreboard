@@ -26,7 +26,7 @@ import {
   applyImpromptuCommand,
   hydrateAuthorityState,
   createDefaultImpromptuState,
-} from '../shared/impromptu-authority.js?v=8.3.0.2';
+} from '../shared/impromptu-authority.js?v=8.3.0.4';
 
 let client = null;
 let roomId = '';
@@ -748,6 +748,7 @@ function publishAuthorityResult(result) {
   for (const ev of result.sessionEvents || []) {
     client.sendSession(ev.action, ev.payload || {});
   }
+  scheduleAuthorityCooldownClear(authorityPrivateState);
   if (result.closeTable) {
     wantConnection = false;
     try { client.disconnect(); } catch (_) { /* ignore */ }
@@ -757,6 +758,23 @@ function publishAuthorityResult(result) {
     const dash = `${window.location.origin}/web/dashboard/?impromptu=${reason}`;
     window.location.href = dash;
   }
+}
+
+/** Dock keeps the game ball faded ~500ms after a rack win / early reject — then revive. */
+let authorityCooldownTimer = null;
+function scheduleAuthorityCooldownClear(privateState) {
+  if (authorityCooldownTimer) {
+    clearTimeout(authorityCooldownTimer);
+    authorityCooldownTimer = null;
+  }
+  if (!isAuthority || !isImpromptuTable()) return;
+  const cd = privateState && privateState._cooldown;
+  if (!cd || !cd.ballId) return;
+  const ms = cd.until ? Math.max(0, cd.until - Date.now()) : 500;
+  authorityCooldownTimer = setTimeout(() => {
+    authorityCooldownTimer = null;
+    runAuthorityCommand('clear_tracker_cooldown', {});
+  }, ms + 16);
 }
 
 function runAuthorityCommand(action, payload) {
