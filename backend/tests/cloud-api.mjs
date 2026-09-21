@@ -893,6 +893,11 @@ async function run() {
       let nineWin = start('game2', { earlyGameBallEnabled: true });
       nineWin = applyImpromptuCommand(nineWin, 'toggle_pot', { ballId: 'ball 9' })._private;
       assert('smoke early-9 option awards', nineWin.p1Score === 1 && nineWin._cooldown?.mode === 'rack_win');
+      assert(
+        'smoke early-9 counts game-ball pot',
+        nineWin._matchBallsP1 === 1 && nineWin._matchRacks?.[0]?.ballsP1 === 1,
+        `balls=${nineWin._matchBallsP1}`,
+      );
       nineWin = applyImpromptuCommand(nineWin, 'clear_tracker_cooldown', {})._private;
       assert('smoke game-ball cooldown clears', !anyFaded(nineWin));
 
@@ -915,6 +920,11 @@ async function run() {
       }
       set8 = applyImpromptuCommand(set8, 'toggle_pot', { ballId: 'ball 8' })._private;
       assert('smoke legal 8 awards active', set8.p1Score === 1 && set8.p2Score === 0);
+      assert(
+        'smoke legal 8 includes game ball',
+        set8._matchBallsP1 === 8 && set8._matchRacks?.[0]?.ballsP1 === 8,
+        `balls=${set8._matchBallsP1}`,
+      );
 
       // Grid sizes
       assert('smoke 9-ball grid size', (start('game2').ballGrid?.balls || []).filter((b) => /^ball \d+$/.test(b.id)).length === 9);

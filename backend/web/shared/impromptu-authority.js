@@ -1075,6 +1075,11 @@ function refreshDerived(state) {
     || Object.keys(state._snookerCleared || {}).some((k) => state._snookerCleared[k])
   );
   state.canResetScores = true;
+  state.duplicatePlayerIds = (() => {
+    const a = String(state.player1Id || '').trim();
+    const b = String(state.player2Id || '').trim();
+    return !!(a && b && a === b);
+  })();
   state.matchInProgress = !!(
     state.canCallGame || state.gameScoringLocked || state.rackBreakerSlot
     || state.awaitingBreaker
@@ -1384,7 +1389,17 @@ export function applyImpromptuCommand(stateIn, action, payload = {}) {
     return state._matchId;
   }
 
+  function duplicatePlayerIds() {
+    const a = String(state.player1Id || '').trim();
+    const b = String(state.player2Id || '').trim();
+    return !!(a && b && a === b);
+  }
+
   function bumpActivity() {
+    // Dock PlayerStats.duplicateNames: same roster UUID on both sides — do not start cloud stats.
+    if (duplicatePlayerIds()) {
+      return;
+    }
     if (!state._cloudStarted && (state.player1Name || state.player2Name)) {
       const matchId = ensureMatchId();
       state._cloudStarted = true;
@@ -1407,6 +1422,19 @@ export function applyImpromptuCommand(stateIn, action, payload = {}) {
 
   function endMatch(reason, winnerSlot) {
     const matchId = ensureMatchId();
+    // Same player on both sides — discard instead of writing career/history (dock parity).
+    if (duplicatePlayerIds()) {
+      sessionEvents.push({
+        action: 'discard',
+        payload: {
+          matchId,
+          sessionId: matchId,
+          reason: 'duplicate_player_ids',
+        },
+      });
+      closeTable = true;
+      return;
+    }
     const raceTo = parseRaceTarget(state.raceInfo, state.gameType);
     let slot = winnerSlot;
     if (slot == null) {
@@ -1448,7 +1476,7 @@ export function applyImpromptuCommand(stateIn, action, payload = {}) {
         },
       });
     } else {
-      // No scored session — still free the impromptu seat.
+      // No scored session — still free the seat.
       sessionEvents.push({
         action: 'discard',
         payload: { matchId, sessionId: matchId, reason: 'abandon_match' },
@@ -1823,6 +1851,8 @@ export function applyImpromptuCommand(stateIn, action, payload = {}) {
           const winner = gameBallAction === 'loss'
             ? (active === '2' ? '1' : '2')
             : active;
+          // Dock creditTrackerRackWin/Loss: count the shooter's game-ball pot before rack write.
+          noteBallPot(state, active);
           awardTrackerRack(state, winner, ballId);
           bumpActivity();
           break;

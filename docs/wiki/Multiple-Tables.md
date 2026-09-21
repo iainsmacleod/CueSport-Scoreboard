@@ -27,7 +27,7 @@ Cloud tables are **not** created by `?instance=`.
 | Concept | Meaning |
 |---------|---------|
 | **OBS Dock Key** | One seat = one **dock** cloud table (streaming) |
-| **Impromptu table** | Dockless scoring seat from the Dashboard — no OBS dock or overlay |
+| **Ad-hoc table** | Dockless scoring seat from the Dashboard — no OBS dock or overlay |
 | Room identity (dock) | Keyed by Dock Key (`api_key_id`) |
 | Local `?instance=` | Still isolates localStorage / BroadcastChannel on that machine |
 
@@ -39,15 +39,15 @@ Cloud tables are **not** created by `?instance=`.
 4. Two docks with different keys are two cloud tables — even if they use the same local `instance` string.
 5. One key with two docks fighting for it will not work reliably (one-live-dock-per-key).
 
-### Impromptu (dockless) tables
+### Ad-hoc (dockless) tables
 
 Use these when you are **not** streaming — league nights, friendly games, side tables, or large events where you cannot put every table on OBS.
 
-1. On the Dashboard **Tables** tab, choose **Create Impromptu Table** (tier-limited; separate from Dock Key seats).
+1. On the Dashboard **Tables** tab, choose **Create Ad-hoc Table** (tier-limited; separate from Dock Key seats).
 2. New tables open mobile **Setup**; after names are set, the card opens **Control**.
 3. Score from **Control**; share **scoring-only guest links** from **Share** (a default **Guest scorer** link is created with the table). There is no Stream tab and no OBS Dock Owner guest link — the signed-in owner is already the authority. Table cards show **Ready** (nobody connected), **Admin** (owner controlling), or **Guest** (guest link open; scoring still needs Admin authority).
 4. The signed-in owner phone is the scoring authority (same command vocabulary as the dock). Guests relay commands to that authority over Cloud WebSocket — not OBS BroadcastChannel / `browser_source.html`.
-5. **Destroy Table** discards the seat without history. **End Match** or **Call Match** logs history and **deletes the table**, freeing an impromptu seat. Restart Match keeps the seat.
+5. **Destroy Table** discards the seat without history. **End Match** or **Call Match** logs history and **deletes the table**, freeing an ad-hoc seat. Restart Match keeps the seat.
 
 ## Recommended multi-table layout
 

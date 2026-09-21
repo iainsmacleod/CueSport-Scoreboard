@@ -556,7 +556,7 @@ export async function createGuestLink(serverUrl, token, roomId, label, extraHead
 }
 
 /** Create a dockless impromptu scoring table. */
-export async function createImpromptuRoom(serverUrl, token, label = 'Impromptu Table') {
+export async function createImpromptuRoom(serverUrl, token, label = 'Ad-hoc Table') {
   const base = serverUrl.replace(/\/$/, '');
   const res = await fetch(`${base}/api/rooms`, {
     method: 'POST',
@@ -568,7 +568,7 @@ export async function createImpromptuRoom(serverUrl, token, label = 'Impromptu T
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    const error = new Error(err.error || err.message || 'Failed to create impromptu table');
+    const error = new Error(err.error || err.message || 'Failed to create ad-hoc table');
     error.code = err.code || null;
     error.quota = err.quota || null;
     throw error;

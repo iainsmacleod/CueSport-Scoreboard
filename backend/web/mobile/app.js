@@ -26,7 +26,7 @@ import {
   applyImpromptuCommand,
   hydrateAuthorityState,
   createDefaultImpromptuState,
-} from '../shared/impromptu-authority.js?v=8.3.0.9';
+} from '../shared/impromptu-authority.js?v=8.3.0.11';
 
 let client = null;
 let roomId = '';
@@ -34,7 +34,7 @@ let lastState = {};
 let raceDirty = false;
 let gameInfoDirty = false;
 let dockPresent = false;
-/** Impromptu tables: scoring authority (owner mobile) is present. */
+/** Ad-hoc tables: scoring authority (owner mobile) is present. */
 let authorityPresent = false;
 /** This session is the impromptu scoring authority. */
 let isAuthority = false;
@@ -727,7 +727,7 @@ function applyImpromptuChrome() {
   show('viewReplay', false);
   const title = document.getElementById('pageTitle');
   if (title && !isGuestMode && !isViewOnly) {
-    title.textContent = 'CueSport Scoreboard — Impromptu';
+    title.textContent = 'CueSport Scoreboard — Ad-hoc';
   }
   const destroyBtn = document.getElementById('destroyTableBtn');
   if (destroyBtn) {
@@ -1181,6 +1181,13 @@ function applyState(state) {
     const input = document.getElementById('p2Name');
     if (state.player2Id) input?.setAttribute('data-player-id', state.player2Id);
     else input?.removeAttribute('data-player-id');
+  }
+  const dupHint = document.getElementById('duplicatePlayerHint');
+  if (dupHint) {
+    const showDup = !!(state.duplicatePlayerIds
+      || (String(state.player1Id || '').trim()
+        && String(state.player1Id) === String(state.player2Id || '').trim()));
+    dupHint.classList.toggle('hidden', !showDup);
   }
   if (state.raceInfo != null) {
     raceDirty = applyCommittedTextField('raceInput', state.raceInfo, raceDirty);
@@ -2381,7 +2388,7 @@ function getMatchActionConfirmCopy(cmd, opts = {}) {
     },
     destroy_table: {
       title: 'Destroy Table',
-      message: 'Remove this impromptu table and free the seat? Any in-progress match will be discarded (not saved to history). This cannot be undone.',
+      message: 'Remove this ad-hoc table and free the seat? Any in-progress match will be discarded (not saved to history). This cannot be undone.',
       confirm: 'Destroy Table',
     },
     delete_clip: {

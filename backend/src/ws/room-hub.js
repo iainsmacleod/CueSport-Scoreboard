@@ -193,7 +193,7 @@ function buildDashboardRooms(accountId) {
       api_key_id: keyId || null,
       api_key_label: keyLabel,
       dock_label: kind === 'impromptu'
-        ? (room.label || 'Impromptu Table')
+        ? (room.label || 'Ad-hoc Table')
         : (keyLabel || room.dock_label),
       dock_connected: dockConnected,
       authority_connected: authorityConnected,
@@ -619,7 +619,7 @@ async function handleRoomClientJoin(ws, meta, msg, authenticateJoin) {
     send(ws, {
       type: 'error',
       code: 'impromptu_no_dock',
-      message: 'This is an impromptu table — connect from mobile or the dashboard, not an OBS dock.',
+      message: 'This is an ad-hoc table — connect from mobile or the dashboard, not an OBS dock.',
     });
     return;
   }
@@ -971,7 +971,7 @@ function handleSession(ws, meta, msg) {
   }
 
   if (impromptu && action === 'end') {
-    // Match saved — remove table and free the impromptu seat.
+    // Match saved — remove table and free the ad-hoc seat.
     performDeleteRoom(meta.roomId);
   }
 }
@@ -1283,7 +1283,7 @@ function sqliteCutoffFromMsAgo(msAgo) {
   return d.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, '');
 }
 
-/** Prune unmapped dock rooms, idle dock TTL rooms, and abandoned impromptu tables. */
+/** Prune unmapped dock rooms, idle dock TTL rooms, and abandoned ad-hoc tables. */
 export function sweepStaleRooms() {
   let deleted = 0;
 

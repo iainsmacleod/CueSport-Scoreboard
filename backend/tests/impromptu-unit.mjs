@@ -293,6 +293,12 @@ try {
       && nineWin.state.awaitingBreaker === true
       && nineWin._private._cooldown?.mode === 'rack_win',
   );
+  assert(
+    'early-9 counts game-ball pot',
+    nineWin._private._matchBallsP1 === 1
+      && nineWin._private._matchRacks?.[0]?.ballsP1 === 1,
+    `balls=${nineWin._private._matchBallsP1} rack=${JSON.stringify(nineWin._private._matchRacks)}`,
+  );
   const nineCleared = applyImpromptuCommand(nineWin._private, 'clear_tracker_cooldown', {});
   assert(
     '9-ball cooldown clears game ball for next rack',
@@ -309,6 +315,12 @@ try {
   }
   const nineInOrder = applyImpromptuCommand(nineClear, 'toggle_pot', { ballId: 'ball 9' });
   assert('9-ball in-order awards rack', nineInOrder.state.p1Score === 1);
+  assert(
+    '9-ball in-order includes game ball in pots',
+    nineInOrder._private._matchBallsP1 === 9
+      && nineInOrder._private._matchRacks?.[0]?.ballsP1 === 9,
+    `balls=${nineInOrder._private._matchBallsP1} rack=${JSON.stringify(nineInOrder._private._matchRacks)}`,
+  );
 
   // Manual score_add must reset tracker / snooker frame (dock postScore parity).
   let rack = createDefaultImpromptuState({
@@ -391,6 +403,13 @@ try {
       && loss8.state.lastRackWinnerSlot === '2',
     `p1=${loss8.state.p1Score} p2=${loss8.state.p2Score} last=${loss8.state.lastRackWinnerSlot}`,
   );
+  assert(
+    'illegal 8 still counts shooter’s pot',
+    loss8._private._matchBallsP1 === 3
+      && loss8._private._matchRacks?.[0]?.ballsP1 === 3
+      && loss8._private._matchRacks?.[0]?.winnerSlot === '2',
+    `balls=${loss8._private._matchBallsP1} rack=${JSON.stringify(loss8._private._matchRacks)}`,
+  );
 
   // Ball-set: second object pot on break assigns group.
   let ballSet = createDefaultImpromptuState({
@@ -410,6 +429,12 @@ try {
   assert(
     'legal 8 after group awards active rack',
     legal8.state.p1Score === 1 && legal8.state.p2Score === 0,
+  );
+  assert(
+    'legal 8 includes game ball in pots',
+    legal8._private._matchBallsP1 === 8
+      && legal8._private._matchRacks?.[0]?.ballsP1 === 8,
+    `balls=${legal8._private._matchBallsP1} rack=${JSON.stringify(legal8._private._matchRacks)}`,
   );
 
   // Straight 14.1 re-rack when one ball left.
@@ -599,6 +624,27 @@ try {
     'hydrate restores match racks',
     hydratedStats._matchRacks?.length === 1 && hydratedStats._matchRacks[0].winnerSlot === '1',
     JSON.stringify(hydratedStats._matchRacks),
+  );
+
+  // Same roster UUID on both sides: no session:start; end discards (dock duplicateNames parity).
+  let dup = createDefaultImpromptuState({
+    player1Name: 'Bob', player2Name: 'Bob',
+    player1Id: 'same-uuid', player2Id: 'same-uuid',
+  });
+  const dupBreaker = applyImpromptuCommand(dup, 'select_breaker', { slot: '1' });
+  assert(
+    'duplicate player ids skip session:start',
+    !(dupBreaker.sessionEvents || []).some((ev) => ev.action === 'start')
+      && dupBreaker.state.duplicatePlayerIds === true,
+    JSON.stringify(dupBreaker.sessionEvents),
+  );
+  dup = applyImpromptuCommand(dupBreaker._private, 'score_add', { player: '1' })._private;
+  const dupEnd = applyImpromptuCommand(dup, 'end_match', {});
+  assert(
+    'duplicate player ids end discards (no history)',
+    (dupEnd.sessionEvents || []).some((ev) => ev.action === 'discard' && ev.payload?.reason === 'duplicate_player_ids')
+      && !(dupEnd.sessionEvents || []).some((ev) => ev.action === 'end'),
+    JSON.stringify(dupEnd.sessionEvents),
   );
 
   // Reconnect must not emit a second session:start (stale live games).

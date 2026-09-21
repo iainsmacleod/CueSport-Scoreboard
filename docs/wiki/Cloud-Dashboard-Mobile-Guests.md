@@ -6,7 +6,7 @@ Day-to-day use after Cloud is connected ([Hosted](Cloud-Hosted-Setup) or [Self-h
 
 | Tab | Purpose |
 |-----|---------|
-| **Tables** | Live cards for connected docks **and** open impromptu tables. First-time onboarding carousel when no dock is online. **Create Impromptu Table** for dockless scoring. |
+| **Tables** | Live cards for connected docks **and** open ad-hoc tables. First-time onboarding carousel when no dock is online. **Create Ad-hoc Table** for dockless scoring. |
 | **Stats** | Account leaderboard, recent matches (including Live / in progress), player detail, rename, edit/delete matches, **Kill** unfinished matches. |
 | **Settings** | OBS Dock Keys — create, rename, change role, copy, revoke one, **Revoke All**. |
 | **Account** | Plan / billing (hosted), manage sessions (**Clear All Logins** also revokes guest links), sign out, account deletion. |
@@ -16,14 +16,14 @@ Hosted Platform Admins also get an **Admin** tab for customer support (not shown
 ### Live table cards
 
 - **Dock tables** appear when `dock_connected` is true for that Dock Key’s room.
-- **Impromptu tables** appear while the room exists. Status shows **Ready** / **Admin** / **Guest**. Open the card for Control (or Setup if names are still placeholders).
+- **Ad-hoc tables** appear while the room exists. Status shows **Ready** / **Admin** / **Guest**. Open the card for Control (or Setup if names are still placeholders).
 - Updates push over WebSocket (no polling).
 
-### Impromptu tables
+### Ad-hoc tables
 
 Use for **league nights, friendly games, and multi-table events** where you are not streaming every table (or any table).
 
-- Create from **Tables → Create Impromptu Table** (quota separate from OBS Dock Keys).
+- Create from **Tables → Create Ad-hoc Table** (quota separate from OBS Dock Keys).
 - Mobile shows Dashboard / Setup / Control / Share — no Stream.
 - Default **Guest scorer** link only (no OBS Dock Owner elevated link).
 - **Destroy Table** frees the seat without history; End or Call Match saves history and closes the table.

@@ -59,7 +59,7 @@ function enrichRoom(room) {
     api_key_label: apiKeyLabel,
     // Title is the seat name (OBS Dock Key N), never instance nicknames like "Main table".
     dock_label: kind === 'impromptu'
-      ? (room.label || 'Impromptu Table')
+      ? (room.label || 'Ad-hoc Table')
       : (apiKeyLabel || (room.dock_label !== 'Main table' && room.dock_label !== 'Default Room'
         ? room.dock_label
         : null) || apiKeyLabel || 'Connection'),
@@ -319,7 +319,7 @@ export async function registerAccountRoutes(app) {
     return { ok: true, revoked };
   });
 
-  // Impromptu (dockless) tables only — dock rooms are still created on OBS dock join.
+  // Ad-hoc (dockless) tables only — dock rooms are still created on OBS dock join.
   app.post('/api/rooms', async (request, reply) => {
     const auth = await resolveAuthFromRequest(request);
     if (!auth?.account) return reply.code(401).send({ error: 'Unauthorized' });
@@ -336,7 +336,7 @@ export async function registerAccountRoutes(app) {
     }
     if (!hasCloudSubscriptionAccess(auth.account)) {
       return reply.code(403).send({
-        error: 'An active subscription or trial is required to create impromptu tables. Choose a plan to continue.',
+        error: 'An active subscription or trial is required to create ad-hoc tables. Choose a plan to continue.',
         code: 'subscription_required',
       });
     }
@@ -348,10 +348,10 @@ export async function registerAccountRoutes(app) {
         quota: check.quota,
       });
     }
-    const label = String(request.body?.label || 'Impromptu Table').trim().slice(0, 60) || 'Impromptu Table';
+    const label = String(request.body?.label || 'Ad-hoc Table').trim().slice(0, 60) || 'Ad-hoc Table';
     const room = sqlite.createImpromptuRoom(auth.account.id, label);
     if (!room) {
-      return reply.code(500).send({ error: 'Could not create impromptu table' });
+      return reply.code(500).send({ error: 'Could not create ad-hoc table' });
     }
     sqlite.createGuestToken(room.id, auth.account.id, 'Guest scorer');
     const sessionState = sqlite.getRoomSessionState(room.id);

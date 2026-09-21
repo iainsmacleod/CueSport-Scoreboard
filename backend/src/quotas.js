@@ -280,7 +280,7 @@ export function assertCanCreateImpromptuTable(account) {
     return {
       ok: false,
       code: 'impromptu_table_limit',
-      message: `Impromptu table limit reached (${quota.limits.maxImpromptuTables} on ${quota.tierDisplayName} plan). End a match to free a seat, or upgrade your plan.`,
+      message: `Ad-hoc table limit reached (${quota.limits.maxImpromptuTables} on ${quota.tierDisplayName} plan). End a match to free a seat, or upgrade your plan.`,
       quota,
     };
   }

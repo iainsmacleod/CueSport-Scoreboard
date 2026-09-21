@@ -636,7 +636,7 @@ export function updateAccountSubscription(accountId, {
   return getAccountById(accountId);
 }
 
-/** Dock rooms with no room_docks mapping (junk from legacy signup). Impromptu rooms are intentionally unmapped. */
+/** Dock rooms with no room_docks mapping (junk from legacy signup). Ad-hoc rooms are intentionally unmapped. */
 export function listUnmappedRooms() {
   return getDb().prepare(`
     SELECT r.* FROM rooms r
@@ -646,7 +646,7 @@ export function listUnmappedRooms() {
   `).all();
 }
 
-/** Impromptu rooms with no authority activity older than cutoff (created_at / session updated_at). */
+/** Ad-hoc rooms with no authority activity older than cutoff (created_at / session updated_at). */
 export function listAbandonedImpromptuRooms(cutoffSqlite) {
   return getDb().prepare(`
     SELECT r.*
@@ -839,10 +839,10 @@ export function countImpromptuRoomsForAccount(accountId) {
 }
 
 /** Create a dockless scoring table (no OBS Dock Key / room_docks row). */
-export function createImpromptuRoom(accountId, label = 'Impromptu Table') {
+export function createImpromptuRoom(accountId, label = 'Ad-hoc Table') {
   if (!accountId) return null;
   const roomId = uuidv4();
-  const roomLabel = String(label || 'Impromptu Table').trim().slice(0, 60) || 'Impromptu Table';
+  const roomLabel = String(label || 'Ad-hoc Table').trim().slice(0, 60) || 'Ad-hoc Table';
   const database = getDb();
   database.prepare(
     `INSERT INTO rooms (id, account_id, label, kind) VALUES (?, ?, ?, 'impromptu')`
@@ -1365,7 +1365,7 @@ export function getRoomsWithLiveState(accountId) {
     const apiKey = dock?.api_key_id ? getApiKeyById(dock.api_key_id) : null;
     const apiKeyLabel = apiKey?.label || null;
     const connectionLabel = kind === 'impromptu'
-      ? (room.label && room.label !== 'Default Room' ? room.label : 'Impromptu Table')
+      ? (room.label && room.label !== 'Default Room' ? room.label : 'Ad-hoc Table')
       : (apiKeyLabel
         || (dock?.label && dock.label !== 'Main table' && dock.label !== 'Default Room' && dock.label !== 'Table'
           ? dock.label
