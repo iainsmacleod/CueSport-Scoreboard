@@ -617,6 +617,12 @@
       breakdown && breakdown.indexOf('Fouls') !== -1 &&
       (breakdown.indexOf('B&R') !== -1 || breakdown.indexOf('B&amp;R') !== -1),
       breakdown && breakdown.slice(0, 240));
+    assert(suite, 'B&R flag has Break\'n\'Run tooltip',
+      breakdown && breakdown.indexOf('title="Break\'n\'Run"') !== -1,
+      breakdown && breakdown.slice(0, 320));
+    assert(suite, 'TR flag has Table Run tooltip',
+      breakdown && breakdown.indexOf('title="Table Run"') !== -1,
+      breakdown && breakdown.slice(0, 320));
 
     const scoreP1 = match.finalScore
       ? (Number(match.finalScore.p1) || 0)

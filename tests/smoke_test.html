@@ -1942,6 +1942,47 @@
                 poolBreakdown && poolBreakdown.indexOf('Winner:') !== -1,
                 poolBreakdown && (poolBreakdown.indexOf('Winner:') !== -1 ? 'ok' : poolBreakdown.slice(0, 200)));
 
+            const tipMatch = {
+                gameType: 'game1',
+                player1Id: histP1.id,
+                player2Id: histP2.id,
+                player1Name: histP1.name || 'P1',
+                player2Name: histP2.name || 'P2',
+                racks: [
+                    {
+                        rackNumber: 1,
+                        winnerId: histP1.id,
+                        winnerSlot: '1',
+                        breakerSlot: '1',
+                        breakAndRun: true,
+                        tableRun: false,
+                        foulsP1: 0,
+                        foulsP2: 0,
+                        ballsP1: 8,
+                        ballsP2: 0
+                    },
+                    {
+                        rackNumber: 2,
+                        winnerId: histP1.id,
+                        winnerSlot: '1',
+                        breakerSlot: '2',
+                        breakAndRun: false,
+                        tableRun: true,
+                        foulsP1: 0,
+                        foulsP2: 0,
+                        ballsP1: 8,
+                        ballsP2: 0
+                    }
+                ]
+            };
+            const tipBreakdown = cp.PlayerStats.renderMatchRackBreakdown(tipMatch, { viewerPlayerId: histP1.id });
+            assert('Match History', 'B&R flag tooltip is Break\'n\'Run',
+                tipBreakdown && tipBreakdown.indexOf('title="Break\'n\'Run"') !== -1,
+                tipBreakdown && tipBreakdown.slice(0, 280));
+            assert('Match History', 'TR flag tooltip is Table Run',
+                tipBreakdown && tipBreakdown.indexOf('title="Table Run"') !== -1,
+                tipBreakdown && tipBreakdown.slice(0, 280));
+
             assert('StatsTab', 'Stats tab button present', !!cp.document.getElementById('statsTab'));
             assert('StatsTab', 'Player Stats on Stats tab',
                 !!cp.document.getElementById('StatsSettings') &&

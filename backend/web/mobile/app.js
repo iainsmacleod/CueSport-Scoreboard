@@ -1168,6 +1168,7 @@ function applyState(state) {
       slotP2.disabled = active === '2';
     }
   }
+  syncBallSetPanel(state);
 
   // Form fields — always sync from dock (including empty), unless the user has unsaved edits
   if (state.player1Name != null) document.getElementById('p1Name').value = state.player1Name;
@@ -1397,11 +1398,51 @@ function ballImageFile(n, selection) {
 }
 
 /** Show assigned 8-ball group badges on slot buttons (same mapping as overlay). */
+function ballSetGroupLabels(style) {
+  if (style === 'international') {
+    return { low: 'Reds', high: 'Yellows' };
+  }
+  return { low: 'Solids', high: 'Stripes' };
+}
+
+function isEightBallBallSetGame(state) {
+  const gt = state?.gameType;
+  if (gt === 'game1') return true;
+  if (gt === 'game7' && state.ballSelection !== 'snooker') return true;
+  return false;
+}
+
+function syncBallSetPanel(state) {
+  const panel = document.getElementById('ballSetPanel');
+  if (!panel) return;
+  const show = isEightBallBallSetGame(state) && state.useBallSet === true;
+  panel.classList.toggle('hidden', !show);
+  if (!show) return;
+
+  const style = state.ballSelection || 'american';
+  const labels = ballSetGroupLabels(style);
+  const lowBtn = document.getElementById('ballSetLowBtn');
+  const highBtn = document.getElementById('ballSetHighBtn');
+  const openBtn = document.getElementById('ballSetOpenBtn');
+  if (lowBtn) lowBtn.textContent = labels.low;
+  if (highBtn) highBtn.textContent = labels.high;
+
+  const set = state.playerBallSet || 'p1Open';
+  const locked = !!(state.gameScoringLocked || state.awaitingBreaker);
+  [lowBtn, highBtn, openBtn].forEach((btn) => {
+    if (!btn) return;
+    const value = btn.getAttribute('data-value');
+    btn.classList.toggle('selected', value === set);
+    btn.setAttribute('aria-pressed', value === set ? 'true' : 'false');
+    btn.disabled = locked || !controlsEnabled();
+  });
+}
+
 function syncPlayerSlotBallBadges(state, slotP1, slotP2) {
   const img1 = document.getElementById('playerSlotP1Ball') || slotP1?.querySelector('.slot-ball');
   const img2 = document.getElementById('playerSlotP2Ball') || slotP2?.querySelector('.slot-ball');
   if (!img1 || !img2) return;
-  const use = state.useBallSet === true;
+  const use = state.useBallSet === true && isEightBallBallSetGame(state);
   const set = state.playerBallSet || 'p1Open';
   const assigned = use && (set === 'p1red/smalls' || set === 'p1yellow/bigs');
   if (!assigned) {
@@ -1409,29 +1450,44 @@ function syncPlayerSlotBallBadges(state, slotP1, slotP2) {
     img2.classList.add('hidden');
     img1.removeAttribute('src');
     img2.removeAttribute('src');
+    img1.removeAttribute('title');
+    img2.removeAttribute('title');
+    img1.alt = '';
+    img2.alt = '';
     return;
   }
   const style = state.ballSelection || 'american';
+  const labels = ballSetGroupLabels(style);
   let p1File;
   let p2File;
+  let p1Label;
+  let p2Label;
   if (style === 'international') {
     if (set === 'p1red/smalls') {
       p1File = 'red-international-small-ball.png';
       p2File = 'yellow-international-small-ball.png';
+      p1Label = labels.low;
+      p2Label = labels.high;
     } else {
       p1File = 'yellow-international-small-ball.png';
       p2File = 'red-international-small-ball.png';
+      p1Label = labels.high;
+      p2Label = labels.low;
     }
   } else {
     const p1Num = set === 'p1red/smalls' ? 1 : 15;
     const p2Num = set === 'p1red/smalls' ? 15 : 1;
     p1File = ballImageFile(p1Num, style);
     p2File = ballImageFile(p2Num, style);
+    p1Label = set === 'p1red/smalls' ? labels.low : labels.high;
+    p2Label = set === 'p1red/smalls' ? labels.high : labels.low;
   }
   img1.src = `${BALL_IMG}/${p1File}`;
   img2.src = `${BALL_IMG}/${p2File}`;
-  img1.alt = set === 'p1red/smalls' ? 'Solids' : 'Stripes';
-  img2.alt = set === 'p1red/smalls' ? 'Stripes' : 'Solids';
+  img1.alt = p1Label;
+  img2.alt = p2Label;
+  img1.title = p1Label;
+  img2.title = p2Label;
   img1.classList.remove('hidden');
   img2.classList.remove('hidden');
 }
@@ -2500,6 +2556,7 @@ function sendCmd(action, payload) {
     if (action === 'set_snooker_gold') clearPendingSetup('snookerGold');
     if (action === 'set_point_based') clearPendingSetup('pointBased');
     if (action === 'set_ball_selection') clearPendingSetup('ballSelection');
+    if (action === 'set_use_ball_set') clearPendingSetup('useBallSet');
     return false;
   }
   if (connectionIsReconnecting()) {
@@ -2844,6 +2901,10 @@ function syncSetupVariantOptions(state) {
       : 'Early Game Ball/Win on Break';
   }
 
+  const showBallSet = gameType === 'game1'
+    || (gameType === 'game7' && (state?.ballSelection || document.getElementById('ballSelectionSelect')?.value) !== 'snooker');
+  showSetupRow('setupBallSetRow', showBallSet);
+
   showSetupRow('setupSnookerGoldRow', gameType === 'game8');
   showSetupRow('setupPointBasedRow', gameType === 'game7');
 
@@ -2864,6 +2925,9 @@ function syncSetupFieldsFromState(state) {
   if (!state) return;
   if (typeof state.earlyGameBallEnabled === 'boolean') {
     syncCheckboxFromState('earlyGameBallCheckbox', 'earlyGameBall', state.earlyGameBallEnabled);
+  }
+  if (typeof state.useBallSet === 'boolean') {
+    syncCheckboxFromState('useBallSetCheckbox', 'useBallSet', state.useBallSet);
   }
   if (typeof state.snookerGoldEnabled === 'boolean') {
     syncCheckboxFromState('snookerGoldCheckbox', 'snookerGold', state.snookerGoldEnabled);
@@ -2917,6 +2981,13 @@ function wireSetupPanel() {
     markSetupPending('earlyGameBall', e.target.checked ? '1' : '0');
     sendCmd('set_early_game_ball', { enabled: e.target.checked });
   });
+  document.getElementById('useBallSetCheckbox')?.addEventListener('change', (e) => {
+    markSetupPending('useBallSet', e.target.checked ? '1' : '0');
+    sendCmd('set_use_ball_set', { enabled: e.target.checked });
+    if (lastState) {
+      syncBallSetPanel({ ...lastState, useBallSet: e.target.checked });
+    }
+  });
   document.getElementById('snookerGoldCheckbox')?.addEventListener('change', (e) => {
     markSetupPending('snookerGold', e.target.checked ? '1' : '0');
     sendCmd('set_snooker_gold', { enabled: e.target.checked });
@@ -2957,6 +3028,7 @@ function wireCommands() {
       if (el.dataset.isp1 != null) payload.isP1 = el.dataset.isp1 === 'true';
       if (el.dataset.index != null) payload.index = parseInt(el.dataset.index, 10);
       if (el.dataset.mode) payload.mode = el.dataset.mode;
+      if (el.dataset.value != null) payload.value = el.dataset.value;
       if (cmd === 'set_player_name') {
         payload.slot = el.dataset.slot;
         payload.name = document.getElementById(payload.slot === '1' ? 'p1Name' : 'p2Name').value;

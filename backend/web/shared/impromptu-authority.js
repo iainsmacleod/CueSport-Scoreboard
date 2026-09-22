@@ -1599,7 +1599,9 @@ export function createDefaultImpromptuState(overrides = {}) {
     ballSelection: 'american',
     earlyGameBallEnabled: false,
     snookerGoldEnabled: false,
-    useBallSet: false,
+    // Match dock Feature Settings default (useBallSet: "yes") so 8-ball
+    // group assignment, win rules, and slot badges work out of the box.
+    useBallSet: true,
     playerBallSet: 'p1Open',
     activePlayer: '1',
     rackBreakerSlot: '',
@@ -2027,11 +2029,13 @@ export function applyImpromptuCommand(stateIn, action, payload = {}) {
       resetSnookerFrame(state);
       clearMatchStats(state);
       state.rackBreakerSlot = '';
+      state.playerBallSet = 'p1Open';
+      state._ballSetOpenLastPotSlot = '';
+      state._ballSetOpenSamePlayerPots = 0;
       // Dock applyGameTypeChange: Snooker forces snooker balls; leaving Snooker
       // (or 9/10-Ball) drops a stale snooker ballSelection so pool art is correct.
       if (state.gameType === 'game8') {
         state.ballSelection = 'snooker';
-        state.playerBallSet = 'p1Open';
       } else if (state.gameType === 'game2' || state.gameType === 'game3') {
         state.ballSelection = 'american';
       } else if (state.ballSelection === 'snooker') {
@@ -2053,6 +2057,11 @@ export function applyImpromptuCommand(stateIn, action, payload = {}) {
       break;
     case 'set_use_ball_set':
       state.useBallSet = !!payload.enabled;
+      if (!state.useBallSet) {
+        state.playerBallSet = 'p1Open';
+        state._ballSetOpenLastPotSlot = '';
+        state._ballSetOpenSamePlayerPots = 0;
+      }
       break;
     case 'set_player_ball_set':
       state.playerBallSet = String(payload.value || 'p1Open');

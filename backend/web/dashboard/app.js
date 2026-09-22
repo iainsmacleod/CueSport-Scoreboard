@@ -3315,8 +3315,16 @@ function renderMatchRackBreakdown(m, options = {}) {
         parts.push(`<span>HB: ${escapeHtml(String(isP1 ? hb1 : hb2))}</span>`);
       }
       if (isPoolRunGame && winnerSlot === slot) {
-        if (isBreakAndRun) parts.push('<span class="stats-rack-flag">B&amp;R</span>');
-        if (isTableRun) parts.push('<span class="stats-rack-flag">TR</span>');
+        if (isBreakAndRun) {
+          parts.push(
+            '<span class="stats-rack-flag" title="Break\'n\'Run" aria-label="Break\'n\'Run">B&amp;R</span>'
+          );
+        }
+        if (isTableRun) {
+          parts.push(
+            '<span class="stats-rack-flag" title="Table Run" aria-label="Table Run">TR</span>'
+          );
+        }
       }
       return `<div class="stats-rack-player-line">${parts.join('')}</div>`;
     }).join('');
@@ -3615,10 +3623,16 @@ function renderPlayerDetail() {
       cards.push(`<div class="stats-summary-card"><strong>${highestRun}</strong><span>Longest run</span></div>`);
     }
     if (breakAndRuns > 0) {
-      cards.push(`<div class="stats-summary-card"><strong>${breakAndRuns}</strong><span>B&amp;R</span></div>`);
+      cards.push(
+        `<div class="stats-summary-card"><strong>${breakAndRuns}</strong>`
+        + `<span title="Break'n'Run" aria-label="Break'n'Run">B&amp;R</span></div>`
+      );
     }
     if (tableRuns > 0) {
-      cards.push(`<div class="stats-summary-card"><strong>${tableRuns}</strong><span>Table runs</span></div>`);
+      cards.push(
+        `<div class="stats-summary-card"><strong>${tableRuns}</strong>`
+        + `<span title="Table Run" aria-label="Table Run">Table runs</span></div>`
+      );
     }
     const fouls = player ? (player.fouls || 0) : 0;
     if (fouls > 0) {

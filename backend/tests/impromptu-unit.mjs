@@ -701,6 +701,46 @@ try {
     `balls=${legal8._private._matchBallsP1} rack=${JSON.stringify(legal8._private._matchRacks)}`,
   );
 
+  // Default ad-hoc 8-ball enables Ball Set (dock Feature Settings parity).
+  const default8 = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game1',
+  });
+  assert('ad-hoc 8-ball defaults useBallSet on', default8.useBallSet === true);
+  assert('ad-hoc 8-ball starts Open table', default8.playerBallSet === 'p1Open');
+  let autoAssign = applyImpromptuCommand(default8, 'select_breaker', { slot: '1' })._private;
+  autoAssign = applyImpromptuCommand(autoAssign, 'toggle_pot', { ballId: 'ball 2' })._private;
+  const autoPub = applyImpromptuCommand(autoAssign, 'toggle_pot', { ballId: 'ball 4' });
+  assert(
+    'default Ball Set auto-assigns group without override',
+    autoPub.state.useBallSet === true && autoPub.state.playerBallSet === 'p1red/smalls',
+    `use=${autoPub.state.useBallSet} set=${autoPub.state.playerBallSet}`,
+  );
+  const setToggle = applyImpromptuCommand(autoPub._private, 'set_use_ball_set', { enabled: false });
+  assert(
+    'set_use_ball_set disables feature and clears group',
+    setToggle.state.useBallSet === false && setToggle.state.playerBallSet === 'p1Open',
+    `use=${setToggle.state.useBallSet} set=${setToggle.state.playerBallSet}`,
+  );
+  const setChoice = applyImpromptuCommand(
+    createDefaultImpromptuState({ player1Name: 'A', player2Name: 'B', gameType: 'game1' }),
+    'set_player_ball_set',
+    { value: 'p1yellow/bigs' },
+  );
+  assert(
+    'set_player_ball_set publishes stripes for P1',
+    setChoice.state.playerBallSet === 'p1yellow/bigs' && setChoice.state.useBallSet === true,
+  );
+  const switched = applyImpromptuCommand(
+    setChoice._private,
+    'set_game_type',
+    { gameType: 'game2' },
+  );
+  assert(
+    'game type change resets Chosen Ball to Open',
+    switched.state.playerBallSet === 'p1Open',
+    `set=${switched.state.playerBallSet}`,
+  );
+
   // Straight 14.1 re-rack when one ball left.
   let straight141 = createDefaultImpromptuState({
     player1Name: 'A', player2Name: 'B', gameType: 'game4',
@@ -956,6 +996,23 @@ try {
   assert('streamer has maxImpromptuTables', streamerLimits.maxImpromptuTables === 2);
   const toLimits = quotas.getTierLimits('tournament_organizer');
   assert('tournament organizer has maxImpromptuTables', toLimits.maxImpromptuTables === 5);
+
+  // Static UI contracts: mobile ball-set controls + B&R/TR tooltips.
+  const { fileURLToPath } = await import('url');
+  const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+  const mobileHtml = fs.readFileSync(path.join(repoRoot, 'backend', 'web', 'mobile', 'index.html'), 'utf8');
+  assert('mobile has ball set panel', mobileHtml.includes('id="ballSetPanel"'));
+  assert('mobile has Ball Set setup toggle', mobileHtml.includes('id="useBallSetCheckbox"'));
+  assert('mobile has Chosen Ball buttons', mobileHtml.includes('data-cmd="set_player_ball_set"'));
+  const playerStatsSrc = fs.readFileSync(path.join(repoRoot, 'common', 'js', 'player_stats.js'), 'utf8');
+  assert('dock stats B&R tooltip', /title="Break\\'n\\'Run"/.test(playerStatsSrc));
+  assert('dock stats TR tooltip', playerStatsSrc.includes('title="Table Run"'));
+  const dashSrc = fs.readFileSync(path.join(repoRoot, 'backend', 'web', 'dashboard', 'app.js'), 'utf8');
+  assert(
+    'dashboard B&R tooltip',
+    /title="Break\\'n\\'Run"/.test(dashSrc) || dashSrc.includes("title=\"Break'n'Run\""),
+  );
+  assert('dashboard TR tooltip', dashSrc.includes('title="Table Run"'));
 } catch (err) {
   failed += 1;
   console.error('FAIL suite error', err);

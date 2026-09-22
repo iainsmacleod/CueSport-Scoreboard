@@ -75,6 +75,14 @@
               </button>
             </div>
           </div>
+          <div class="panel live-inline-panel hidden" id="ballSetPanel">
+            <h2 id="ballSetPanelHeading">P1 Chosen Ball</h2>
+            <div class="row equal" id="ballSetChoices">
+              <button type="button" class="btn" id="ballSetLowBtn" data-cmd="set_player_ball_set" data-value="p1red/smalls">Solids</button>
+              <button type="button" class="btn" id="ballSetHighBtn" data-cmd="set_player_ball_set" data-value="p1yellow/bigs">Stripes</button>
+              <button type="button" class="btn" id="ballSetOpenBtn" data-cmd="set_player_ball_set" data-value="p1Open">Open</button>
+            </div>
+          </div>
           <div class="live-ball-section hidden" id="ballGridPanel">
             <p id="ballGridHint" class="ball-grid-hint hidden"></p>
             <div id="ballGrid" class="ball-grid ball-grid-live"></div>
@@ -207,6 +215,10 @@
             </select>
           </div>
           <div id="setupVariantOptions" class="setup-variant-options">
+            <label id="setupBallSetRow" class="setup-option-row hidden" for="useBallSetCheckbox">
+              <span>Ball Set</span>
+              <input type="checkbox" id="useBallSetCheckbox" class="setup-option-check" />
+            </label>
             <label id="setupEarlyGameRow" class="setup-option-row hidden" for="earlyGameBallCheckbox">
               <span id="earlyGameBallLabel">Win on Break</span>
               <input type="checkbox" id="earlyGameBallCheckbox" class="setup-option-check" />

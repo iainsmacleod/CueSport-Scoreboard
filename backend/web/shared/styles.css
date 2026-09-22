@@ -3467,6 +3467,7 @@ body.controls-locked #mobileBottomNav {
   font-weight: 600;
   opacity: 1;
   color: #7dcfff;
+  cursor: help;
 }
 .stats-rack-breaker {
   font-weight: 400;

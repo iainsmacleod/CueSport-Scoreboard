@@ -2503,6 +2503,7 @@ label.switch.toggle-disabled {
 	font-weight: 600;
 	opacity: 1;
 	color: #7dcfff;
+	cursor: help;
 }
 
 .stats-rack-breaker {

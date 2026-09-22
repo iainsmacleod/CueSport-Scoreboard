@@ -924,6 +924,7 @@ async function run() {
 
       // 8-ball: illegal → opponent; ball-set + legal 8 → active.
       let bad8 = start('game1');
+      assert('smoke 8-ball defaults useBallSet on', bad8.useBallSet === true);
       bad8 = applyImpromptuCommand(bad8, 'toggle_pot', { ballId: 'ball 1' })._private;
       bad8 = applyImpromptuCommand(bad8, 'toggle_pot', { ballId: 'ball 8' })._private;
       assert(
@@ -932,10 +933,11 @@ async function run() {
         `p1=${bad8.p1Score} p2=${bad8.p2Score}`,
       );
 
-      let set8 = start('game1', { useBallSet: true, playerBallSet: 'p1Open' });
+      let set8 = start('game1', { playerBallSet: 'p1Open' });
       set8 = applyImpromptuCommand(set8, 'toggle_pot', { ballId: 'ball 3' })._private;
       set8 = applyImpromptuCommand(set8, 'toggle_pot', { ballId: 'ball 5' })._private;
       assert('smoke ball-set assigns on 2nd pot', set8.playerBallSet === 'p1red/smalls');
+      assert('smoke ball-set published for badges', set8.useBallSet === true);
       for (const n of [1, 2, 4, 6, 7]) {
         set8 = applyImpromptuCommand(set8, 'toggle_pot', { ballId: `ball ${n}` })._private;
       }

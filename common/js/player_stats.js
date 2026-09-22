@@ -6888,10 +6888,14 @@
                 }
                 if (isPoolRunGame && winnerSlot === slot) {
                     if (isBreakAndRun) {
-                        parts.push('<span class="stats-rack-flag">B&amp;R</span>');
+                        parts.push(
+                            '<span class="stats-rack-flag" title="Break\'n\'Run" aria-label="Break\'n\'Run">B&amp;R</span>'
+                        );
                     }
                     if (isTableRun) {
-                        parts.push('<span class="stats-rack-flag">TR</span>');
+                        parts.push(
+                            '<span class="stats-rack-flag" title="Table Run" aria-label="Table Run">TR</span>'
+                        );
                     }
                 }
                 return '<div class="stats-rack-player-line">' + parts.join('') + '</div>';
@@ -8123,14 +8127,14 @@
             cards.push(
                 '<div class="stats-summary-card"><strong>' +
                 escapeHtml(String(breakAndRuns)) +
-                '</strong><span>B&amp;R</span></div>'
+                '</strong><span title="Break\'n\'Run" aria-label="Break\'n\'Run">B&amp;R</span></div>'
             );
         }
         if (tableRuns > 0) {
             cards.push(
                 '<div class="stats-summary-card"><strong>' +
                 escapeHtml(String(tableRuns)) +
-                '</strong><span>Table runs</span></div>'
+                '</strong><span title="Table Run" aria-label="Table Run">Table runs</span></div>'
             );
         }
         if (fouls > 0) {
