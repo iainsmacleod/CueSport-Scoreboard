@@ -26,7 +26,7 @@ import {
   applyImpromptuCommand,
   hydrateAuthorityState,
   createDefaultImpromptuState,
-} from '../shared/impromptu-authority.js?v=8.3.0.19';
+} from '../shared/impromptu-authority.js?v=8.3.0.20';
 
 let client = null;
 let roomId = '';

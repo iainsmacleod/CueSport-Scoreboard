@@ -502,6 +502,23 @@ function isRackOpponentVisited() {
     return getStorageItem("rackOpponentVisited") === "yes";
 }
 
+/**
+ * True while the breaker's first visit is still open: breaker is active, the
+ * opponent has not taken the table, and no object balls are down yet.
+ * Used so Win on Break / 8-restore only apply on the actual break — not after a dry break.
+ */
+function isEightBallOnBreakVisit() {
+    if (countFadedObjectBalls() > 0) {
+        return false;
+    }
+    const breaker = getRackBreakerSlot();
+    if (!breaker) {
+        // No breaker recorded — treat first-object 8 as the legacy break path.
+        return true;
+    }
+    return getActivePlayerSlot() === breaker && !isRackOpponentVisited();
+}
+
 function setRackOpponentVisited(yes) {
     setStorageItem("rackOpponentVisited", yes ? "yes" : "no");
 }
@@ -3508,8 +3525,9 @@ function isUnassignedEightBallClearForWin() {
 /**
  * Resolve potting the game ball for 8 / 9 / 10-Ball.
  * 9/10: Early Game Ball/Win on Break on → early win; off → require all lower balls (else reject).
- * 8: Win on Break on + first ball → win; own group (or unassigned clear) → win; otherwise out of sequence → loss.
- * 8 with Win on Break off + first ball → reject (no win on break).
+ * 8: Win on Break only while the breaker is still on the break visit with no prior object pots;
+ *    own group (or unassigned clear) → win; otherwise out of sequence → loss.
+ * 8 with Win on Break off on the break visit → reject (no win on break).
  */
 function resolveTrackerGameBallPot(ballId) {
     const type = getStorageItem("gameType");
@@ -3523,7 +3541,7 @@ function resolveTrackerGameBallPot(ballId) {
 
     if (type === "game1") {
         const othersDown = countFadedObjectBalls();
-        if (othersDown === 0) {
+        if (othersDown === 0 && isEightBallOnBreakVisit()) {
             if (isEarlyGameBallEnabled()) {
                 return creditTrackerRackWin(ballId);
             }
@@ -3536,7 +3554,7 @@ function resolveTrackerGameBallPot(ballId) {
             areAllEightBallObjectBallsPotted()) {
             return creditTrackerRackWin(ballId);
         }
-        // 8 potted with own group (or neither group while Open) still up — loss of rack.
+        // 8 potted with own group still up — including after a dry break — loss of rack.
         return creditTrackerRackLoss(ballId);
     }
 

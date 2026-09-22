@@ -881,7 +881,7 @@ function resolveTrackerGameBallAction(state, ballId) {
 
   if (gt === 'game1') {
     const othersDown = countFadedObjectBalls(state);
-    if (othersDown === 0) {
+    if (othersDown === 0 && isEightBallOnBreakVisit(state)) {
       return state.earlyGameBallEnabled ? 'win' : 'early_reject';
     }
     const active = state.activePlayer === '2' ? '2' : '1';
@@ -895,6 +895,18 @@ function resolveTrackerGameBallAction(state, ballId) {
   }
 
   return 'win';
+}
+
+/** Breaker still on break: active, no opponent visit, no object pots yet. */
+function isEightBallOnBreakVisit(state) {
+  if (countFadedObjectBalls(state) > 0) return false;
+  const breaker = state.rackBreakerSlot;
+  if (breaker !== '1' && breaker !== '2') {
+    // No breaker recorded — legacy first-object 8 path.
+    return true;
+  }
+  const active = state.activePlayer === '2' ? '2' : '1';
+  return active === breaker && !state._rackOpponentVisited;
 }
 
 function startTrackerCooldown(state, ballId, mode) {

@@ -621,6 +621,37 @@ try {
       && early8._private._cooldown?.mode === 'early_reject',
   );
 
+  // Dry break → incoming player pots 8 → loss (not win-on-break / restore).
+  let dryBreakEight = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game1', earlyGameBallEnabled: false,
+  });
+  dryBreakEight = applyImpromptuCommand(dryBreakEight, 'select_breaker', { slot: '1' })._private;
+  dryBreakEight = applyImpromptuCommand(dryBreakEight, 'toggle_active_player', { isP1: false })._private;
+  assert('dry break marks opponent visit', dryBreakEight._rackOpponentVisited === true);
+  const dry8 = applyImpromptuCommand(dryBreakEight, 'toggle_pot', { ballId: 'ball 8' });
+  assert(
+    'dry-break incoming 8 is loss of rack',
+    dry8.state.p1Score === 1
+      && dry8.state.p2Score === 0
+      && dry8.state.lastRackWinnerSlot === '1',
+    `p1=${dry8.state.p1Score} p2=${dry8.state.p2Score} last=${dry8.state.lastRackWinnerSlot}`,
+  );
+
+  // Same scenario with win-on-break on must still be a loss (not a break win).
+  let dryBreakWinFlag = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game1', earlyGameBallEnabled: true,
+  });
+  dryBreakWinFlag = applyImpromptuCommand(dryBreakWinFlag, 'select_breaker', { slot: '1' })._private;
+  dryBreakWinFlag = applyImpromptuCommand(dryBreakWinFlag, 'toggle_active_player', { isP1: false })._private;
+  const dry8WinFlag = applyImpromptuCommand(dryBreakWinFlag, 'toggle_pot', { ballId: 'ball 8' });
+  assert(
+    'dry-break incoming 8 is loss even if win-on-break on',
+    dry8WinFlag.state.p1Score === 1
+      && dry8WinFlag.state.p2Score === 0
+      && dry8WinFlag.state.lastRackWinnerSlot === '1',
+    `p1=${dry8WinFlag.state.p1Score} p2=${dry8WinFlag.state.p2Score} last=${dry8WinFlag.state.lastRackWinnerSlot}`,
+  );
+
   // Illegal 8 with some (but not a full group) down → opponent rack.
   let illegal8 = createDefaultImpromptuState({
     player1Name: 'A', player2Name: 'B', gameType: 'game1', useBallSet: false,
