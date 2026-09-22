@@ -69,7 +69,9 @@ body {
 	border-color: var(--cs-border) !important;
 }
 
-.tab button.active {
+.tab button.active,
+#statsOverlayControls .button.active,
+#statsOverlayControls .obs28.active {
 	background: linear-gradient(135deg, rgba(47, 128, 255, 0.26), rgba(155, 92, 255, 0.22)) !important;
 	color: #fff !important;
 	border-color: var(--cs-blue) !important;

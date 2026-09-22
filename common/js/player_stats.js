@@ -5126,13 +5126,12 @@
             if (!btn) {
                 return;
             }
-            if (activeMode === key) {
-                btn.style.backgroundColor = '#008000';
-                btn.style.color = '#ffffff';
-            } else {
-                btn.style.backgroundColor = '';
-                btn.style.color = '';
-            }
+            const isActive = activeMode === key;
+            btn.classList.toggle('active', isActive);
+            btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+            // Clear legacy inline colors so theme `.active` CSS can apply.
+            btn.style.backgroundColor = '';
+            btn.style.color = '';
         });
     }
 
