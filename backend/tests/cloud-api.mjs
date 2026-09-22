@@ -292,10 +292,6 @@ async function run() {
 
   const googleLogo = await fetch(`${BASE}/web/shared/google/g-logo.svg`);
   assert('GET /web/shared/google/g-logo.svg', googleLogo.ok);
-  const googleSignIn = await fetch(`${BASE}/web/shared/google/signin.svg`);
-  assert('GET /web/shared/google/signin.svg', googleSignIn.ok);
-  const googleSignUp = await fetch(`${BASE}/web/shared/google/signup.svg`);
-  assert('GET /web/shared/google/signup.svg', googleSignUp.ok);
 
   const termsPage = await fetch(`${BASE}/terms`);
   const termsText = termsPage.ok ? await termsPage.text() : '';

@@ -1,6 +1,5 @@
 import * as sqlite from '../db/sqlite.js';
 import { config } from '../config.js';
-import { getAccountQuota } from '../quotas.js';
 import { isAccountAdminAuth } from '../lib/dock-roles.js';
 import {
   buildPlansCatalogFromStripe,
@@ -13,10 +12,7 @@ import {
   tierToPriceId,
   trialDaysForTier,
 } from '../lib/stripe-billing.js';
-import {
-  hasCloudSubscriptionAccess,
-  isAdminSupportTrialActive,
-} from '../lib/subscription-access.js';
+import { isAdminSupportTrialActive } from '../lib/subscription-access.js';
 
 async function resolveAccountAuth(request) {
   const auth = request.headers.authorization || '';
@@ -368,22 +364,4 @@ async function handleStripeEvent(event, log) {
       || sqlite.findAccountIdByStripeCustomerId(customerId);
     if (accountId) syncAccountFromSubscription(accountId, subscription);
   }
-}
-
-/** Enrich /api/me-style payloads with billing access flags. */
-export function billingAccountFields(account) {
-  const status = account?.subscription_status || 'inactive';
-  const access = hasCloudSubscriptionAccess(account);
-  const complimentary = isAdminSupportTrialActive(account);
-  return {
-    subscription_status: status,
-    subscription_tier: account?.subscription_tier || null,
-    trial_ends_at: account?.trial_ends_at || null,
-    stripe_customer_id: account?.stripe_customer_id || null,
-    stripe_subscription_id: account?.stripe_subscription_id || null,
-    has_subscription_access: access,
-    is_complimentary: complimentary,
-    needs_plan: !access && !config.allowDevAuth,
-    quota: account ? getAccountQuota(account) : null,
-  };
 }

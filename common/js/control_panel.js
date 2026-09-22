@@ -73,19 +73,6 @@ function getReplayClipDisplayLabel(entry, index) {
 let replayHistory = loadReplayHistory();
 /** True while an Instant Replay / historic clip is playing in OBS (monitor button → Replay Active). */
 let isReplayPlaybackActive = false;
-// function updateTabVisibility() {
-//     // Get the state of the player settings
-//     const player1Enabled = document.getElementById("usePlayer1Setting").checked;
-//     const player2Enabled = document.getElementById("usePlayer2Setting").checked;
-//     // Determine if both players are enabled
-//     const bothPlayersEnabled = player1Enabled && player2Enabled;
-
-//     // Get tab elements
-//     const scoringTab = document.getElementById("scoringTab");
-
-//     // Show or hide the scoring tab
-//     // scoringTab.style.display = bothPlayersEnabled ? "inline-block" : "none";
-// }
 
 function toggleReplayClipsVisibility() {
     const replayClips = document.getElementById("replayClips");
@@ -154,12 +141,11 @@ function updateReplayControlsVisibility() {
     replayControlsDiv.classList.remove('noShow');
 }
 
-// Call updateTabVisibility on page load to set initial tab visibility
+// Initialize control panel UI on load
 document.addEventListener("DOMContentLoaded", function () {
     // In your initialization code
     loadReplaySources();
     updateReplayControlsVisibility();
-    // updateTabVisibility();
     updateReplayButtonsVisibility();
     updateReplaySourceSettingsVisibility();
     updatePlayerBallControlVisibility();
@@ -5914,7 +5900,6 @@ function playerSetting(player) {
 
     bc.postMessage({ playerDisplay: usePlayer, playerNumber: player });
 
-    // updateTabVisibility();
     //Hide/Show based on both players enabled
     document.getElementById("swapBtn").classList[bothPlayersEnabled ? "remove" : "add"]("noShow");
     syncScoreDisplayDependentUI();
@@ -5955,7 +5940,6 @@ function clockSetting() {
         document.getElementById("extensionControls").classList.remove("noShow");
         document.getElementById("clockControlLabel").classList.remove("noShow");
     }
-    // updateTabVisibility();
 
     if (window.streamSharing && typeof window.streamSharing.sendUpdate === "function") {
         window.streamSharing.sendUpdate();

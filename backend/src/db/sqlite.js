@@ -797,11 +797,6 @@ export function updateApiKey(keyId, accountId, { label, role } = {}) {
   };
 }
 
-/** Rename an active seat; syncs room / dock labels that use this key. */
-export function renameApiKey(keyId, accountId, label) {
-  return updateApiKey(keyId, accountId, { label });
-}
-
 /** Returns plaintext key for the account owner, or null if missing/revoked/legacy. */
 export function getApiKeyPlaintext(keyId, accountId) {
   const row = getDb().prepare(
@@ -1262,14 +1257,6 @@ export function peekRoomDockByApiKey(apiKeyId) {
   ).get(apiKeyId) || null;
 }
 
-/** @deprecated Prefer peekRoomDockByApiKey — instance is no longer room identity. */
-export function peekRoomDock(accountId, instanceKey) {
-  const key = (instanceKey || 'default').trim() || 'default';
-  return getDb().prepare(
-    'SELECT * FROM room_docks WHERE account_id = ? AND instance_key = ? ORDER BY last_seen_at DESC LIMIT 1'
-  ).get(accountId, key) || null;
-}
-
 /**
  * One room per Dock Key under an account.
  * Callers must enforce room quotas before create (see room-hub).
@@ -1309,14 +1296,6 @@ export function ensureRoomForApiKey(accountId, apiKeyId, { instanceKey, label } 
   return getRoom(roomId);
 }
 
-/** @deprecated Prefer ensureRoomForApiKey. */
-export function ensureRoomForInstance(accountId, instanceKey, label, apiKeyId = null) {
-  if (apiKeyId) {
-    return ensureRoomForApiKey(accountId, apiKeyId, { instanceKey, label });
-  }
-  return null;
-}
-
 /** Persist label sync when a dock key is known for a room (reconnect backfill). */
 export function setRoomDockApiKey(roomId, apiKeyId) {
   if (!roomId || !apiKeyId) return false;
@@ -1346,14 +1325,6 @@ export function touchRoomDockByApiKey(apiKeyId, instanceKey) {
     `UPDATE room_docks SET last_seen_at = datetime('now'), instance_key = ?
      WHERE api_key_id = ?`
   ).run(key, apiKeyId);
-}
-
-/** @deprecated Prefer touchRoomDockByApiKey. */
-export function touchRoomDock(accountId, instanceKey) {
-  const key = (instanceKey || 'default').trim() || 'default';
-  getDb().prepare(
-    `UPDATE room_docks SET last_seen_at = datetime('now') WHERE account_id = ? AND instance_key = ?`
-  ).run(accountId, key);
 }
 
 export function getRoomsWithLiveState(accountId) {

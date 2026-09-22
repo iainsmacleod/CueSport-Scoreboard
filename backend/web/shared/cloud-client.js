@@ -509,10 +509,6 @@ export async function fetchApiKey(serverUrl, token, keyId) {
   return res.json();
 }
 
-export async function renameApiKey(serverUrl, token, keyId, label) {
-  return patchApiKey(serverUrl, token, keyId, { label });
-}
-
 export async function patchApiKey(serverUrl, token, keyId, patch) {
   const base = serverUrl.replace(/\/$/, '');
   const res = await fetch(`${base}/api/api-keys/${encodeURIComponent(keyId)}`, {

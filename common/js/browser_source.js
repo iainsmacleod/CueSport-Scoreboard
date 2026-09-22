@@ -587,24 +587,6 @@ function applySavedBallStates() {
     });
 }
 
-// function styleChange(n) {
-// 	if (n == 1) {
-// 		document.styleSheets[0].disabled = false;
-// 		document.styleSheets[1].disabled = true;
-// 		document.styleSheets[2].disabled = true;
-// 	}
-// 	if (n == 2) {
-// 		document.styleSheets[0].disabled = true;
-// 		document.styleSheets[1].disabled = false;
-// 		document.styleSheets[2].disabled = true;
-// 	}
-// 	if (n == 3) {
-// 		document.styleSheets[0].disabled = true;
-// 		document.styleSheets[1].disabled = true;
-// 		document.styleSheets[2].disabled = false;
-// 	}
-// }
-
 function playWebmAnimation(gameType, containerSelector = '#videoContainer') {
 	// Determine which video URL to use based on the gameType value and ball selection.
     let videoUrl;

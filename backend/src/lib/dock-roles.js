@@ -4,12 +4,6 @@ export const DOCK_KEY_ROLES = ['administrator', 'trusted_operator', 'operator'];
 export const DEFAULT_DOCK_KEY_ROLE = 'trusted_operator';
 export const OBS_DOCK_OWNER_GUEST_LABEL = 'OBS Dock Owner';
 
-export const DOCK_KEY_ROLE_LABELS = {
-  administrator: 'Administrator',
-  trusted_operator: 'Trusted Operator',
-  operator: 'Operator',
-};
-
 export function isValidDockKeyRole(role) {
   return DOCK_KEY_ROLES.includes(String(role || '').trim());
 }

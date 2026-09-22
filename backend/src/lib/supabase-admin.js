@@ -38,8 +38,3 @@ export async function deleteSupabaseAuthUser(authUserId) {
   if (error && !isMissingUserError(error)) throw error;
   return { deleted: !error, alreadyMissing: !!error };
 }
-
-/** @internal test helper */
-export function clearSupabaseAdminClient() {
-  adminClient = null;
-}

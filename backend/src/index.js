@@ -163,7 +163,7 @@ function resolveGoogleButtonRoot() {
     path.join(__dirname, '..', 'common', 'images', 'google'),
     path.join(__dirname, '..', '..', 'common', 'images', 'google'),
   ];
-  return candidates.find((dir) => fs.existsSync(path.join(dir, 'g-logo.svg')) || fs.existsSync(path.join(dir, 'signin.svg'))) || null;
+  return candidates.find((dir) => fs.existsSync(path.join(dir, 'g-logo.svg'))) || null;
 }
 
 const googleButtonRoot = resolveGoogleButtonRoot();

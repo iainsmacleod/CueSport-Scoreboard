@@ -335,13 +335,6 @@ export async function getSubscriptionBillingSummary(account) {
   }
 }
 
-/** @internal test helper */
-export function clearStripeBillingCaches() {
-  priceCache.clear();
-  catalogCache = null;
-  subscriptionSummaryCache.clear();
-}
-
 export function mapStripeSubscriptionStatus(status) {
   const s = String(status || '').toLowerCase();
   if (s === 'trialing') return 'trialing';
