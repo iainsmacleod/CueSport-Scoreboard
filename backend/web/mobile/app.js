@@ -26,7 +26,7 @@ import {
   applyImpromptuCommand,
   hydrateAuthorityState,
   createDefaultImpromptuState,
-} from '../shared/impromptu-authority.js?v=8.3.0.11';
+} from '../shared/impromptu-authority.js?v=8.3.0.12';
 
 let client = null;
 let roomId = '';
@@ -1583,8 +1583,11 @@ function updateMobileRackFoulDisplay(state) {
   const marginDisplay = scoreMargin && scoreMargin.display != null
     ? String(scoreMargin.display)
     : (marginDiff > 0 ? `+${marginDiff}` : String(marginDiff));
-  // Hide Remaining while tied (esp. 0–0 full-table 147); only useful with a lead/deficit.
-  const showDiff = snooker && marginDiff !== 0;
+  // Hide Remaining/Diff only before any frame points (0–0), not when tied mid-frame.
+  const showMargin = scoreMargin && scoreMargin.showMargin != null
+    ? !!scoreMargin.showMargin
+    : ((Number(state.p1Balls) || 0) !== 0 || (Number(state.p2Balls) || 0) !== 0);
+  const showDiff = snooker && showMargin;
   const showRemaining = showDiff && pointsRemaining > 0;
   const showMarginLine = showRemaining || showDiff;
   const breakBalls = (

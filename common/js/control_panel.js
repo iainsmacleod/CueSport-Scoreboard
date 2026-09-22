@@ -1454,8 +1454,9 @@ function updateRackFoulDisplay() {
             : getSnookerPointsRemainingOnTable())
         : 0;
     const marginDiff = scoreMargin ? scoreMargin.diff : 0;
-    // Hide Remaining while tied (esp. 0–0 full-table 147); only useful with a lead/deficit.
-    const showDiff = snookerLive && marginDiff !== 0;
+    // Hide Remaining/Diff only before any frame points are scored (0–0), not when tied mid-frame.
+    const showMargin = !!(scoreMargin && scoreMargin.showMargin);
+    const showDiff = snookerLive && showMargin;
     const showRemaining = showDiff && pointsRemaining > 0;
     const showMarginLine = showRemaining || showDiff;
     if (statsRow) {
@@ -2838,6 +2839,17 @@ function getNextSnookerClearanceColor() {
     return null;
 }
 
+/**
+ * WPBSA: Free Ball nominates a ball other than the ball on.
+ * When Black is the only object ball remaining, Free Ball cannot apply.
+ */
+function isOnlySnookerBlackRemaining() {
+    if (getSnookerRemainingReds() > 0) {
+        return false;
+    }
+    return getNextSnookerClearanceColor() === 7;
+}
+
 /** Points for the lowest ball still on the table (free ball scores this value). */
 function getSnookerLowestBallPoints() {
     if (!isSnookerBallMode()) {
@@ -3015,7 +3027,9 @@ function updateSnookerBallAvailability() {
 
     setSnookerBallDisabled(1, expectColor || redsDone);
     // Free Ball only after a foul and then an Active Player change (incoming visit).
-    const freeBallOk = isSnookerFreeBallOffered() && !expectColor && !allColorsCleared;
+    // Not available when only Black remains (cannot nominate a ball other than the ball on).
+    const freeBallOk = isSnookerFreeBallOffered() && !expectColor && !allColorsCleared
+        && !isOnlySnookerBlackRemaining();
     setSnookerBallDisabled(10, !freeBallOk);
 
     if (clearance) {
@@ -3790,7 +3804,8 @@ async function handleSnookerBallClick(element) {
 
     if (isFreeball) {
         // Free Ball: only after a foul and an Active Player change (incoming visit).
-        if (!isSnookerFreeBallOffered() || expectColor || areSnookerColorsAllCleared()) {
+        if (!isSnookerFreeBallOffered() || expectColor || areSnookerColorsAllCleared()
+            || isOnlySnookerBlackRemaining()) {
             return;
         }
         const undoSnap = captureSnookerUndoSnapshot();

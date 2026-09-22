@@ -489,7 +489,8 @@
                 return {
                     diff: Number(margin.diff) || 0,
                     remaining: Number(margin.remaining) || 0,
-                    display: margin.display != null ? String(margin.display) : '0'
+                    display: margin.display != null ? String(margin.display) : '0',
+                    showMargin: !!margin.showMargin,
                 };
             })(),
             snookerBreakBalls: snooker && typeof window.getSnookerBreakBallsForPublish === 'function'

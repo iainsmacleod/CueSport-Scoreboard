@@ -129,6 +129,15 @@ function getNextSnookerClearanceColor(state) {
   return null;
 }
 
+/**
+ * WPBSA: Free Ball nominates a ball other than the ball on.
+ * When Black is the only object ball remaining, Free Ball cannot apply.
+ */
+function isOnlySnookerBlackRemaining(state) {
+  if ((Number(state._snookerRedsPotted) || 0) < 15) return false;
+  return getNextSnookerClearanceColor(state) === 7;
+}
+
 function clearSnookerBreakTracking(state) {
   state._snookerBreak = 0;
   state._snookerBreakBallCounts = {};
@@ -184,18 +193,19 @@ function getSnookerPointsRemainingOnTable(state) {
 /** Active-player score margin vs opponent (dock getSnookerScoreMargin publish subset). */
 function getSnookerScoreMargin(state) {
   if (state.gameType !== 'game8') {
-    return { diff: 0, remaining: 0, display: '0' };
+    return { diff: 0, remaining: 0, display: '0', showMargin: false };
   }
   const slot = state.activePlayer === '2' ? '2' : '1';
   const other = slot === '2' ? '1' : '2';
   const mine = Number(slot === '2' ? state.p2Balls : state.p1Balls) || 0;
   const theirs = Number(other === '2' ? state.p2Balls : state.p1Balls) || 0;
+  const showMargin = mine !== 0 || theirs !== 0;
   const diff = mine - theirs;
   const remaining = getSnookerPointsRemainingOnTable(state);
   let display = '0';
   if (diff > 0) display = `+${diff}`;
   else if (diff < 0) display = String(diff);
-  return { diff, remaining, display };
+  return { diff, remaining, display, showMargin };
 }
 
 function getSnookerBreakBallsForPublish(state) {
@@ -981,8 +991,10 @@ function buildBallGrid(state) {
       freeball: false,
     });
     // Free Ball only after a foul and then an Active Player change (dock parity).
+    // Not available when only Black remains (cannot nominate a ball other than the ball on).
     const freeOffered = !!state._snookerFreeBallOffered;
-    const freeBallOk = !locked && freeOffered && !expectColor && !allColorsCleared;
+    const freeBallOk = !locked && freeOffered && !expectColor && !allColorsCleared
+      && !isOnlySnookerBlackRemaining(state);
     balls.push({
       id: 'ball 10', file: ballFile(10, 'snooker'), title: 'Free Ball',
       hidden: false, faded: false, disabled: !freeBallOk,
@@ -1733,7 +1745,8 @@ export function applyImpromptuCommand(stateIn, action, payload = {}) {
 
         if (isFreeball) {
           if (!state._snookerFreeBallOffered || expectColor
-            || SNOOKER_CLEARANCE_ORDER.every((n) => isSnookerColorCleared(state, n))) {
+            || SNOOKER_CLEARANCE_ORDER.every((n) => isSnookerColorCleared(state, n))
+            || isOnlySnookerBlackRemaining(state)) {
             publish = false;
             break;
           }

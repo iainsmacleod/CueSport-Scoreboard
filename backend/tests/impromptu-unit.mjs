@@ -181,6 +181,59 @@ try {
     JSON.stringify(afterFree.state.snookerBreakBalls),
   );
 
+  // WPBSA: Free Ball cannot apply when Black is the only object ball remaining.
+  let onlyBlack = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game8', ballSelection: 'snooker',
+    rackBreakerSlot: '1', activePlayer: '1',
+    _snookerRedsPotted: 15,
+    _snookerPhase: 'red',
+    _snookerCleared: {
+      'ball 2': true, 'ball 3': true, 'ball 4': true,
+      'ball 5': true, 'ball 6': true,
+    },
+  });
+  onlyBlack = applyImpromptuCommand(onlyBlack, 'snooker_foul', { foulKey: 'black' })._private;
+  assert('foul still switches when only black left', onlyBlack.activePlayer === '2');
+  const freeOnBlack = (onlyBlack.ballGrid?.balls || []).find((b) => b.id === 'ball 10');
+  assert(
+    'free ball disabled when only black remains',
+    freeOnBlack && freeOnBlack.disabled === true,
+    `disabled=${freeOnBlack?.disabled}`,
+  );
+  const rejectFreeOnBlack = applyImpromptuCommand(onlyBlack, 'snooker_ball', { ballId: 'ball 10' });
+  assert(
+    'free ball pot rejected when only black remains',
+    rejectFreeOnBlack.publish === false
+      || rejectFreeOnBlack.state.p2Balls === onlyBlack.p2Balls,
+    `p2=${rejectFreeOnBlack.state.p2Balls}`,
+  );
+
+  // Remaining/Diff row: hide only at 0–0; show with Diff 0 when tied after scoring.
+  let tied = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game8', ballSelection: 'snooker',
+  });
+  assert(
+    'margin hidden at 0-0',
+    tied.snookerScoreMargin?.showMargin === false,
+    JSON.stringify(tied.snookerScoreMargin),
+  );
+  tied = applyImpromptuCommand(tied, 'select_breaker', { slot: '1' })._private;
+  tied = applyImpromptuCommand(tied, 'snooker_ball', { ballId: 'ball 1' })._private;
+  tied = applyImpromptuCommand(tied, 'toggle_active_player', { isP1: false })._private;
+  tied = applyImpromptuCommand(tied, 'snooker_foul', { foulKey: 'black' })._private;
+  // After foul black (+7 to P1), P1 leads; force a tie for margin UI.
+  tied.p1Balls = 7;
+  tied.p2Balls = 7;
+  tied = applyImpromptuCommand(tied, 'toggle_active_player', { isP1: true })._private;
+  assert(
+    'margin shown when tied mid-frame',
+    tied.snookerScoreMargin?.showMargin === true
+      && tied.snookerScoreMargin?.diff === 0
+      && tied.snookerScoreMargin?.display === '0'
+      && tied.snookerScoreMargin?.remaining > 0,
+    JSON.stringify(tied.snookerScoreMargin),
+  );
+
   // Undo restores snooker phase.
   const undone = applyImpromptuCommand(afterBlack._private, 'undo', {});
   assert('undo restores color phase', undone.state.snookerPhase === 'color' && undone.state.p1Balls === 1);
