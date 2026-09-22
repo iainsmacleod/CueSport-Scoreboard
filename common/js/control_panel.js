@@ -2860,9 +2860,25 @@ function getSnookerLowestBallPoints() {
     }
     const nextColor = getNextSnookerClearanceColor();
     if (nextColor && SNOOKER_BALL_META[nextColor]) {
-        return SNOOKER_BALL_META[nextColor].points || 1;
+        return (SNOOKER_BALL_META[nextColor].points) || 1;
     }
     return 1;
+}
+
+/**
+ * WPBSA foul value for a selected foul key.
+ * Cue-ball (white) fouls use the value of the ball on (min 4).
+ * Object-ball fouls use that ball's value (min 4 for yellow–brown).
+ */
+function getSnookerFoulPointsForKey(foulKey) {
+    const key = String(foulKey || "").trim().toLowerCase();
+    if (!key) {
+        return 0;
+    }
+    if (key === "white") {
+        return Math.max(4, getSnookerLowestBallPoints());
+    }
+    return SNOOKER_FOUL_POINTS[key] || 0;
 }
 
 function refreshSnookerFreeBallLabel() {
@@ -3011,7 +3027,7 @@ function updateSnookerBallAvailability() {
         for (let i = 1; i <= 11; i++) {
             setSnookerBallDisabled(i, true);
         }
-        updateSnookerGoldVisibility();
+        updateSnookerFoulTargetVisibility();
         updateScoringUndoButton();
         return;
     }
@@ -3071,7 +3087,7 @@ function updateSnookerBallAvailability() {
     // Foul ball is unavailable once the frame has no colors left to foul on.
     setSnookerBallDisabled(11, allColorsCleared);
     refreshSnookerFreeBallLabel();
-    updateSnookerGoldVisibility();
+    updateSnookerFoulTargetVisibility();
     updateScoringUndoButton();
 }
 
@@ -3200,6 +3216,16 @@ function updateSnookerUiVisibility() {
     }
 }
 
+const SNOOKER_FOUL_KEY_TO_NUM = {
+    yellow: 2,
+    green: 3,
+    brown: 4,
+    blue: 5,
+    pink: 6,
+    black: 7,
+    gold: 8
+};
+
 function updateSnookerGoldVisibility() {
     const optionOn = isSnookerGoldEnabled();
     const ball8 = document.getElementById("ball 8");
@@ -3225,6 +3251,45 @@ function updateSnookerGoldVisibility() {
         const foulGoldAvailable = optionOn && !isSnookerGoldenBallFouled() && !isSnookerColorCleared(8);
         foulGold.classList[foulGoldAvailable ? "remove" : "add"]("noShow");
     }
+}
+
+/**
+ * Foul picker: cue ball + object balls still on the table.
+ * Cleared colors (final clearance) are hidden so they cannot be selected.
+ */
+function updateSnookerFoulTargetVisibility() {
+    updateSnookerGoldVisibility();
+    const container = document.getElementById("snookerFoulTargets");
+    if (!container) {
+        return;
+    }
+    if (!isSnookerBallMode()) {
+        container.querySelectorAll("[data-foul]").forEach(function (el) {
+            const key = el.getAttribute("data-foul");
+            if (key === "gold") {
+                el.classList.add("noShow");
+            } else {
+                el.classList.remove("noShow");
+            }
+        });
+        return;
+    }
+    container.querySelectorAll("[data-foul]").forEach(function (el) {
+        const key = el.getAttribute("data-foul");
+        if (!key || key === "white") {
+            el.classList.remove("noShow");
+            return;
+        }
+        if (key === "gold") {
+            // Handled by updateSnookerGoldVisibility above.
+            return;
+        }
+        const n = SNOOKER_FOUL_KEY_TO_NUM[key];
+        if (n == null) {
+            return;
+        }
+        el.classList[isSnookerColorCleared(n) ? "add" : "remove"]("noShow");
+    });
 }
 
 function snookerGoldToggle() {
@@ -3589,7 +3654,7 @@ function openSnookerFoulPicker() {
     if (!modal) {
         return;
     }
-    updateSnookerGoldVisibility();
+    updateSnookerFoulTargetVisibility();
     clearSnookerFoulHoverLabel();
     modal.style.display = "block";
 }
@@ -3614,7 +3679,7 @@ function updateSnookerFoulHoverLabel(element) {
         return;
     }
     const foulKey = element.getAttribute("data-foul");
-    const points = SNOOKER_FOUL_POINTS[foulKey];
+    const points = getSnookerFoulPointsForKey(foulKey);
     if (!points) {
         label.textContent = "";
         return;
@@ -3639,11 +3704,16 @@ function applySnookerFoulByKey(foulKey) {
     }
     cancelSnookerFoul();
     if (foulKey === "gold") {
-        if (!isSnookerGoldEnabled() || isSnookerGoldenBallFouled()) {
+        if (!isSnookerGoldEnabled() || isSnookerGoldenBallFouled() || isSnookerColorCleared(8)) {
+            return false;
+        }
+    } else if (foulKey !== "white") {
+        const foulNum = SNOOKER_FOUL_KEY_TO_NUM[foulKey];
+        if (foulNum != null && isSnookerColorCleared(foulNum)) {
             return false;
         }
     }
-    const points = SNOOKER_FOUL_POINTS[foulKey];
+    const points = getSnookerFoulPointsForKey(foulKey);
     if (!points) {
         return false;
     }
@@ -3715,6 +3785,7 @@ function selectSnookerFoul(element) {
 }
 
 window.applySnookerFoulByKey = applySnookerFoulByKey;
+window.getSnookerFoulPointsForKey = getSnookerFoulPointsForKey;
 
 async function handleSnookerBallClick(element) {
     if (!element || !element.id || isGameScoringLocked()) {
@@ -6711,8 +6782,9 @@ function togglePlayer(isChecked, options) {
             keepUndoStack: true
         });
         // Free Ball is only offered to the incoming player after a foul + player change.
+        // Not when Black is the only object ball left (cannot nominate another ball).
         if (foulAwaiting) {
-            setSnookerFreeBallOffered(true);
+            setSnookerFreeBallOffered(!isOnlySnookerBlackRemaining());
             updateSnookerBallAvailability();
         }
         updateScoringUndoButton();

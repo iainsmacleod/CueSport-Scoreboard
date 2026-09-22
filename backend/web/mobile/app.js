@@ -26,7 +26,7 @@ import {
   applyImpromptuCommand,
   hydrateAuthorityState,
   createDefaultImpromptuState,
-} from '../shared/impromptu-authority.js?v=8.3.0.12';
+} from '../shared/impromptu-authority.js?v=8.3.0.16';
 
 let client = null;
 let roomId = '';
@@ -1627,9 +1627,10 @@ function updateMobileRackFoulDisplay(state) {
 }
 
 function isSnookerGameState(state, snapshot) {
-  return !!(snapshot && snapshot.snooker) ||
-    state.gameType === 'game8' ||
-    state.ballSelection === 'snooker';
+  // Custom (game7) may use snooker balls; ignore stale ballSelection on 8/9/10/etc.
+  return !!(snapshot && snapshot.snooker)
+    || state.gameType === 'game8'
+    || (state.gameType === 'game7' && state.ballSelection === 'snooker');
 }
 
 /** Bank / One Pocket — same rule as dock isPoolRespotGame(). */
@@ -1656,14 +1657,14 @@ function appendActionBallsForGame(grid, state, snapshot, { locked, awaiting, can
   const snooker = isSnookerGameState(state, snapshot);
   if (snooker) {
     const b10 = findSnapshotBall(snapshot, 'ball 10');
-    const freeOffered = state.snookerFreeBallOffered === true;
-    // When offered, keep tappable even if dock disable flag raced the publish.
-    const freeDisabled = locked || (!freeOffered && (b10 ? !!b10.disabled : true));
+    // Prefer authority/dock disabled flag (covers only-black WPBSA block). Do not force-enable
+    // just because snookerFreeBallOffered is true — that flag can race ahead of availability.
+    const freeDisabled = locked || (b10 ? !!b10.disabled : true);
     appendBallButton(grid, {
       src: resolveBallImageSrc(state, 'ball 10', (b10 && b10.file) || 'snooker-freeball-small.png'),
       title: (b10 && b10.title) || 'Free Ball',
       faded: false,
-      disabled: freeOffered && !locked ? false : freeDisabled,
+      disabled: freeDisabled,
       awaiting,
       clicked: !!(b10 && b10.clicked),
       extraClass: 'freeball-btn',
@@ -1764,7 +1765,11 @@ function renderBallGrid(state) {
     } else if (locked) {
       hint.textContent = 'Scoring locked';
       hint.classList.remove('hidden');
-    } else if (state.snookerFreeBallOffered && snooker) {
+    } else if (
+      snooker
+      && state.snookerFreeBallOffered
+      && !(findSnapshotBall(snapshot, 'ball 10')?.disabled)
+    ) {
       hint.textContent = 'Free ball available';
       hint.classList.remove('hidden');
     } else if (!useSnapshot && snooker) {
@@ -1858,13 +1863,13 @@ function openSnookerFoulPicker() {
     ? snapshot.snookerFoulTargets
     : defaultSnookerFoulTargets();
   // Prefer dock/impromptu targets that match known foul keys; fall back if keys are stale (e.g. ball_N).
-  const usable = fromDock.filter((t) => t && SNOOKER_FOUL_POINTS[t.key]);
+  const usable = fromDock.filter((t) => t && (t.points || SNOOKER_FOUL_POINTS[t.key]));
   const targets = usable.length ? usable : defaultSnookerFoulTargets();
 
   container.innerHTML = '';
   targets.forEach((target) => {
     const key = target.key;
-    const points = SNOOKER_FOUL_POINTS[key];
+    const points = Number(target.points) || SNOOKER_FOUL_POINTS[key];
     if (!points) return;
     const file = target.file || SNOOKER_FOUL_IMAGES[key];
     const btn = document.createElement('button');

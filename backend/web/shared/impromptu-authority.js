@@ -44,14 +44,71 @@ const SNOOKER_FOUL_TARGET_DEFS = [
   { key: 'gold', file: 'snooker-gold-small.png', alt: 'Gold' },
 ];
 
-function buildSnookerFoulTargets(state) {
-  return SNOOKER_FOUL_TARGET_DEFS
-    .filter((t) => t.key !== 'gold' || state.snookerGoldEnabled === true)
-    .map((t) => ({ key: t.key, file: t.file, alt: t.alt }));
+/** Foul picker color keys → snooker ball numbers (white has no ball id). */
+const SNOOKER_FOUL_KEY_TO_NUM = {
+  yellow: 2,
+  green: 3,
+  brown: 4,
+  blue: 5,
+  pink: 6,
+  black: 7,
+  gold: 8,
+};
+
+/**
+ * Foul options are cue ball + object balls still on the table.
+ * Cleared colors (final clearance, not re-spotted) are omitted.
+ */
+function isSnookerFoulTargetAvailable(state, foulKey) {
+  const key = String(foulKey || '').trim().toLowerCase();
+  if (!key || key === 'white') return true;
+  if (key === 'gold') {
+    return state.snookerGoldEnabled === true
+      && !state._snookerGoldenBallFouled
+      && !isSnookerColorCleared(state, 8);
+  }
+  const n = SNOOKER_FOUL_KEY_TO_NUM[key];
+  if (n == null) return false;
+  return !isSnookerColorCleared(state, n);
 }
 
-function resolveSnookerFoulPoints(foulKey) {
+function buildSnookerFoulTargets(state) {
+  ensureSnookerFrameState(state);
+  return SNOOKER_FOUL_TARGET_DEFS
+    .filter((t) => isSnookerFoulTargetAvailable(state, t.key))
+    .map((t) => ({
+      key: t.key,
+      file: t.file,
+      alt: t.alt,
+      points: resolveSnookerFoulPoints(state, t.key),
+    }));
+}
+
+/** Offer Free Ball after a foul only when a ball other than the ball on exists. */
+function shouldOfferSnookerFreeBall(state) {
+  return !isOnlySnookerBlackRemaining(state);
+}
+
+/** Points for the ball on / lowest object ball still available (free-ball value). */
+function getSnookerLowestBallPoints(state) {
+  ensureSnookerFrameState(state);
+  if ((Number(state._snookerRedsPotted) || 0) < 15) {
+    return SNOOKER_POINTS['ball 1'] || 1;
+  }
+  const next = getNextSnookerClearanceColor(state);
+  return next ? (SNOOKER_POINTS[`ball ${next}`] || 1) : 1;
+}
+
+/**
+ * WPBSA foul value: cue-ball fouls use the ball on (min 4);
+ * object-ball fouls use that ball's table value (min 4 for yellow–brown).
+ */
+function resolveSnookerFoulPoints(state, foulKey) {
   const key = String(foulKey || '').trim().toLowerCase();
+  if (!key) return 4;
+  if (key === 'white') {
+    return Math.max(4, getSnookerLowestBallPoints(state));
+  }
   if (SNOOKER_FOUL_BY_KEY[key] != null) return SNOOKER_FOUL_BY_KEY[key];
   // Legacy ball_N / ball N keys from early impromptu publishes.
   const n = parseInt(key.replace(/\D/g, ''), 10);
@@ -227,6 +284,24 @@ function resetSnookerFrame(state) {
   state._snookerFreeBallOffered = false;
   state._snookerFoulAwaitingPlayerChange = false;
   state._snookerGoldenBallFouled = false;
+}
+
+/**
+ * Dock parity (togglePlayer → resetSnookerSequenceState): any Active Player change
+ * ends the visit and returns the incoming player to ball-on red (or clearance yellow).
+ * Free Ball is re-offered only when the switch follows a foul.
+ */
+function endSnookerVisitOnPlayerChange(state, foulAwaiting) {
+  ensureSnookerFrameState(state);
+  foldSnookerBreakIntoFrameHigh(state);
+  clearSnookerBreakTracking(state);
+  state._snookerPhase = 'red';
+  state._snookerFoulAwaitingPlayerChange = false;
+  if (foulAwaiting) {
+    state._snookerFreeBallOffered = shouldOfferSnookerFreeBall(state);
+  } else {
+    state._snookerFreeBallOffered = false;
+  }
 }
 
 function isSnookerGoldenBallAvailable(state) {
@@ -912,7 +987,11 @@ function hasRackBreakerSlot(state) {
 function buildBallGrid(state) {
   const gt = state.gameType || 'game1';
   const snooker = gt === 'game8';
-  const style = snooker ? 'snooker' : (state.ballSelection || 'american');
+  // Ignore stale ballSelection=snooker left over on pool games (dock parity).
+  const rawStyle = state.ballSelection || 'american';
+  const style = snooker
+    ? 'snooker'
+    : (rawStyle === 'snooker' && gt !== 'game7' ? 'american' : rawStyle);
   const balls = [];
   const faded = state._potted || {};
   const count = snooker ? 7 : (POOL_BALL_COUNTS[gt] || 15);
@@ -1564,16 +1643,8 @@ export function applyImpromptuCommand(stateIn, action, payload = {}) {
           noteRackVisitTransition(state, prev, slot);
         }
         if (state.gameType === 'game8' && prev !== slot) {
-          ensureSnookerFrameState(state);
-          foldSnookerBreakIntoFrameHigh(state);
-          clearSnookerBreakTracking(state);
-          if (state._snookerFoulAwaitingPlayerChange) {
-            state._snookerFoulAwaitingPlayerChange = false;
-            state._snookerFreeBallOffered = true;
-            state._snookerPhase = 'red';
-          } else {
-            state._snookerFreeBallOffered = false;
-          }
+          const foulAwaiting = !!state._snookerFoulAwaitingPlayerChange;
+          endSnookerVisitOnPlayerChange(state, foulAwaiting);
         }
       }
       bumpActivity();
@@ -1590,16 +1661,8 @@ export function applyImpromptuCommand(stateIn, action, payload = {}) {
       state.activePlayer = target;
       noteRackVisitTransition(state, prev, target);
       if (state.gameType === 'game8') {
-        ensureSnookerFrameState(state);
-        foldSnookerBreakIntoFrameHigh(state);
-        clearSnookerBreakTracking(state);
-        if (state._snookerFoulAwaitingPlayerChange) {
-          state._snookerFoulAwaitingPlayerChange = false;
-          state._snookerFreeBallOffered = true;
-          state._snookerPhase = 'red';
-        } else {
-          state._snookerFreeBallOffered = false;
-        }
+        const foulAwaiting = !!state._snookerFoulAwaitingPlayerChange;
+        endSnookerVisitOnPlayerChange(state, foulAwaiting);
       }
       bumpActivity();
       break;
@@ -1631,7 +1694,16 @@ export function applyImpromptuCommand(stateIn, action, payload = {}) {
       resetSnookerFrame(state);
       clearMatchStats(state);
       state.rackBreakerSlot = '';
-      if (state.gameType === 'game8') state.ballSelection = 'snooker';
+      // Dock applyGameTypeChange: Snooker forces snooker balls; leaving Snooker
+      // (or 9/10-Ball) drops a stale snooker ballSelection so pool art is correct.
+      if (state.gameType === 'game8') {
+        state.ballSelection = 'snooker';
+        state.playerBallSet = 'p1Open';
+      } else if (state.gameType === 'game2' || state.gameType === 'game3') {
+        state.ballSelection = 'american';
+      } else if (state.ballSelection === 'snooker') {
+        state.ballSelection = 'american';
+      }
       break;
     }
     case 'set_early_game_ball':
@@ -1913,9 +1985,14 @@ export function applyImpromptuCommand(stateIn, action, payload = {}) {
       break;
     }
     case 'snooker_foul': {
+      ensureSnookerFrameState(state);
+      const key = String(payload.foulKey || '').trim().toLowerCase();
+      if (!key || !isSnookerFoulTargetAvailable(state, key)) {
+        publish = false;
+        break;
+      }
       pushUndo(state);
-      const key = String(payload.foulKey || '');
-      const pts = resolveSnookerFoulPoints(key);
+      const pts = resolveSnookerFoulPoints(state, key);
       const fouler = state.activePlayer === '2' ? '2' : '1';
       const opponent = fouler === '2' ? '1' : '2';
       if (opponent === '2') state.p2Balls = clampScore((Number(state.p2Balls) || 0) + pts);
@@ -1923,7 +2000,6 @@ export function applyImpromptuCommand(stateIn, action, payload = {}) {
       if (fouler === '2') state.foulsP2 = (Number(state.foulsP2) || 0) + 1;
       else state.foulsP1 = (Number(state.foulsP1) || 0) + 1;
       noteMatchFoul(state, fouler, 1);
-      ensureSnookerFrameState(state);
       foldSnookerBreakIntoFrameHigh(state);
       clearSnookerBreakTracking(state);
       state._snookerPhase = 'red';
@@ -1931,7 +2007,7 @@ export function applyImpromptuCommand(stateIn, action, payload = {}) {
       noteRackVisitTransition(state, fouler, opponent);
       state.activePlayer = opponent;
       state._snookerFoulAwaitingPlayerChange = false;
-      state._snookerFreeBallOffered = true;
+      state._snookerFreeBallOffered = shouldOfferSnookerFreeBall(state);
       if (key === 'gold') {
         state._snookerGoldenBallFouled = true;
         markSnookerColorCleared(state, 8);

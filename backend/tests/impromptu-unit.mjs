@@ -83,6 +83,28 @@ try {
       && !afterRack.state.rackBreakerSlot,
   );
 
+  // Leaving Snooker must drop snooker ball art (dock applyGameTypeChange parity).
+  let snookerToEight = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game8', ballSelection: 'snooker',
+  });
+  snookerToEight = applyImpromptuCommand(snookerToEight, 'set_game_type', { gameType: 'game1' })._private;
+  assert(
+    'snooker→8-ball clears snooker ballSelection',
+    snookerToEight.gameType === 'game1' && snookerToEight.ballSelection === 'american',
+    `gt=${snookerToEight.gameType} sel=${snookerToEight.ballSelection}`,
+  );
+  const eightBall1 = (snookerToEight.ballGrid?.balls || []).find((b) => b.id === 'ball 1');
+  const eightBall10 = (snookerToEight.ballGrid?.balls || []).find((b) => b.id === 'ball 10');
+  assert(
+    'snooker→8-ball shows pool ball art',
+    eightBall1 && eightBall1.file === '1ball_small.png'
+      && eightBall10 && eightBall10.file === '10ball_small.png'
+      && !(snookerToEight.ballGrid?.balls || []).some((b) => b.freeball || b.file?.includes('snooker-')),
+    `file1=${eightBall1?.file} file10=${eightBall10?.file}`,
+  );
+  const eightGridCount = (snookerToEight.ballGrid?.balls || []).filter((b) => /^ball \d+$/.test(b.id)).length;
+  assert('snooker→8-ball has 15 object balls', eightGridCount === 15, `count=${eightGridCount}`);
+
   // Snooker: colors re-spot after red → color (not permanently faded).
   let snooker = createDefaultImpromptuState({
     player1Name: 'A', player2Name: 'B', gameType: 'game8', ballSelection: 'snooker',
@@ -126,6 +148,43 @@ try {
   );
   const redAgain = (afterBlack.state.ballGrid?.balls || []).find((b) => b.id === 'ball 1');
   assert('red enabled again', redAgain && !redAgain.disabled && !redAgain.faded);
+
+  // Dock parity: miss after red (player change) returns incoming player to ball-on red.
+  let miss = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game8', ballSelection: 'snooker',
+  });
+  miss = applyImpromptuCommand(miss, 'select_breaker', { slot: '1' })._private;
+  miss = applyImpromptuCommand(miss, 'snooker_ball', { ballId: 'ball 1' })._private;
+  assert('miss setup is color phase', miss.snookerPhase === 'color');
+  miss = applyImpromptuCommand(miss, 'toggle_active_player', { isP1: false })._private;
+  assert('miss/switch resets to red phase', miss.snookerPhase === 'red');
+  const missRed = (miss.ballGrid?.balls || []).find((b) => b.id === 'ball 1');
+  const missBlack = (miss.ballGrid?.balls || []).find((b) => b.id === 'ball 7');
+  assert(
+    'incoming player is on red after miss',
+    missRed && !missRed.disabled && missBlack && missBlack.disabled === true,
+    `redDisabled=${missRed?.disabled} blackDisabled=${missBlack?.disabled}`,
+  );
+  assert('miss/switch clears free ball offer', miss.snookerFreeBallOffered !== true);
+
+  // After 15th red, miss/switch must enter clearance (yellow), not free-choice colors.
+  let missClear = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game8', ballSelection: 'snooker',
+    rackBreakerSlot: '1', activePlayer: '1',
+    _snookerRedsPotted: 14,
+    _snookerPhase: 'red',
+  });
+  missClear = applyImpromptuCommand(missClear, 'snooker_ball', { ballId: 'ball 1' })._private;
+  assert('15th red sets color phase', missClear.snookerPhase === 'color' && missClear.snookerRedsPotted === 15);
+  missClear = applyImpromptuCommand(missClear, 'toggle_active_player', { isP1: false })._private;
+  assert('miss after 15th red enters clearance phase', missClear.snookerPhase === 'red');
+  const missYellow = (missClear.ballGrid?.balls || []).find((b) => b.id === 'ball 2');
+  const missGreen = (missClear.ballGrid?.balls || []).find((b) => b.id === 'ball 3');
+  assert(
+    'miss after 15th red enables yellow only',
+    missYellow && !missYellow.disabled && missGreen && missGreen.disabled === true,
+    `yellowDisabled=${missYellow?.disabled} greenDisabled=${missGreen?.disabled}`,
+  );
 
   // Clearance: after 15 reds + color, yellow stays down.
   let clear = afterBlack._private;
@@ -194,6 +253,11 @@ try {
   });
   onlyBlack = applyImpromptuCommand(onlyBlack, 'snooker_foul', { foulKey: 'black' })._private;
   assert('foul still switches when only black left', onlyBlack.activePlayer === '2');
+  assert(
+    'free ball not offered when only black remains',
+    onlyBlack.snookerFreeBallOffered !== true,
+    `offered=${onlyBlack.snookerFreeBallOffered}`,
+  );
   const freeOnBlack = (onlyBlack.ballGrid?.balls || []).find((b) => b.id === 'ball 10');
   assert(
     'free ball disabled when only black remains',
@@ -207,6 +271,66 @@ try {
       || rejectFreeOnBlack.state.p2Balls === onlyBlack.p2Balls,
     `p2=${rejectFreeOnBlack.state.p2Balls}`,
   );
+
+  // Foul picker: cleared colors (not re-spotted) are not foul options.
+  let foulClear = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game8', ballSelection: 'snooker',
+    rackBreakerSlot: '1', activePlayer: '1',
+    _snookerRedsPotted: 15,
+    _snookerPhase: 'red',
+    _snookerCleared: { 'ball 2': true, 'ball 3': true },
+  });
+  const clearanceFoulKeys = (foulClear.ballGrid?.snookerFoulTargets || []).map((t) => t.key);
+  assert(
+    'foul picker omits cleared yellow/green',
+    clearanceFoulKeys.includes('white')
+      && clearanceFoulKeys.includes('brown')
+      && clearanceFoulKeys.includes('black')
+      && !clearanceFoulKeys.includes('yellow')
+      && !clearanceFoulKeys.includes('green'),
+    JSON.stringify(clearanceFoulKeys),
+  );
+  const rejectClearedFoul = applyImpromptuCommand(foulClear, 'snooker_foul', { foulKey: 'yellow' });
+  assert(
+    'cleared yellow foul rejected',
+    rejectClearedFoul.publish === false && rejectClearedFoul.state.p2Balls === 0,
+  );
+
+  // White foul = value of the ball on (min 4): blue/pink/black → 5; only black → 7.
+  let whiteBlue = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game8', ballSelection: 'snooker',
+    rackBreakerSlot: '1', activePlayer: '1',
+    _snookerRedsPotted: 15,
+    _snookerPhase: 'red',
+    _snookerCleared: { 'ball 2': true, 'ball 3': true, 'ball 4': true },
+  });
+  const whiteBlueTarget = (whiteBlue.ballGrid?.snookerFoulTargets || []).find((t) => t.key === 'white');
+  assert(
+    'white foul shows 5 when blue is on',
+    whiteBlueTarget && whiteBlueTarget.points === 5,
+    JSON.stringify(whiteBlueTarget),
+  );
+  const whiteBlueFoul = applyImpromptuCommand(whiteBlue, 'snooker_foul', { foulKey: 'white' });
+  assert('white foul awards 5 when blue on', whiteBlueFoul.state.p2Balls === 5);
+
+  let whiteBlack = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game8', ballSelection: 'snooker',
+    rackBreakerSlot: '1', activePlayer: '1',
+    _snookerRedsPotted: 15,
+    _snookerPhase: 'red',
+    _snookerCleared: {
+      'ball 2': true, 'ball 3': true, 'ball 4': true,
+      'ball 5': true, 'ball 6': true,
+    },
+  });
+  const whiteBlackTarget = (whiteBlack.ballGrid?.snookerFoulTargets || []).find((t) => t.key === 'white');
+  assert(
+    'white foul shows 7 when only black remains',
+    whiteBlackTarget && whiteBlackTarget.points === 7,
+    JSON.stringify(whiteBlackTarget),
+  );
+  const whiteBlackFoul = applyImpromptuCommand(whiteBlack, 'snooker_foul', { foulKey: 'white' });
+  assert('white foul awards 7 when only black on', whiteBlackFoul.state.p2Balls === 7);
 
   // Remaining/Diff row: hide only at 0–0; show with Diff 0 when tied after scoring.
   let tied = createDefaultImpromptuState({

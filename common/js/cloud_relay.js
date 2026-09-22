@@ -456,6 +456,9 @@
                         key: key,
                         file: imageFileName(img),
                         alt: (img && img.alt) ? img.alt : key,
+                        points: typeof window.getSnookerFoulPointsForKey === 'function'
+                            ? window.getSnookerFoulPointsForKey(key)
+                            : undefined,
                     });
                 });
             }
