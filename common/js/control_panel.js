@@ -13,6 +13,20 @@
 // Declared here (strict mode) — also assigned from control_panel_post.js after load.
 var p1namemsg;
 var p2namemsg;
+var p1ScoreValue;
+var p2ScoreValue;
+var c1value;
+var c2value;
+var playerx;
+var pColormsg;
+var racemsg;
+var gamemsg;
+var tev;
+var timerIsRunning;
+var countDownTime;
+var playerNumber;
+var msg;
+var msg2;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // functions
