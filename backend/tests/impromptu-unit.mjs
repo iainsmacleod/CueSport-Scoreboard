@@ -997,13 +997,14 @@ try {
   const toLimits = quotas.getTierLimits('tournament_organizer');
   assert('tournament organizer has maxImpromptuTables', toLimits.maxImpromptuTables === 5);
 
-  // Static UI contracts: mobile ball-set controls + B&R/TR tooltips.
+  // Static UI contracts: mobile shows badges only (no Chosen Ball UI) + B&R/TR tooltips.
   const { fileURLToPath } = await import('url');
   const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
   const mobileHtml = fs.readFileSync(path.join(repoRoot, 'backend', 'web', 'mobile', 'index.html'), 'utf8');
-  assert('mobile has ball set panel', mobileHtml.includes('id="ballSetPanel"'));
-  assert('mobile has Ball Set setup toggle', mobileHtml.includes('id="useBallSetCheckbox"'));
-  assert('mobile has Chosen Ball buttons', mobileHtml.includes('data-cmd="set_player_ball_set"'));
+  assert('mobile has slot ball badge imgs', mobileHtml.includes('id="playerSlotP1Ball"') && mobileHtml.includes('id="playerSlotP2Ball"'));
+  assert('mobile has no Chosen Ball panel', !mobileHtml.includes('id="ballSetPanel"'));
+  assert('mobile has no Ball Set setup toggle', !mobileHtml.includes('id="useBallSetCheckbox"'));
+  assert('mobile has no Chosen Ball buttons', !mobileHtml.includes('data-cmd="set_player_ball_set"'));
   const playerStatsSrc = fs.readFileSync(path.join(repoRoot, 'common', 'js', 'player_stats.js'), 'utf8');
   assert('dock stats B&R tooltip', /title="Break\\'n\\'Run"/.test(playerStatsSrc));
   assert('dock stats TR tooltip', playerStatsSrc.includes('title="Table Run"'));

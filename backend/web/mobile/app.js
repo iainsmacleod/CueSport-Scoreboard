@@ -1168,8 +1168,6 @@ function applyState(state) {
       slotP2.disabled = active === '2';
     }
   }
-  syncBallSetPanel(state);
-
   // Form fields — always sync from dock (including empty), unless the user has unsaved edits
   if (state.player1Name != null) document.getElementById('p1Name').value = state.player1Name;
   if (state.player2Name != null) document.getElementById('p2Name').value = state.player2Name;
@@ -1410,32 +1408,6 @@ function isEightBallBallSetGame(state) {
   if (gt === 'game1') return true;
   if (gt === 'game7' && state.ballSelection !== 'snooker') return true;
   return false;
-}
-
-function syncBallSetPanel(state) {
-  const panel = document.getElementById('ballSetPanel');
-  if (!panel) return;
-  const show = isEightBallBallSetGame(state) && state.useBallSet === true;
-  panel.classList.toggle('hidden', !show);
-  if (!show) return;
-
-  const style = state.ballSelection || 'american';
-  const labels = ballSetGroupLabels(style);
-  const lowBtn = document.getElementById('ballSetLowBtn');
-  const highBtn = document.getElementById('ballSetHighBtn');
-  const openBtn = document.getElementById('ballSetOpenBtn');
-  if (lowBtn) lowBtn.textContent = labels.low;
-  if (highBtn) highBtn.textContent = labels.high;
-
-  const set = state.playerBallSet || 'p1Open';
-  const locked = !!(state.gameScoringLocked || state.awaitingBreaker);
-  [lowBtn, highBtn, openBtn].forEach((btn) => {
-    if (!btn) return;
-    const value = btn.getAttribute('data-value');
-    btn.classList.toggle('selected', value === set);
-    btn.setAttribute('aria-pressed', value === set ? 'true' : 'false');
-    btn.disabled = locked || !controlsEnabled();
-  });
 }
 
 function syncPlayerSlotBallBadges(state, slotP1, slotP2) {
@@ -2556,7 +2528,6 @@ function sendCmd(action, payload) {
     if (action === 'set_snooker_gold') clearPendingSetup('snookerGold');
     if (action === 'set_point_based') clearPendingSetup('pointBased');
     if (action === 'set_ball_selection') clearPendingSetup('ballSelection');
-    if (action === 'set_use_ball_set') clearPendingSetup('useBallSet');
     return false;
   }
   if (connectionIsReconnecting()) {
@@ -2901,10 +2872,6 @@ function syncSetupVariantOptions(state) {
       : 'Early Game Ball/Win on Break';
   }
 
-  const showBallSet = gameType === 'game1'
-    || (gameType === 'game7' && (state?.ballSelection || document.getElementById('ballSelectionSelect')?.value) !== 'snooker');
-  showSetupRow('setupBallSetRow', showBallSet);
-
   showSetupRow('setupSnookerGoldRow', gameType === 'game8');
   showSetupRow('setupPointBasedRow', gameType === 'game7');
 
@@ -2925,9 +2892,6 @@ function syncSetupFieldsFromState(state) {
   if (!state) return;
   if (typeof state.earlyGameBallEnabled === 'boolean') {
     syncCheckboxFromState('earlyGameBallCheckbox', 'earlyGameBall', state.earlyGameBallEnabled);
-  }
-  if (typeof state.useBallSet === 'boolean') {
-    syncCheckboxFromState('useBallSetCheckbox', 'useBallSet', state.useBallSet);
   }
   if (typeof state.snookerGoldEnabled === 'boolean') {
     syncCheckboxFromState('snookerGoldCheckbox', 'snookerGold', state.snookerGoldEnabled);
@@ -2980,13 +2944,6 @@ function wireSetupPanel() {
   document.getElementById('earlyGameBallCheckbox')?.addEventListener('change', (e) => {
     markSetupPending('earlyGameBall', e.target.checked ? '1' : '0');
     sendCmd('set_early_game_ball', { enabled: e.target.checked });
-  });
-  document.getElementById('useBallSetCheckbox')?.addEventListener('change', (e) => {
-    markSetupPending('useBallSet', e.target.checked ? '1' : '0');
-    sendCmd('set_use_ball_set', { enabled: e.target.checked });
-    if (lastState) {
-      syncBallSetPanel({ ...lastState, useBallSet: e.target.checked });
-    }
   });
   document.getElementById('snookerGoldCheckbox')?.addEventListener('change', (e) => {
     markSetupPending('snookerGold', e.target.checked ? '1' : '0');
