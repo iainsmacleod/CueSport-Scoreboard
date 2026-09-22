@@ -16,10 +16,12 @@
 
 var cLogoName = "Player 1 Logo";  // 13 character limit. it will auto trim to 13 characters.
 var cLogoName2 = "Player 2 Logo";
-const bc = new BroadcastChannel(`main_${INSTANCE_ID}`);
-const bcr = new BroadcastChannel(`recv_${INSTANCE_ID}`); // return channel from browser_source
+// bc / bcr are created in control_panel.js (available before late-loading this file).
 
 (function wrapBroadcastChannelForCloud() {
+    if (!bc || typeof bc.postMessage !== 'function') {
+        return;
+    }
     const _post = bc.postMessage.bind(bc);
     bc.postMessage = function (data) {
         _post(data);

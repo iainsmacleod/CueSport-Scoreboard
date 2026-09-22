@@ -315,7 +315,8 @@ export function mergeRosterPlayersIntoStats(stats, rosterRows) {
     if (!id) continue;
     if (byId.has(id)) {
       const existing = byId.get(id);
-      if (row.name && (!existing.name || existing.name === id)) {
+      // Roster is canonical for display name (match end payloads can lag after renames/edits).
+      if (row.name) {
         existing.name = row.name;
       }
       existing.createdAt = row.created_at || existing.createdAt || null;

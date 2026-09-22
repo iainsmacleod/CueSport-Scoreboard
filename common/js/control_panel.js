@@ -10,6 +10,9 @@
 //  Salotto logo is the copyright of Salotto and is used with their permission.
 //  for more information about Salotto please visit https://salotto.app
 
+// Declared here (strict mode) — also assigned from control_panel_post.js after load.
+var p1namemsg;
+var p2namemsg;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // functions
@@ -17,6 +20,9 @@
 // Get instance from URL or use 'default'
 const urlParams = new URLSearchParams(window.location.search);
 const INSTANCE_ID = urlParams.get('instance') || '';
+// BroadcastChannels must exist before any control_panel API runs (post.js loads at end of body).
+var bc = new BroadcastChannel(`main_${INSTANCE_ID}`);
+var bcr = new BroadcastChannel(`recv_${INSTANCE_ID}`);
 // Create OBSWebSocket client instance
 const obs = new OBSWebSocket();
 // Track readiness (post-Identify)

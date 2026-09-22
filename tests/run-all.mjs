@@ -174,6 +174,14 @@ async function runBrowserSuite(browser, {
         (result.skipped ? `, ${result.skipped} skipped` : '') +
         (result.error ? ` — ${result.error}` : '')
     );
+    if (!result.ok && Array.isArray(result.failures) && result.failures.length) {
+      for (const f of result.failures.slice(0, 40)) {
+        console.log(`      FAIL  [${f.suite || '?'}] ${f.name}${f.detail ? ` — ${f.detail}` : ''}`);
+      }
+      if (result.failures.length > 40) {
+        console.log(`      … ${result.failures.length - 40} more`);
+      }
+    }
     return { ok: !!result.ok, result };
   } catch (err) {
     console.error(`    FAIL  ${name}: ${err.message}`);

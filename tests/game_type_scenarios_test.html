@@ -379,16 +379,20 @@
       // Prefer early/win-on-break for a reliable game-ball award.
       setEarlyGameBall(cp, true);
       // 8-Ball: any object ball down before the 8 is a loss unless a full group is cleared.
-      // Unfade scramble pots without resetBallTracker (that would clear the breaker).
+      // Unfade scramble pots without resetBallTracker (that would clear the breaker) —
+      // but if objects are already fully cleared (TR path), leave them faded for a legal 8.
       if (game.id === 'game1') {
-        const ballState = JSON.parse(cp.getStorageItem('ballState') || '{}');
-        visibleObjectBalls(cp, game.winningBall).forEach((el) => {
-          if (el.classList.contains('faded')) {
-            el.classList.remove('faded');
-            ballState[el.id] = false;
-          }
-        });
-        cp.setStorageItem('ballState', JSON.stringify(ballState));
+        const stillUp = unfadedObjectBalls(cp, game.winningBall);
+        if (stillUp.length > 0) {
+          const ballState = JSON.parse(cp.getStorageItem('ballState') || '{}');
+          visibleObjectBalls(cp, game.winningBall).forEach((el) => {
+            if (el.classList.contains('faded')) {
+              el.classList.remove('faded');
+              ballState[el.id] = false;
+            }
+          });
+          cp.setStorageItem('ballState', JSON.stringify(ballState));
+        }
       } else if (rand) {
         const extras = unfadedObjectBalls(cp, game.winningBall);
         shuffleInPlace(extras, rand);
@@ -437,14 +441,23 @@
     ensureActiveSlot(cp, winnerSlot);
     await sleep(20);
     clearUndoStack(cp);
-    await scramblePoolActions(cp, game, rand, {
-      allowFoul: false,
-      allowRespot: !!game.pocket,
-      allowUndo: false,
-      keepSlot: winnerSlot,
-      minSteps: 1,
-      maxSteps: 3,
-    });
+    if (game.id === 'game1') {
+      // 8-Ball: Win on Break is breaker-only. Non-breaker TR needs a legal 8
+      // after all object balls are down (early 8 would be loss of rack).
+      const winId = game.winningBall || 'ball 8';
+      for (const ball of unfadedObjectBalls(cp, winId)) {
+        await potBallEl(cp, ball);
+      }
+    } else {
+      await scramblePoolActions(cp, game, rand, {
+        allowFoul: false,
+        allowRespot: !!game.pocket,
+        allowUndo: false,
+        keepSlot: winnerSlot,
+        minSteps: 1,
+        maxSteps: 3,
+      });
+    }
     ensureActiveSlot(cp, winnerSlot);
     clearUndoStack(cp);
     await potWinningBall(cp, game, rand);
@@ -884,6 +897,11 @@
         total: rows.length,
         loops: loops,
         seed: seed,
+        failures: rows.filter((r) => !r.pass).map((r) => ({
+          suite: r.suite,
+          name: r.name,
+          detail: r.detail || '',
+        })),
       };
       statusEl.textContent = 'Done.';
     } catch (err) {

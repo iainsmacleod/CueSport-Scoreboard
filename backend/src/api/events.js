@@ -301,6 +301,10 @@ export async function registerEventRoutes(app) {
     const allowRunOuts = supportsBreakAndTableRun(gameType);
     const endPayload = {
       ...prevEnd,
+      player1: player1Name,
+      player2: player2Name,
+      player1Id,
+      player2Id,
       winnerSlot,
       scores,
       gameInfo,
@@ -410,7 +414,7 @@ export async function registerEventRoutes(app) {
     const events = sqlite.getAccountSessionEvents(accountId, 10000);
     let updated = 0;
     for (const ev of events) {
-      if (ev.event_type !== 'session:start') continue;
+      if (ev.event_type !== 'session:start' && ev.event_type !== 'session:end') continue;
       if (ev.account_id !== accountId) continue;
       const payload = { ...(ev.payload || {}) };
       let changed = false;

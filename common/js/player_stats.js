@@ -3115,6 +3115,25 @@
         });
         match.finalScore = { p1: p1Frames, p2: p2Frames };
 
+        // Keep the dock scoreboard in sync — Call Match Early / End Match trim racks to
+        // p1ScoreCtrlPanel / p2ScoreCtrlPanel, so leaving them at 0 would wipe frames.
+        if (typeof setStorageItem === 'function') {
+            setStorageItem('p1ScoreCtrlPanel', p1Frames);
+            setStorageItem('p2ScoreCtrlPanel', p2Frames);
+        }
+        const p1ScoreEl = document.getElementById('p1Score');
+        const p2ScoreEl = document.getElementById('p2Score');
+        if (p1ScoreEl) {
+            p1ScoreEl.value = String(p1Frames);
+        }
+        if (p2ScoreEl) {
+            p2ScoreEl.value = String(p2Frames);
+        }
+        if (typeof bc !== 'undefined' && bc && typeof bc.postMessage === 'function') {
+            bc.postMessage({ player: '1', score: p1Frames });
+            bc.postMessage({ player: '2', score: p2Frames });
+        }
+
         if (winnerSlot) {
             const ids = getSlotPlayerIds(winnerSlot);
             await applyRackDelta(ids.winnerId, ids.loserId, 'game8', 1);

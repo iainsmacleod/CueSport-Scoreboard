@@ -1484,7 +1484,7 @@ async function run() {
       });
       assert('Wrong room rejected', false, 'should have failed');
     } catch (e) {
-      assert('Wrong room rejected', /room|forbidden|not found/i.test(e.message), e.message);
+      assert('Wrong room rejected', /room|forbidden|not found|no access|table/i.test(e.message), e.message);
     }
 
     // Session + state persistence

@@ -83,9 +83,14 @@
       document.getElementById('results').innerHTML = '';
       document.getElementById('summary').textContent = '';
       let passed = 0, failed = 0, skipped = 0;
+      const failureList = [];
       function assert(name, cond, detail) {
         if (cond) { passed++; log(name, 'pass'); }
-        else { failed++; log(name + (detail ? ' (' + detail + ')' : ''), 'fail'); }
+        else {
+          failed++;
+          failureList.push({ suite: 'cloud_relay', name: name, detail: detail || '' });
+          log(name + (detail ? ' (' + detail + ')' : ''), 'fail');
+        }
       }
       function skip(name, reason) {
         skipped++;
@@ -130,10 +135,11 @@
       const token = login.body.access_token;
 
       let apiKey = null;
+      const keyLabel = 'browser-test-' + Date.now().toString(36);
       const keyRes = await fetchJson('/api/api-keys', {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label: 'browser-test' }),
+        body: JSON.stringify({ label: keyLabel }),
       });
       if (keyRes.ok && keyRes.body.key?.length === 32) {
         apiKey = keyRes.body.key;
@@ -338,6 +344,7 @@
         skipped,
         total: passed + failed + skipped,
         ok: failed === 0,
+        failures: failureList.slice(),
       };
     }
 
