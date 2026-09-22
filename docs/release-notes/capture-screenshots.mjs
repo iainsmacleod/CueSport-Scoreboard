@@ -643,7 +643,7 @@ async function capture820(version, cloudBaseArg) {
         addBall(grid, 'snooker-blue-small.png', 'Blue');
         addBall(grid, 'snooker-pink-small.png', 'Pink');
         addBall(grid, 'snooker-black-small.png', 'Black');
-        addBall(grid, 'snooker-freeball-small.png', 'Free Ball', { extraClass: 'freeball-btn' });
+        addBall(grid, 'snooker-freeball-small.png', 'Free Ball');
         addBall(grid, 'foul-small.png', 'Foul');
         addBall(grid, 'undo-small.png', 'Undo', { extraClass: 'undo-ball' });
       }

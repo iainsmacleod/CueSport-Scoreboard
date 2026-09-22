@@ -1033,6 +1033,7 @@ const SNOOKER_BALL_META = {
 
 const SNOOKER_FOUL_POINTS = {
     white: 4,
+    red: 4,
     yellow: 4,
     green: 4,
     brown: 4,
@@ -1101,21 +1102,12 @@ function getSnookerRedsPotted() {
 }
 
 /**
- * Reds potted count used for possible-break math. If phase/color and visit points exist
- * but the counter has not caught up yet (async overlay race), treat one red as potted.
- * Freeball visits keep all 15 reds on the table (afterFreeball=yes).
+ * Reds potted for Remaining / Possible Break — use the stored counter only.
+ * (Previously invented +1 red when phase=color to paper over overlay races;
+ * Free Ball visits never increment reds, so Remaining stays correct without heuristics.)
  */
 function getEffectiveSnookerRedsPotted() {
-    const stored = getSnookerRedsPotted();
-    if (
-        stored === 0 &&
-        getSnookerPhase() === "color" &&
-        !getSnookerAfterFreeball() &&
-        getSnookerCurrentBreak() > 0
-    ) {
-        return 1;
-    }
-    return stored;
+    return getSnookerRedsPotted();
 }
 
 function setSnookerRedsPotted(n) {
@@ -2929,6 +2921,10 @@ function getSnookerPointsRemainingOnTable() {
 window.getSnookerBreakBallsForPublish = getSnookerBreakBallsForPublish;
 window.getSnookerCurrentBreak = getSnookerCurrentBreak;
 window.getSnookerPointsRemainingOnTable = getSnookerPointsRemainingOnTable;
+window.getEffectiveSnookerRedsPotted = getEffectiveSnookerRedsPotted;
+window.getSnookerRedsPotted = getSnookerRedsPotted;
+window.getSnookerAfterFreeball = getSnookerAfterFreeball;
+window.getSnookerFinalColorsPoints = getSnookerFinalColorsPoints;
 
 /**
  * Remaining points for a player's maximum continuing break:
@@ -3217,6 +3213,7 @@ function updateSnookerUiVisibility() {
 }
 
 const SNOOKER_FOUL_KEY_TO_NUM = {
+    red: 1,
     yellow: 2,
     green: 3,
     brown: 4,
@@ -3256,6 +3253,7 @@ function updateSnookerGoldVisibility() {
 /**
  * Foul picker: cue ball + object balls still on the table.
  * Cleared colors (final clearance) are hidden so they cannot be selected.
+ * Red is shown only while reds remain on the table.
  */
 function updateSnookerFoulTargetVisibility() {
     updateSnookerGoldVisibility();
@@ -3266,7 +3264,7 @@ function updateSnookerFoulTargetVisibility() {
     if (!isSnookerBallMode()) {
         container.querySelectorAll("[data-foul]").forEach(function (el) {
             const key = el.getAttribute("data-foul");
-            if (key === "gold") {
+            if (key === "gold" || key === "red") {
                 el.classList.add("noShow");
             } else {
                 el.classList.remove("noShow");
@@ -3274,10 +3272,15 @@ function updateSnookerFoulTargetVisibility() {
         });
         return;
     }
+    const redsLeft = getSnookerRemainingReds() > 0;
     container.querySelectorAll("[data-foul]").forEach(function (el) {
         const key = el.getAttribute("data-foul");
         if (!key || key === "white") {
             el.classList.remove("noShow");
+            return;
+        }
+        if (key === "red") {
+            el.classList[redsLeft ? "remove" : "add"]("noShow");
             return;
         }
         if (key === "gold") {
@@ -3289,6 +3292,56 @@ function updateSnookerFoulTargetVisibility() {
             return;
         }
         el.classList[isSnookerColorCleared(n) ? "add" : "remove"]("noShow");
+    });
+}
+
+const SNOOKER_FOUL_PUBLISH_DEFS = [
+    { key: "white", file: "snooker-white-small.png", alt: "White" },
+    { key: "red", file: "snooker-red-small.png", alt: "Red" },
+    { key: "yellow", file: "snooker-yellow-small.png", alt: "Yellow" },
+    { key: "green", file: "snooker-green-small.png", alt: "Green" },
+    { key: "brown", file: "snooker-brown-small.png", alt: "Brown" },
+    { key: "blue", file: "snooker-blue-small.png", alt: "Blue" },
+    { key: "pink", file: "snooker-pink-small.png", alt: "Pink" },
+    { key: "black", file: "snooker-black-small.png", alt: "Black" },
+    { key: "gold", file: "snooker-gold-small.png", alt: "Gold" }
+];
+
+/**
+ * Build foul picker targets from scoring state (same rules as the dock modal).
+ * Published to mobile so remote control matches dock availability.
+ */
+function getSnookerFoulTargetsForPublish() {
+    if (!isSnookerBallMode()) {
+        return [];
+    }
+    const redsLeft = getSnookerRemainingReds() > 0;
+    const goldOk = isSnookerGoldEnabled()
+        && !isSnookerGoldenBallFouled()
+        && !isSnookerColorCleared(8);
+    return SNOOKER_FOUL_PUBLISH_DEFS.filter(function (def) {
+        const key = def.key;
+        if (key === "white") {
+            return true;
+        }
+        if (key === "red") {
+            return redsLeft;
+        }
+        if (key === "gold") {
+            return goldOk;
+        }
+        const n = SNOOKER_FOUL_KEY_TO_NUM[key];
+        if (n == null) {
+            return false;
+        }
+        return !isSnookerColorCleared(n);
+    }).map(function (def) {
+        return {
+            key: def.key,
+            file: def.file,
+            alt: def.alt,
+            points: getSnookerFoulPointsForKey(def.key)
+        };
     });
 }
 
@@ -3708,9 +3761,15 @@ function applySnookerFoulByKey(foulKey) {
             return false;
         }
     } else if (foulKey !== "white") {
-        const foulNum = SNOOKER_FOUL_KEY_TO_NUM[foulKey];
-        if (foulNum != null && isSnookerColorCleared(foulNum)) {
-            return false;
+        if (foulKey === "red") {
+            if (getSnookerRemainingReds() <= 0) {
+                return false;
+            }
+        } else {
+            const foulNum = SNOOKER_FOUL_KEY_TO_NUM[foulKey];
+            if (foulNum != null && isSnookerColorCleared(foulNum)) {
+                return false;
+            }
         }
     }
     const points = getSnookerFoulPointsForKey(foulKey);
@@ -3786,6 +3845,9 @@ function selectSnookerFoul(element) {
 
 window.applySnookerFoulByKey = applySnookerFoulByKey;
 window.getSnookerFoulPointsForKey = getSnookerFoulPointsForKey;
+window.updateSnookerFoulTargetVisibility = updateSnookerFoulTargetVisibility;
+window.getSnookerFoulTargetsForPublish = getSnookerFoulTargetsForPublish;
+window.getSnookerRemainingReds = getSnookerRemainingReds;
 
 async function handleSnookerBallClick(element) {
     if (!element || !element.id || isGameScoringLocked()) {

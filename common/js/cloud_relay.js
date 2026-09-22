@@ -443,24 +443,32 @@
             undoEl.classList.contains('snooker-ball-disabled') ||
             undoEl.getAttribute('aria-disabled') === 'true' ||
             undoEl.classList.contains('noShow');
-        const snookerFoulTargets = [];
+        let snookerFoulTargets = [];
         if (snooker) {
-            const foulContainer = document.getElementById('snookerFoulTargets');
-            if (foulContainer) {
-                foulContainer.querySelectorAll('[data-foul]').forEach(function (el) {
-                    if (el.classList.contains('noShow')) return;
-                    const key = el.getAttribute('data-foul');
-                    if (!key) return;
-                    const img = el.querySelector('img');
-                    snookerFoulTargets.push({
-                        key: key,
-                        file: imageFileName(img),
-                        alt: (img && img.alt) ? img.alt : key,
-                        points: typeof window.getSnookerFoulPointsForKey === 'function'
-                            ? window.getSnookerFoulPointsForKey(key)
-                            : undefined,
+            if (typeof window.updateSnookerFoulTargetVisibility === 'function') {
+                window.updateSnookerFoulTargetVisibility();
+            }
+            // Same availability rules as the dock foul modal (red only while reds remain).
+            if (typeof window.getSnookerFoulTargetsForPublish === 'function') {
+                snookerFoulTargets = window.getSnookerFoulTargetsForPublish() || [];
+            } else {
+                const foulContainer = document.getElementById('snookerFoulTargets');
+                if (foulContainer) {
+                    foulContainer.querySelectorAll('[data-foul]').forEach(function (el) {
+                        if (el.classList.contains('noShow')) return;
+                        const key = el.getAttribute('data-foul');
+                        if (!key) return;
+                        const img = el.querySelector('img');
+                        snookerFoulTargets.push({
+                            key: key,
+                            file: imageFileName(img),
+                            alt: (img && img.alt) ? img.alt : key,
+                            points: typeof window.getSnookerFoulPointsForKey === 'function'
+                                ? window.getSnookerFoulPointsForKey(key)
+                                : undefined,
+                        });
                     });
-                });
+                }
             }
         }
         return {
@@ -647,6 +655,9 @@
             }
             state.snookerFreeBallOffered = dockStorage('snookerFreeBallOffered', 'no') === 'yes';
             state.snookerPhase = dockStorage('snookerPhase', 'red') || 'red';
+            state.snookerRedsPotted = Math.min(15, Math.max(0,
+                parseInt(dockStorage('snookerRedsPotted', '0') || '0', 10) || 0));
+            state.snookerAfterFreeball = dockStorage('snookerAfterFreeball', 'no') === 'yes';
             state.dualScoreMode = typeof window.isDualScoreMode === 'function'
                 ? window.isDualScoreMode()
                 : (state.gameType === 'game5' || state.gameType === 'game6' || state.gameType === 'game8' ||
@@ -679,6 +690,7 @@
             state.ballGrid.awaitingBreaker = state.awaitingBreaker;
             state.ballGrid.locked = state.gameScoringLocked;
             state.ballGrid.canUndo = state.canUndo;
+            state.ballGrid.snookerRedsPotted = state.snookerRedsPotted;
             // Match progress heuristics for mobile UI
             const p1 = Number(state.p1Score) || 0;
             const p2 = Number(state.p2Score) || 0;

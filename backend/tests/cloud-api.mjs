@@ -814,12 +814,37 @@ async function run() {
       );
       sn = applyImpromptuCommand(sn, 'snooker_foul', { foulKey: 'brown' })._private;
       assert('smoke snooker free ball offered', sn.snookerFreeBallOffered === true && sn.activePlayer === '2');
+      const remainingBeforeFree = sn.snookerPointsRemaining;
       sn = applyImpromptuCommand(sn, 'snooker_ball', { ballId: 'ball 10' })._private;
       assert('smoke snooker free ball scores', sn.p2Balls === 5);
+      assert(
+        'smoke snooker free ball remaining unchanged',
+        sn.snookerPointsRemaining === remainingBeforeFree
+          && sn.snookerAfterFreeball === true,
+        `before=${remainingBeforeFree} after=${sn.snookerPointsRemaining}`,
+      );
+      sn = applyImpromptuCommand(sn, 'undo', {})._private;
+      assert(
+        'smoke snooker undo free ball restores offer',
+        sn.snookerFreeBallOffered === true && sn.p2Balls === 4 && sn.activePlayer === '2',
+      );
+      // Miss after red: switch then undo restores colour for original player.
+      sn = applyImpromptuCommand(sn, 'undo', {})._private; // undo foul
+      sn = applyImpromptuCommand(sn, 'snooker_ball', { ballId: 'ball 1' })._private;
+      assert('smoke snooker red before miss', sn.snookerPhase === 'color' && sn.activePlayer === '1');
+      sn = applyImpromptuCommand(sn, 'toggle_active_player', { isP1: false })._private;
+      assert('smoke snooker miss → red for P2', sn.snookerPhase === 'red' && sn.activePlayer === '2');
+      sn = applyImpromptuCommand(sn, 'undo', {})._private;
+      assert(
+        'smoke snooker undo miss restores colour for P1',
+        sn.snookerPhase === 'color' && sn.activePlayer === '1' && sn.p1Balls === 9,
+      );
       assert(
         'smoke snooker foul picker keys',
         (sn.ballGrid?.snookerFoulTargets || []).some((t) => t.key === 'black'),
       );
+      sn = applyImpromptuCommand(sn, 'snooker_foul', { foulKey: 'brown' })._private;
+      sn = applyImpromptuCommand(sn, 'snooker_ball', { ballId: 'ball 10' })._private;
       sn._snookerRedsPotted = 15;
       sn._snookerPhase = 'red';
       sn._snookerCleared = { 'ball 2': true };

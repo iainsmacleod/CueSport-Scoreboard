@@ -166,6 +166,24 @@ try {
     `redDisabled=${missRed?.disabled} blackDisabled=${missBlack?.disabled}`,
   );
   assert('miss/switch clears free ball offer', miss.snookerFreeBallOffered !== true);
+  const missSwitchEntry = miss._scoringUndoStack?.[miss._scoringUndoStack.length - 1];
+  assert(
+    'playerSwitch undo entry is typed (no full _potted clone on stack tip)',
+    missSwitchEntry
+      && missSwitchEntry.type === 'playerSwitch'
+      && missSwitchEntry.before
+      && missSwitchEntry.before._potted == null,
+    JSON.stringify(missSwitchEntry),
+  );
+  // Typed playerSwitch undo restores colour visit without reversing the red pot.
+  const missUndone = applyImpromptuCommand(miss, 'undo', {});
+  assert(
+    'undo miss restores colour phase and P1',
+    missUndone.state.snookerPhase === 'color'
+      && missUndone.state.activePlayer === '1'
+      && missUndone.state.p1Balls === 1,
+    `phase=${missUndone.state.snookerPhase} active=${missUndone.state.activePlayer} p1=${missUndone.state.p1Balls}`,
+  );
 
   // After 15th red, miss/switch must enter clearance (yellow), not free-choice colors.
   let missClear = createDefaultImpromptuState({
@@ -215,7 +233,10 @@ try {
   const foulTargets = free.ballGrid?.snookerFoulTargets || [];
   assert(
     'foul picker targets use dock keys',
-    foulTargets.some((t) => t.key === 'black') && foulTargets.every((t) => !String(t.key).startsWith('ball')),
+    foulTargets.some((t) => t.key === 'black')
+      && foulTargets.some((t) => t.key === 'red')
+      && foulTargets.some((t) => t.key === 'white')
+      && foulTargets.every((t) => !String(t.key).startsWith('ball')),
     JSON.stringify(foulTargets.map((t) => t.key)),
   );
   const afterFoul = applyImpromptuCommand(free, 'snooker_foul', { foulKey: 'black' });
@@ -234,10 +255,35 @@ try {
   assert('free ball scores 1 in reds', afterFree.state.p2Balls === 8 && afterFree.state.snookerPhase === 'color');
   assert('free ball cleared after pot', afterFree.state.snookerFreeBallOffered !== true);
   assert(
+    'free ball sets afterFreeball flag',
+    afterFree._private._snookerAfterFreeball === true
+      || afterFree.state.snookerAfterFreeball === true,
+  );
+  assert(
+    'free ball remaining stays full reds package',
+    afterFree.state.snookerPointsRemaining === 147,
+    `remaining=${afterFree.state.snookerPointsRemaining}`,
+  );
+  assert(
     'free ball appears in break chips',
     afterFree.state.snookerCurrentBreak === 1
       && afterFree.state.snookerBreakBalls?.some((b) => b.key === 'freeball' && b.count === 1),
     JSON.stringify(afterFree.state.snookerBreakBalls),
+  );
+  const undoFree = applyImpromptuCommand(afterFree._private, 'undo', {});
+  assert(
+    'undo free ball restores foul score and offer',
+    undoFree.state.p2Balls === 7
+      && undoFree.state.snookerFreeBallOffered === true
+      && undoFree.state.activePlayer === '2',
+  );
+  const undoFoul = applyImpromptuCommand(undoFree._private, 'undo', {});
+  assert(
+    'undo foul restores pre-foul scores and P1',
+    undoFoul.state.p2Balls === 0
+      && undoFoul.state.foulsP1 === 0
+      && undoFoul.state.activePlayer === '1'
+      && undoFoul.state.snookerFreeBallOffered !== true,
   );
 
   // WPBSA: Free Ball cannot apply when Black is the only object ball remaining.
@@ -287,7 +333,8 @@ try {
       && clearanceFoulKeys.includes('brown')
       && clearanceFoulKeys.includes('black')
       && !clearanceFoulKeys.includes('yellow')
-      && !clearanceFoulKeys.includes('green'),
+      && !clearanceFoulKeys.includes('green')
+      && !clearanceFoulKeys.includes('red'),
     JSON.stringify(clearanceFoulKeys),
   );
   const rejectClearedFoul = applyImpromptuCommand(foulClear, 'snooker_foul', { foulKey: 'yellow' });
@@ -375,13 +422,22 @@ try {
   const respotReady = (pot1.state.ballGrid?.balls || []).find((b) => b.id === 'poolRespotBtn');
   assert('bank ball faded', faded1 && faded1.faded);
   assert('bank respot enabled with faded', respotReady && !respotReady.disabled);
-  const respot = applyImpromptuCommand(pot1._private, 'respot_ball', { ballId: 'ball 1' });
+  const undoBankPot = applyImpromptuCommand(pot1._private, 'undo', {});
+  assert(
+    'bank pot undo unfades and clears ball',
+    undoBankPot.state.p1Balls === 0
+      && !(undoBankPot.state.ballGrid?.balls || []).find((b) => b.id === 'ball 1')?.faded,
+  );
+  // Re-pot for respot path.
+  const pot1b = applyImpromptuCommand(undoBankPot._private, 'toggle_pot', { ballId: 'ball 1' });
+  assert('bank pot awards ball again', pot1b.state.p1Balls === 1);
+  const respot = applyImpromptuCommand(pot1b._private, 'respot_ball', { ballId: 'ball 1' });
   assert(
     'bank respot keeps score',
     respot.state.p1Balls === 1
       && !(respot.state.ballGrid?.balls || []).find((b) => b.id === 'ball 1')?.faded,
   );
-  let bankRun = pot1._private;
+  let bankRun = pot1b._private;
   for (let i = 2; i <= 8; i += 1) {
     bankRun = applyImpromptuCommand(bankRun, 'toggle_pot', { ballId: `ball ${i}` })._private;
   }
@@ -737,6 +793,23 @@ try {
   statsSn = applyImpromptuCommand(statsSn, 'snooker_ball', { ballId: 'ball 1' })._private;
   statsSn = applyImpromptuCommand(statsSn, 'snooker_ball', { ballId: 'ball 7' })._private;
   assert('frame high break tracks visit', statsSn._frameHighBreakP1 === 8, `hb=${statsSn._frameHighBreakP1}`);
+  // Alternating shooter must credit the outgoing visit, not the incoming player.
+  statsSn = applyImpromptuCommand(statsSn, 'toggle_active_player', { isP1: false })._private;
+  assert(
+    'player switch keeps high break on P1 (outgoing)',
+    statsSn._frameHighBreakP1 === 8 && statsSn._frameHighBreakP2 === 0
+      && (Number(statsSn._snookerBreak) || 0) === 0,
+    `p1=${statsSn._frameHighBreakP1} p2=${statsSn._frameHighBreakP2} cur=${statsSn._snookerBreak}`,
+  );
+  statsSn = applyImpromptuCommand(statsSn, 'snooker_ball', { ballId: 'ball 1' })._private;
+  statsSn = applyImpromptuCommand(statsSn, 'snooker_ball', { ballId: 'ball 5' })._private;
+  assert('P2 visit high is 6', statsSn._frameHighBreakP2 === 6, `hb2=${statsSn._frameHighBreakP2}`);
+  statsSn = applyImpromptuCommand(statsSn, 'toggle_active_player', { isP1: true })._private;
+  assert(
+    'switch back does not swap highs',
+    statsSn._frameHighBreakP1 === 8 && statsSn._frameHighBreakP2 === 6,
+    `p1=${statsSn._frameHighBreakP1} p2=${statsSn._frameHighBreakP2}`,
+  );
   statsSn = applyImpromptuCommand(statsSn, 'score_add', { player: '1' })._private;
   const endSn = applyImpromptuCommand(statsSn, 'end_match', {});
   const endSnPayload = (endSn.sessionEvents || []).find((ev) => ev.action === 'end')?.payload;

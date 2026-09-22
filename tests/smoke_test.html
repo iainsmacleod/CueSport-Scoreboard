@@ -4266,6 +4266,14 @@
                 cp.getStorageItem('p2BallsCtrlPanel'));
             assert('Snooker', 'Free ball scores lowest on table during reds',
                 cp.getSnookerLowestBallPoints() === 1);
+            assert('Snooker', 'Free Ball sets afterFreeball flag',
+                cp.getSnookerAfterFreeball() === true);
+            assert('Snooker', 'Remaining uses real reds (unchanged by Free Ball)',
+                cp.getEffectiveSnookerRedsPotted() === cp.getSnookerRedsPotted()
+                && cp.getSnookerPointsRemainingOnTable() === (15 - cp.getSnookerRedsPotted()) * 8 + cp.getSnookerFinalColorsPoints(),
+                'effective=' + cp.getEffectiveSnookerRedsPotted()
+                + ' stored=' + cp.getSnookerRedsPotted()
+                + ' remaining=' + cp.getSnookerPointsRemainingOnTable());
             await cp.undoLastSnookerAction();
             await sleep(80);
             assert('Snooker', 'Undo Free Ball restores P2 foul score',
@@ -4710,7 +4718,65 @@
                 black && black.classList.contains('snooker-ball-disabled'));
             assert('Snooker', 'Free ball still disabled in clearance without foul offer',
                 freeBall && freeBall.classList.contains('snooker-ball-disabled'));
+
+            // White foul = ball on; Free Ball blocked when only black remains.
+            cp.setSnookerClearedColors([2, 3, 4]);
+            cp.setSnookerRedsPotted(15);
+            cp.setSnookerPhase('red');
+            cp.clearSnookerFreeBallOfferState();
+            cp.setStorageItem('activePlayer', '1');
+            cp.document.getElementById('playerToggleCheckbox').checked = true;
+            cp.updateSnookerBallAvailability();
+            cp.updateSnookerFoulTargetVisibility();
+            assert('Snooker', 'White foul is 5 when blue is on',
+                typeof cp.getSnookerFoulPointsForKey === 'function'
+                && cp.getSnookerFoulPointsForKey('white') === 5,
+                String(typeof cp.getSnookerFoulPointsForKey === 'function'
+                    ? cp.getSnookerFoulPointsForKey('white') : 'missing'));
+            const foulYellow = cp.document.querySelector('#snookerFoulTargets [data-foul="yellow"]');
+            const foulGreen = cp.document.querySelector('#snookerFoulTargets [data-foul="green"]');
+            assert('Snooker', 'Cleared yellow hidden from foul picker',
+                foulYellow && foulYellow.classList.contains('noShow'));
+            assert('Snooker', 'Cleared green hidden from foul picker',
+                foulGreen && foulGreen.classList.contains('noShow'));
+            const foulRedClearance = cp.document.querySelector('#snookerFoulTargets [data-foul="red"]');
+            assert('Snooker', 'Red foul option hidden in clearance',
+                foulRedClearance && foulRedClearance.classList.contains('noShow'));
+            cp.setSnookerClearedColors([]);
+            cp.setSnookerRedsPotted(0);
+            cp.updateSnookerFoulTargetVisibility();
+            assert('Snooker', 'Red foul option shown while reds remain',
+                foulRedClearance && !foulRedClearance.classList.contains('noShow'));
+            const publishTargets = typeof cp.getSnookerFoulTargetsForPublish === 'function'
+                ? cp.getSnookerFoulTargetsForPublish()
+                : [];
+            assert('Snooker', 'Publish foul targets include red while reds remain',
+                Array.isArray(publishTargets) && publishTargets.some((t) => t && t.key === 'red'),
+                JSON.stringify(publishTargets.map((t) => t && t.key)));
+            cp.setSnookerClearedColors([2, 3, 4, 5, 6]);
+            cp.setSnookerRedsPotted(15);
+            cp.setSnookerPhase('red');
+            cp.clearSnookerFreeBallOfferState();
+            cp.setStorageItem('activePlayer', '1');
+            cp.document.getElementById('playerToggleCheckbox').checked = true;
+            cp.updateSnookerBallAvailability();
+            cp.updateSnookerFoulTargetVisibility();
+            assert('Snooker', 'White foul is 7 when only black remains',
+                cp.getSnookerFoulPointsForKey('white') === 7,
+                String(cp.getSnookerFoulPointsForKey('white')));
+            cp.openSnookerFoulPicker();
+            cp.selectSnookerFoul(cp.document.querySelector('#snookerFoulTargets [data-foul="black"]'));
+            await sleep(50);
+            assert('Snooker', 'Only-black Free Ball stays disabled after foul',
+                freeBall && freeBall.classList.contains('snooker-ball-disabled')
+                && cp.isSnookerFreeBallOffered() !== true);
+            cp.clearSnookerFreeBallOfferState();
+            cp.setStorageItem('activePlayer', '1');
+            cp.document.getElementById('playerToggleCheckbox').checked = true;
+
             cp.setSnookerClearedColors([2]);
+            cp.setSnookerRedsPotted(15);
+            cp.setSnookerPhase('red');
             cp.updateSnookerBallAvailability();
             assert('Snooker', 'Clearance enables green after yellow',
                 green && !green.classList.contains('snooker-ball-disabled') &&

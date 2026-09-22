@@ -2395,10 +2395,6 @@ button.table-card-create:disabled {
   display: block;
   pointer-events: none;
 }
-.ball-btn.freeball-btn:not(:disabled):not(.is-disabled) {
-  box-shadow: 0 0 0 2px #7aa2f7;
-}
-
 body.mobile.has-mobile-nav {
   padding-bottom: 0;
 }

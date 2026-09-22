@@ -26,7 +26,7 @@ import {
   applyImpromptuCommand,
   hydrateAuthorityState,
   createDefaultImpromptuState,
-} from '../shared/impromptu-authority.js?v=8.3.0.16';
+} from '../shared/impromptu-authority.js?v=8.3.0.19';
 
 let client = null;
 let roomId = '';
@@ -1296,6 +1296,7 @@ function syncCheckboxFromState(checkboxId, key, checked) {
 
 const SNOOKER_FOUL_POINTS = {
   white: 4,
+  red: 4,
   yellow: 4,
   green: 4,
   brown: 4,
@@ -1307,6 +1308,7 @@ const SNOOKER_FOUL_POINTS = {
 
 const SNOOKER_FOUL_IMAGES = {
   white: 'snooker-white-small.png',
+  red: 'snooker-red-small.png',
   yellow: 'snooker-yellow-small.png',
   green: 'snooker-green-small.png',
   brown: 'snooker-brown-small.png',
@@ -1657,9 +1659,11 @@ function appendActionBallsForGame(grid, state, snapshot, { locked, awaiting, can
   const snooker = isSnookerGameState(state, snapshot);
   if (snooker) {
     const b10 = findSnapshotBall(snapshot, 'ball 10');
-    // Prefer authority/dock disabled flag (covers only-black WPBSA block). Do not force-enable
-    // just because snookerFreeBallOffered is true — that flag can race ahead of availability.
-    const freeDisabled = locked || (b10 ? !!b10.disabled : true);
+    // Prefer authority/dock disabled flag (covers only-black WPBSA block). Also refuse
+    // when public free-ball offer is false even if a stale ball snapshot says enabled.
+    const freeDisabled = locked
+      || (b10 ? !!b10.disabled : true)
+      || state.snookerFreeBallOffered !== true;
     appendBallButton(grid, {
       src: resolveBallImageSrc(state, 'ball 10', (b10 && b10.file) || 'snooker-freeball-small.png'),
       title: (b10 && b10.title) || 'Free Ball',
@@ -1667,7 +1671,6 @@ function appendActionBallsForGame(grid, state, snapshot, { locked, awaiting, can
       disabled: freeDisabled,
       awaiting,
       clicked: !!(b10 && b10.clicked),
-      extraClass: 'freeball-btn',
       action: 'snooker_ball',
       payload: { ballId: 'ball 10' },
     });
@@ -1765,13 +1768,6 @@ function renderBallGrid(state) {
     } else if (locked) {
       hint.textContent = 'Scoring locked';
       hint.classList.remove('hidden');
-    } else if (
-      snooker
-      && state.snookerFreeBallOffered
-      && !(findSnapshotBall(snapshot, 'ball 10')?.disabled)
-    ) {
-      hint.textContent = 'Free ball available';
-      hint.classList.remove('hidden');
     } else if (!useSnapshot && snooker) {
       hint.textContent = 'Waiting for ball state from dock…';
       hint.classList.remove('hidden');
@@ -1842,13 +1838,13 @@ function renderBallGrid(state) {
 }
 
 function defaultSnookerFoulTargets() {
-  return Object.keys(SNOOKER_FOUL_IMAGES)
-    .filter((key) => key !== 'gold')
-    .map((key) => ({
-      key,
-      file: SNOOKER_FOUL_IMAGES[key],
-      alt: key.charAt(0).toUpperCase() + key.slice(1),
-    }));
+  // Offline/legacy fallback only — prefer authority/dock snookerFoulTargets.
+  return ['white', 'red', 'yellow', 'green', 'brown', 'blue', 'pink', 'black'].map((key) => ({
+    key,
+    file: SNOOKER_FOUL_IMAGES[key],
+    alt: key.charAt(0).toUpperCase() + key.slice(1),
+    points: SNOOKER_FOUL_POINTS[key],
+  }));
 }
 
 function openSnookerFoulPicker() {
@@ -1858,13 +1854,17 @@ function openSnookerFoulPicker() {
   const hint = document.getElementById('snookerFoulHint');
   if (!modal || !container) return;
 
-  const snapshot = lastState.ballGrid;
-  const fromDock = snapshot && Array.isArray(snapshot.snookerFoulTargets) && snapshot.snookerFoulTargets.length
-    ? snapshot.snookerFoulTargets
-    : defaultSnookerFoulTargets();
-  // Prefer dock/impromptu targets that match known foul keys; fall back if keys are stale (e.g. ball_N).
-  const usable = fromDock.filter((t) => t && (t.points || SNOOKER_FOUL_POINTS[t.key]));
-  const targets = usable.length ? usable : defaultSnookerFoulTargets();
+  const snapshot = lastState && lastState.ballGrid;
+  // Trust the published list exactly (including when red is correctly omitted).
+  // Only use the full default list when the field was never published.
+  let targets;
+  if (snapshot && Array.isArray(snapshot.snookerFoulTargets)) {
+    targets = snapshot.snookerFoulTargets.filter(
+      (t) => t && t.key && (t.points || SNOOKER_FOUL_POINTS[t.key]),
+    );
+  } else {
+    targets = defaultSnookerFoulTargets();
+  }
 
   container.innerHTML = '';
   targets.forEach((target) => {

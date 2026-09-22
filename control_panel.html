@@ -33,10 +33,10 @@ for more information about Salotto please visit https://salotto.app
     <script src="./common/js/jquery.js?v=8.0.0"></script>
     <script src="./common/js/scoreboard_helpers.js?v=8.0.0"></script>
     <script src="./common/js/match_racks.js?v=8.0.0"></script>
-    <script src="./common/js/cloud_relay.js?v=8.3.0.15"></script>
+    <script src="./common/js/cloud_relay.js?v=8.3.0.21"></script>
     <script src="./common/js/stream_sharing.js?v=8.0.0.6"></script>
     <script src="./common/js/player_stats.js?v=8.3.0"></script>
-    <script src="./common/js/control_panel.js?v=8.3.0.15"></script>
+    <script src="./common/js/control_panel.js?v=8.3.0.21"></script>
     <script src="./common/js/cloud_commands.js?v=8.3.0"></script>
     <script src="./common/js/cloud_auth.js?v=8.0.0.4"></script>
     <script src="./common/js/cloud_remote.js?v=8.3.0"></script>
@@ -1278,6 +1278,12 @@ for more information about Salotto please visit https://salotto.app
                         onmouseenter="updateSnookerFoulHoverLabel(this)"
                         onmouseleave="clearSnookerFoulHoverLabel()">
                         <img src="./common/images/snooker-white-small.png" alt="White">
+                    </div>
+                    <div class="ball snooker-foul-target" data-foul="red" id="snookerFoulRed"
+                        onclick="selectSnookerFoul(this)"
+                        onmouseenter="updateSnookerFoulHoverLabel(this)"
+                        onmouseleave="clearSnookerFoulHoverLabel()">
+                        <img src="./common/images/snooker-red-small.png" alt="Red">
                     </div>
                     <div class="ball snooker-foul-target" data-foul="yellow"
                         onclick="selectSnookerFoul(this)"
