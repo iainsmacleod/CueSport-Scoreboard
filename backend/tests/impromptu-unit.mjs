@@ -475,6 +475,109 @@ try {
     stFoul.state.p1Score === 0 && stFoul.state.activePlayer === '2' && stFoul.state.foulsP1 === 1,
   );
 
+  // Manual − must allow negatives (dock postBalls / Straight Pool foul parity).
+  let negPrimary = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game4',
+  });
+  negPrimary = applyImpromptuCommand(negPrimary, 'select_breaker', { slot: '1' })._private;
+  negPrimary = applyImpromptuCommand(negPrimary, 'score_sub', { player: '1' })._private;
+  assert('manual score_sub goes negative', negPrimary.p1Score === -1, `score=${negPrimary.p1Score}`);
+  negPrimary = applyImpromptuCommand(negPrimary, 'score_add', { player: '1' })._private;
+  assert('manual score_add recovers from negative', negPrimary.p1Score === 0, `score=${negPrimary.p1Score}`);
+
+  // Straight Pool manual +/− scores balls, not racks — keep breaker (dock postScore skip).
+  let straightManual = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game4',
+  });
+  straightManual = applyImpromptuCommand(straightManual, 'select_breaker', { slot: '1' })._private;
+  const afterStraightAdd = applyImpromptuCommand(straightManual, 'score_add', { player: '1' });
+  assert(
+    'straight score_add keeps breaker',
+    afterStraightAdd.state.p1Score === 1
+      && afterStraightAdd.state.awaitingBreaker === false
+      && afterStraightAdd.state.rackBreakerSlot === '1'
+      && afterStraightAdd.state.playerSlotMode === 'active',
+    `score=${afterStraightAdd.state.p1Score} await=${afterStraightAdd.state.awaitingBreaker} breaker=${afterStraightAdd.state.rackBreakerSlot}`,
+  );
+  assert(
+    'straight score_add notes run',
+    afterStraightAdd._private._straightRunSlot === '1'
+      && afterStraightAdd._private._straightRunLength === 1,
+    `run=${afterStraightAdd._private._straightRunSlot}:${afterStraightAdd._private._straightRunLength}`,
+  );
+  const afterStraightAdd2 = applyImpromptuCommand(afterStraightAdd._private, 'score_add', { player: '1' });
+  assert(
+    'straight score_add still no breaker prompt',
+    afterStraightAdd2.state.p1Score === 2
+      && afterStraightAdd2.state.awaitingBreaker === false
+      && afterStraightAdd2.state.rackBreakerSlot === '1',
+  );
+
+  let negBalls = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game8', ballSelection: 'snooker',
+  });
+  negBalls = applyImpromptuCommand(negBalls, 'select_breaker', { slot: '1' })._private;
+  negBalls = applyImpromptuCommand(negBalls, 'balls_sub', { player: '1' })._private;
+  assert('manual balls_sub goes negative', negBalls.p1Balls === -1, `balls=${negBalls.p1Balls}`);
+  negBalls = applyImpromptuCommand(negBalls, 'balls_add', { player: '1' })._private;
+  assert('manual balls_add recovers from negative', negBalls.p1Balls === 0, `balls=${negBalls.p1Balls}`);
+
+  // One Pocket / Bank: balls may go below 0 (dock foul / postBalls parity).
+  let opNeg = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game6',
+  });
+  opNeg = applyImpromptuCommand(opNeg, 'select_breaker', { slot: '1' })._private;
+  opNeg = applyImpromptuCommand(opNeg, 'balls_sub', { player: '1' })._private;
+  assert('one-pocket balls_sub goes negative', opNeg.p1Balls === -1, `balls=${opNeg.p1Balls}`);
+  opNeg = applyImpromptuCommand(opNeg, 'pool_foul', {})._private;
+  assert(
+    'one-pocket foul goes more negative',
+    opNeg.p1Balls === -2 && opNeg.activePlayer === '2',
+    `balls=${opNeg.p1Balls}`,
+  );
+  let bankNeg = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game5',
+  });
+  bankNeg = applyImpromptuCommand(bankNeg, 'select_breaker', { slot: '1' })._private;
+  bankNeg = applyImpromptuCommand(bankNeg, 'balls_sub', { player: '1' })._private;
+  assert('bank balls_sub goes negative', bankNeg.p1Balls === -1, `balls=${bankNeg.p1Balls}`);
+  bankNeg = applyImpromptuCommand(bankNeg, 'pool_foul', {})._private;
+  assert(
+    'bank foul goes more negative',
+    bankNeg.p1Balls === -2 && bankNeg.activePlayer === '2',
+    `balls=${bankNeg.p1Balls}`,
+  );
+  let stFoulNeg = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game4',
+  });
+  stFoulNeg = applyImpromptuCommand(stFoulNeg, 'select_breaker', { slot: '1' })._private;
+  stFoulNeg = applyImpromptuCommand(stFoulNeg, 'pool_foul', {})._private;
+  assert(
+    'straight foul from 0 goes negative',
+    stFoulNeg.p1Score === -1 && stFoulNeg.activePlayer === '2',
+    `score=${stFoulNeg.p1Score}`,
+  );
+
+  // Straight Pool with no race: Call Match after points are on the board.
+  let straightCall = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game4', raceInfo: '',
+  });
+  assert('straight open race not locked', straightCall.gameScoringLocked !== true);
+  assert('straight open race cannot call before play', straightCall.canCallGame !== true);
+  straightCall = applyImpromptuCommand(straightCall, 'select_breaker', { slot: '1' })._private;
+  straightCall = applyImpromptuCommand(straightCall, 'score_add', { player: '1' })._private;
+  assert(
+    'straight open race can call after points',
+    straightCall.canCallGame === true && straightCall.gameScoringLocked !== true,
+    `canCall=${straightCall.canCallGame} locked=${straightCall.gameScoringLocked}`,
+  );
+  const called = applyImpromptuCommand(straightCall, 'call_match_early', {});
+  assert(
+    'straight open race call_match_early ends session',
+    (called.sessionEvents || []).some((ev) => ev.action === 'end'),
+    JSON.stringify(called.sessionEvents),
+  );
+
   // Grid sizes: 9-ball / 10-ball / 8-ball object counts.
   function objectBalls(gt) {
     const s = createDefaultImpromptuState({ player1Name: 'A', player2Name: 'B', gameType: gt });

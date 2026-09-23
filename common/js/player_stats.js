@@ -3674,7 +3674,16 @@
             return false;
         }
         const match = getActivePendingMatch();
-        return !!(match && match.racks && match.racks.length > 0);
+        if (!match) {
+            return false;
+        }
+        if (match.racks && match.racks.length > 0) {
+            return true;
+        }
+        // Straight Pool (and open-ended matches with no race) have no rack rows —
+        // allow Call Match Early when primary scores show play.
+        const scores = getCurrentScores();
+        return (Number(scores.p1) || 0) !== 0 || (Number(scores.p2) || 0) !== 0;
     }
 
     /**
@@ -3691,7 +3700,9 @@
             return false;
         }
         // After flush, require either recorded racks or a non-zero scoreboard to reconcile.
-        if ((!match.racks || match.racks.length === 0) && (scores.p1 + scores.p2) <= 0) {
+        if ((!match.racks || match.racks.length === 0)
+            && (Number(scores.p1) || 0) === 0
+            && (Number(scores.p2) || 0) === 0) {
             return false;
         }
 

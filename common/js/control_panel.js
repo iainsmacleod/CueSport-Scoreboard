@@ -6520,7 +6520,7 @@ function postScore(opt1, player, options) {
             resetBothPlayersBalls();
             scoreChanged = true;
         }
-    } else if (scoreValue > 0) {
+    } else if (scoreValue > -999) {
         scoreValue = scoreValue - 1;
         bc.postMessage({ player: player, score: scoreValue });
         setStorageItem("p" + player + "ScoreCtrlPanel", scoreValue);

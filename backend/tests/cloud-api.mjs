@@ -892,6 +892,58 @@ async function run() {
         `score=${st.p1Score} potted=${JSON.stringify(st._potted)}`,
       );
 
+      // Straight Pool scores balls (points), not racks — manual + must not re-prompt breaker.
+      let stManual = start('game4');
+      stManual = applyImpromptuCommand(stManual, 'score_add', { player: '1' })._private;
+      assert(
+        'smoke straight score_add keeps breaker (balls not racks)',
+        stManual.p1Score === 1
+          && stManual.awaitingBreaker === false
+          && stManual.rackBreakerSlot === '1'
+          && stManual.playerSlotMode === 'active',
+        `score=${stManual.p1Score} await=${stManual.awaitingBreaker} breaker=${stManual.rackBreakerSlot}`,
+      );
+      stManual = applyImpromptuCommand(stManual, 'score_add', { player: '1' })._private;
+      assert(
+        'smoke straight score_add still no breaker prompt',
+        stManual.p1Score === 2 && stManual.awaitingBreaker === false && stManual.rackBreakerSlot === '1',
+      );
+
+      // Negative scores allowed (dock foul / postBalls / postScore parity).
+      // Straight: fouls and manual − on primary Balls may go below 0.
+      let stNeg = start('game4');
+      stNeg = applyImpromptuCommand(stNeg, 'score_sub', { player: '1' })._private;
+      assert('smoke straight score_sub goes negative', stNeg.p1Score === -1, `score=${stNeg.p1Score}`);
+      stNeg = applyImpromptuCommand(stNeg, 'score_add', { player: '1' })._private;
+      assert('smoke straight score_add recovers from negative', stNeg.p1Score === 0);
+      stNeg = applyImpromptuCommand(stNeg, 'pool_foul', {})._private;
+      assert(
+        'smoke straight foul goes negative',
+        stNeg.p1Score === -1 && stNeg.activePlayer === '2',
+        `score=${stNeg.p1Score}`,
+      );
+
+      // One Pocket / Bank: secondary balls counters may go below 0 (fouls & manual −).
+      let opNeg = start('game6');
+      opNeg = applyImpromptuCommand(opNeg, 'balls_sub', { player: '1' })._private;
+      assert('smoke one-pocket balls_sub goes negative', opNeg.p1Balls === -1, `balls=${opNeg.p1Balls}`);
+      opNeg = applyImpromptuCommand(opNeg, 'pool_foul', {})._private;
+      assert(
+        'smoke one-pocket foul goes more negative',
+        opNeg.p1Balls === -2 && opNeg.activePlayer === '2',
+        `balls=${opNeg.p1Balls}`,
+      );
+
+      let bankNeg = start('game5');
+      bankNeg = applyImpromptuCommand(bankNeg, 'balls_sub', { player: '1' })._private;
+      assert('smoke bank balls_sub goes negative', bankNeg.p1Balls === -1, `balls=${bankNeg.p1Balls}`);
+      bankNeg = applyImpromptuCommand(bankNeg, 'pool_foul', {})._private;
+      assert(
+        'smoke bank foul goes more negative',
+        bankNeg.p1Balls === -2 && bankNeg.activePlayer === '2',
+        `balls=${bankNeg.p1Balls}`,
+      );
+
       // Manual score_add clears tracker for next rack.
       let rack = start('game1');
       rack = applyImpromptuCommand(rack, 'toggle_pot', { ballId: 'ball 1' })._private;

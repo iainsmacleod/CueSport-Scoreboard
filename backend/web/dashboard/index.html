@@ -35,11 +35,6 @@
     </section>
     <section id="loginSection" class="panel hidden">
       <h2 id="loginSectionTitle">Sign In</h2>
-      <p>
-        CueSport Scoreboard Cloud is the managed relay for your OBS CueSport Scoreboard: remote mobile and guest control,
-        cloud match history, multi-table Dock Keys, and optional public live-stream listing —
-        while the overlay stays in OBS.
-      </p>
       <section class="dash-login-feature-grid" aria-label="Cloud feature highlights">
         <article class="dash-login-feature-card">
           <span class="dash-login-feature-icon" aria-hidden="true">
@@ -261,16 +256,33 @@
           </div>
           <p id="statsStatus" class="hint"></p>
           <div class="stats-subtabs" role="tablist" aria-label="Stats views">
-            <button type="button" class="stats-subtab active" role="tab" aria-selected="true" data-stats-panel="leaderboard">
-              <svg class="stats-subtab-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v4a5 5 0 0 1-10 0V4z"/><path d="M5 6H3a2 2 0 0 0 2 4h1"/><path d="M19 6h2a2 2 0 0 1-2 4h-1"/></svg>
-              Leaderboard
-            </button>
-            <button type="button" class="stats-subtab" role="tab" aria-selected="false" data-stats-panel="matches">
+            <button type="button" class="stats-subtab active" role="tab" aria-selected="true" data-stats-panel="matches">
               <svg class="stats-subtab-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg>
               Recent matches
             </button>
+            <button type="button" class="stats-subtab" role="tab" aria-selected="false" data-stats-panel="leaderboard">
+              <svg class="stats-subtab-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v4a5 5 0 0 1-10 0V4z"/><path d="M5 6H3a2 2 0 0 0 2 4h1"/><path d="M19 6h2a2 2 0 0 1-2 4h-1"/></svg>
+              Leaderboard
+            </button>
           </div>
-          <div id="statsPanelLeaderboard" class="stats-subpanel" role="tabpanel">
+          <div id="statsPanelMatches" class="stats-subpanel" role="tabpanel">
+            <div class="stats-table-wrap">
+              <table class="dash-stats-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Event</th>
+                    <th>Match</th>
+                    <th>Score</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="statsMatchesBody"></tbody>
+              </table>
+            </div>
+            <div id="statsMatchesPager" class="stats-pager hidden" aria-label="Recent matches pages"></div>
+          </div>
+          <div id="statsPanelLeaderboard" class="stats-subpanel hidden" role="tabpanel">
             <div class="stats-table-wrap">
               <table class="dash-stats-table" id="statsLeaderboardTable">
                 <thead>
@@ -288,23 +300,6 @@
               </table>
             </div>
             <div id="statsLeaderboardPager" class="stats-pager hidden" aria-label="Leaderboard pages"></div>
-          </div>
-          <div id="statsPanelMatches" class="stats-subpanel hidden" role="tabpanel">
-            <div class="stats-table-wrap">
-              <table class="dash-stats-table">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Event</th>
-                    <th>Match</th>
-                    <th>Score</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody id="statsMatchesBody"></tbody>
-              </table>
-            </div>
-            <div id="statsMatchesPager" class="stats-pager hidden" aria-label="Recent matches pages"></div>
           </div>
         </div>
 
@@ -375,9 +370,9 @@
         </div>
         <div class="panel" id="dockKeysPanel">
           <h2>OBS Dock Keys</h2>
-          <p class="hint">One key per OBS CueSport Scoreboard dock; a second dock using the same key will be rejected.</p>
           <p class="hint">Create a named key for each table, pick a role, then paste it into that CueSport Scoreboard dock&rsquo;s Cloud Connection settings.</p>
           <p class="hint">
+            <strong>View</strong> — display and copy your key to paste into CueSport Scoreboard dock.<br />
             <strong>Share</strong> — copy and send the key to another manager of an OBS instance.<br />
             <strong>Edit</strong> — change the seat name/label and role (Administrator, Trusted Operator, or Operator).<br />
             <strong>Remove</strong> — frees the seat and disconnects any dock using it. Create a new key to replace a leaked one.

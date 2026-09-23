@@ -421,6 +421,15 @@ function prepareNextRackOrFrame(state, winnerSlot, options = {}) {
   state._rackBallsP1 = 0;
   state._rackBallsP2 = 0;
 
+  // Straight Pool / skipTrackerReset: scoring balls (or keeping tracker), not ending a rack —
+  // do not clear breaker (dock postScore skips maybeShowRackBreakerPicker for game4).
+  if (skipTrackerReset) {
+    if (winnerSlot === '1' || winnerSlot === '2') {
+      state.lastRackWinnerSlot = winnerSlot;
+    }
+    return;
+  }
+
   const raceTo = parseRaceTarget(state.raceInfo, state.gameType);
   if (isBreakerPromptEnabled(state) && !isRaceLocked(state.p1Score, state.p2Score, raceTo)) {
     state.rackBreakerSlot = '';
@@ -1186,10 +1195,10 @@ function refreshDerived(state) {
 
   state.canUndo = hasUndoEntries(state) && !state.awaitingBreaker;
   state.canCallGame = !locked && (
-    (Number(state.p1Score) || 0) > 0
-    || (Number(state.p2Score) || 0) > 0
-    || (Number(state.p1Balls) || 0) > 0
-    || (Number(state.p2Balls) || 0) > 0
+    (Number(state.p1Score) || 0) !== 0
+    || (Number(state.p2Score) || 0) !== 0
+    || (Number(state.p1Balls) || 0) !== 0
+    || (Number(state.p2Balls) || 0) !== 0
     || Object.keys(state._potted || {}).some((k) => state._potted[k])
     || (Number(state._snookerRedsPotted) || 0) > 0
     || Object.keys(state._snookerCleared || {}).some((k) => state._snookerCleared[k])
@@ -1502,7 +1511,7 @@ function applyScoringUndoEntry(state, entry) {
     applyScoringBefore(state, before);
     return;
   }
-  if (entry.type === 'scoreSub' || entry.type === 'ballsSub' || entry.type === 'ballsAdd') {
+  if (entry.type === 'scoreSub' || entry.type === 'scoreAdd' || entry.type === 'ballsSub' || entry.type === 'ballsAdd') {
     applyScoringBefore(state, before);
     return;
   }
@@ -1837,7 +1846,7 @@ export function applyImpromptuCommand(stateIn, action, payload = {}) {
           sessionId: matchId,
           reason,
           winnerSlot: slot || null,
-          scores: { p1: clampScore(state.p1Score), p2: clampScore(state.p2Score) },
+          scores: { p1: clampSignedScore(state.p1Score), p2: clampSignedScore(state.p2Score) },
           player1: state.player1Name,
           player2: state.player2Name,
           player1Id: state.player1Id || null,
@@ -1869,23 +1878,30 @@ export function applyImpromptuCommand(stateIn, action, payload = {}) {
     case 'score_add': {
       const p = String(payload.player || '1');
       const before = captureScoringBefore(state);
-      if (p === '2') state.p2Score = clampScore((Number(state.p2Score) || 0) + 1);
-      else state.p1Score = clampScore((Number(state.p1Score) || 0) + 1);
-      // Dock postScore("add"): zero balls, reset tracker / snooker frame, re-prompt breaker.
-      prepareNextRackOrFrame(state, p);
-      pushScoringUndo(state, {
-        type: state.gameType === 'game8' ? 'snookerFrame' : 'rackWin',
-        player: p,
-        before,
-      });
+      if (p === '2') state.p2Score = clampSignedScore((Number(state.p2Score) || 0) + 1);
+      else state.p1Score = clampSignedScore((Number(state.p1Score) || 0) + 1);
+      if (isStraightPool(state)) {
+        // Dock postScore for game4: points only — no rack prep / breaker re-prompt.
+        noteStraightPoolPoint(state, p, 1);
+        pushScoringUndo(state, { type: 'scoreAdd', player: p, before });
+      } else {
+        // Dock postScore("add"): zero balls, reset tracker / snooker frame, re-prompt breaker.
+        prepareNextRackOrFrame(state, p);
+        pushScoringUndo(state, {
+          type: state.gameType === 'game8' ? 'snookerFrame' : 'rackWin',
+          player: p,
+          before,
+        });
+      }
       bumpActivity();
       break;
     }
     case 'score_sub': {
       const p = String(payload.player || '1');
       const before = captureScoringBefore(state);
-      if (p === '2') state.p2Score = clampScore((Number(state.p2Score) || 0) - 1);
-      else state.p1Score = clampScore((Number(state.p1Score) || 0) - 1);
+      // Manual − matches dock ball counters / Straight Pool fouls: allow below zero.
+      if (p === '2') state.p2Score = clampSignedScore((Number(state.p2Score) || 0) - 1);
+      else state.p1Score = clampSignedScore((Number(state.p1Score) || 0) - 1);
       if (!isStraightPool(state)) {
         popLastMatchRackIfWinner(state, p);
       } else {
@@ -1916,8 +1932,8 @@ export function applyImpromptuCommand(stateIn, action, payload = {}) {
     case 'balls_sub': {
       const p = String(payload.player || '1');
       const before = captureScoringBefore(state);
-      if (p === '2') state.p2Balls = clampScore((Number(state.p2Balls) || 0) - 1);
-      else state.p1Balls = clampScore((Number(state.p1Balls) || 0) - 1);
+      if (p === '2') state.p2Balls = clampSignedScore((Number(state.p2Balls) || 0) - 1);
+      else state.p1Balls = clampSignedScore((Number(state.p1Balls) || 0) - 1);
       pushScoringUndo(state, { type: 'ballsSub', player: p, before });
       bumpActivity();
       break;

@@ -4735,7 +4735,7 @@ document.getElementById('adminDetailBody')?.addEventListener('click', async (eve
 });
 
 function setActiveStatsPanel(which) {
-  const panel = which === 'matches' ? 'matches' : 'leaderboard';
+  const panel = which === 'leaderboard' ? 'leaderboard' : 'matches';
   document.querySelectorAll('.stats-subtab').forEach((tab) => {
     const active = tab.dataset.statsPanel === panel;
     tab.classList.toggle('active', active);

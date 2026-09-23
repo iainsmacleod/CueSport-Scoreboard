@@ -210,6 +210,8 @@ function setActiveView(view) {
     view = 'control';
   }
   if (view === 'replay' && !isReplayEnabled()) view = 'control';
+  if (isImpromptuTable() && view === 'replay') view = 'control';
+  const leavingSetup = activeView === 'setup' && view !== 'setup';
   activeView = view;
   show('viewControl', view === 'control');
   show('viewSetup', view === 'setup');
@@ -241,12 +243,41 @@ function setActiveView(view) {
     shareBtn.setAttribute('aria-current', view === 'share' ? 'page' : 'false');
   }
 
+  syncTabToUrl(view);
+
+  if (leavingSetup) flushPendingSetupFields();
+
   if (view === 'share' && !isViewOnly) {
     hideGuestShareDetails();
     ensureGuestShareLink({ refreshList: true, forceHide: true })
       .catch((err) => setError(err.message || 'Failed to create guest link'));
   } else {
     hideGuestShareDetails();
+  }
+}
+
+const MOBILE_TAB_VIEWS = ['control', 'setup', 'replay', 'share'];
+
+function readTabFromUrl() {
+  try {
+    const tab = new URLSearchParams(window.location.search).get('tab');
+    return MOBILE_TAB_VIEWS.includes(tab) ? tab : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Keep ?tab= in sync so refresh restores the tab the user picked. */
+function syncTabToUrl(view) {
+  try {
+    const url = new URL(window.location.href);
+    const nextTab = MOBILE_TAB_VIEWS.includes(view) ? view : 'control';
+    if (url.searchParams.get('tab') === nextTab) return;
+    url.searchParams.set('tab', nextTab);
+    const next = `${url.pathname}${url.search}${url.hash}`;
+    window.history.replaceState({}, '', next);
+  } catch {
+    /* ignore */
   }
 }
 
@@ -2043,7 +2074,8 @@ function isRaceCompleteFromState(state) {
 
 /**
  * Match control_panel: one danger button morphs Restart Match ↔ End Match.
- * Call Match only when racks exist and the race is not complete.
+ * Call Match when scoreboard activity exists and the race is not complete
+ * (includes Straight Pool with no Race Info / no rack rows).
  */
 function syncMatchActionButtons(state) {
   // Same gate as control_panel isRaceComplete() / isGameScoringLocked()
@@ -2508,10 +2540,40 @@ function controlLockMessage() {
   return 'Controls are paused';
 }
 
+/** Commit typed Race / Event Information before leaving Setup or scoring (dock live-field parity). */
+let flushingSetupFields = false;
+function flushPendingSetupFields() {
+  if (flushingSetupFields || !controlsEnabled()) return;
+  const raceInput = document.getElementById('raceInput');
+  const gameInfoInput = document.getElementById('gameInfoInput');
+  const raceNeeds = raceDirty || (raceInput && fieldDiffersFromCommitted(raceInput, lastState.raceInfo));
+  const infoNeeds = gameInfoDirty
+    || (gameInfoInput && fieldDiffersFromCommitted(gameInfoInput, lastState.gameInfo));
+  if (!raceNeeds && !infoNeeds) return;
+  flushingSetupFields = true;
+  try {
+    if (raceNeeds && raceInput) {
+      raceDirty = false;
+      sendCmd('set_race', { value: raceInput.value ?? '' });
+    }
+    if (infoNeeds && gameInfoInput) {
+      gameInfoDirty = false;
+      sendCmd('set_game_info', { value: gameInfoInput.value ?? '' });
+    }
+    syncSaveIcons();
+  } finally {
+    flushingSetupFields = false;
+  }
+}
+
 function sendCmd(action, payload) {
   if (!controlsEnabled()) {
     setError(controlLockMessage());
     return false;
+  }
+  // Push any unsaved Setup text into authority/dock before match activity.
+  if (action !== 'set_race' && action !== 'set_game_info') {
+    flushPendingSetupFields();
   }
   // Impromptu authority applies locally (same command vocabulary as the dock).
   if (isAuthority && isImpromptuTable()) {
@@ -2918,6 +2980,12 @@ function wireSetupPanel() {
     gameInfoDirty = fieldDiffersFromCommitted(gameInfoInput, lastState.gameInfo);
     syncSaveIcons();
   });
+  raceInput?.addEventListener('blur', () => {
+    if (raceDirty) flushPendingSetupFields();
+  });
+  gameInfoInput?.addEventListener('blur', () => {
+    if (gameInfoDirty) flushPendingSetupFields();
+  });
 
   document.getElementById('saveRaceBtn').onclick = () => {
     if (!raceDirty || !controlsEnabled()) return;
@@ -3250,11 +3318,17 @@ async function connectGuestSession({ quiet, isCurrent }) {
     showControl();
     dockPresent = (joined.clients || []).includes('dock');
     softDockPresent = dockPresent;
+    const urlTabGuest = readTabFromUrl();
+    if (urlTabGuest) initialViewChosen = true;
     if (joined.state && Object.keys(joined.state).length) {
       applyState(joined.state);
     } else {
       setActiveView('setup');
       initialViewChosen = false;
+    }
+    if (urlTabGuest && !isViewOnly) {
+      setActiveView(urlTabGuest);
+      initialViewChosen = true;
     }
     syncReplayNavVisibility(joined.state || lastState || {});
     setConnectionStatus(scoringHostPresent() ? 'connected' : 'waiting');
@@ -3378,6 +3452,8 @@ async function connectAuthenticatedSession({ quiet, isCurrent }) {
     if (isViewOnly) applyViewOnlyUI();
     dockPresent = (joined.clients || []).includes('dock');
     softDockPresent = dockPresent;
+    const urlTab = readTabFromUrl();
+    if (urlTab) initialViewChosen = true;
     if (isAuthority && isImpromptuTable()) {
       const seed = (joined.state && Object.keys(joined.state).length)
         ? joined.state
@@ -3400,9 +3476,11 @@ async function connectAuthenticatedSession({ quiet, isCurrent }) {
     } else if (!quiet && isViewOnly) {
       setActiveView('control');
     }
-    const preferSetup = new URLSearchParams(window.location.search).get('tab') === 'setup';
-    if (preferSetup && !isViewOnly) {
-      setActiveView('setup');
+    if (urlTab && !isViewOnly) {
+      setActiveView(urlTab);
+      initialViewChosen = true;
+    } else if (urlTab && isViewOnly && (urlTab === 'control' || urlTab === 'setup' || urlTab === 'replay')) {
+      setActiveView(urlTab);
       initialViewChosen = true;
     }
     setConnectionStatus(scoringHostPresent() ? 'connected' : 'waiting');
