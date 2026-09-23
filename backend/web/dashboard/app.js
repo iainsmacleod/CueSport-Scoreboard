@@ -973,20 +973,6 @@ function renderQuota(quota, account = null) {
     && usage.apiKeys >= limits.maxApiKeys;
   const blocked = (!isPlatformAdminUser && needsPlan) || atKeyLimit;
   if (createBtn) createBtn.disabled = blocked;
-  const impromptuHint = document.getElementById('impromptuQuotaHint');
-  if (impromptuHint) {
-    const gate = getImpromptuCreateGate();
-    if (gate.mode === 'needs_plan') {
-      impromptuHint.textContent = 'Choose a plan to create ad-hoc tables.';
-    } else if (gate.mode === 'at_limit') {
-      impromptuHint.textContent = '';
-    } else if (limits.maxImpromptuTables != null) {
-      impromptuHint.textContent =
-        `${(usage.impromptuTables || 0)}/${limits.maxImpromptuTables} ad-hoc seats in use`;
-    } else {
-      impromptuHint.textContent = '';
-    }
-  }
   syncCreateImpromptuCardState();
   if (hint) {
     if (isPlatformAdminUser && !atKeyLimit) {
@@ -5141,7 +5127,6 @@ async function createImpromptuTableFromDashboard() {
     return;
   }
   const buttons = Array.from(document.querySelectorAll('.table-card-create'));
-  const hint = document.getElementById('impromptuQuotaHint');
   buttons.forEach((btn) => { btn.disabled = true; });
   try {
     setError('');
@@ -5151,7 +5136,6 @@ async function createImpromptuTableFromDashboard() {
     if (!roomId) throw new Error('Table created but no id returned');
     window.location.href = `${getServerUrl().replace(/\/$/, '')}/m/${roomId}?tab=setup`;
   } catch (err) {
-    if (hint) hint.textContent = err.message || 'Could not create ad-hoc table';
     setError(err.message || 'Could not create ad-hoc table');
     if (lastQuota) renderQuota(lastQuota, lastAccount);
     else syncCreateImpromptuCardState();
