@@ -51,7 +51,7 @@ In the OBS dock Connection settings → **Self-hosting**, use server URL `http:/
 
 Do **not** share the owner secret with every scorer — create Dock Keys and guest links instead.
 
-Platform Admin and Stripe billing are **disabled** in self-host / dev-auth mode. Use **Account → Simulated plan** to temporarily apply catalog dock-key / ad-hoc limits for local testing (default: Unrestricted).
+Platform Admin and Stripe billing are **disabled** in self-host / dev-auth mode. Use **Account → Simulated plan** to temporarily apply catalog dock-key / ad-hoc limits for local testing (default: Unrestricted). Choosing a **lower-capacity** simulated plan (including Unrestricted → Streamer) clears Dock Keys and ad-hoc tables the same way a real hosted downgrade does; moving up leaves seats alone.
 
 ## Connect the OBS dock
 

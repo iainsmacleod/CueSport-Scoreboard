@@ -25,6 +25,8 @@ Caps also include mobile + guest connections per table (see the dashboard billin
 4. Complete Stripe Checkout for your plan and accept the Terms / Privacy when prompted.
 5. Manage payment and cancellation later via **Account** → Stripe Customer Portal.
 
+**Plan changes:** Upgrading keeps your Dock Keys and ad-hoc tables. **Downgrading** to a plan with fewer seats immediately revokes all OBS Dock Keys and deletes all ad-hoc tables — recreate seats under the new limits. Match history is kept.
+
 ## 2. Create an OBS Dock Key
 
 1. In the dashboard, open **Settings** (or the first-table onboarding guide).

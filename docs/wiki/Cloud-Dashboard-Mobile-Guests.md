@@ -11,7 +11,7 @@ Day-to-day use after Cloud is connected ([Hosted](Cloud-Hosted-Setup) or [Self-h
 | **Settings** | OBS Dock Keys — create, rename, change role, copy, revoke one, **Revoke All**. |
 | **Account** | Plan / billing (hosted), manage sessions (**Clear All Logins** also revokes guest links), sign out, account deletion. |
 
-Hosted Platform Admins also get an **Admin** tab for customer support (not shown on self-host).
+Hosted Platform Admins also get an **Admin** tab for customer support (not shown on self-host). The accounts list shows **Keys · OBS · Ad-hoc** counts; account detail labels each table **OBS** or **Ad-hoc** and shows matching quota usage.
 
 ### Live table cards
 
