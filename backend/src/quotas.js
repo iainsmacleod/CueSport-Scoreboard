@@ -157,6 +157,34 @@ export function getTierLimits(accountOrTier) {
   return { tier, ...tierCatalog[tier] };
 }
 
+/** Seat capacity used to compare plan tiers (null / unrestricted = unlimited). */
+export function getTierSeatCapacity(accountOrTier) {
+  const raw = typeof accountOrTier === 'string'
+    ? accountOrTier
+    : (accountOrTier?.simulated_plan || accountOrTier?.subscription_tier);
+  const key = canonicalizeTierKey(raw || '');
+  if (!key || key === 'unrestricted' || key === 'platform_admin') {
+    return Number.POSITIVE_INFINITY;
+  }
+  const limits = getTierLimits(key);
+  if (limits.maxApiKeys == null) return Number.POSITIVE_INFINITY;
+  return limits.maxApiKeys;
+}
+
+/** True when moving to a plan with fewer dock/ad-hoc seats. */
+export function isTierDowngrade(fromTier, toTier) {
+  if (toTier == null || toTier === '') return false;
+  if (fromTier == null || fromTier === '') return false;
+  const fromKey = canonicalizeTierKey(fromTier);
+  const toKey = canonicalizeTierKey(toTier);
+  const fromUnresolved = !fromKey || fromKey === 'unrestricted' || fromKey === 'platform_admin';
+  const toUnresolved = !toKey || toKey === 'unrestricted' || toKey === 'platform_admin';
+  const fromId = fromUnresolved ? 'unrestricted' : normalizeTierName(fromKey);
+  const toId = toUnresolved ? 'unrestricted' : normalizeTierName(toKey);
+  if (fromId === toId) return false;
+  return getTierSeatCapacity(toId) < getTierSeatCapacity(fromId);
+}
+
 export function getAccountUsage(accountId) {
   return {
     apiKeys: sqlite.countActiveApiKeys(accountId),

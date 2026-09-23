@@ -13,6 +13,8 @@ import {
   trialDaysForTier,
 } from '../lib/stripe-billing.js';
 import { isAdminSupportTrialActive } from '../lib/subscription-access.js';
+import { isTierDowngrade } from '../quotas.js';
+import { resetAccountSeatsForPlanDowngrade } from '../ws/room-hub.js';
 
 async function resolveAccountAuth(request) {
   const auth = request.headers.authorization || '';
@@ -73,7 +75,9 @@ function syncAccountFromSubscription(accountId, subscription) {
   if (status === 'trialing') {
     sqlite.recordEmailTrialUse(account.email);
   }
-  return sqlite.updateAccountSubscription(accountId, {
+  const previousTier = account.subscription_tier;
+  const nextTier = tier || previousTier;
+  const updated = sqlite.updateAccountSubscription(accountId, {
     subscriptionStatus: status,
     subscriptionTier: tier || undefined,
     stripeCustomerId: typeof subscription.customer === 'string'
@@ -81,6 +85,22 @@ function syncAccountFromSubscription(accountId, subscription) {
       : subscription.customer?.id,
     stripeSubscriptionId: subscription.id,
   });
+  if (
+    (status === 'active' || status === 'trialing' || status === 'past_due')
+    && isTierDowngrade(previousTier, nextTier)
+  ) {
+    const reset = resetAccountSeatsForPlanDowngrade(accountId);
+    console.info(
+      '[billing] plan downgrade reset seats',
+      JSON.stringify({
+        accountId,
+        from: previousTier,
+        to: nextTier,
+        ...reset,
+      }),
+    );
+  }
+  return updated;
 }
 
 export async function registerBillingRoutes(app) {

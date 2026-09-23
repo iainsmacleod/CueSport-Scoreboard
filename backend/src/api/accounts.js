@@ -20,6 +20,7 @@ import {
   getRoomCleanupAfter,
   resolveRoomApiKeyId,
   notifyAccountTables,
+  resetAccountSeatsForPlanDowngrade,
 } from '../ws/room-hub.js';
 import { config } from '../config.js';
 import {
@@ -28,6 +29,7 @@ import {
   getAccountQuota,
   getSimulatedPlanOptions,
   getTierDisplayName,
+  isTierDowngrade,
   resolveSimulatedPlan,
   getTiersCatalog,
 } from '../quotas.js';
@@ -176,21 +178,34 @@ export async function registerAccountRoutes(app) {
     if (!canSimulatePlan) {
       return reply.code(403).send({ error: 'Simulated plan is only available for platform admins or self-host owners' });
     }
+    const previousPlan = resolveSimulatedPlan(auth.account);
     const requested = String(request.body?.tier ?? request.body?.simulated_plan ?? '').trim().toLowerCase();
+    let nextPlan = 'unrestricted';
     if (!requested || requested === 'unrestricted' || requested === 'platform_admin') {
       sqlite.setAccountSimulatedPlan(auth.account.id, null);
+      nextPlan = 'unrestricted';
     } else {
       const catalog = getTiersCatalog();
       if (!catalog[requested]) {
         return reply.code(400).send({ error: 'Unknown tier' });
       }
       sqlite.setAccountSimulatedPlan(auth.account.id, requested);
+      nextPlan = requested;
+    }
+    let seatReset = null;
+    if (isTierDowngrade(previousPlan, nextPlan)) {
+      seatReset = resetAccountSeatsForPlanDowngrade(auth.account.id);
+      request.log?.info?.(
+        { accountId: auth.account.id, from: previousPlan, to: nextPlan, ...seatReset },
+        'simulated plan downgrade reset seats',
+      );
     }
     const account = sqlite.getAccountById(auth.account.id);
     return {
       ok: true,
       simulated_plan: resolveSimulatedPlan(account),
       quota: getAccountQuota(account),
+      seat_reset: seatReset,
       account: {
         id: account.id,
         email: account.email,

@@ -1128,8 +1128,14 @@ export function kickAccountClientsForDeletion(accountId) {
 const API_KEY_REVOKED_MESSAGE =
   'This OBS Dock Key was revoked. Create a new key in the dashboard and paste it into Connection settings.';
 
+const PLAN_DOWNGRADE_DOCK_MESSAGE =
+  'Your plan was changed to a lower tier. Dock Keys were cleared — create new keys within your plan limits and paste them into Connection settings.';
+
+const PLAN_DOWNGRADE_ADHOC_MESSAGE =
+  'Your plan was changed to a lower tier. Ad-hoc tables were cleared — create new ones within your plan limits.';
+
 /** Kick any live dock holding this API key (used on revoke). */
-export function kickApiKeyDocks(keyId) {
+export function kickApiKeyDocks(keyId, message = API_KEY_REVOKED_MESSAGE) {
   if (!keyId) return 0;
   const key = String(keyId);
   const targets = new Set();
@@ -1144,7 +1150,7 @@ export function kickApiKeyDocks(keyId) {
   for (const ws of targets) {
     // Send first; brief delay so OBS/browser can process the error before close
     // (immediate close often drops the last frame and leaves the dock UI stuck).
-    send(ws, { type: 'error', code: 'api_key_revoked', message: API_KEY_REVOKED_MESSAGE });
+    send(ws, { type: 'error', code: 'api_key_revoked', message });
     const target = ws;
     setTimeout(() => {
       try { target.close(); } catch (_) { /* ignore */ }
@@ -1159,15 +1165,59 @@ export function kickApiKeyDocks(keyId) {
  * After an API key is revoked in SQLite: disconnect docks using it and delete
  * the mapped table so dashboards drop the seat immediately (not after grace).
  */
-export function revokeApiKeySeat(keyId) {
+export function revokeApiKeySeat(keyId, message = API_KEY_REVOKED_MESSAGE) {
   if (!keyId) return { kicked: 0, roomDeleted: false, roomId: null };
   const roomId = sqlite.getRoomIdForApiKey(keyId);
-  const kicked = kickApiKeyDocks(keyId);
+  const kicked = kickApiKeyDocks(keyId, message);
   let roomDeleted = false;
   if (roomId) {
     roomDeleted = performDeleteRoom(roomId).ok;
   }
   return { kicked, roomDeleted, roomId: roomDeleted ? roomId : null };
+}
+
+/**
+ * Plan downgrade: revoke every Dock Key (kick OBS) and delete every ad-hoc table.
+ * Match history is kept. Caller should only invoke when the new tier has fewer seats.
+ */
+export function resetAccountSeatsForPlanDowngrade(accountId) {
+  if (!accountId) {
+    return {
+      keysRevoked: 0,
+      docksKicked: 0,
+      dockRoomsDeleted: 0,
+      adhocDeleted: 0,
+      adhocKicked: 0,
+    };
+  }
+  const keyIds = sqlite.revokeAllApiKeysForAccount(accountId);
+  let docksKicked = 0;
+  let dockRoomsDeleted = 0;
+  for (const keyId of keyIds) {
+    const { kicked, roomDeleted } = revokeApiKeySeat(keyId, PLAN_DOWNGRADE_DOCK_MESSAGE);
+    docksKicked += kicked;
+    if (roomDeleted) dockRoomsDeleted += 1;
+  }
+
+  const adhocRooms = sqlite.getRoomsForAccount(accountId)
+    .filter((room) => room.kind === 'impromptu');
+  let adhocDeleted = 0;
+  let adhocKicked = 0;
+  for (const room of adhocRooms) {
+    adhocKicked += kickRoomClients(room.id, {
+      code: 'plan_downgrade',
+      message: PLAN_DOWNGRADE_ADHOC_MESSAGE,
+    });
+    if (performDeleteRoom(room.id).ok) adhocDeleted += 1;
+  }
+
+  return {
+    keysRevoked: keyIds.length,
+    docksKicked,
+    dockRoomsDeleted,
+    adhocDeleted,
+    adhocKicked,
+  };
 }
 
 /**
