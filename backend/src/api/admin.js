@@ -60,18 +60,22 @@ function rejectSelfAccountAdminMutation(auth, accountId, reply) {
 }
 
 function enrichAdminRoom(room) {
-  const cleanupMs = getRoomCleanupAfter(room.id);
-  const apiKeyId = resolveRoomApiKeyId(room.id, room.api_key_id);
+  const kind = room.kind === 'impromptu' ? 'impromptu' : 'dock';
+  const cleanupMs = kind === 'dock' ? getRoomCleanupAfter(room.id) : null;
+  const apiKeyId = kind === 'dock' ? resolveRoomApiKeyId(room.id, room.api_key_id) : null;
   const apiKey = apiKeyId ? sqlite.getApiKeyById(apiKeyId) : null;
   const apiKeyLabel = apiKey?.label || room.api_key_label || null;
   return {
     ...room,
+    kind,
     api_key_id: apiKeyId || null,
     api_key_label: apiKeyLabel,
-    dock_label: apiKeyLabel || (room.dock_label !== 'Main table' && room.dock_label !== 'Default Room'
-      ? room.dock_label
-      : null) || apiKeyLabel || 'Connection',
-    dock_connected: roomHasConnectedDock(room.id),
+    dock_label: kind === 'impromptu'
+      ? (room.label || room.dock_label || 'Ad-hoc Table')
+      : (apiKeyLabel || (room.dock_label !== 'Main table' && room.dock_label !== 'Default Room'
+        ? room.dock_label
+        : null) || apiKeyLabel || 'Connection'),
+    dock_connected: kind === 'dock' ? roomHasConnectedDock(room.id) : false,
     cleanup_after: cleanupMs ? new Date(cleanupMs).toISOString() : null,
   };
 }

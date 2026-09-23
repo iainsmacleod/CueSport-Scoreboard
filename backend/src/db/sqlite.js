@@ -907,6 +907,8 @@ const ADMIN_ACCOUNT_SELECT = `
          a.deletion_started_at, a.deletion_error,
          (SELECT COUNT(*) FROM api_keys ak WHERE ak.account_id = a.id AND ak.revoked_at IS NULL) AS api_key_count,
          (SELECT COUNT(*) FROM rooms r WHERE r.account_id = a.id) AS room_count,
+         (SELECT COUNT(*) FROM rooms r WHERE r.account_id = a.id AND COALESCE(r.kind, 'dock') = 'dock') AS dock_room_count,
+         (SELECT COUNT(*) FROM rooms r WHERE r.account_id = a.id AND r.kind = 'impromptu') AS impromptu_room_count,
          (SELECT COUNT(*) FROM room_guest_tokens g WHERE g.account_id = a.id AND g.revoked_at IS NULL) AS guest_link_count,
          (SELECT MAX(d.last_seen_at) FROM room_docks d WHERE d.account_id = a.id) AS last_dock_seen_at
   FROM accounts a
@@ -949,6 +951,8 @@ function mapAdminAccountRow(row) {
     sessions_invalid_after: row.sessions_invalid_after || null,
     api_key_count: Number(row.api_key_count) || 0,
     room_count: Number(row.room_count) || 0,
+    dock_room_count: Number(row.dock_room_count) || 0,
+    impromptu_room_count: Number(row.impromptu_room_count) || 0,
     guest_link_count: Number(row.guest_link_count) || 0,
     last_activity_at: row.last_dock_seen_at || null,
   };
@@ -966,23 +970,29 @@ export function getAccountAdminDetail(accountId) {
   if (!row) return null;
   const account = mapAdminAccountRow(row);
   const rooms = database.prepare(
-    `SELECT r.id, r.label, r.created_at,
+    `SELECT r.id, r.label, r.kind, r.created_at,
             d.api_key_id, d.label AS dock_label, d.last_seen_at,
             (SELECT COUNT(*) FROM room_guest_tokens g
              WHERE g.room_id = r.id AND g.revoked_at IS NULL) AS guest_link_count
      FROM rooms r
      LEFT JOIN room_docks d ON d.room_id = r.id
      WHERE r.account_id = ?
-     ORDER BY r.created_at`
-  ).all(accountId).map((r) => ({
-    id: r.id,
-    label: r.label,
-    created_at: r.created_at,
-    api_key_id: r.api_key_id || null,
-    dock_label: r.dock_label || null,
-    last_seen_at: r.last_seen_at || null,
-    guest_link_count: Number(r.guest_link_count) || 0,
-  }));
+     ORDER BY CASE WHEN r.kind = 'impromptu' THEN 1 ELSE 0 END, r.created_at`
+  ).all(accountId).map((r) => {
+    const kind = r.kind === 'impromptu' ? 'impromptu' : 'dock';
+    return {
+      id: r.id,
+      label: r.label,
+      kind,
+      created_at: r.created_at,
+      api_key_id: r.api_key_id || null,
+      dock_label: kind === 'impromptu'
+        ? (r.label || 'Ad-hoc Table')
+        : (r.dock_label || null),
+      last_seen_at: r.last_seen_at || null,
+      guest_link_count: Number(r.guest_link_count) || 0,
+    };
+  });
   const apiKeys = getApiKeysForAccount(accountId);
   return {
     ...account,

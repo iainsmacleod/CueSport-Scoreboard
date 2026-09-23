@@ -2333,7 +2333,7 @@ function renderAdminAccountsTable() {
   const body = document.getElementById('adminAccountsBody');
   if (!body) return;
   if (!adminAccountsCache.length) {
-    body.innerHTML = '<tr><td colspan="7">No accounts</td></tr>';
+    body.innerHTML = '<tr><td colspan="8">No accounts</td></tr>';
     return;
   }
   body.innerHTML = adminAccountsCache.map((a) => {
@@ -2347,7 +2347,8 @@ function renderAdminAccountsTable() {
       <td>${escapeHtml(adminTierLabel(a))}</td>
       <td>${escapeHtml(formatComplimentaryUntil(a.trial_ends_at))}</td>
       <td>${Number(a.api_key_count) || 0}</td>
-      <td>${Number(a.room_count) || 0}</td>
+      <td>${Number(a.dock_room_count) || 0}</td>
+      <td>${Number(a.impromptu_room_count) || 0}</td>
       <td>${escapeHtml(a.last_activity_at ? formatLocalDate(a.last_activity_at) : '—')}</td>
     </tr>
   `;
@@ -2451,7 +2452,9 @@ async function loadAdminAccountDetail(accountId) {
         <div><strong>Created:</strong> ${escapeHtml(account.created_at ? formatLocalDate(account.created_at) : '—')}</div>
         <div><strong>Quota:</strong> ${
           quota?.limits
-            ? `${quota.usage?.apiKeys ?? 0}/${quota.limits.maxApiKeys == null ? '∞' : quota.limits.maxApiKeys} keys · ${quota.usage?.rooms ?? 0}/${quota.limits.maxRooms == null ? '∞' : quota.limits.maxRooms} tables`
+            ? `${quota.usage?.apiKeys ?? 0}/${quota.limits.maxApiKeys == null ? '∞' : quota.limits.maxApiKeys} keys · `
+              + `${quota.usage?.rooms ?? 0}/${quota.limits.maxRooms == null ? '∞' : quota.limits.maxRooms} OBS · `
+              + `${quota.usage?.impromptuTables ?? 0}/${quota.limits.maxImpromptuTables == null ? '∞' : quota.limits.maxImpromptuTables} ad-hoc`
             : '—'
         }</div>
       </div>
@@ -2467,12 +2470,22 @@ async function loadAdminAccountDetail(accountId) {
       </ul>
       <h3 class="stats-section-title">Tables</h3>
       <ul class="admin-room-list">
-        ${rooms.length ? rooms.map((r) => `
+        ${rooms.length ? rooms.map((r) => {
+          const isImpromptu = r.kind === 'impromptu';
+          const kindLabel = isImpromptu ? 'Ad-hoc' : 'OBS';
+          const name = isImpromptu
+            ? (r.label || r.dock_label || 'Ad-hoc Table')
+            : (r.dock_label || r.label || r.id);
+          const seen = isImpromptu
+            ? (r.last_seen_at ? `Updated ${formatLocalDate(r.last_seen_at)}` : 'No recent activity')
+            : (r.last_seen_at ? `Seen ${formatLocalDate(r.last_seen_at)}` : 'No dock seen');
+          return `
           <li>
-            <span>${escapeHtml(r.dock_label || r.label || r.id)} · guests ${Number(r.guest_link_count) || 0}</span>
-            <span class="hint">${escapeHtml(r.last_seen_at ? `Seen ${formatLocalDate(r.last_seen_at)}` : 'No dock seen')}</span>
+            <span><strong>${escapeHtml(kindLabel)}</strong> · ${escapeHtml(name)} · guests ${Number(r.guest_link_count) || 0}</span>
+            <span class="hint">${escapeHtml(seen)}</span>
           </li>
-        `).join('') : '<li class="hint">No tables</li>'}
+        `;
+        }).join('') : '<li class="hint">No tables</li>'}
       </ul>
       <h3 class="stats-section-title">Stats snapshot</h3>
       <div class="admin-stats-summary">
