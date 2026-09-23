@@ -10,7 +10,9 @@ import { config } from './config.js';
  *  maxControlConnectionsPerRoom = mobile + guest connections per table (dock not counted)
  *
  *  Paid / managed ids: streamer, tournament_organizer, league_director, network_organization
- *  Self-host only: selfhost
+ *  Self-host (`selfhost`) is a deployment mode label only — always unrestricted when
+ *  ALLOW_DEV_AUTH=true. Catalog nulls are kept so accidental lookups stay uncapped;
+ *  use Simulated plan to apply a paid tier's limits for local testing.
  */
 export const TIER_DISPLAY_NAMES = {
   streamer: 'Streamer',
@@ -45,11 +47,12 @@ const BUILTIN_TIERS = {
     maxImpromptuTables: 25,
     maxControlConnectionsPerRoom: 10,
   },
+  /** Label for self-host accounts — not a sold plan; limits are always unrestricted. */
   selfhost: {
-    maxApiKeys: 2,
-    maxRooms: 2,
-    maxImpromptuTables: 2,
-    maxControlConnectionsPerRoom: 5,
+    maxApiKeys: null,
+    maxRooms: null,
+    maxImpromptuTables: null,
+    maxControlConnectionsPerRoom: null,
   },
 };
 
@@ -165,17 +168,21 @@ export function getAccountUsage(accountId) {
 /** @returns {'unrestricted'|string} */
 export function resolveSimulatedPlan(account) {
   const raw = String(account?.simulated_plan || '').trim().toLowerCase();
-  if (!raw || raw === 'unrestricted' || raw === 'platform_admin') return 'unrestricted';
+  if (!raw || raw === 'unrestricted' || raw === 'platform_admin' || raw === 'selfhost') {
+    return 'unrestricted';
+  }
   return normalizeTierName(raw);
 }
 
 export function getSimulatedPlanOptions() {
   return [
     { id: 'unrestricted', label: 'Unrestricted' },
-    ...Object.keys(tierCatalog).map((id) => ({
-      id,
-      label: getTierDisplayName(id),
-    })),
+    ...Object.keys(tierCatalog)
+      .filter((id) => id !== 'selfhost')
+      .map((id) => ({
+        id,
+        label: getTierDisplayName(id),
+      })),
   ];
 }
 
@@ -200,12 +207,25 @@ function limitsPayload(limits) {
 export function getAccountQuota(account) {
   const usage = getAccountUsage(account.id);
   if (config.allowDevAuth) {
+    const simulated = resolveSimulatedPlan(account);
+    if (simulated === 'unrestricted') {
+      return {
+        tier: 'selfhost',
+        tierDisplayName: 'Self-host (unrestricted)',
+        limits: unrestrictedLimits(),
+        usage,
+        self_host_unrestricted: true,
+        simulated_plan: 'unrestricted',
+      };
+    }
+    const limits = getTierLimits(simulated);
     return {
-      tier: 'selfhost',
-      tierDisplayName: 'Self-host (unrestricted)',
-      limits: unrestrictedLimits(),
+      tier: limits.tier,
+      tierDisplayName: `${getTierDisplayName(limits.tier)} (simulated)`,
+      limits: limitsPayload(limits),
       usage,
-      self_host_unrestricted: true,
+      self_host_unrestricted: false,
+      simulated_plan: limits.tier,
     };
   }
   if (isPlatformAdmin(account)) {
@@ -289,7 +309,11 @@ export function assertCanCreateImpromptuTable(account) {
 
 /** Soft ceiling for mobile/guest seats per table. */
 export function getMaxControlConnections(account) {
-  if (config.allowDevAuth) return 100;
+  if (config.allowDevAuth) {
+    const simulated = resolveSimulatedPlan(account);
+    if (simulated === 'unrestricted') return 100;
+    return getTierLimits(simulated).maxControlConnectionsPerRoom;
+  }
   if (isPlatformAdmin(account)) {
     const simulated = resolveSimulatedPlan(account);
     if (simulated === 'unrestricted') return 100;

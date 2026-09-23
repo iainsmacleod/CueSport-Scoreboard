@@ -128,6 +128,8 @@ let matchesPage = 1;
 /** Expanded rack/frame breakdowns in match lists (collapsed by default). */
 const expandedMatchRacks = new Set();
 let isPlatformAdminUser = false;
+/** Platform admin or self-host owner may simulate catalog plan limits. */
+let canSimulatePlanUser = false;
 let adminAccountsCache = [];
 let adminSelectedId = '';
 let adminSearchTimer = null;
@@ -813,15 +815,20 @@ function isComplimentaryActive(account) {
 function buildAccountPlanLineHtml(account, quota) {
   const display = quota?.tierDisplayName || account?.subscription_tier_display || account?.subscription_tier || '—';
   const platformUnlimited = !!(quota?.platform_admin_unlimited || (isPlatformAdminUser && quota?.limits?.maxApiKeys == null));
+  const simulatedLabel = String(display).replace(/\s*\(simulated\)\s*$/i, '');
 
   if (quota?.self_host_unrestricted) {
     return 'Self-hosted deployment — unrestricted access (no subscription required)';
   }
 
+  if (dashPublicConfigCache?.allowDevAuth && quota?.simulated_plan && quota.simulated_plan !== 'unrestricted') {
+    return `Self-hosted — simulating ${escapeHtml(simulatedLabel)} limits`;
+  }
+
   if (isPlatformAdminUser) {
     return platformUnlimited
       ? 'Platform admin — unrestricted quotas (no plan required)'
-      : `Platform admin — simulating ${String(display).replace(/\s*\(simulated\)\s*$/i, '')} limits`;
+      : `Platform admin — simulating ${escapeHtml(simulatedLabel)} limits`;
   }
 
   if (isComplimentaryActive(account)) {
@@ -935,10 +942,21 @@ function renderQuota(quota, account = null) {
 function syncSimulatedPlanSelect(me) {
   const wrap = document.getElementById('simulatedPlanWrap');
   const select = document.getElementById('simulatedPlanSelect');
-  const isAdmin = !!(me?.is_platform_admin || isPlatformAdminUser);
-  wrap?.classList.toggle('hidden', !isAdmin);
-  document.getElementById('simulatedPlanHint')?.classList.toggle('hidden', !isAdmin);
-  if (!isAdmin || !select) return;
+  const canSimulate = !!(
+    me?.can_simulate_plan
+    || me?.is_platform_admin
+    || isPlatformAdminUser
+    || canSimulatePlanUser
+    || dashPublicConfigCache?.allowDevAuth
+  );
+  if (typeof me?.can_simulate_plan === 'boolean') {
+    canSimulatePlanUser = me.can_simulate_plan;
+  } else if (me?.is_platform_admin || dashPublicConfigCache?.allowDevAuth) {
+    canSimulatePlanUser = true;
+  }
+  wrap?.classList.toggle('hidden', !canSimulate);
+  document.getElementById('simulatedPlanHint')?.classList.toggle('hidden', !canSimulate);
+  if (!canSimulate || !select) return;
   const options = Array.isArray(me?.simulated_plan_options) && me.simulated_plan_options.length
     ? me.simulated_plan_options
     : [
@@ -947,7 +965,6 @@ function syncSimulatedPlanSelect(me) {
       { id: 'tournament_organizer', label: 'Tournament Organizer' },
       { id: 'league_director', label: 'League Director' },
       { id: 'network_organization', label: 'Network Organization' },
-      { id: 'selfhost', label: 'Self-host' },
     ];
   const selected = me?.account?.simulated_plan
     || me?.quota?.simulated_plan
@@ -960,7 +977,7 @@ function syncSimulatedPlanSelect(me) {
 
 async function onSimulatedPlanChange(event) {
   const select = event?.target;
-  if (!select || !isPlatformAdminUser) return;
+  if (!select || !canSimulatePlanUser) return;
   const tier = select.value || 'unrestricted';
   try {
     const result = await setSimulatedPlan(getServerUrl(), getToken(), tier);
@@ -969,7 +986,8 @@ async function onSimulatedPlanChange(event) {
     }
     if (result.quota) renderQuota(result.quota, lastAccount);
     syncSimulatedPlanSelect({
-      is_platform_admin: true,
+      can_simulate_plan: true,
+      is_platform_admin: isPlatformAdminUser,
       account: { simulated_plan: result.simulated_plan || tier },
       quota: result.quota,
       simulated_plan_options: null,
@@ -2184,7 +2202,10 @@ function setPlatformAdminUi(enabled) {
       select.value = PLATFORM_VIEW_ALL;
     }
     updatePlatformAccountFilterHint();
-    syncSimulatedPlanSelect({ is_platform_admin: false });
+    syncSimulatedPlanSelect({
+      can_simulate_plan: !!dashPublicConfigCache?.allowDevAuth,
+      is_platform_admin: false,
+    });
     const detail = document.getElementById('adminDetailPanel');
     if (detail) detail.classList.add('hidden');
     const activeAdmin = document.querySelector('.dash-tab.active[data-tab="admin"]');
@@ -4413,6 +4434,7 @@ async function applyDashboardMe(me) {
   lastAccount = me.account || null;
   const emailEl = document.getElementById('userEmail');
   if (emailEl) emailEl.textContent = me.account.email;
+  canSimulatePlanUser = !!(me.can_simulate_plan || me.is_platform_admin || dashPublicConfigCache?.allowDevAuth);
   setPlatformAdminUi(!!me.is_platform_admin);
   setActiveDashTab(localStorage.getItem(DASH_TAB_KEY) || 'tables');
   renderQuota(me.quota, me.account);

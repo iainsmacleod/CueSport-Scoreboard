@@ -25,7 +25,7 @@ Set `DEV_AUTH_SECRET` and `DEV_AUTH_ACCOUNT_EMAIL` in `.env` (see `.env.example`
 
 ### Self-host access model
 
-A normal self-hosted deployment has **one unrestricted server-owner account**, identified by `DEV_AUTH_ACCOUNT_EMAIL` and protected by `DEV_AUTH_SECRET`. It is not intended to host separate end-user accounts. Subscription testing, simulated plans, billing gates, and Platform Admin are disabled in self-host mode.
+A normal self-hosted deployment has **one unrestricted server-owner account**, identified by `DEV_AUTH_ACCOUNT_EMAIL` and protected by `DEV_AUTH_SECRET`. It is not intended to host separate end-user accounts. Billing gates and Platform Admin are disabled in self-host mode. The Account tab includes a **Simulated plan** dropdown so you can temporarily apply catalog dock-key / ad-hoc limits for local testing (default remains Unrestricted).
 
 Delegate access without sharing the owner login:
 
@@ -120,7 +120,8 @@ Built-in defaults (all overridable via the env vars above).
 | **Tournament Organizer** | `tournament_organizer` | `STRIPE_PRICE_TOURNAMENT_ORGANIZER` | 5 | 5 | 5 | Self-serve |
 | **League Director** | `league_director` | `STRIPE_PRICE_LEAGUE_DIRECTOR` | 10 | 10 | 5 | Self-serve |
 | **Network Organization** | `network_organization` | — | 25 | 25 | 10 | Contact only |
-| **Self-host** | `selfhost` | — | Unrestricted | Unrestricted | Unrestricted | Not sold (dev / Docker) |
+
+Self-host (`selfhost`) is a deployment label when `ALLOW_DEV_AUTH=true` — not a paid row above. The owner is unrestricted; **Account → Simulated plan** can apply a catalog tier’s limits for testing.
 
 Use the **Product name** column when creating Stripe Products. Map each Product’s recurring Price ID to the matching `STRIPE_PRICE_*` env var.
 
@@ -154,7 +155,7 @@ See the [plans table in Environment variables](#environment-variables) (Product 
 
 ### Platform admin + complimentary access
 
-On the managed deployment (`ALLOW_DEV_AUTH=false`), hosted multi-tenant support is gated by **`PLATFORM_ADMIN_EMAILS`** (not Dock Key roles or subscription tiers). Allowlisted service operators get `is_platform_admin` on `GET /api/me`, an **Admin** tab, a **View account** filter on Tables/Stats (**My account**, **All accounts**, or one tenant), and `/api/admin/*` routes (list tenants, read tables/stats/players, revoke keys, invalidate sessions, grant/revoke **Complimentary access** with a chosen tier). Platform admins bypass subscription/trial gates on their own account and can pick a **Simulated plan** (default **Unrestricted**, or simulate any catalog tier’s dock-key/table limits via `PATCH /api/me/simulated-plan`). In self-host mode, the owner account is unrestricted and Platform Admin plus simulated-plan controls are disabled.
+On the managed deployment (`ALLOW_DEV_AUTH=false`), hosted multi-tenant support is gated by **`PLATFORM_ADMIN_EMAILS`** (not Dock Key roles or subscription tiers). Allowlisted service operators get `is_platform_admin` on `GET /api/me`, an **Admin** tab, a **View account** filter on Tables/Stats (**My account**, **All accounts**, or one tenant), and `/api/admin/*` routes (list tenants, read tables/stats/players, revoke keys, invalidate sessions, grant/revoke **Complimentary access** with a chosen tier). Platform admins bypass subscription/trial gates on their own account and can pick a **Simulated plan** (default **Unrestricted**, or simulate any catalog tier’s dock-key/table limits via `PATCH /api/me/simulated-plan`). In self-host mode, the owner account is unrestricted by default and Platform Admin is disabled, but the same **Simulated plan** control is available on the Account tab for local quota testing.
 
 Platform admins can also permanently delete another account. The workflow requires the account email, requires a second confirmation when active Stripe billing will be cancelled, locks and disconnects the account, removes its Supabase identity, and cascade-deletes its Cloud data. **Block future signups from this email** and **Allow this email another Streamer trial** are independent opt-in deletion choices; email blocking is reversible through **Allow Future Signup**. Email/trial records and the deleted Supabase identity use HMAC fingerprints rather than retaining plaintext identity data; the identity fingerprint prevents an already-issued JWT from recreating the deleted account while still allowing a genuinely new signup unless the email was blocked. Stripe customers, invoices, and tax records remain in Stripe for accounting; subscriptions are cancelled immediately.
 
@@ -182,8 +183,8 @@ This backend is GPL-licensed alongside the scoreboard. You may run your own inst
 |--------|------|-------------|
 | GET | `/api/config/public` | Client-facing config |
 | POST | `/api/auth/dev-login` | Dev auth (secret → signed token) |
-| GET | `/api/me` | Account, rooms, keys, quota, billing flags, `is_platform_admin`, simulated plan (Bearer token) |
-| PATCH | `/api/me/simulated-plan` | Platform admin: `{ tier: "unrestricted" \| "<catalog_tier>" }` for plan-limit simulation |
+| GET | `/api/me` | Account, rooms, keys, quota, billing flags, `is_platform_admin`, `can_simulate_plan`, simulated plan (Bearer token) |
+| PATCH | `/api/me/simulated-plan` | Platform admin or self-host owner: `{ tier: "unrestricted" \| "<catalog_tier>" }` for plan-limit simulation |
 | GET | `/api/billing/plans` | Plan catalog (limits + Stripe amounts/trial days + `trialEligible` / `trialConfigured`) |
 | GET | `/api/billing/summary` | Complimentary flag + live Stripe subscription summary |
 | POST | `/api/billing/checkout` | Stripe Checkout session `{ tier, acceptedTerms }` |

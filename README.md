@@ -373,7 +373,8 @@ Use these **product names** in Stripe (and in the dashboard billing UI). Interna
 | **Tournament Organizer** | `tournament_organizer` | `STRIPE_PRICE_TOURNAMENT_ORGANIZER` | 5 | 5 | 5 | Self-serve |
 | **League Director** | `league_director` | `STRIPE_PRICE_LEAGUE_DIRECTOR` | 10 | 10 | 5 | Self-serve |
 | **Network Organization** | `network_organization` | — | 25 | 25 | 10 | Contact only (`BILLING_CONTACT_URL`) |
-| **Self-host** | `selfhost` | — | Unrestricted | Unrestricted | Unrestricted | Not sold (local / Docker when `ALLOW_DEV_AUTH=true`) |
+
+Self-host is not a billed product: with `ALLOW_DEV_AUTH=true` the owner account is unrestricted. Use **Account → Simulated plan** to temporarily apply one of the hosted tiers above for local quota testing.
 
 **Stripe setup checklist** (managed cloud):
 
@@ -396,7 +397,7 @@ Caps are overridable via `TIER_{TIER}_MAX_*` or `TIER_LIMITS_JSON` — see [`bac
 | Account model | Separate customer accounts on a managed multi-tenant service | One server-owner account; share named role-scoped Dock Keys instead of creating user accounts |
 | Other operators | Each customer manages its own account; Dock Keys and guest links delegate table access | OBS operators use Administrator / Trusted Operator / Operator Dock Keys; temporary scorers use guest links |
 | Backend | `cuesport.macleod.systems` | Your own `backend/` deployment |
-| Cost | **Streamer** (free trial then monthly) / **Tournament Organizer** / **League Director** via Stripe Checkout; **Network Organization** by contact; platform admins can grant **Complimentary access** (no card) | Free and unrestricted (you run the server) |
+| Cost | **Streamer** (free trial then monthly) / **Tournament Organizer** / **League Director** via Stripe Checkout; **Network Organization** by contact; platform admins can grant **Complimentary access** (no card) | Free and unrestricted (you run the server); optional **Simulated plan** on Account for local quota testing |
 | Platform admin | Hosted service operator support: account inspection, complimentary access, session/key actions, and account deletion | Disabled; the unrestricted owner manages the deployment and delegates access with Dock Keys |
 
 ---

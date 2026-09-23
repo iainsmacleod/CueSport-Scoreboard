@@ -480,6 +480,44 @@ async function run() {
           && me.body.quota?.self_host_unrestricted === true
           && me.body.quota?.limits?.maxApiKeys == null
       );
+      assert(
+        'Self-host exposes simulated plan controls',
+        me.body.can_simulate_plan === true
+          && me.body.account?.simulated_plan === 'unrestricted'
+          && Array.isArray(me.body.simulated_plan_options)
+          && me.body.simulated_plan_options.length > 0
+      );
+      const selfSimStreamer = await fetchJson('/api/me/simulated-plan', {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ tier: 'streamer' }),
+      });
+      assert(
+        'Self-host PATCH simulated-plan to streamer',
+        selfSimStreamer.ok
+          && selfSimStreamer.body.simulated_plan === 'streamer'
+          && selfSimStreamer.body.quota?.self_host_unrestricted === false
+          && selfSimStreamer.body.quota?.limits?.maxApiKeys === 2,
+        JSON.stringify(selfSimStreamer.body)
+      );
+      const selfSimReset = await fetchJson('/api/me/simulated-plan', {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ tier: 'unrestricted' }),
+      });
+      assert(
+        'Self-host PATCH simulated-plan back to unrestricted',
+        selfSimReset.ok
+          && selfSimReset.body.simulated_plan === 'unrestricted'
+          && selfSimReset.body.quota?.self_host_unrestricted === true,
+        JSON.stringify(selfSimReset.body)
+      );
     }
     assert(
       'GET /api/me includes trial_ends_at',
@@ -1468,7 +1506,7 @@ async function run() {
               headers: { Authorization: `Bearer ${tokenFresh}` },
             });
           }
-          // Self-host maxRooms is 2 — prune rooms from this check so later seat tests have headroom.
+          // Prune rooms from this check so later seat tests have headroom.
           const meAfterTwoKeys = await fetchJson('/api/me', {
             headers: { Authorization: `Bearer ${tokenFresh}` },
           });
@@ -2149,7 +2187,7 @@ async function run() {
     }
 
     // Dock key roles: dashboard JWT-only, operator/trusted/admin mutation gates, guest-link rules
-    // Self-host default quota is 2 OBS Dock Keys — reuse the primary key + one second seat.
+    // Reuse the primary key + one second seat for role checks.
     try {
       await wsJoin({ client: 'dashboard', apiKey });
       assert('Dashboard WS join with API key rejected', false, 'should have failed');
@@ -2862,7 +2900,8 @@ async function run() {
           headers: { Authorization: `Bearer ${tokenFresh}` },
         });
         assert('Non-admin GET /api/admin/players 403', deniedAllPlayers.status === 403);
-        const deniedSimPlan = await fetchJson('/api/me/simulated-plan', {
+        const { config: runtimeConfig } = await import('../src/config.js');
+        const simPlanRes = await fetchJson('/api/me/simulated-plan', {
           method: 'PATCH',
           headers: {
             Authorization: `Bearer ${tokenFresh}`,
@@ -2870,7 +2909,23 @@ async function run() {
           },
           body: JSON.stringify({ tier: 'streamer' }),
         });
-        assert('Non-admin PATCH simulated-plan 403', deniedSimPlan.status === 403);
+        if (runtimeConfig.allowDevAuth) {
+          assert(
+            'Self-host owner PATCH simulated-plan allowed',
+            simPlanRes.ok && simPlanRes.body.simulated_plan === 'streamer',
+            JSON.stringify(simPlanRes.body)
+          );
+          await fetchJson('/api/me/simulated-plan', {
+            method: 'PATCH',
+            headers: {
+              Authorization: `Bearer ${tokenFresh}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ tier: 'unrestricted' }),
+          });
+        } else {
+          assert('Non-admin PATCH simulated-plan 403', simPlanRes.status === 403);
+        }
       } else {
         const listed = await fetchJson('/api/admin/accounts', {
           headers: { Authorization: `Bearer ${tokenFresh}` },

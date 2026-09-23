@@ -120,6 +120,7 @@ export async function registerAccountRoutes(app) {
     const hasAccess = hasCloudSubscriptionAccess(account);
     const status = String(account.subscription_status || '').toLowerCase();
     const platformAdmin = isPlatformAdmin(account);
+    const canSimulatePlan = platformAdmin || config.allowDevAuth;
     const quota = getAccountQuota(account);
     const complimentary = isAdminSupportTrialActive(account);
     let billingSummary = null;
@@ -142,11 +143,12 @@ export async function registerAccountRoutes(app) {
         is_complimentary: complimentary,
         needs_plan: !hasAccess && !config.allowDevAuth,
         is_trialing: status === 'trialing',
-        simulated_plan: platformAdmin ? resolveSimulatedPlan(account) : null,
+        simulated_plan: canSimulatePlan ? resolveSimulatedPlan(account) : null,
         billing_summary: billingSummary,
       },
       is_platform_admin: platformAdmin,
-      simulated_plan_options: platformAdmin ? getSimulatedPlanOptions() : null,
+      can_simulate_plan: canSimulatePlan,
+      simulated_plan_options: canSimulatePlan ? getSimulatedPlanOptions() : null,
       billing: {
         stripeConfigured: isStripeConfigured() && !config.allowDevAuth,
         plansUrl: '/api/billing/plans',
@@ -170,8 +172,9 @@ export async function registerAccountRoutes(app) {
     if (!isAccountAdminAuth(auth)) {
       return reply.code(403).send({ error: 'Account sign-in required' });
     }
-    if (!isPlatformAdmin(auth.account)) {
-      return reply.code(403).send({ error: 'Platform admin required' });
+    const canSimulatePlan = isPlatformAdmin(auth.account) || config.allowDevAuth;
+    if (!canSimulatePlan) {
+      return reply.code(403).send({ error: 'Simulated plan is only available for platform admins or self-host owners' });
     }
     const requested = String(request.body?.tier ?? request.body?.simulated_plan ?? '').trim().toLowerCase();
     if (!requested || requested === 'unrestricted' || requested === 'platform_admin') {

@@ -50,6 +50,27 @@ try {
   assert('quota tracks impromptu usage', (quota.usage.impromptuTables || 0) === 1);
   assert('self-host unrestricted impromptu', quota.limits.maxImpromptuTables == null);
 
+  sqlite.setAccountSimulatedPlan(account.id, 'streamer');
+  const simAccount = sqlite.getAccountById(account.id);
+  const simQuota = quotas.getAccountQuota(simAccount);
+  assert('self-host simulated streamer caps ad-hoc', simQuota.limits.maxImpromptuTables === 2);
+  assert('self-host simulated clears unrestricted flag', simQuota.self_host_unrestricted === false);
+  assert(
+    'self-host simulated assertCanCreate still ok under limit',
+    quotas.assertCanCreateImpromptuTable(simAccount).ok === true,
+  );
+  const room2 = sqlite.createImpromptuRoom(account.id, 'Second');
+  const room3 = sqlite.createImpromptuRoom(account.id, 'Third');
+  assert('created second and third for limit test', !!room2?.id && !!room3?.id);
+  const overAccount = sqlite.getAccountById(account.id);
+  const overCheck = quotas.assertCanCreateImpromptuTable(overAccount);
+  assert('self-host simulated streamer blocks 3rd ad-hoc', overCheck.ok === false && overCheck.code === 'impromptu_table_limit');
+  sqlite.deleteRoom(room2.id);
+  sqlite.deleteRoom(room3.id);
+  sqlite.setAccountSimulatedPlan(account.id, null);
+  const resetQuota = quotas.getAccountQuota(sqlite.getAccountById(account.id));
+  assert('self-host reset to unrestricted', resetQuota.self_host_unrestricted === true && resetQuota.limits.maxImpromptuTables == null);
+
   sqlite.deleteRoom(room.id);
   assert('delete frees seat', sqlite.countImpromptuRoomsForAccount(account.id) === 0);
   assert('guest tokens cascaded', sqlite.countActiveGuestTokensForRoom(room.id) === 0);
