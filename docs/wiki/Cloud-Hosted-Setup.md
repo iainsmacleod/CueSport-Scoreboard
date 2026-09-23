@@ -6,16 +6,16 @@ Use the managed service at **[cuesport.macleod.systems](https://cuesport.macleod
 
 1. Install the OBS control panel and browser source — [Getting Started with OBS](Getting-Started-OBS).
 2. Have a Google account ready for sign-in.
-3. Know which plan you need (seats = Dock Keys = tables):
+3. Know which plan you need (Dock Keys for OBS tables; ad-hoc for dockless scoring seats):
 
-| Plan | Dock keys (tables) | Notes |
-|------|--------------------|-------|
-| **Streamer** | 2 | Card-required free trial, then monthly |
-| **Tournament Organizer** | 5 | Bills immediately |
-| **League Director** | 10 | Bills immediately |
-| **Network Organization** | 25 | Contact only |
+| Plan | Dock keys | Ad-hoc tables | Notes |
+|------|-----------|---------------|-------|
+| **Streamer** | 2 | 2 | Card-required free trial, then monthly |
+| **Tournament Organizer** | 5 | 5 | Bills immediately |
+| **League Director** | 10 | 10 | Bills immediately |
+| **Network Organization** | 25 | 25 | Contact only |
 
-Caps include mobile + guest connections per table (see the dashboard billing UI for current limits).
+Caps also include mobile + guest connections per table (see the dashboard billing UI for current limits).
 
 ## 1. Create your account
 

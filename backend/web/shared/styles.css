@@ -2193,6 +2193,12 @@ button.table-card-create:disabled {
   cursor: not-allowed;
   transform: none;
 }
+button.table-card-create.table-card-create-upgrade {
+  border-color: rgba(158, 193, 255, 0.55);
+}
+button.table-card-create.table-card-create-upgrade .table-card-create-plus {
+  color: #c9dcff;
+}
 .table-card-create-plus {
   display: block;
   font-size: 3rem;
@@ -2200,6 +2206,12 @@ button.table-card-create:disabled {
   font-weight: 300;
   color: #9ec1ff;
   margin-bottom: 0.35rem;
+}
+.table-card-create-plus .dash-action-icon {
+  display: block;
+  width: 2.75rem;
+  height: 2.75rem;
+  margin: 0 auto;
 }
 .table-card-create-label {
   display: block;

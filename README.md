@@ -365,14 +365,14 @@ See [`backend/README.md`](backend/README.md) for Supabase/Google OAuth productio
 
 Use these **product names** in Stripe (and in the dashboard billing UI). Internal ids are what Checkout/`STRIPE_PRICE_*` and quotas use.
 
-**One OBS Dock Key = one seat = one cloud table.** Room safety cap tracks keys. Mobile + guest connections are per table (dock itself is not counted).
+**One OBS Dock Key = one seat = one cloud table.** Room safety cap tracks keys. Ad-hoc tables are dockless scoring seats (separate from Dock Keys). Mobile + guest connections are per table (dock itself is not counted).
 
-| Product name (Stripe / UI) | Internal id | Stripe Price env | Dock keys (seats) | Room safety cap | Mobile + guest / table | Checkout |
-|----------------------------|-------------|------------------|-------------------|-----------------|------------------------|----------|
-| **Streamer** | `streamer` | `STRIPE_PRICE_STREAMER` | 2 | 2 | 5 | Self-serve |
-| **Tournament Organizer** | `tournament_organizer` | `STRIPE_PRICE_TOURNAMENT_ORGANIZER` | 5 | 5 | 5 | Self-serve |
-| **League Director** | `league_director` | `STRIPE_PRICE_LEAGUE_DIRECTOR` | 10 | 10 | 5 | Self-serve |
-| **Network Organization** | `network_organization` | — | 25 | 25 | 10 | Contact only (`BILLING_CONTACT_URL`) |
+| Product name (Stripe / UI) | Internal id | Stripe Price env | Dock keys (seats) | Ad-hoc tables | Room safety cap | Mobile + guest / table | Checkout |
+|----------------------------|-------------|------------------|-------------------|---------------|-----------------|------------------------|----------|
+| **Streamer** | `streamer` | `STRIPE_PRICE_STREAMER` | 2 | 2 | 2 | 5 | Self-serve |
+| **Tournament Organizer** | `tournament_organizer` | `STRIPE_PRICE_TOURNAMENT_ORGANIZER` | 5 | 5 | 5 | 5 | Self-serve |
+| **League Director** | `league_director` | `STRIPE_PRICE_LEAGUE_DIRECTOR` | 10 | 10 | 10 | 5 | Self-serve |
+| **Network Organization** | `network_organization` | — | 25 | 25 | 25 | 10 | Contact only (`BILLING_CONTACT_URL`) |
 
 Self-host is not a billed product: with `ALLOW_DEV_AUTH=true` the owner account is unrestricted. Use **Account → Simulated plan** to temporarily apply one of the hosted tiers above for local quota testing.
 

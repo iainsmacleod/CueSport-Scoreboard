@@ -422,7 +422,7 @@
           const btnLabel = plan.trialDays ? 'Start free trial' : 'Get started';
           card.innerHTML = `
             <h3>${escapeHtml(plan.displayName || plan.id)}</h3>
-            <p class="billing-plan-limits">${escapeHtml(String(limits.maxApiKeys ?? '—'))} dock keys · up to ${escapeHtml(String(limits.maxControlConnectionsPerRoom ?? '—'))} mobile/guest per table</p>
+            <p class="billing-plan-limits">${escapeHtml(String(limits.maxApiKeys ?? '—'))} dock keys · ${escapeHtml(String(limits.maxImpromptuTables ?? '—'))} ad-hoc tables · up to ${escapeHtml(String(limits.maxControlConnectionsPerRoom ?? '—'))} mobile/guest per table</p>
             <p class="billing-plan-price hint">${escapeHtml(priceText)}</p>
           `;
           const btn = document.createElement('button');

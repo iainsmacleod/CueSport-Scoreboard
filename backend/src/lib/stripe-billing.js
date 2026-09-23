@@ -215,6 +215,7 @@ function basePlanRow(id, limits) {
     limits: {
       maxApiKeys: limits.maxApiKeys,
       maxRooms: limits.maxRooms,
+      maxImpromptuTables: limits.maxImpromptuTables,
       maxControlConnectionsPerRoom: limits.maxControlConnectionsPerRoom,
     },
   };
@@ -243,6 +244,7 @@ export function buildPlansCatalog() {
       limits: {
         maxApiKeys: network.maxApiKeys,
         maxRooms: network.maxRooms,
+        maxImpromptuTables: network.maxImpromptuTables,
         maxControlConnectionsPerRoom: network.maxControlConnectionsPerRoom,
       },
     },

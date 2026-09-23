@@ -662,8 +662,6 @@ function formatCreateImpromptuCard() {
   const card = document.createElement('button');
   card.type = 'button';
   card.className = 'table-card table-card-create panel';
-  card.title = 'Create a dockless table for scoring without OBS — league nights, side tables, and multi-table events';
-  card.setAttribute('aria-label', 'Create Ad-hoc Table');
   card.dataset.action = 'create-impromptu';
   card.innerHTML = `
     <span class="table-card-create-plus" aria-hidden="true">+</span>
@@ -671,24 +669,92 @@ function formatCreateImpromptuCard() {
     <span class="table-card-create-hint">No stream? Still track the match</span>
     <span class="table-card-create-detail">League nights, side tables, and multi-table events — score from phone without OBS.</span>
   `;
+  applyImpromptuCreateCardContent(card);
   return card;
 }
 
-function canCreateImpromptuTable() {
-  if (isViewingOtherAccount()) return false;
-  const needsPlan = !!(lastAccount && lastAccount.needs_plan);
-  if (!isPlatformAdminUser && needsPlan) return false;
-  if (!lastQuota) return true;
+/** @returns {{ mode: 'create'|'needs_plan'|'at_limit'|'blocked', used?: number, max?: number, plan?: string }} */
+function getImpromptuCreateGate() {
+  if (isViewingOtherAccount()) return { mode: 'blocked' };
+  const needsPlan = !!(lastAccount && lastAccount.needs_plan) && !isPlatformAdminUser;
+  if (needsPlan) return { mode: 'needs_plan' };
+  if (!lastQuota) return { mode: 'create' };
+  if (lastQuota.platform_admin_unlimited || lastQuota.self_host_unrestricted) return { mode: 'create' };
   const limits = lastQuota.limits || {};
   const usage = lastQuota.usage || {};
-  if (lastQuota.platform_admin_unlimited || lastQuota.self_host_unrestricted) return true;
-  if (limits.maxImpromptuTables == null) return true;
-  return (usage.impromptuTables || 0) < limits.maxImpromptuTables;
+  if (limits.maxImpromptuTables == null) return { mode: 'create' };
+  const used = usage.impromptuTables || 0;
+  const max = limits.maxImpromptuTables;
+  if (used >= max) {
+    const plan = String(lastQuota.tierDisplayName || lastAccount?.subscription_tier_display || 'your plan')
+      .replace(/\s*\(simulated\)\s*$/i, '');
+    return { mode: 'at_limit', used, max, plan };
+  }
+  return { mode: 'create', used, max };
+}
+
+function canCreateImpromptuTable() {
+  return getImpromptuCreateGate().mode === 'create';
+}
+
+function applyImpromptuCreateCardContent(card, gate = getImpromptuCreateGate()) {
+  if (!card) return;
+  const plus = card.querySelector('.table-card-create-plus');
+  const label = card.querySelector('.table-card-create-label');
+  const hint = card.querySelector('.table-card-create-hint');
+  const detail = card.querySelector('.table-card-create-detail');
+  const isUpgrade = gate.mode === 'needs_plan' || gate.mode === 'at_limit';
+  card.classList.toggle('table-card-create-upgrade', isUpgrade);
+  card.dataset.action = isUpgrade ? 'upgrade-impromptu' : 'create-impromptu';
+
+  if (gate.mode === 'needs_plan') {
+    if (plus) plus.innerHTML = dashActionIcon('unlock');
+    if (label) label.textContent = 'Choose a plan';
+    if (hint) hint.textContent = 'Ad-hoc tables need an active subscription';
+    if (detail) detail.textContent = 'Unlock cloud scoring seats, then create dockless tables from here.';
+    card.title = 'Choose a plan to unlock ad-hoc tables';
+    card.setAttribute('aria-label', 'Choose a plan to unlock ad-hoc tables');
+    return;
+  }
+
+  if (gate.mode === 'at_limit') {
+    if (plus) plus.innerHTML = dashActionIcon('unlock');
+    if (label) label.textContent = 'Ad-hoc seats full';
+    if (hint) hint.textContent = `${gate.used}/${gate.max} in use on ${gate.plan}`;
+    if (detail) {
+      detail.textContent =
+        'End/Destroy an Ad-hoc match to free a seat, or upgrade for more ad-hoc tables.';
+    }
+    card.title = 'Ad-hoc limit reached — upgrade or free a seat';
+    card.setAttribute('aria-label', 'Ad-hoc limit reached — upgrade or free a seat');
+    return;
+  }
+
+  if (plus) plus.textContent = '+';
+  if (label) label.textContent = 'Create Ad-hoc Table';
+  if (hint) hint.textContent = 'No stream? Still track the match';
+  if (detail) {
+    detail.textContent =
+      'League nights, side tables, and multi-table events — score from phone without OBS.';
+  }
+  card.title =
+    'Create a dockless table for scoring without OBS — league nights, side tables, and multi-table events';
+  card.setAttribute('aria-label', 'Create Ad-hoc Table');
+}
+
+function openSubscriptionUpgradePrompt() {
+  setActiveDashTab(isPlatformAdminUser ? 'admin' : 'account');
+  document.getElementById('accountSubscriptionSection')?.scrollIntoView?.({
+    behavior: 'smooth',
+    block: 'start',
+  });
 }
 
 function syncCreateImpromptuCardState() {
-  const blocked = !canCreateImpromptuTable();
+  const gate = getImpromptuCreateGate();
+  const blocked = gate.mode === 'blocked';
   document.querySelectorAll('.table-card-create').forEach((btn) => {
+    applyImpromptuCreateCardContent(btn, gate);
     btn.disabled = blocked;
     btn.classList.toggle('is-disabled', blocked);
   });
@@ -905,17 +971,15 @@ function renderQuota(quota, account = null) {
   const atKeyLimit = !platformUnlimited
     && limits.maxApiKeys != null
     && usage.apiKeys >= limits.maxApiKeys;
-  const atImpromptuLimit = !platformUnlimited
-    && limits.maxImpromptuTables != null
-    && (usage.impromptuTables || 0) >= limits.maxImpromptuTables;
   const blocked = (!isPlatformAdminUser && needsPlan) || atKeyLimit;
   if (createBtn) createBtn.disabled = blocked;
   const impromptuHint = document.getElementById('impromptuQuotaHint');
   if (impromptuHint) {
-    if (needsPlan && !isPlatformAdminUser) {
+    const gate = getImpromptuCreateGate();
+    if (gate.mode === 'needs_plan') {
       impromptuHint.textContent = 'Choose a plan to create ad-hoc tables.';
-    } else if (atImpromptuLimit) {
-      impromptuHint.textContent = 'Ad-hoc seat limit reached — end a match to free a seat.';
+    } else if (gate.mode === 'at_limit') {
+      impromptuHint.textContent = '';
     } else if (limits.maxImpromptuTables != null) {
       impromptuHint.textContent =
         `${(usage.impromptuTables || 0)}/${limits.maxImpromptuTables} ad-hoc seats in use`;
@@ -1071,7 +1135,9 @@ function fillBillingPlanPicker(grid, account, billingMeta, plansPayload) {
     h.textContent = plan.displayName || plan.id;
     const p = document.createElement('p');
     p.className = 'billing-plan-limits';
-    p.textContent = `${limits.maxApiKeys ?? '—'} dock keys · up to ${limits.maxControlConnectionsPerRoom ?? '—'} mobile/guest per table`;
+    p.textContent =
+      `${limits.maxApiKeys ?? '—'} dock keys · ${limits.maxImpromptuTables ?? '—'} ad-hoc tables · `
+      + `up to ${limits.maxControlConnectionsPerRoom ?? '—'} mobile/guest per table`;
     card.appendChild(h);
     card.appendChild(p);
 
@@ -1494,6 +1560,9 @@ function dashActionIcon(kind) {
   }
   if (kind === 'key') {
     return `<svg ${common}><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>`;
+  }
+  if (kind === 'unlock') {
+    return `<svg ${common}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>`;
   }
   if (kind === 'kick') {
     return `<svg ${common}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="17" y1="8" x2="22" y2="13"/><line x1="22" y1="8" x2="17" y2="13"/></svg>`;
@@ -5049,7 +5118,12 @@ document.getElementById('createKeyBtn').addEventListener('click', () => {
 });
 
 async function createImpromptuTableFromDashboard() {
-  if (!canCreateImpromptuTable()) {
+  const gate = getImpromptuCreateGate();
+  if (gate.mode === 'needs_plan' || gate.mode === 'at_limit') {
+    openSubscriptionUpgradePrompt();
+    return;
+  }
+  if (gate.mode !== 'create') {
     setError('Ad-hoc tables are unavailable — check your plan or seat limit.');
     return;
   }
@@ -5075,7 +5149,7 @@ document.getElementById('createImpromptuCard')?.addEventListener('click', () => 
   createImpromptuTableFromDashboard();
 });
 document.getElementById('tableCards')?.addEventListener('click', (event) => {
-  const btn = event.target.closest('[data-action="create-impromptu"]');
+  const btn = event.target.closest('[data-action="create-impromptu"], [data-action="upgrade-impromptu"]');
   if (!btn) return;
   event.preventDefault();
   createImpromptuTableFromDashboard();

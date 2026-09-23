@@ -112,14 +112,14 @@ See [`.env.example`](.env.example).
 | `ROOM_CLEANUP_SWEEPER_MS` | How often the sweeper runs (default 10m) |
 
 Built-in defaults (all overridable via the env vars above).
-**One OBS Dock Key = one live dock connection and one cloud table** (create a separate key per table and paste into each dock). Rooms are keyed by Dock Key (`api_key_id`); the dock’s local `?instance=` only isolates localStorage / BroadcastChannel. Rooms are created when a dock connects and pruned after idle — match history is never deleted with the room.
+**One OBS Dock Key = one live dock connection and one cloud table** (create a separate key per table and paste into each dock). Rooms are keyed by Dock Key (`api_key_id`); the dock’s local `?instance=` only isolates localStorage / BroadcastChannel. Rooms are created when a dock connects and pruned after idle — match history is never deleted with the room. **Ad-hoc tables** are dockless scoring seats counted separately from Dock Keys.
 
-| Product name (Stripe / UI) | Internal id | Stripe Price env | Dock keys (seats) | Room safety cap | Mobile + guest / table | Checkout |
-|----------------------------|-------------|------------------|-------------------|-----------------|------------------------|----------|
-| **Streamer** | `streamer` | `STRIPE_PRICE_STREAMER` | 2 | 2 | 5 | Self-serve |
-| **Tournament Organizer** | `tournament_organizer` | `STRIPE_PRICE_TOURNAMENT_ORGANIZER` | 5 | 5 | 5 | Self-serve |
-| **League Director** | `league_director` | `STRIPE_PRICE_LEAGUE_DIRECTOR` | 10 | 10 | 5 | Self-serve |
-| **Network Organization** | `network_organization` | — | 25 | 25 | 10 | Contact only |
+| Product name (Stripe / UI) | Internal id | Stripe Price env | Dock keys (seats) | Ad-hoc tables | Room safety cap | Mobile + guest / table | Checkout |
+|----------------------------|-------------|------------------|-------------------|---------------|-----------------|------------------------|----------|
+| **Streamer** | `streamer` | `STRIPE_PRICE_STREAMER` | 2 | 2 | 2 | 5 | Self-serve |
+| **Tournament Organizer** | `tournament_organizer` | `STRIPE_PRICE_TOURNAMENT_ORGANIZER` | 5 | 5 | 5 | 5 | Self-serve |
+| **League Director** | `league_director` | `STRIPE_PRICE_LEAGUE_DIRECTOR` | 10 | 10 | 10 | 5 | Self-serve |
+| **Network Organization** | `network_organization` | — | 25 | 25 | 25 | 10 | Contact only |
 
 Self-host (`selfhost`) is a deployment label when `ALLOW_DEV_AUTH=true` — not a paid row above. The owner is unrestricted; **Account → Simulated plan** can apply a catalog tier’s limits for testing.
 
