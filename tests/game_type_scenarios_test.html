@@ -37,8 +37,9 @@
     and Snooker (147, golden 167, free balls / fouls). Each match records <strong>at least 5</strong>
     racks/frames. Loops shuffle game order, rack/frame order, and which player scores;
     racks also mix object-ball pots, fouls, respots (Bank/One Pocket), and undos.
-    Use <code>?loops=N</code> and optional <code>?seed=123</code> (reproducible). Serve from repo root:
-    <code>python -m http.server 8765</code> →
+    Optional <strong>local↔cloud parity</strong> cycle needs <code>?cloud=http://localhost:4003&amp;dev_secret=…</code>
+    (same as <code>run-all.mjs --cloud</code>). Use <code>?loops=N</code> and optional <code>?seed=123</code>.
+    Serve from repo root: <code>python -m http.server 8765</code> →
     <code>http://localhost:8765/tests/game_type_scenarios_test.html</code>
   </p>
   <div class="toolbar">
@@ -58,6 +59,7 @@
   <iframe id="cpFrame" title="control panel" src="../control_panel.html?instance=scenario-test"></iframe>
   <iframe id="bsFrame" title="browser source" src="../browser_source.html?instance=scenario-test"></iframe>
 
+  <script src="stats_parity_helpers.js"></script>
   <script>
   'use strict';
 
@@ -840,6 +842,377 @@
     assert(suite, 'Career highest break ≥ 167', careerHb >= 167, 'careerHb=' + careerHb);
   }
 
+  async function fetchJson(url, opts) {
+    const res = await fetch(url, opts);
+    let body = null;
+    try { body = await res.json(); } catch (e) { body = null; }
+    return { ok: res.ok, status: res.status, body: body };
+  }
+
+  async function waitCloudConnected(cp, timeoutMs) {
+    const deadline = Date.now() + (timeoutMs || 15000);
+    while (Date.now() < deadline) {
+      if (cp.cloudRelay && typeof cp.cloudRelay.isConnected === 'function' && cp.cloudRelay.isConnected()) {
+        return true;
+      }
+      await sleep(200);
+    }
+    return false;
+  }
+
+  async function tryEnableCloudParity(cp, assert) {
+    const qs = new URLSearchParams(location.search);
+    const cloudServer = String(qs.get('cloud') || '').replace(/\/$/, '');
+    const secret = qs.get('dev_secret') || '';
+    if (!cloudServer || !secret) {
+      assert('Parity', 'Cloud half available', true, 'skipped — pass ?cloud=…&dev_secret=…');
+      return null;
+    }
+    if (!cp.cloudRelay || typeof cp.cloudRelay.setCredentials !== 'function') {
+      assert('Parity', 'cloudRelay ready', false);
+      return null;
+    }
+    let health;
+    try {
+      health = await fetchJson(cloudServer + '/health', { signal: AbortSignal.timeout(5000) });
+    } catch (e) {
+      assert('Parity', 'Cloud half available', true, 'skipped — backend unreachable');
+      return null;
+    }
+    if (!health.ok || !(health.body && health.body.ok)) {
+      assert('Parity', 'Cloud half available', true, 'skipped — /health not ok');
+      return null;
+    }
+    const login = await fetchJson(cloudServer + '/api/auth/dev-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ secret: secret }),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!login.ok || !login.body || !String(login.body.access_token || '').startsWith('dev:')) {
+      assert('Parity', 'Cloud dev-login', false, JSON.stringify(login.body));
+      return null;
+    }
+    const token = login.body.access_token;
+    const keyLabel = 'scenario-parity-' + Date.now().toString(36);
+    let apiKey = null;
+    const keyRes = await fetchJson(cloudServer + '/api/api-keys', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label: keyLabel }),
+    });
+    if (keyRes.ok && keyRes.body && keyRes.body.key && keyRes.body.key.length === 32) {
+      apiKey = keyRes.body.key;
+    } else if (keyRes.body && keyRes.body.code === 'api_key_limit') {
+      const me = await fetchJson(cloudServer + '/api/me', {
+        headers: { Authorization: 'Bearer ' + token },
+      });
+      const existingId = me.body && me.body.api_keys && me.body.api_keys[0] && me.body.api_keys[0].id;
+      if (existingId) {
+        const viewed = await fetchJson(cloudServer + '/api/api-keys/' + existingId, {
+          headers: { Authorization: 'Bearer ' + token },
+        });
+        apiKey = viewed.body && viewed.body.key;
+      }
+    }
+    if (!apiKey || apiKey.length !== 32) {
+      assert('Parity', 'Cloud OBS Dock Key', false, keyRes.body && (keyRes.body.message || keyRes.body.error));
+      return null;
+    }
+    cp.cloudRelay.setCredentials({
+      serverUrl: cloudServer,
+      apiKey: apiKey,
+      accessToken: token,
+      roomId: '',
+    });
+    cp.cloudRelay.setEnabled(true);
+    const connected = await waitCloudConnected(cp, 20000);
+    assert('Parity', 'Cloud dock connected', connected);
+    if (!connected) {
+      await disableCloudParity(cp);
+      return null;
+    }
+    assert('Parity', 'Cloud stats mode on', cp.PlayerStats.isCloudStatsMode() === true);
+    return { server: cloudServer, token: token, apiKey: apiKey };
+  }
+
+  async function disableCloudParity(cp) {
+    try {
+      if (cp.cloudRelay) {
+        if (typeof cp.cloudRelay.setEnabled === 'function') {
+          cp.cloudRelay.setEnabled(false);
+        }
+        if (typeof cp.cloudRelay.clearSession === 'function') {
+          cp.cloudRelay.clearSession();
+        }
+      }
+      if (cp.PlayerStats && typeof cp.PlayerStats.invalidateCloudStatsCache === 'function') {
+        cp.PlayerStats.invalidateCloudStatsCache();
+      }
+    } catch (e) { /* ignore teardown errors */ }
+    await sleep(200);
+  }
+
+  async function snapshotLocalTyped(cp, playerId, gameType) {
+    const p = await cp.PlayerStats.getPlayer(playerId);
+    return window.StatsParity.typedCareerFromLocalPlayer(p, gameType);
+  }
+
+  async function snapshotCloudTyped(cp, playerName, gameType) {
+    if (typeof cp.PlayerStats.invalidateCloudStatsCache === 'function') {
+      cp.PlayerStats.invalidateCloudStatsCache();
+    }
+    const data = await cp.PlayerStats.fetchCloudStats();
+    const player = window.StatsParity.findCloudPlayerByName(data, playerName);
+    return window.StatsParity.typedCareerFromCloudPlayer(player, gameType);
+  }
+
+  async function playTiedCallEarly(cp, p1, p2, gameInfo) {
+    await setPlayers(cp, p1, p2);
+    await setupGame(cp, 'game1', 5);
+    cp.document.getElementById('gameInfoTxt').value = gameInfo;
+    if (typeof cp.postInfo === 'function') cp.postInfo();
+    cp.setStorageItem('p1ScoreCtrlPanel', 0);
+    cp.setStorageItem('p2ScoreCtrlPanel', 0);
+    cp.document.getElementById('p1Score').value = '0';
+    cp.document.getElementById('p2Score').value = '0';
+    cp.resetBallTracker();
+    // Two racks each → tied Call Early draw
+    await winBreakAndRun(cp, POOL_GAMES[0], '1', () => 0.5);
+    await winBreakAndRun(cp, POOL_GAMES[0], '2', () => 0.5);
+    await winTableRun(cp, POOL_GAMES[0], '1', () => 0.5);
+    await winTableRun(cp, POOL_GAMES[0], '2', () => 0.5);
+    const scores = {
+      p1: parseInt(cp.getStorageItem('p1ScoreCtrlPanel') || '0', 10),
+      p2: parseInt(cp.getStorageItem('p2ScoreCtrlPanel') || '0', 10),
+    };
+    if (scores.p1 !== scores.p2) {
+      // Force tie on the board before Call Early if rack helpers drifted.
+      const tie = Math.min(scores.p1, scores.p2);
+      cp.setStorageItem('p1ScoreCtrlPanel', tie);
+      cp.setStorageItem('p2ScoreCtrlPanel', tie);
+      cp.document.getElementById('p1Score').value = String(tie);
+      cp.document.getElementById('p2Score').value = String(tie);
+      const match = pendingMatch(cp);
+      if (match) {
+        match.finalScore = { p1: tie, p2: tie };
+      }
+    }
+    const saved = await cp.PlayerStats.callGame();
+    await sleep(300);
+    return saved;
+  }
+
+  async function playShortPoolWithRuns(cp, p1, p2, gameInfo) {
+    await setPlayers(cp, p1, p2);
+    await setupGame(cp, 'game1', 3);
+    cp.document.getElementById('gameInfoTxt').value = gameInfo;
+    if (typeof cp.postInfo === 'function') cp.postInfo();
+    cp.setStorageItem('p1ScoreCtrlPanel', 0);
+    cp.setStorageItem('p2ScoreCtrlPanel', 0);
+    cp.document.getElementById('p1Score').value = '0';
+    cp.document.getElementById('p2Score').value = '0';
+    cp.resetBallTracker();
+    await winBreakAndRun(cp, POOL_GAMES[0], '1', () => 0.5);
+    await winTableRun(cp, POOL_GAMES[0], '2', () => 0.5);
+    await winBreakAndRun(cp, POOL_GAMES[0], '1', () => 0.5);
+    await finishMatch(cp);
+    await sleep(300);
+  }
+
+  async function runLocalCloudParityCycle(cp, assert, tag) {
+    const SP = window.StatsParity;
+    assert('Parity', 'StatsParity helpers loaded', !!(SP && SP.assertCareerParity));
+    if (!SP) return;
+
+    // Ensure local mode for local half
+    await disableCloudParity(cp);
+    assert('Parity', 'Local mode for local half',
+      cp.PlayerStats.isCloudStatsMode() === false &&
+      cp.PlayerStats.skipLocalCareerWrites() === false);
+
+    const drawName1 = ('PL' + tag + 'D1').slice(0, 20);
+    const drawName2 = ('PL' + tag + 'D2').slice(0, 20);
+    const poolName1 = ('PL' + tag + 'P1').slice(0, 20);
+    const poolName2 = ('PL' + tag + 'P2').slice(0, 20);
+
+    const drawP1 = await cp.PlayerStats.ensurePlayer(drawName1);
+    const drawP2 = await cp.PlayerStats.ensurePlayer(drawName2);
+    const beforeD1 = await snapshotLocalTyped(cp, drawP1.id, 'game1');
+    const beforeD2 = await snapshotLocalTyped(cp, drawP2.id, 'game1');
+    const drawSaved = await playTiedCallEarly(cp, drawP1, drawP2, 'Parity draw ' + tag);
+    assert('Parity', 'Local Call Early draw saved', drawSaved === true);
+    // End Match / clear board after Call Early
+    if (typeof cp.performResetScores === 'function') {
+      cp.performResetScores({ endMatch: true });
+    }
+    await sleep(200);
+    const afterD1 = await snapshotLocalTyped(cp, drawP1.id, 'game1');
+    const afterD2 = await snapshotLocalTyped(cp, drawP2.id, 'game1');
+    const localDrawDelta1 = SP.careerDelta(beforeD1, afterD1);
+    const localDrawDelta2 = SP.careerDelta(beforeD2, afterD2);
+    assert('Parity', 'Local draw gamesDrawn +1 (P1)', localDrawDelta1.gamesDrawn === 1,
+      JSON.stringify(localDrawDelta1));
+    assert('Parity', 'Local draw gamesDrawn +1 (P2)', localDrawDelta2.gamesDrawn === 1,
+      JSON.stringify(localDrawDelta2));
+    assert('Parity', 'Local draw no W/L',
+      localDrawDelta1.gamesWon === 0 && localDrawDelta1.gamesLost === 0 &&
+      localDrawDelta2.gamesWon === 0 && localDrawDelta2.gamesLost === 0);
+
+    const h2hLocal = await cp.PlayerStats.getHeadToHead(drawP1.id, drawP2.id);
+    assert('Parity', 'Local H2H Matches Drawn',
+      !!(h2hLocal && h2hLocal.gamesDrawn &&
+        (h2hLocal.gamesDrawn[drawP1.id] || 0) >= 1 &&
+        (h2hLocal.gamesDrawn[drawP2.id] || 0) >= 1),
+      h2hLocal && JSON.stringify(h2hLocal.gamesDrawn));
+
+    const poolP1 = await cp.PlayerStats.ensurePlayer(poolName1);
+    const poolP2 = await cp.PlayerStats.ensurePlayer(poolName2);
+    const beforeP1 = await snapshotLocalTyped(cp, poolP1.id, 'game1');
+    const beforeP2 = await snapshotLocalTyped(cp, poolP2.id, 'game1');
+    await playShortPoolWithRuns(cp, poolP1, poolP2, 'Parity pool ' + tag);
+    const afterP1 = await snapshotLocalTyped(cp, poolP1.id, 'game1');
+    const afterP2 = await snapshotLocalTyped(cp, poolP2.id, 'game1');
+    const localPoolDelta1 = SP.careerDelta(beforeP1, afterP1);
+    const localPoolDelta2 = SP.careerDelta(beforeP2, afterP2);
+    assert('Parity', 'Local pool B&R credited',
+      localPoolDelta1.breakAndRuns + localPoolDelta2.breakAndRuns >= 1,
+      JSON.stringify({ p1: localPoolDelta1, p2: localPoolDelta2 }));
+    assert('Parity', 'Local pool TR credited',
+      localPoolDelta1.tableRuns + localPoolDelta2.tableRuns >= 1,
+      JSON.stringify({ p1: localPoolDelta1, p2: localPoolDelta2 }));
+
+    // Edit preserve: B&R survives normalizeRacksPayload via saveMatch
+    const editP1 = await cp.PlayerStats.ensurePlayer(('PE' + tag + '1').slice(0, 20));
+    const editP2 = await cp.PlayerStats.ensurePlayer(('PE' + tag + '2').slice(0, 20));
+    const savedEdit = await cp.PlayerStats.saveMatch({
+      player1Id: editP1.id,
+      player2Id: editP2.id,
+      gameType: 'game1',
+      gameInfo: 'Parity edit ' + tag,
+      racks: [
+        {
+          winnerId: '1',
+          breakerSlot: '1',
+          breakAndRun: true,
+          tableRun: false,
+          ballsP1: 8,
+          ballsP2: 0,
+          foulsP1: 0,
+          foulsP2: 0,
+        },
+        {
+          winnerId: '2',
+          breakerSlot: '2',
+          breakAndRun: false,
+          tableRun: true,
+          ballsP1: 0,
+          ballsP2: 7,
+          foulsP1: 0,
+          foulsP2: 0,
+        },
+      ],
+      ballsP1: 8,
+      ballsP2: 7,
+      date: new Date().toISOString().slice(0, 10),
+    });
+    assert('Parity', 'Edit-seed match saved with B&R',
+      !!(savedEdit && savedEdit.racks && savedEdit.racks[0] && savedEdit.racks[0].breakAndRun),
+      savedEdit && JSON.stringify(savedEdit.racks && savedEdit.racks[0]));
+    const reSaved = await cp.PlayerStats.saveMatch({
+      id: savedEdit.id,
+      player1Id: editP1.id,
+      player2Id: editP2.id,
+      gameType: 'game1',
+      gameInfo: savedEdit.gameInfo,
+      racks: savedEdit.racks,
+      ballsP1: 8,
+      ballsP2: 7,
+      date: new Date().toISOString().slice(0, 10),
+    });
+    assert('Parity', 'Re-save preserves B&R flag',
+      !!(reSaved && reSaved.racks && reSaved.racks[0] && reSaved.racks[0].breakAndRun),
+      reSaved && JSON.stringify(reSaved.racks && reSaved.racks[0]));
+    assert('Parity', 'Re-save preserves TR flag',
+      !!(reSaved && reSaved.racks && reSaved.racks[1] && reSaved.racks[1].tableRun),
+      reSaved && JSON.stringify(reSaved.racks && reSaved.racks[1]));
+    assert('Parity', 'Re-save preserves rack ballsP',
+      !!(reSaved && reSaved.racks && reSaved.racks[0] && Number(reSaved.racks[0].ballsP1) === 8),
+      reSaved && JSON.stringify(reSaved.racks && reSaved.racks[0]));
+
+    // Straight HR local
+    const stP1 = await cp.PlayerStats.ensurePlayer(('PS' + tag + '1').slice(0, 20));
+    const stP2 = await cp.PlayerStats.ensurePlayer(('PS' + tag + '2').slice(0, 20));
+    const beforeSt = await snapshotLocalTyped(cp, stP1.id, 'game4');
+    await cp.PlayerStats.saveMatch({
+      player1Id: stP1.id,
+      player2Id: stP2.id,
+      gameType: 'game4',
+      gameInfo: 'Parity straight ' + tag,
+      scoreP1: 50,
+      scoreP2: 20,
+      highestRunP1: 18,
+      highestRunP2: 7,
+      foulsP1: 1,
+      foulsP2: 0,
+      date: new Date().toISOString().slice(0, 10),
+    });
+    const afterSt = await snapshotLocalTyped(cp, stP1.id, 'game4');
+    const stDelta = SP.careerDelta(beforeSt, afterSt);
+    assert('Parity', 'Straight highestRun rolls into career', stDelta.highestRun >= 18,
+      JSON.stringify(stDelta));
+    assert('Parity', 'Straight racks stay 0', stDelta.racksWon === 0 && stDelta.racksLost === 0,
+      JSON.stringify(stDelta));
+
+    const cloudCtx = await tryEnableCloudParity(cp, assert);
+    if (!cloudCtx) {
+      return;
+    }
+
+    try {
+      const cDraw1 = await cp.PlayerStats.ensurePlayer(drawName1);
+      const cDraw2 = await cp.PlayerStats.ensurePlayer(drawName2);
+      const cBeforeD1 = await snapshotCloudTyped(cp, drawName1, 'game1');
+      const cBeforeD2 = await snapshotCloudTyped(cp, drawName2, 'game1');
+      const cDrawSaved = await playTiedCallEarly(cp, cDraw1, cDraw2, 'Parity cloud draw ' + tag);
+      assert('Parity', 'Cloud Call Early draw saved', cDrawSaved === true);
+      if (typeof cp.performResetScores === 'function') {
+        cp.performResetScores({ endMatch: true });
+      }
+      await sleep(500);
+      const cAfterD1 = await snapshotCloudTyped(cp, drawName1, 'game1');
+      const cAfterD2 = await snapshotCloudTyped(cp, drawName2, 'game1');
+      const cloudDrawDelta1 = SP.careerDelta(cBeforeD1, cAfterD1);
+      const cloudDrawDelta2 = SP.careerDelta(cBeforeD2, cAfterD2);
+      SP.assertCareerParity(assert, 'Parity', localDrawDelta1, cloudDrawDelta1, 'Draw P1 career');
+      SP.assertCareerParity(assert, 'Parity', localDrawDelta2, cloudDrawDelta2, 'Draw P2 career');
+
+      const cloudData = await cp.PlayerStats.fetchCloudStats();
+      const cloudH2H = cp.PlayerStats.buildCloudHeadToHead(cDraw1.id, cDraw2.id, cloudData);
+      const drawnVals = cloudH2H && cloudH2H.gamesDrawn
+        ? Object.keys(cloudH2H.gamesDrawn).map((k) => Number(cloudH2H.gamesDrawn[k]) || 0)
+        : [];
+      assert('Parity', 'Cloud H2H Matches Drawn',
+        drawnVals.some((n) => n >= 1),
+        cloudH2H && JSON.stringify(cloudH2H.gamesDrawn));
+
+      const cPool1 = await cp.PlayerStats.ensurePlayer(poolName1);
+      const cPool2 = await cp.PlayerStats.ensurePlayer(poolName2);
+      const cBeforeP1 = await snapshotCloudTyped(cp, poolName1, 'game1');
+      const cBeforeP2 = await snapshotCloudTyped(cp, poolName2, 'game1');
+      await playShortPoolWithRuns(cp, cPool1, cPool2, 'Parity cloud pool ' + tag);
+      await sleep(500);
+      const cAfterP1 = await snapshotCloudTyped(cp, poolName1, 'game1');
+      const cAfterP2 = await snapshotCloudTyped(cp, poolName2, 'game1');
+      SP.assertCareerParity(assert, 'Parity', localPoolDelta1, SP.careerDelta(cBeforeP1, cAfterP1), 'Pool P1 career');
+      SP.assertCareerParity(assert, 'Parity', localPoolDelta2, SP.careerDelta(cBeforeP2, cAfterP2), 'Pool P2 career');
+    } finally {
+      await disableCloudParity(cp);
+      assert('Parity', 'Local mode restored after cloud half',
+        cp.PlayerStats.isCloudStatsMode() === false);
+    }
+  }
+
   async function runAllScenarios() {
     const rows = [];
     const assert = function (suite, name, cond, detail) {
@@ -878,6 +1251,9 @@
         statusEl.textContent = 'Loop ' + loop + '/' + loops + ' — Snooker…';
         await runSnookerScenarios(cp, assert, tag, loopRand);
       }
+
+      statusEl.textContent = 'Local↔cloud parity cycle…';
+      await runLocalCloudParityCycle(cp, assert, 't' + Date.now().toString(36).slice(-5));
 
       const passed = rows.filter((r) => r.pass).length;
       const failed = rows.length - passed;

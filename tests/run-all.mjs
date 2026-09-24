@@ -277,7 +277,7 @@ async function main() {
             name: 'game_type_scenarios_test.html',
             url:
               `http://127.0.0.1:${args.staticPort}/tests/game_type_scenarios_test.html` +
-              `?autorun=1&loops=1&seed=1`,
+              `?autorun=1&loops=1&seed=1&cloud=${cloudQ}&dev_secret=${secretQ}`,
             timeoutMs: 20 * 60 * 1000,
           });
           results.push({ name: 'game_type_scenarios', ok: scenarios.ok });

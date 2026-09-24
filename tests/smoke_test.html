@@ -103,6 +103,7 @@
     <iframe id="cpFrame" title="control panel" src="../control_panel.html"></iframe>
     <iframe id="bsFrame" title="browser source" src="../browser_source.html"></iframe>
 
+    <script src="stats_parity_helpers.js"></script>
     <script>
     'use strict';
 
@@ -1913,6 +1914,143 @@
                 earlyMatch && earlyMatch.racks && String(earlyMatch.racks.length));
             cp.performResetScores({ endMatch: true });
             await sleep(200);
+
+            // --- Local career draws + edit preserve (IndexedDB parity with cloud) ---
+            assert('Local Parity', 'StatsParity helpers loaded',
+                !!(window.StatsParity && window.StatsParity.normalizeCareerSnapshot));
+            const drawA = await cp.PlayerStats.ensurePlayer(tag + '_DrawA');
+            const drawB = await cp.PlayerStats.ensurePlayer(tag + '_DrawB');
+            const beforeDrawA = window.StatsParity.typedCareerFromLocalPlayer(
+                await cp.PlayerStats.getPlayer(drawA.id), 'game1');
+            const beforeDrawB = window.StatsParity.typedCareerFromLocalPlayer(
+                await cp.PlayerStats.getPlayer(drawB.id), 'game1');
+            await cp.PlayerStats.saveMatch({
+                player1Id: drawA.id,
+                player2Id: drawB.id,
+                gameType: 'game1',
+                gameInfo: 'Smoke draw ' + tag,
+                scoreP1: 3,
+                scoreP2: 3,
+                status: 'completed',
+                date: new Date().toISOString().slice(0, 10)
+            });
+            const afterDrawA = window.StatsParity.typedCareerFromLocalPlayer(
+                await cp.PlayerStats.getPlayer(drawA.id), 'game1');
+            const afterDrawB = window.StatsParity.typedCareerFromLocalPlayer(
+                await cp.PlayerStats.getPlayer(drawB.id), 'game1');
+            const dA = window.StatsParity.careerDelta(beforeDrawA, afterDrawA);
+            const dB = window.StatsParity.careerDelta(beforeDrawB, afterDrawB);
+            assert('Local Parity', 'Tied saveMatch gamesDrawn +1 each',
+                dA.gamesDrawn === 1 && dB.gamesDrawn === 1,
+                JSON.stringify({ a: dA, b: dB }));
+            assert('Local Parity', 'Tied saveMatch no W/L',
+                dA.gamesWon === 0 && dA.gamesLost === 0 && dB.gamesWon === 0 && dB.gamesLost === 0);
+            const h2hDraw = await cp.PlayerStats.getHeadToHead(drawA.id, drawB.id);
+            assert('Local Parity', 'H2H Matches Drawn after tie',
+                !!(h2hDraw && h2hDraw.gamesDrawn &&
+                    (h2hDraw.gamesDrawn[drawA.id] || 0) >= 1 &&
+                    (h2hDraw.gamesDrawn[drawB.id] || 0) >= 1),
+                h2hDraw && JSON.stringify(h2hDraw.gamesDrawn));
+            // Also confirm Call Early draw path increments gamesDrawn.
+            cp.document.getElementById('p1Name').value = drawA.name;
+            cp.document.getElementById('p2Name').value = drawB.name;
+            cp.document.getElementById('p1Name').setAttribute('data-player-id', drawA.id);
+            cp.document.getElementById('p2Name').setAttribute('data-player-id', drawB.id);
+            cp.postNames();
+            await sleep(200);
+            if (typeof cp.gameType === 'function') cp.gameType('game1');
+            cp.document.getElementById('raceInfoTxt').value = '5';
+            cp.setStorageItem('raceInfo', '5');
+            cp.performResetScores({ endMatch: false });
+            await sleep(150);
+            cp.postScore('add', '1');
+            cp.postScore('add', '2');
+            await sleep(100);
+            const beforeCallDrawA = window.StatsParity.typedCareerFromLocalPlayer(
+                await cp.PlayerStats.getPlayer(drawA.id), 'game1');
+            const callDrawOk = await cp.PlayerStats.callGame();
+            assert('Local Parity', 'Call Early tied saves', callDrawOk === true);
+            cp.performResetScores({ endMatch: true });
+            await sleep(200);
+            const afterCallDrawA = window.StatsParity.typedCareerFromLocalPlayer(
+                await cp.PlayerStats.getPlayer(drawA.id), 'game1');
+            assert('Local Parity', 'Call Early tied gamesDrawn +1',
+                window.StatsParity.careerDelta(beforeCallDrawA, afterCallDrawA).gamesDrawn === 1,
+                JSON.stringify(window.StatsParity.careerDelta(beforeCallDrawA, afterCallDrawA)));
+
+            const editA = await cp.PlayerStats.ensurePlayer(tag + '_EditA');
+            const editB = await cp.PlayerStats.ensurePlayer(tag + '_EditB');
+            const brSeed = await cp.PlayerStats.saveMatch({
+                player1Id: editA.id,
+                player2Id: editB.id,
+                gameType: 'game1',
+                gameInfo: 'Smoke B&R edit ' + tag,
+                racks: [
+                    {
+                        winnerId: '1',
+                        breakerSlot: '1',
+                        breakAndRun: true,
+                        tableRun: false,
+                        ballsP1: 8,
+                        ballsP2: 0,
+                        foulsP1: 0,
+                        foulsP2: 1
+                    }
+                ],
+                ballsP1: 8,
+                ballsP2: 0,
+                date: new Date().toISOString().slice(0, 10)
+            });
+            assert('Local Parity', 'Seed match keeps B&R after normalize',
+                !!(brSeed && brSeed.racks && brSeed.racks[0] && brSeed.racks[0].breakAndRun &&
+                    brSeed.racks[0].breakerSlot === '1' && Number(brSeed.racks[0].ballsP1) === 8),
+                brSeed && JSON.stringify(brSeed.racks && brSeed.racks[0]));
+            const brResave = await cp.PlayerStats.saveMatch({
+                id: brSeed.id,
+                player1Id: editA.id,
+                player2Id: editB.id,
+                gameType: 'game1',
+                gameInfo: brSeed.gameInfo,
+                racks: brSeed.racks,
+                ballsP1: 8,
+                ballsP2: 0,
+                date: new Date().toISOString().slice(0, 10)
+            });
+            assert('Local Parity', 'Re-save preserves B&R / ballsP',
+                !!(brResave && brResave.racks && brResave.racks[0] &&
+                    brResave.racks[0].breakAndRun && Number(brResave.racks[0].ballsP1) === 8),
+                brResave && JSON.stringify(brResave.racks && brResave.racks[0]));
+            const editCareer = await cp.PlayerStats.getPlayer(editA.id);
+            const editTyped = editCareer && editCareer.stats && editCareer.stats.byGameType &&
+                editCareer.stats.byGameType.game1;
+            assert('Local Parity', 'Career B&R after preserved edit',
+                editTyped && (editTyped.breakAndRuns || 0) >= 1,
+                editTyped && JSON.stringify(editTyped));
+
+            const hrA = await cp.PlayerStats.ensurePlayer(tag + '_HrA');
+            const hrB = await cp.PlayerStats.ensurePlayer(tag + '_HrB');
+            const beforeHr = window.StatsParity.typedCareerFromLocalPlayer(
+                await cp.PlayerStats.getPlayer(hrA.id), 'game4');
+            await cp.PlayerStats.saveMatch({
+                player1Id: hrA.id,
+                player2Id: hrB.id,
+                gameType: 'game4',
+                gameInfo: 'Smoke HR ' + tag,
+                scoreP1: 40,
+                scoreP2: 12,
+                highestRunP1: 22,
+                highestRunP2: 5,
+                foulsP1: 0,
+                foulsP2: 1,
+                date: new Date().toISOString().slice(0, 10)
+            });
+            const afterHr = window.StatsParity.typedCareerFromLocalPlayer(
+                await cp.PlayerStats.getPlayer(hrA.id), 'game4');
+            const hrDelta = window.StatsParity.careerDelta(beforeHr, afterHr);
+            assert('Local Parity', 'Straight highestRun career', hrDelta.highestRun >= 22,
+                JSON.stringify(hrDelta));
+            assert('Local Parity', 'Straight racks W/L stay 0',
+                hrDelta.racksWon === 0 && hrDelta.racksLost === 0, JSON.stringify(hrDelta));
 
             await cp.PlayerStats.saveMatch({
                 player1Id: histP1.id,
