@@ -249,10 +249,36 @@
           <div id="statsSummary" class="stats-summary"></div>
           <hr class="stats-divider" />
           <div class="stats-toolbar">
-            <div class="autocomplete-wrapper stats-player-search">
-              <input id="statsPlayerSearch" type="search" placeholder="Search or pick a player" maxlength="20" autocomplete="off" aria-label="Search or pick a player" />
-              <div id="statsPlayerAutocomplete" class="autocomplete-list hidden"></div>
-            </div>
+            <label class="stats-filter stats-toolbar-filter">
+              Player
+              <div class="autocomplete-wrapper stats-player-search">
+                <input id="statsPlayerSearch" type="search" placeholder="Search or pick a player" maxlength="20" autocomplete="off" aria-label="Search or pick a player" />
+                <div id="statsPlayerAutocomplete" class="autocomplete-list hidden"></div>
+              </div>
+            </label>
+            <label class="stats-filter stats-toolbar-filter">
+              Event
+              <div class="autocomplete-wrapper stats-event-search">
+                <input id="statsEventSearch" type="search" placeholder="Filter by event" maxlength="60" autocomplete="off" aria-label="Filter by event" />
+                <div id="statsEventAutocomplete" class="autocomplete-list hidden"></div>
+              </div>
+            </label>
+            <label class="stats-filter stats-date-filter">
+              From
+              <span class="stats-date-input-wrap">
+                <input id="statsDateFrom" type="date" aria-label="Match date from" />
+                <button type="button" class="stats-date-clear" data-clear-date="statsDateFrom" title="Clear from date" aria-label="Clear from date" hidden>&times;</button>
+              </span>
+            </label>
+            <label class="stats-filter stats-date-filter">
+              To
+              <span class="stats-date-input-wrap">
+                <input id="statsDateTo" type="date" aria-label="Match date to" />
+                <button type="button" class="stats-date-clear" data-clear-date="statsDateTo" title="Clear to date" aria-label="Clear to date" hidden>&times;</button>
+              </span>
+            </label>
+            <button type="button" id="statsClearFiltersBtn" class="btn danger dash-action-btn" title="Clear filters" disabled>Clear</button>
+            <button type="button" id="statsRefreshBtn" class="btn info dash-action-btn" title="Refresh stats">Refresh</button>
           </div>
           <p id="statsStatus" class="hint"></p>
           <div class="stats-subtabs" role="tablist" aria-label="Stats views">
@@ -287,13 +313,13 @@
               <table class="dash-stats-table" id="statsLeaderboardTable">
                 <thead>
                   <tr>
-                    <th scope="col">Pos</th>
-                    <th scope="col" data-sort-key="name" class="stats-sortable" title="Click to sort; click again to reverse">Player</th>
-                    <th scope="col" data-sort-key="matches" class="stats-sortable" title="Click to sort; click again to reverse">Matches W/D/L</th>
-                    <th scope="col" data-sort-key="winPct" class="stats-sortable" title="Click to sort; click again to reverse">Win %</th>
-                    <th scope="col" data-sort-key="racks" class="stats-sortable" title="Click to sort; click again to reverse">Racks W/L</th>
-                    <th scope="col" data-sort-key="dateAdded" class="stats-sortable" title="Click to sort; click again to reverse">Date Added</th>
-                    <th scope="col" data-sort-key="lastPlayed" class="stats-sortable" title="Click to sort; click again to reverse">Last played</th>
+                    <th scope="col" data-label="Rank">Rank</th>
+                    <th scope="col" data-sort-key="name" data-label="Player" class="stats-sortable" title="Click to sort; click again to reverse">Player</th>
+                    <th scope="col" data-sort-key="matches" data-label="Matches W/D/L" class="stats-sortable" title="Click to sort; click again to reverse">Matches W/D/L</th>
+                    <th scope="col" data-sort-key="winPct" data-label="Win %" class="stats-sortable" title="Click to sort; click again to reverse">Win %</th>
+                    <th scope="col" data-sort-key="racks" data-label="Racks W/L" class="stats-sortable" title="Click to sort; click again to reverse">Racks W/L</th>
+                    <th scope="col" data-sort-key="dateAdded" data-label="Date Added" class="stats-sortable" title="Click to sort; click again to reverse">Date Added</th>
+                    <th scope="col" data-sort-key="lastPlayed" data-label="Last Played" class="stats-sortable" title="Click to sort; click again to reverse">Last Played</th>
                   </tr>
                 </thead>
                 <tbody id="statsLeaderboardBody"></tbody>

@@ -105,6 +105,8 @@ let statsLoading = false;
 let statsRefreshQueued = false;
 let statsRefreshTimer = null;
 let selectedPlayerKey = '';
+/** When set, overview player filter matches this roster/player id exactly (autocomplete pick). */
+let statsPlayerFilterId = '';
 let playerRenameEditing = false;
 let playerDetailOpponentFilter = '';
 let playerDetailGameFilter = '';
@@ -125,6 +127,8 @@ let leaderboardSortKey = 'matches';
 let leaderboardSortDir = 'desc';
 let leaderboardPage = 1;
 let matchesPage = 1;
+/** Distinct non-empty gameInfo values from the loaded stats blob (event filter autocomplete). */
+let cachedEventInfoOptions = [];
 /** Expanded rack/frame breakdowns in match lists (collapsed by default). */
 const expandedMatchRacks = new Set();
 let isPlatformAdminUser = false;
@@ -1538,6 +1542,9 @@ function dashActionIcon(kind) {
   if (kind === 'cancel') {
     return `<svg ${common}><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`;
   }
+  if (kind === 'clearFilters') {
+    return `<svg ${common}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/><line x1="16.5" y1="8.5" x2="21.5" y2="13.5"/><line x1="21.5" y1="8.5" x2="16.5" y2="13.5"/></svg>`;
+  }
   if (kind === 'plus') {
     return `<svg ${common}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
   }
@@ -2765,7 +2772,7 @@ function compareLeaderboardPlayers(a, b, key, dir) {
   return String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' });
 }
 
-/** Competitive standing is not shown — Pos is the current sorted row order (1-based across pages). */
+/** Standing in the current sort within the event/date scope (kept when name-filtering). */
 function sortLeaderboardPlayers(players, key = leaderboardSortKey, dir = leaderboardSortDir) {
   const sortKey = LEADERBOARD_SORT_DEFAULTS[key] ? key : 'matches';
   const sortDir = dir === 'asc' ? 'asc' : 'desc';
@@ -2815,32 +2822,45 @@ function setMatchesPage(page) {
 function leaderboardHeaderLines(label) {
   const raw = String(label || '').trim();
   const known = {
+    Rank: ['Rank', ''],
+    Player: ['Player', ''],
     'Matches W/D/L': ['Matches', 'W/D/L'],
     'Win %': ['Win', '%'],
     'Racks W/L': ['Racks', 'W/L'],
-    'Last played': ['Last', 'played'],
+    'Date Added': ['Date', 'Added'],
+    'Last Played': ['Last', 'Played'],
+    'Last played': ['Last', 'Played'],
   };
-  if (known[raw]) return known[raw];
+  if (Object.prototype.hasOwnProperty.call(known, raw)) return known[raw];
   const idx = raw.lastIndexOf(' ');
   if (idx > 0) return [raw.slice(0, idx), raw.slice(idx + 1)];
   return [raw, ''];
 }
 
 function updateLeaderboardSortHeaders() {
-  document.querySelectorAll('#statsLeaderboardTable th[data-sort-key]').forEach((th) => {
+  document.querySelectorAll('#statsLeaderboardTable thead th').forEach((th) => {
     const key = th.getAttribute('data-sort-key');
-    const label = th.getAttribute('data-label') || th.textContent.replace(/[▲▼]\s*$/, '').trim();
+    const sortable = !!key && !!LEADERBOARD_SORT_DEFAULTS[key];
+    const label = th.getAttribute('data-label')
+      || th.textContent.replace(/[▲▼]\s*$/, '').trim();
     th.setAttribute('data-label', label);
-    const active = key === leaderboardSortKey;
-    th.classList.toggle('is-sorted', active);
-    th.setAttribute('aria-sort', active
-      ? (leaderboardSortDir === 'asc' ? 'ascending' : 'descending')
-      : 'none');
-    const arrow = active ? (leaderboardSortDir === 'asc' ? '▲' : '▼') : '';
+    if (sortable) {
+      const active = key === leaderboardSortKey;
+      th.classList.toggle('is-sorted', active);
+      th.setAttribute('aria-sort', active
+        ? (leaderboardSortDir === 'asc' ? 'ascending' : 'descending')
+        : 'none');
+    } else {
+      th.classList.remove('is-sorted');
+      th.removeAttribute('aria-sort');
+    }
+    const arrow = sortable && key === leaderboardSortKey
+      ? (leaderboardSortDir === 'asc' ? '▲' : '▼')
+      : '';
     const [primary, secondary] = leaderboardHeaderLines(label);
     const secondaryHtml = secondary
       ? `<span class="stats-th-secondary">${escapeHtml(secondary)}</span>`
-      : '';
+      : `<span class="stats-th-secondary stats-th-secondary-spacer" aria-hidden="true">&nbsp;</span>`;
     const arrowHtml = arrow
       ? `<span class="sort-arrow" aria-hidden="true">${arrow}</span>`
       : '';
@@ -3084,21 +3104,84 @@ function statsFromMatches(matches) {
   return { matches, players };
 }
 
-function applyStatsFilters(data) {
-  const query = (document.getElementById('statsPlayerSearch')?.value || '').trim().toLowerCase();
-  let matches = completedMatches(data);
-  if (query) {
-    matches = matches.filter((m) =>
-      String(m.player1Name || '').toLowerCase().includes(query) ||
-      String(m.player2Name || '').toLowerCase().includes(query)
-    );
+function getOverviewFilterState() {
+  return {
+    playerQuery: (document.getElementById('statsPlayerSearch')?.value || '').trim().toLowerCase(),
+    playerId: String(statsPlayerFilterId || '').trim(),
+    eventQuery: (document.getElementById('statsEventSearch')?.value || '').trim().toLowerCase(),
+    dateFrom: String(document.getElementById('statsDateFrom')?.value || '').trim(),
+    dateTo: String(document.getElementById('statsDateTo')?.value || '').trim(),
+  };
+}
+
+/** Local calendar YYYY-MM-DD for comparing with <input type="date"> values. */
+function matchDateLocalYmd(match) {
+  const d = parseUtcDate(match?.completedAt || match?.startedAt);
+  if (!d) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/** Event + date scope (not player name) — ranking universe for Rank. */
+function matchPassesScopeFilters(m, filters) {
+  if (filters.eventQuery) {
+    const info = String(m.gameInfo || '').toLowerCase();
+    if (!info.includes(filters.eventQuery)) return false;
   }
-  const filtered = statsFromMatches(matches);
-  // Keep zero-stat roster players visible (and searchable by name).
-  // Also restore account owner labels dropped when rebuilding from matches.
-  const byServerId = new Map((data.players || []).map((p) => [String(p?.id || ''), p]));
+  if (filters.dateFrom || filters.dateTo) {
+    const ymd = matchDateLocalYmd(m);
+    if (!ymd) return false;
+    if (filters.dateFrom && ymd < filters.dateFrom) return false;
+    if (filters.dateTo && ymd > filters.dateTo) return false;
+  }
+  return true;
+}
+
+/** Autocomplete pick → exact player id; free text → name substring. */
+function matchPassesPlayerFilter(m, filters) {
+  const playerId = String(filters?.playerId || '').trim();
+  if (playerId) {
+    return String(m.player1Id || '') === playerId || String(m.player2Id || '') === playerId;
+  }
+  const playerQuery = String(filters?.playerQuery || '').trim();
+  if (!playerQuery) return true;
+  return String(m.player1Name || '').toLowerCase().includes(playerQuery)
+    || String(m.player2Name || '').toLowerCase().includes(playerQuery);
+}
+
+function playerMatchesOverviewPlayerFilter(p, filters) {
+  const playerId = String(filters?.playerId || '').trim();
+  if (playerId) return String(p?.id || '') === playerId;
+  const playerQuery = String(filters?.playerQuery || '').trim();
+  if (!playerQuery) return true;
+  return String(p?.name || '').toLowerCase().includes(playerQuery);
+}
+
+function hasOverviewPlayerFilter(filters) {
+  return !!(filters?.playerId || filters?.playerQuery);
+}
+
+function matchPassesOverviewFilters(m, filters = getOverviewFilterState()) {
+  return matchPassesScopeFilters(m, filters) && matchPassesPlayerFilter(m, filters);
+}
+
+function rebuildEventInfoCache(data) {
+  const set = new Set();
+  for (const m of data?.matches || []) {
+    const info = String(m.gameInfo || '').trim();
+    if (info) set.add(info);
+  }
+  cachedEventInfoOptions = Array.from(set).sort((a, b) =>
+    a.localeCompare(b, undefined, { sensitivity: 'base' })
+  );
+}
+
+function mergeRosterMetaIntoPlayers(filteredPlayers, dataPlayers) {
+  const byServerId = new Map((dataPlayers || []).map((p) => [String(p?.id || ''), p]));
   const seen = new Set();
-  for (const p of filtered.players || []) {
+  for (const p of filteredPlayers || []) {
     const id = String(p?.id || '').trim();
     if (!id) continue;
     seen.add(id);
@@ -3108,16 +3191,40 @@ function applyStatsFilters(data) {
     if (!p.accountId && src.accountId) p.accountId = src.accountId;
     p.createdAt = src.createdAt || p.createdAt || null;
   }
-  for (const p of data.players || []) {
-    const id = String(p?.id || '').trim();
-    if (!id || seen.has(id)) continue;
-    const played = (Number(p.gamesWon) || 0) + (Number(p.gamesDrawn) || 0) + (Number(p.gamesLost) || 0) > 0;
-    if (played) continue;
-    if (query && !String(p.name || '').toLowerCase().includes(query)) continue;
-    filtered.players.push({ ...p });
-    seen.add(id);
+  return seen;
+}
+
+/**
+ * Stats for the event/date scope (player name not applied).
+ * Zero-stat roster players are included only when no event/date scope is active.
+ */
+function buildScopedStats(data, filters = getOverviewFilterState()) {
+  const scopedMatches = completedMatches(data).filter((m) => matchPassesScopeFilters(m, filters));
+  const scoped = statsFromMatches(scopedMatches);
+  const seen = mergeRosterMetaIntoPlayers(scoped.players, data.players);
+  const hasScope = !!(filters.eventQuery || filters.dateFrom || filters.dateTo);
+  if (!hasScope) {
+    for (const p of data.players || []) {
+      const id = String(p?.id || '').trim();
+      if (!id || seen.has(id)) continue;
+      const played = (Number(p.gamesWon) || 0) + (Number(p.gamesDrawn) || 0) + (Number(p.gamesLost) || 0) > 0;
+      if (played) continue;
+      scoped.players.push({ ...p });
+      seen.add(id);
+    }
   }
-  return filtered;
+  return scoped;
+}
+
+/** Scoped stats with optional player narrowing (matches + players). */
+function applyStatsFilters(data) {
+  const filters = getOverviewFilterState();
+  const scoped = buildScopedStats(data, filters);
+  if (!hasOverviewPlayerFilter(filters)) return scoped;
+  return {
+    matches: scoped.matches.filter((m) => matchPassesPlayerFilter(m, filters)),
+    players: (scoped.players || []).filter((p) => playerMatchesOverviewPlayerFilter(p, filters)),
+  };
 }
 
 function findStatsPlayer(playerId) {
@@ -3130,6 +3237,71 @@ function statsPlayerDisplayName(playerId, fallback = '') {
   const fromStats = findStatsPlayer(playerId);
   if (fromStats?.name) return fromStats.name;
   return fallback || playerId;
+}
+
+function setStatsRefreshBusy(busy) {
+  const btn = document.getElementById('statsRefreshBtn');
+  if (btn) btn.disabled = !!busy;
+}
+
+function resetOverviewFilterPages() {
+  leaderboardPage = 1;
+  matchesPage = 1;
+}
+
+function applyOverviewFiltersChanged() {
+  selectedPlayerKey = '';
+  resetOverviewFilterPages();
+  syncStatsClearFiltersBtn();
+  if (statsData) renderAccountStats();
+}
+
+function overviewFiltersActive(filters = getOverviewFilterState()) {
+  return !!(
+    filters.playerId
+    || filters.playerQuery
+    || filters.eventQuery
+    || filters.dateFrom
+    || filters.dateTo
+  );
+}
+
+function syncStatsClearFiltersBtn() {
+  const btn = document.getElementById('statsClearFiltersBtn');
+  if (btn) btn.disabled = !overviewFiltersActive();
+}
+
+function clearOverviewFilters() {
+  const player = document.getElementById('statsPlayerSearch');
+  const event = document.getElementById('statsEventSearch');
+  const from = document.getElementById('statsDateFrom');
+  const to = document.getElementById('statsDateTo');
+  if (player) player.value = '';
+  if (event) event.value = '';
+  if (from) from.value = '';
+  if (to) to.value = '';
+  statsPlayerFilterId = '';
+  document.querySelectorAll('.stats-date-clear[data-clear-date]').forEach((btn) => {
+    btn.hidden = true;
+  });
+  applyOverviewFiltersChanged();
+}
+
+/** Fill player search and stay on overview (do not open player detail).
+ * Object with id → exact UUID filter; plain text → name substring. */
+function applyPlayerNameFilter(playerOrName) {
+  const input = document.getElementById('statsPlayerSearch');
+  if (playerOrName && typeof playerOrName === 'object') {
+    const label = String(playerOrName.name || '').trim().slice(0, 20);
+    const id = String(playerOrName.id || '').trim();
+    if (input) input.value = label;
+    statsPlayerFilterId = id;
+  } else {
+    const label = String(playerOrName || '').trim().slice(0, 20);
+    if (input) input.value = label;
+    statsPlayerFilterId = '';
+  }
+  applyOverviewFiltersChanged();
 }
 
 function renderAccountStats() {
@@ -3160,37 +3332,45 @@ function renderAccountStats() {
     return;
   }
 
-  const filtered = applyStatsFilters(statsData);
-  const searchQuery = (document.getElementById('statsPlayerSearch')?.value || '').trim().toLowerCase();
-  let matchList = recentMatches(statsData);
-  if (searchQuery) {
-    matchList = matchList.filter((m) =>
-      String(m.player1Name || '').toLowerCase().includes(searchQuery) ||
-      String(m.player2Name || '').toLowerCase().includes(searchQuery)
-    );
+  const filters = getOverviewFilterState();
+  const scoped = buildScopedStats(statsData, filters);
+  const ranked = sortLeaderboardPlayers(scoped.players);
+  ranked.forEach((p, index) => {
+    p.pos = index + 1;
+  });
+  let boardPlayers = ranked;
+  if (hasOverviewPlayerFilter(filters)) {
+    boardPlayers = ranked.filter((p) => playerMatchesOverviewPlayerFilter(p, filters));
   }
-  const racksPlayed = filtered.matches.reduce((sum, m) => {
+  const summaryMatches = hasOverviewPlayerFilter(filters)
+    ? scoped.matches.filter((m) => matchPassesPlayerFilter(m, filters))
+    : scoped.matches;
+  let matchList = recentMatches(statsData).filter((m) => matchPassesOverviewFilters(m, filters));
+
+  const racksPlayed = summaryMatches.reduce((sum, m) => {
     if (!m.scores) return sum;
     return sum + (Number(m.scores.p1) || 0) + (Number(m.scores.p2) || 0);
   }, 0);
   summaryEl.innerHTML = `
-    <div class="stats-summary-card"><strong>${filtered.matches.length}</strong><span>Completed matches</span></div>
-    <div class="stats-summary-card"><strong>${filtered.players.length}</strong><span>Players</span></div>
+    <div class="stats-summary-card"><strong>${summaryMatches.length}</strong><span>Completed matches</span></div>
+    <div class="stats-summary-card"><strong>${boardPlayers.length}</strong><span>Players</span></div>
     <div class="stats-summary-card"><strong>${racksPlayed}</strong><span>Racks / frames</span></div>
   `;
 
   updateLeaderboardSortHeaders();
 
-  if (!filtered.players.length) {
-    boardBody.innerHTML = '<tr><td colspan="7" class="dash-stats-empty">No completed matches yet. Play a race on a connected dock to populate stats.</td></tr>';
+  if (!boardPlayers.length) {
+    const emptyBoard = (hasOverviewPlayerFilter(filters) || filters.eventQuery || filters.dateFrom || filters.dateTo)
+      ? 'No players match the current filters.'
+      : 'No completed matches yet. Play a race on a connected dock to populate stats.';
+    boardBody.innerHTML = `<tr><td colspan="7" class="dash-stats-empty">${emptyBoard}</td></tr>`;
     renderLeaderboardPager(null);
   } else {
-    const sorted = sortLeaderboardPlayers(filtered.players);
-    const pageInfo = paginateItems(sorted, leaderboardPage, LEADERBOARD_PAGE_SIZE);
+    const pageInfo = paginateItems(boardPlayers, leaderboardPage, LEADERBOARD_PAGE_SIZE);
     leaderboardPage = pageInfo.page;
-    boardBody.innerHTML = pageInfo.items.map((p, index) => `
+    boardBody.innerHTML = pageInfo.items.map((p) => `
       <tr class="stats-row-clickable" data-player-id="${escapeHtml(p.id)}">
-        <td class="stats-pos">${pageInfo.startIndex + index + 1}</td>
+        <td class="stats-pos">${p.pos != null ? p.pos : ''}</td>
         <td>${escapeHtml(p.name)}${p.accountEmail ? `<div class="stats-account-email">${escapeHtml(p.accountEmail)}</div>` : ''}</td>
         <td>${formatMatchRecord(p.gamesWon, p.gamesDrawn, p.gamesLost)}</td>
         <td>${playerWinPct(p)}%</td>
@@ -3203,7 +3383,10 @@ function renderAccountStats() {
   }
 
   if (!matchList.length) {
-    matchBody.innerHTML = '<tr><td colspan="5" class="dash-stats-empty">No match history yet.</td></tr>';
+    const emptyMatches = (hasOverviewPlayerFilter(filters) || filters.eventQuery || filters.dateFrom || filters.dateTo)
+      ? 'No matches match the current filters.'
+      : 'No match history yet.';
+    matchBody.innerHTML = `<tr><td colspan="5" class="dash-stats-empty">${emptyMatches}</td></tr>`;
     renderMatchesPager(null);
   } else {
     // recentMatches() already sorts (live first, then by date desc); paginate that order.
@@ -3212,11 +3395,11 @@ function renderAccountStats() {
     matchBody.innerHTML = matchPageInfo.items.map((m) => matchOverviewRow(m)).join('');
     renderMatchesPager(matchPageInfo);
   }
-  if (statusEl) {
+  if (statusEl && !statsLoading) {
     statusEl.textContent = isViewingOtherAccount()
       ? `Showing ${getPlatformViewAccountLabel()}`
       : '';
-}
+  }
 }
 
 function matchPairHtml(m) {
@@ -4353,12 +4536,14 @@ async function loadAccountStats(force = false) {
   const token = getToken();
   if (!token) return;
   statsLoading = true;
+  setStatsRefreshBusy(true);
   const statusEl = document.getElementById('statsStatus');
   if (statusEl) {
     statusEl.textContent = isViewingOtherAccount()
       ? `Loading stats for ${getPlatformViewAccountLabel()}…`
       : 'Loading cloud stats…';
   }
+  let loadOk = false;
   try {
     if (isViewingAllAccounts()) {
       statsData = await adminFetchJson('/api/admin/stats?accountLimit=200&limitPerAccount=500');
@@ -4370,11 +4555,15 @@ async function loadAccountStats(force = false) {
       statsData = await fetchAccountStats(getServerUrl(), token);
     }
     statsLoaded = true;
-    renderAccountStats();
+    rebuildEventInfoCache(statsData);
+    loadOk = true;
   } catch (err) {
     if (statusEl) statusEl.textContent = err.message || 'Could not load cloud stats.';
   } finally {
     statsLoading = false;
+    setStatsRefreshBusy(false);
+    // Render after clearing the loading flag so status text can be replaced.
+    if (loadOk && statsData) renderAccountStats();
     if (statsRefreshQueued) {
       statsRefreshQueued = false;
       loadAccountStats(true);
@@ -4630,10 +4819,8 @@ function initStatsPlayerSearch() {
   };
 
   const applyFreeTextFilter = () => {
-    selectedPlayerKey = '';
-    leaderboardPage = 1;
-    matchesPage = 1;
-    if (statsData) renderAccountStats();
+    statsPlayerFilterId = '';
+    applyOverviewFiltersChanged();
   };
 
   const refresh = async (options = {}) => {
@@ -4674,7 +4861,7 @@ function initStatsPlayerSearch() {
           + `<span class="autocomplete-preview">${escapeHtml(formatPlayerPreview(player))}</span>`;
         item.addEventListener('mousedown', (e) => {
           e.preventDefault();
-          openPlayerFromSearch(player);
+          applyPlayerNameFilter(player);
           hideList();
         });
         list.appendChild(item);
@@ -4703,7 +4890,8 @@ function initStatsPlayerSearch() {
       if (e.key === 'Enter') {
         e.preventDefault();
         const query = input.value.trim();
-        if (query) openPlayerFromSearch(query);
+        if (query) applyPlayerNameFilter(query);
+        else applyFreeTextFilter();
       }
       return;
     }
@@ -4718,10 +4906,10 @@ function initStatsPlayerSearch() {
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (activeIndex >= 0 && results[activeIndex]) {
-        openPlayerFromSearch(results[activeIndex]);
+        applyPlayerNameFilter(results[activeIndex]);
         hideList();
       } else if (input.value.trim()) {
-        openPlayerFromSearch(input.value.trim());
+        applyPlayerNameFilter(input.value.trim());
         hideList();
       }
     } else if (e.key === 'Escape') {
@@ -4730,6 +4918,165 @@ function initStatsPlayerSearch() {
   });
   document.addEventListener('click', (e) => {
     if (!input.contains(e.target) && !list.contains(e.target)) hideList();
+  });
+}
+
+function initStatsEventSearch() {
+  const input = document.getElementById('statsEventSearch');
+  const list = document.getElementById('statsEventAutocomplete');
+  if (!input || !list) return;
+
+  let debounceTimer = null;
+  let activeIndex = -1;
+  let results = [];
+
+  const hideList = () => list.classList.add('hidden');
+  const showList = () => list.classList.remove('hidden');
+
+  const highlight = (index) => {
+    list.querySelectorAll('.autocomplete-item').forEach((item, i) => {
+      item.classList.toggle('autocomplete-active', i === index);
+    });
+  };
+
+  const applyEventFilter = (value) => {
+    input.value = String(value || '').trim().slice(0, 60);
+    applyOverviewFiltersChanged();
+  };
+
+  const refresh = (options = {}) => {
+    const browseAll = !!options.browseAll;
+    const query = input.value.trim().toLowerCase();
+    if (!query && !browseAll) {
+      hideList();
+      list.innerHTML = '';
+      applyOverviewFiltersChanged();
+      return;
+    }
+    applyOverviewFiltersChanged();
+    results = (cachedEventInfoOptions || []).filter((info) =>
+      !query || String(info).toLowerCase().includes(query)
+    ).slice(0, browseAll ? 250 : 12);
+    activeIndex = -1;
+    list.innerHTML = '';
+    list.classList.toggle('autocomplete-browse', browseAll);
+
+    if (!results.length) {
+      const empty = document.createElement('div');
+      empty.className = 'autocomplete-item autocomplete-new';
+      empty.textContent = query
+        ? `No event match — filtering for “${input.value.trim()}”`
+        : 'No event labels in loaded matches.';
+      list.appendChild(empty);
+      showList();
+      return;
+    }
+
+    results.forEach((info, index) => {
+      const item = document.createElement('div');
+      item.className = 'autocomplete-item';
+      item.dataset.index = String(index);
+      item.innerHTML = `<span class="autocomplete-name">${escapeHtml(info)}</span>`;
+      item.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        applyEventFilter(info);
+        hideList();
+      });
+      list.appendChild(item);
+    });
+    showList();
+    if (browseAll) list.scrollTop = 0;
+  };
+
+  input.addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => refresh(), 150);
+  });
+  input.addEventListener('focus', () => {
+    if (input.value.trim() || cachedEventInfoOptions.length) refresh({ browseAll: !input.value.trim() });
+  });
+  input.addEventListener('dblclick', (e) => {
+    e.preventDefault();
+    input.select();
+    refresh({ browseAll: true });
+  });
+  input.addEventListener('keydown', (e) => {
+    if (list.classList.contains('hidden')) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        applyEventFilter(input.value);
+      }
+      return;
+    }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      activeIndex = activeIndex < 0 ? 0 : Math.min(activeIndex + 1, results.length - 1);
+      highlight(activeIndex);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      activeIndex = activeIndex < 0 ? results.length - 1 : Math.max(activeIndex - 1, 0);
+      highlight(activeIndex);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (activeIndex >= 0 && results[activeIndex]) {
+        applyEventFilter(results[activeIndex]);
+        hideList();
+      } else {
+        applyEventFilter(input.value);
+        hideList();
+      }
+    } else if (e.key === 'Escape') {
+      hideList();
+    }
+  });
+  document.addEventListener('click', (e) => {
+    if (!input.contains(e.target) && !list.contains(e.target)) hideList();
+  });
+}
+
+function initStatsOverviewFilters() {
+  initStatsPlayerSearch();
+  initStatsEventSearch();
+  const fromInput = document.getElementById('statsDateFrom');
+  const toInput = document.getElementById('statsDateTo');
+
+  const syncDateClearButtons = () => {
+    document.querySelectorAll('.stats-date-clear[data-clear-date]').forEach((btn) => {
+      const input = document.getElementById(btn.getAttribute('data-clear-date') || '');
+      btn.hidden = !(input && input.value);
+    });
+  };
+
+  const onDateChange = () => {
+    syncDateClearButtons();
+    applyOverviewFiltersChanged();
+  };
+  fromInput?.addEventListener('change', onDateChange);
+  fromInput?.addEventListener('input', syncDateClearButtons);
+  toInput?.addEventListener('change', onDateChange);
+  toInput?.addEventListener('input', syncDateClearButtons);
+
+  document.querySelectorAll('.stats-date-clear[data-clear-date]').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const input = document.getElementById(btn.getAttribute('data-clear-date') || '');
+      if (!input || !input.value) return;
+      input.value = '';
+      syncDateClearButtons();
+      applyOverviewFiltersChanged();
+    });
+  });
+  syncDateClearButtons();
+  syncStatsClearFiltersBtn();
+
+  document.getElementById('statsClearFiltersBtn')?.addEventListener('click', () => {
+    if (!overviewFiltersActive()) return;
+    clearOverviewFilters();
+  });
+  document.getElementById('statsRefreshBtn')?.addEventListener('click', () => {
+    if (statsLoading) return;
+    loadAccountStats(true);
   });
 }
 
@@ -5822,7 +6169,7 @@ function initMatchPlayerAutocompleteForSlot(slot, inputId, listId) {
   });
 }
 
-initStatsPlayerSearch();
+initStatsOverviewFilters();
 initMatchPlayerAutocomplete();
 setMatchModalActionButtons();
 {
@@ -5834,6 +6181,17 @@ setMatchModalActionButtons();
       title: 'Back to stats',
     });
   }
+  setDashActionButtonContent(document.getElementById('statsClearFiltersBtn'), {
+    icon: 'clearFilters',
+    label: 'Clear',
+    title: 'Clear filters',
+  });
+  setDashActionButtonContent(document.getElementById('statsRefreshBtn'), {
+    icon: 'refresh',
+    label: 'Refresh',
+    title: 'Refresh stats',
+  });
+  syncStatsClearFiltersBtn();
   const createKeyBtn = document.getElementById('createKeyBtn');
   if (createKeyBtn) {
     setDashActionButtonContent(createKeyBtn, {

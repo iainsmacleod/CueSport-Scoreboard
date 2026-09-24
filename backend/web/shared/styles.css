@@ -168,6 +168,10 @@ a.btn:focus {
 .btn.primary { background: #7aa2f7; color: #1a1b26; font-weight: 600; }
 .btn.block { display: block; width: 100%; }
 .btn.danger { background: #f7768e; color: #1a1b26; }
+.btn.info {
+  background: #7aa2f7;
+  color: #1a1b26;
+}
 .btn.success,
 .btn.save {
   background: #9ece6a;
@@ -257,6 +261,11 @@ body.dashboard-page .btn.stream-active {
   background: rgba(255, 107, 133, 0.14);
   color: #ffdce3;
   border-color: rgba(255, 107, 133, 0.65);
+}
+body.dashboard-page .btn.info {
+  background: rgba(122, 162, 247, 0.14);
+  color: #d7e3ff;
+  border-color: rgba(122, 162, 247, 0.65);
 }
 body.dashboard-page .btn.success,
 body.dashboard-page .btn.save {
@@ -2847,15 +2856,36 @@ body.controls-locked #mobileBottomNav {
   display: flex;
   flex-wrap: wrap;
   gap: 0.55rem;
-  align-items: center;
+  align-items: flex-end;
   margin-bottom: 0.75rem;
+  /* Keep open Player/Event autocomplete above stats subtabs (hover uses transform). */
+  position: relative;
+  z-index: 2;
+  container-type: inline-size;
+  container-name: stats-toolbar;
 }
-.stats-player-search {
-  min-width: 12rem;
-  flex: 1 1 12rem;
-  max-width: 18rem;
+.stats-toolbar:focus-within {
+  z-index: 20;
 }
-.stats-player-search input {
+.stats-toolbar .stats-toolbar-filter,
+.stats-toolbar .stats-date-filter {
+  flex: 0 1 auto;
+  margin: 0;
+  min-width: 0;
+}
+.stats-toolbar .stats-player-search,
+.stats-toolbar .stats-event-search {
+  min-width: 10rem;
+  width: 12rem;
+  max-width: 14rem;
+  flex: none;
+}
+.stats-toolbar .stats-filter .autocomplete-wrapper {
+  min-width: 0;
+  width: 100%;
+}
+.stats-toolbar .stats-filter input,
+.stats-toolbar .stats-filter .autocomplete-wrapper input {
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
@@ -2865,9 +2895,73 @@ body.controls-locked #mobileBottomNav {
   border-radius: 6px;
   font-size: 1rem;
   line-height: 1.15;
-  padding: 0.55rem 0.75rem;
+  padding: 0.4rem 0.5rem;
   min-height: 2.25rem;
-  margin: 0.25rem 0;
+  margin: 0;
+}
+.stats-toolbar .stats-date-filter input[type="date"] {
+  width: 10rem;
+  min-width: 10rem;
+  padding-right: 1.7rem;
+}
+.stats-date-input-wrap {
+  position: relative;
+  display: block;
+}
+.stats-date-clear {
+  appearance: none;
+  position: absolute;
+  right: 1.65rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1.25rem;
+  height: 1.25rem;
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: #a9b1d6;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.stats-date-clear:hover {
+  color: #c0caf5;
+  background: rgba(192, 202, 245, 0.12);
+}
+.stats-date-clear[hidden] {
+  display: none;
+}
+/* Clear/Refresh: icon+label when the toolbar is wide enough; icon-only when compact. */
+.stats-toolbar #statsClearFiltersBtn,
+.stats-toolbar #statsRefreshBtn {
+  flex: 0 0 auto;
+  margin: 0;
+  align-self: flex-end;
+}
+@container stats-toolbar (max-width: 54rem) {
+  #statsClearFiltersBtn,
+  #statsRefreshBtn {
+    width: 2.75rem;
+    min-width: 2.75rem;
+    padding: 0.5rem 0.65rem;
+  }
+  #statsClearFiltersBtn .dash-action-label,
+  #statsRefreshBtn .dash-action-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
 }
 .stats-player-heading {
   display: flex;
@@ -2978,7 +3072,13 @@ body.controls-locked #mobileBottomNav {
   flex-direction: column;
   gap: 0.2rem;
   font-size: 0.75rem;
-  opacity: 0.95;
+  color: rgba(192, 202, 245, 0.95);
+}
+.stats-toolbar .stats-filter .autocomplete-list {
+  /* Opaque panel — do not inherit label opacity tricks from parents. */
+  opacity: 1;
+  background: #1a1b26;
+  color: #c0caf5;
 }
 .stats-filter select,
 .stats-filter input {
@@ -3005,6 +3105,8 @@ body.controls-locked #mobileBottomNav {
   display: flex;
   gap: 0.35rem;
   margin: 0.85rem 0 0.65rem;
+  position: relative;
+  z-index: 1;
 }
 .stats-subtab {
   flex: 1;
@@ -3066,13 +3168,32 @@ body.controls-locked #mobileBottomNav {
   font-size: 0.75rem;
   opacity: 0.75;
   font-weight: 600;
+  vertical-align: bottom;
+  line-height: 1.15;
+  white-space: normal;
+}
+.dash-stats-table th .stats-th-lines {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.05rem;
+}
+.dash-stats-table th .stats-th-primary {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.15rem;
+}
+.dash-stats-table th .stats-th-secondary {
+  font-weight: 500;
+  opacity: 0.85;
+  font-size: 0.92em;
+}
+.dash-stats-table th .stats-th-secondary-spacer {
+  visibility: hidden;
 }
 .dash-stats-table th.stats-sortable {
   cursor: pointer;
   user-select: none;
-  white-space: normal;
-  line-height: 1.15;
-  vertical-align: bottom;
   max-width: 5.5rem;
 }
 .dash-stats-table th.stats-sortable[data-sort-key="name"] {
@@ -3082,22 +3203,6 @@ body.controls-locked #mobileBottomNav {
 .dash-stats-table th.stats-sortable.is-sorted {
   opacity: 1;
   color: #c0caf5;
-}
-.dash-stats-table th.stats-sortable .stats-th-lines {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.05rem;
-}
-.dash-stats-table th.stats-sortable .stats-th-primary {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 0.15rem;
-}
-.dash-stats-table th.stats-sortable .stats-th-secondary {
-  font-weight: 500;
-  opacity: 0.85;
-  font-size: 0.92em;
 }
 .dash-stats-table th.stats-sortable .sort-arrow {
   display: inline-block;
