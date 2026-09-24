@@ -56,6 +56,8 @@ export const config = {
   impromptuAbandonedTtlMs: parseEnvMs(process.env.IMPROMPTU_ABANDONED_TTL_MS, 24 * 60 * 60 * 1000),
   /** How often the sweeper looks for rooms to prune. */
   roomCleanupSweeperMs: parseEnvMs(process.env.ROOM_CLEANUP_SWEEPER_MS, 10 * 60 * 1000),
+  /** How often to revoke Dock Keys after complimentary access expires. */
+  complimentaryExpirySweeperMs: parseEnvMs(process.env.COMPLIMENTARY_EXPIRY_SWEEPER_MS, 5 * 60 * 1000),
   /** Stripe (managed cloud billing). Leave empty on self-host. */
   stripeSecretKey: process.env.STRIPE_SECRET_KEY || '',
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || '',

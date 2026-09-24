@@ -11,7 +11,7 @@ import { fileURLToPath } from 'url';
 import WebSocket from 'ws';
 import Database from 'better-sqlite3';
 import bcrypt from 'bcryptjs';
-import { pairSessionEvents, summarizeAccountStats } from '../src/stats/account-stats.js';
+import { pairSessionEvents, summarizeAccountStats, preferSessionEnd } from '../src/stats/account-stats.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
@@ -195,6 +195,67 @@ async function run() {
       'pairSessionEvents: cross-room end does not steal later LIFO end',
       s2.end?.id === 'end-s2-cross-room',
       s2.end ? `s2 end overwritten to ${s2.end.id}` : 'missing'
+    );
+  }
+
+  // Unit: prefer race_complete over a later thin end_match (dock double-end).
+  {
+    const raceEnd = {
+      id: 'end-race',
+      room_id: 'room-dbl',
+      event_type: 'session:end',
+      session_id: 's-dbl',
+      payload: {
+        matchId: 's-dbl',
+        reason: 'race_complete',
+        winnerSlot: '1',
+        scores: { p1: 3, p2: 2 },
+        player1Id: 'p1',
+        player2Id: 'p2',
+        racks: [{ winnerSlot: '1' }, { winnerSlot: '2' }, { winnerSlot: '1' }],
+      },
+    };
+    const thinEnd = {
+      id: 'end-thin',
+      room_id: 'room-dbl',
+      event_type: 'session:end',
+      session_id: 's-dbl',
+      payload: { matchId: 's-dbl', reason: 'end_match' },
+    };
+    assert(
+      'preferSessionEnd: race_complete beats thin end_match',
+      preferSessionEnd(raceEnd, thinEnd)?.id === 'end-race'
+    );
+    assert(
+      'preferSessionEnd: thin end_match does not replace race_complete',
+      preferSessionEnd(thinEnd, raceEnd)?.id === 'end-race'
+    );
+
+    const events = [
+      // Newest first (as getAccountSessionEvents returns)
+      thinEnd,
+      raceEnd,
+      {
+        id: 'start-dbl',
+        room_id: 'room-dbl',
+        event_type: 'session:start',
+        session_id: 's-dbl',
+        payload: { sessionId: 's-dbl', player1: 'A', player2: 'B', gameType: 'game1' },
+      },
+    ];
+    const pairs = pairSessionEvents(events);
+    const rec = pairs.find((p) => p.start?.id === 'start-dbl');
+    assert(
+      'pairSessionEvents: keeps race_complete when later end_match arrives',
+      rec?.end?.id === 'end-race',
+      rec?.end ? `got ${rec.end.id}` : 'no end'
+    );
+    const summary = summarizeAccountStats(events);
+    const a = (summary.players || []).find((p) => p.name === 'A' || p.id === 'p1');
+    assert(
+      'summarizeAccountStats: double end still counts one win (not duplicated)',
+      a && a.gamesWon === 1 && a.gamesLost === 0,
+      a ? `W=${a.gamesWon} L=${a.gamesLost}` : 'missing player A'
     );
   }
 

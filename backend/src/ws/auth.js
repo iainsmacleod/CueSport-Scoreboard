@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { config } from '../config.js';
 import { isDevAuthConfigured, resolveDevAccountFromToken } from '../dev-auth.js';
 import { hasCloudSubscriptionAccess } from '../lib/subscription-access.js';
+import { enforceComplimentaryExpiryForAccount } from '../lib/complimentary-expiry.js';
 import { isPlatformAdmin } from '../lib/platform-admin.js';
 import * as sqlite from '../db/sqlite.js';
 
@@ -48,6 +49,10 @@ function sessionsInvalidated(account, jwtIssuedAtSec) {
 
 function subscriptionRequired(client, account) {
   if (hasCloudSubscriptionAccess(account)) return null;
+  // Natural complimentary expiry: revoke keys / kick seats without waiting for the sweeper.
+  if (account?.id && account?.trial_ends_at) {
+    enforceComplimentaryExpiryForAccount(account.id).catch(() => { /* ignore */ });
+  }
   if (client === 'mobile' || client === 'mobile_guest') {
     return { error: 'subscription_required', message: 'Mobile control requires an active CueSport Scoreboard Cloud subscription' };
   }

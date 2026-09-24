@@ -392,6 +392,10 @@ export async function registerAccountRoutes(app) {
       return reply.code(403).send({ error: 'Account sign-in required' });
     }
     if (!hasCloudSubscriptionAccess(auth.account)) {
+      if (auth.account.trial_ends_at) {
+        const { enforceComplimentaryExpiryForAccount } = await import('../lib/complimentary-expiry.js');
+        await enforceComplimentaryExpiryForAccount(auth.account.id).catch(() => {});
+      }
       return reply.code(403).send({
         error: 'An active subscription or trial is required to create OBS Dock Keys. Choose a plan to continue.',
         code: 'subscription_required',

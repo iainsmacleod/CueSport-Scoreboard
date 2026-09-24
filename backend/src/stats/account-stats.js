@@ -9,6 +9,50 @@ function tableLabel(event) {
   return event.room_label || 'Table';
 }
 
+/**
+ * Score a session:end for dedupe — docks may emit race_complete/call_early then a
+ * redundant end_match after clearing the board. Prefer the richer completion end.
+ */
+export function sessionEndQuality(ev) {
+  const p = ev?.payload && typeof ev.payload === 'object' ? ev.payload : {};
+  let score = 0;
+  const reason = String(p.reason || '');
+  if (reason === 'race_complete' || reason === 'call_early' || reason === 'call_match_early') {
+    score += 50;
+  } else if (reason === 'end_match') {
+    score += 5;
+  } else if (reason) {
+    score += 20;
+  }
+  const slot = p.winnerSlot != null ? String(p.winnerSlot) : '';
+  if (slot === '1' || slot === '2' || slot === 'draw' || slot === 'tie' || slot === '0') {
+    score += 40;
+  }
+  if (p.scores && typeof p.scores === 'object'
+    && (p.scores.p1 != null || p.scores.p2 != null)) {
+    score += 20;
+  }
+  if (p.player1Id || p.player2Id) score += 15;
+  if (Array.isArray(p.racks) && p.racks.length) {
+    score += Math.min(10, p.racks.length);
+  }
+  if (p.highestBreakP1 || p.highestBreakP2 || p.highestRunP1 || p.highestRunP2
+    || p.ballsP1 || p.ballsP2 || p.foulsP1 || p.foulsP2
+    || p.breakAndRunsP1 || p.breakAndRunsP2 || p.tableRunsP1 || p.tableRunsP2) {
+    score += 5;
+  }
+  return score;
+}
+
+/** Keep the higher-quality end; on a tie keep the earlier (current) end. */
+export function preferSessionEnd(current, incoming) {
+  if (!current) return incoming || null;
+  if (!incoming) return current;
+  const cq = sessionEndQuality(current);
+  const iq = sessionEndQuality(incoming);
+  return iq > cq ? incoming : current;
+}
+
 export function pairSessionEvents(events) {
   const chronological = events.slice().reverse();
   const byKey = new Map();
@@ -52,7 +96,8 @@ export function pairSessionEvents(events) {
         rec = stack[stack.length - 1] || null;
       }
       if (rec) {
-        rec.end = ev;
+        // Do not let a later thin end_match overwrite race_complete / call_early.
+        rec.end = preferSessionEnd(rec.end, ev);
         // Always clear from the start's room stack — end.room_id may differ (room delete / remap).
         takeUnmatched(rec.start?.room_id, rec);
       }

@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import * as sqlite from '../db/sqlite.js';
-import { getAccountStats } from '../stats/account-stats.js';
+import { getAccountStats, preferSessionEnd } from '../stats/account-stats.js';
 import { config } from '../config.js';
 import {
   assertCanCreateRoom,
@@ -951,7 +951,25 @@ function handleSession(ws, meta, msg) {
   }
 
   // Persist before clearing room session on end so the end row keeps session_id for pairing.
-  persistEvent(meta, `session:${action}`, payload, meta.client, sessionId);
+  // Docks may send race_complete/call_early then a redundant end_match — keep one quality end.
+  let skipPersist = false;
+  if (action === 'end') {
+    const matchKey = payload.matchId || payload.sessionId || sessionId || null;
+    const existing = matchKey ? sqlite.findMatchingSessionEnd(meta.roomId, matchKey) : null;
+    if (existing) {
+      const incoming = { event_type: 'session:end', payload, session_id: sessionId };
+      const preferred = preferSessionEnd(existing, incoming);
+      if (preferred === existing) {
+        skipPersist = true;
+      } else {
+        sqlite.updateMatchEvent(existing.id, { payload });
+        skipPersist = true;
+      }
+    }
+  }
+  if (!skipPersist) {
+    persistEvent(meta, `session:${action}`, payload, meta.client, sessionId);
+  }
   if (action === 'end') {
     sqlite.setRoomSessionId(meta.roomId, null);
   }

@@ -1022,6 +1022,19 @@ export function setAccountComplimentaryAccess(accountId, { trialEndsAt, subscrip
   return getAccountById(accountId);
 }
 
+/** List accounts that still have a complimentary end timestamp set (may be active or expired). */
+export function listAccountsWithComplimentaryEndSet() {
+  return getDb().prepare(
+    `SELECT id, email, subscription_status, subscription_tier, trial_ends_at,
+            stripe_customer_id, stripe_subscription_id
+     FROM accounts
+     WHERE trial_ends_at IS NOT NULL AND TRIM(trial_ends_at) != ''`
+  ).all().map((row) => ({
+    ...row,
+    trial_ends_at: row.trial_ends_at || null,
+  }));
+}
+
 /**
  * Revoke complimentary access. If subscription is still inactive, reset tier to streamer.
  */
@@ -1085,6 +1098,21 @@ export function getMatchEvents(roomId, limit = 100) {
     ...row,
     payload: JSON.parse(row.payload || '{}'),
   }));
+}
+
+/** Newest session:end for this room whose payload/session matches matchKey. */
+export function findMatchingSessionEnd(roomId, matchKey) {
+  if (!roomId || !matchKey) return null;
+  const key = String(matchKey);
+  for (const row of getMatchEvents(roomId, 100)) {
+    if (row.event_type !== 'session:end') continue;
+    const payload = row.payload || {};
+    const keys = [row.session_id, payload.sessionId, payload.matchId]
+      .filter(Boolean)
+      .map(String);
+    if (keys.includes(key)) return row;
+  }
+  return null;
 }
 
 /** Newest session start/end events for an account (then reversed for pairing). */

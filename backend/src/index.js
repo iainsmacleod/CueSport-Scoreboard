@@ -6,6 +6,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { config } from './config.js';
 import { handleConnection, getConnectionCount, startRoomCleanupSweeper } from './ws/room-hub.js';
+import { startComplimentaryExpirySweeper } from './lib/complimentary-expiry.js';
 import { registerAccountRoutes } from './api/accounts.js';
 import { registerAdminRoutes } from './api/admin.js';
 import { registerBillingRoutes } from './api/billing.js';
@@ -214,6 +215,7 @@ registerQrRoutes(app);
 
 sqlite.getDb();
 startRoomCleanupSweeper();
+startComplimentaryExpirySweeper(config.complimentaryExpirySweeperMs);
 
 if (!fs.existsSync(path.join(webRoot, 'mobile', 'index.html'))) {
   app.log.error(

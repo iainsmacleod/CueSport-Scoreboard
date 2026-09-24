@@ -13,6 +13,7 @@ import {
   trialDaysForTier,
 } from '../lib/stripe-billing.js';
 import { isAdminSupportTrialActive } from '../lib/subscription-access.js';
+import { revokeDockKeysIfNoCloudAccess } from '../lib/complimentary-expiry.js';
 import { isTierDowngrade } from '../quotas.js';
 import { resetAccountSeatsForPlanDowngrade } from '../ws/room-hub.js';
 
@@ -66,7 +67,7 @@ async function ensureStripeCustomer(account) {
   return customer.id;
 }
 
-function syncAccountFromSubscription(accountId, subscription) {
+async function syncAccountFromSubscription(accountId, subscription) {
   if (!accountId || !subscription) return null;
   const status = mapStripeSubscriptionStatus(subscription.status);
   const tier = tierFromSubscription(subscription);
@@ -99,6 +100,16 @@ function syncAccountFromSubscription(accountId, subscription) {
         ...reset,
       }),
     );
+  } else if (status === 'inactive') {
+    // Trial ended unpaid / canceled / incomplete_expired — revoke keys unless complimentary remains.
+    // past_due is intentionally not revoked (payment retry window).
+    const seatReset = await revokeDockKeysIfNoCloudAccess(accountId);
+    if (seatReset.revoked) {
+      console.info(
+        '[billing] subscription inactive — revoked dock keys',
+        JSON.stringify({ accountId, ...seatReset }),
+      );
+    }
   }
   return updated;
 }
@@ -336,7 +347,7 @@ async function handleStripeEvent(event, log) {
     if (accountId && subscriptionId) {
       const stripe = getStripe();
       const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-      syncAccountFromSubscription(accountId, subscription);
+      await syncAccountFromSubscription(accountId, subscription);
     }
     return;
   }
@@ -368,9 +379,17 @@ async function handleStripeEvent(event, log) {
           ? subscription.customer
           : subscription.customer?.id,
       });
+      // Period ended / canceled — revoke keys unless complimentary access remains.
+      const seatReset = await revokeDockKeysIfNoCloudAccess(accountId);
+      if (seatReset.revoked) {
+        log?.info(
+          { accountId, keys: seatReset.keysRevoked.length },
+          'Stripe subscription deleted — revoked dock keys',
+        );
+      }
       return;
     }
-    syncAccountFromSubscription(accountId, subscription);
+    await syncAccountFromSubscription(accountId, subscription);
     return;
   }
 
@@ -382,6 +401,6 @@ async function handleStripeEvent(event, log) {
     const subscription = await stripe.subscriptions.retrieve(subscriptionId);
     const accountId = subscription.metadata?.account_id
       || sqlite.findAccountIdByStripeCustomerId(customerId);
-    if (accountId) syncAccountFromSubscription(accountId, subscription);
+    if (accountId) await syncAccountFromSubscription(accountId, subscription);
   }
 }
