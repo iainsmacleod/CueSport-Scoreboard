@@ -1839,25 +1839,39 @@ export function applyImpromptuCommand(stateIn, action, payload = {}) {
           durationSeconds = Math.round((endMs - startMs) / 1000);
         }
       }
-      sessionEvents.push({
-        action: 'end',
-        payload: {
-          matchId,
-          sessionId: matchId,
-          reason,
-          winnerSlot: slot || null,
-          scores: { p1: clampSignedScore(state.p1Score), p2: clampSignedScore(state.p2Score) },
-          player1: state.player1Name,
-          player2: state.player2Name,
-          player1Id: state.player1Id || null,
-          player2Id: state.player2Id || null,
-          gameType: state.gameType,
-          gameInfo: state.gameInfo || '',
-          racks: serializeMatchRacksForCloud(state),
-          ...(durationSeconds != null ? { durationSeconds } : {}),
-          ...extras,
-        },
-      });
+      const scoreP1 = clampSignedScore(state.p1Score);
+      const scoreP2 = clampSignedScore(state.p2Score);
+      const racks = serializeMatchRacksForCloud(state);
+      const hasPlay = (Number(scoreP1) || 0) !== 0 || (Number(scoreP2) || 0) !== 0
+        || (Array.isArray(racks) && racks.length > 0)
+        || !!slot;
+      // Breaker-only / empty board: discard instead of writing a completed 0-0 draw.
+      if (!hasPlay) {
+        sessionEvents.push({
+          action: 'discard',
+          payload: { matchId, sessionId: matchId, reason: reason || 'end_match_empty' },
+        });
+      } else {
+        sessionEvents.push({
+          action: 'end',
+          payload: {
+            matchId,
+            sessionId: matchId,
+            reason,
+            winnerSlot: slot || null,
+            scores: { p1: scoreP1, p2: scoreP2 },
+            player1: state.player1Name,
+            player2: state.player2Name,
+            player1Id: state.player1Id || null,
+            player2Id: state.player2Id || null,
+            gameType: state.gameType,
+            gameInfo: state.gameInfo || '',
+            racks,
+            ...(durationSeconds != null ? { durationSeconds } : {}),
+            ...extras,
+          },
+        });
+      }
     } else {
       // No scored session — still free the seat.
       sessionEvents.push({

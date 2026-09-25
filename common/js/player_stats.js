@@ -881,8 +881,8 @@
                     typed.racksWon += own;
                     typed.racksLost += opp;
                 }
-            } else if (m.winnerSlot === 'draw' || m.winnerSlot === 'tie' || m.winnerSlot === '0' ||
-                ((m.finalScore.p1 || 0) === (m.finalScore.p2 || 0))) {
+            } else if ((m.winnerSlot === 'draw' || m.winnerSlot === 'tie' || m.winnerSlot === '0' ||
+                ((m.finalScore.p1 || 0) === (m.finalScore.p2 || 0))) && matchHasRecordedPlay(m)) {
                 typed.gamesDrawn = (typed.gamesDrawn || 0) + 1;
                 if (gt !== 'game4') {
                     const own = isP1 ? (m.finalScore.p1 || 0) : (m.finalScore.p2 || 0);
@@ -974,8 +974,8 @@
                 summary.gamesWon[m1Key] = (summary.gamesWon[m1Key] || 0) + 1;
             } else if (m.winnerSlot === '2') {
                 summary.gamesWon[m2Key] = (summary.gamesWon[m2Key] || 0) + 1;
-            } else if (m.winnerSlot === 'draw' || m.winnerSlot === 'tie' || m.winnerSlot === '0' ||
-                ((m.finalScore.p1 || 0) === (m.finalScore.p2 || 0))) {
+            } else if ((m.winnerSlot === 'draw' || m.winnerSlot === 'tie' || m.winnerSlot === '0' ||
+                ((m.finalScore.p1 || 0) === (m.finalScore.p2 || 0))) && matchHasRecordedPlay(m)) {
                 summary.gamesDrawn[m1Key] = (summary.gamesDrawn[m1Key] || 0) + 1;
                 summary.gamesDrawn[m2Key] = (summary.gamesDrawn[m2Key] || 0) + 1;
             }
@@ -1867,7 +1867,11 @@
             if (m.status !== 'completed') {
                 continue;
             }
-            // Draws (no winnerId) break the streak — same as a loss.
+            // Empty 0–0 pregame rows (if any linger) do not affect streak.
+            if (!matchHasRecordedPlay(m)) {
+                continue;
+            }
+            // Draws break the streak — same as a loss.
             if (!m.winnerId) {
                 break;
             }
@@ -2393,7 +2397,7 @@
     async function createNewMatchSession(p1Name, p2Name, context) {
         // Never auto-create roster rows from naming alone — that duplicated cloud
         // players when blur/state races minted multiple UUIDs for the same name.
-        // Explicit autocomplete "Create new player" (or local first-score materialize)
+        // Explicit autocomplete "Create new player" (or materialize at breaker / first score)
         // is what adds a roster identity.
         const p1 = await resolvePlayerForSlot('1', p1Name, false);
         const p2 = await resolvePlayerForSlot('2', p2Name, false);
@@ -2441,7 +2445,7 @@
         activeMatchSession.straightPoolRunLength = 0;
         activeMatchSession.rackStartedAt = now;
         await persistPendingSession();
-        // Do not emit cloud session:start yet — wait for breaker pick or first score/pot.
+        // Cloud session:start is emitted by ensureCloudMatchStarted (breaker / first score).
         return true;
     }
 
@@ -2493,8 +2497,8 @@
 
     /**
      * Ensure each named slot has a roster UUID before pots/racks are attributed.
-     * Primary call: onNamesUpdated when both names are set. Also a safety net at the
-     * start of ball/rack/frame writes and breaker selection.
+     * Bind roster UUIDs onto the open session. Called when the match actually
+     * starts (breaker / first score), not when names are typed alone.
      * Cloud + local: lookup-or-create once via ensurePlayer (playerEnsureInflight).
      */
     async function materializeSessionPlayersIfNeeded() {
@@ -2571,25 +2575,21 @@
         return true;
     }
 
-    /** Breaking Player chosen — match is no longer idle setup. */
+    /**
+     * Breaking Player chosen — start the local match (and cloud session) the same way
+     * cloud does: naming alone must not create an idle pregame row.
+     */
     function onBreakerSelected() {
         const start = function () {
             return materializeSessionPlayersIfNeeded().then(function () {
                 ensureCloudMatchStarted('breaker');
             });
         };
-        if (!activeMatchSession.matchId) {
-            // Names may not have created a session yet; ensure then mark started.
-            ensureActiveSession().then(function (ready) {
-                if (ready) {
-                    return start();
-                }
-            }).catch(function (err) {
-                console.error('PlayerStats onBreakerSelected error:', err);
-            });
-            return;
-        }
-        start().catch(function (err) {
+        ensureActiveSession().then(function (ready) {
+            if (ready) {
+                return start();
+            }
+        }).catch(function (err) {
             console.error('PlayerStats onBreakerSelected error:', err);
         });
     }
@@ -3435,6 +3435,55 @@
         return { p1: p1, p2: p2 };
     }
 
+    /**
+     * True when a match has real play — not a name-only pregame (0–0, no racks/balls).
+     * Empty 0–0 must never count as a completed draw or appear as a result in history.
+     */
+    function matchHasRecordedPlay(match) {
+        if (!match) {
+            return false;
+        }
+        const scores = match.finalScore || match.scores || {};
+        if ((Number(scores.p1) || 0) > 0 || (Number(scores.p2) || 0) > 0) {
+            return true;
+        }
+        if (match.racks && match.racks.length > 0) {
+            return true;
+        }
+        if (match.balls && match.balls.length > 0) {
+            return true;
+        }
+        if (match.matchHighestRun) {
+            const keys = Object.keys(match.matchHighestRun);
+            for (let i = 0; i < keys.length; i++) {
+                if ((Number(match.matchHighestRun[keys[i]]) || 0) > 0) {
+                    return true;
+                }
+            }
+        }
+        if ((Number(match.highestRunP1) || 0) > 0 || (Number(match.highestRunP2) || 0) > 0) {
+            return true;
+        }
+        if ((Number(match.highestBreakP1) || 0) > 0 || (Number(match.highestBreakP2) || 0) > 0) {
+            return true;
+        }
+        if ((Number(match.foulsP1) || 0) > 0 || (Number(match.foulsP2) || 0) > 0) {
+            return true;
+        }
+        return false;
+    }
+
+    /** Completed tied scoreline that actually had play (not an empty 0–0 pregame). */
+    function matchIsCountableDraw(match) {
+        if (!match || match.status !== 'completed' || match.winnerId) {
+            return false;
+        }
+        if (match.winnerSlot === '1' || match.winnerSlot === '2') {
+            return false;
+        }
+        return matchHasRecordedPlay(match);
+    }
+
     function clampScore(value) {
         if (window.ScoreboardHelpers && typeof window.ScoreboardHelpers.clampScore === 'function') {
             return window.ScoreboardHelpers.clampScore(value);
@@ -3746,22 +3795,30 @@
         await reconcileMatchRacksWithScores(match, scores);
         trimMatchRacksToScoreline(match, scores);
 
+        // After reconcile/trim, refuse empty 0–0 (pregame / board-cleared with no play).
+        const scoreP1 = Number(match.finalScore && match.finalScore.p1) || Number(scores.p1) || 0;
+        const scoreP2 = Number(match.finalScore && match.finalScore.p2) || Number(scores.p2) || 0;
+        if (!matchHasRecordedPlay(match) && scoreP1 === 0 && scoreP2 === 0) {
+            return false;
+        }
+
         let winnerSlot = null;
-        if (scores.p1 > scores.p2) {
+        if (scoreP1 > scoreP2) {
             winnerSlot = '1';
-        } else if (scores.p2 > scores.p1) {
+        } else if (scoreP2 > scoreP1) {
             winnerSlot = '2';
         }
 
         if (winnerSlot) {
             // Racks already reconciled above — finalize without a second reconcile pass
             // (which would duplicate rows when existing racks lacked matching winnerIds).
-            await finalizeMatchCompletion(winnerSlot, scores, { skipReconcile: true });
+            await finalizeMatchCompletion(winnerSlot, { p1: scoreP1, p2: scoreP2 }, { skipReconcile: true });
         } else {
             const now = new Date().toISOString();
             match.status = 'completed';
             match.completedAt = now;
             match.winnerId = null;
+            match.finalScore = { p1: scoreP1, p2: scoreP2 };
             captureActiveMatchGameInfo();
             await putMatch(match);
             ensureCloudMatchStarted('call_early');
@@ -3771,7 +3828,7 @@
             if (activeMatchSession.cloudSessionStarted) {
                 emitCloudSession('end', buildCloudMatchEndPayload(match, {
                     reason: 'call_early',
-                    scores: scores,
+                    scores: { p1: scoreP1, p2: scoreP2 },
                     winnerSlot: 'draw',
                 }));
                 invalidateCloudStatsCache();
@@ -3892,14 +3949,15 @@
 
         if (p1Name && p2Name) {
             const context = getCurrentContext();
-            if (isPlayerSlotEnabled('1') && isPlayerSlotEnabled('2')) {
-                await ensureActiveSession();
-                // Bind UUIDs before any scoring — not as a side effect of the first pot.
-                await materializeSessionPlayersIfNeeded();
-            } else if (sessionNeedsReset(p1Name, p2Name, context)) {
+            // Name changes mid-match abandon the open session. Do not create a new
+            // local match until breaker pick or first score (same rule as cloud session:start).
+            if (activeMatchSession.matchId && sessionNeedsReset(p1Name, p2Name, context)) {
                 await abandonActivePendingMatch();
                 await resetSessionState();
             }
+        } else if (activeMatchSession.matchId && (!p1Name || !p2Name)) {
+            await abandonActivePendingMatch();
+            await resetSessionState();
         }
         maybeRefreshStatsModalH2H();
         broadcastOverlayStatsIfEnabled();
@@ -3925,14 +3983,14 @@
                 invalidateCloudStatsCache();
             }
             await resetSessionState();
-            await ensureActiveSession();
+            // Next match starts on breaker / first score — do not open an idle local session.
             broadcastOverlayStatsIfEnabled();
             return;
         }
 
         if (activeMatchSession.matchId && activeMatchSession.matchCompletedRecorded) {
             await resetSessionState();
-            await ensureActiveSession();
+            // Same as End Match: wait for breaker / first score before a new session.
         } else if (activeMatchSession.matchId) {
             const match = getActivePendingMatch();
             // Restart Match: drop cloud "In progress" (breaker-only or scored).
@@ -4164,7 +4222,7 @@
         }
         if (match.status === 'completed' && match.winnerId) {
             summary.gamesWon[match.winnerId] = (summary.gamesWon[match.winnerId] || 0) + 1;
-        } else if (match.status === 'completed' && !match.winnerId) {
+        } else if (matchIsCountableDraw(match)) {
             if (!summary.gamesDrawn) {
                 summary.gamesDrawn = {};
             }
@@ -4322,6 +4380,10 @@
         const opts = options || {};
         const all = await getStoredMatchesForPlayer(playerId);
         let matches = all.filter(function (m) {
+            // Hide legacy empty completed 0–0 rows (pre-breaker session bleed) from history.
+            if (m.status === 'completed' && !matchHasRecordedPlay(m) && !m.winnerId) {
+                return false;
+            }
             return m.status === 'completed';
         }).sort(function (a, b) {
             const dateA = a.completedAt || a.startedAt || '';
@@ -4505,8 +4567,8 @@
                 } else if (m.winnerId === opponentId) {
                     player.stats.gamesLost++;
                     ensureTypeStats(player.stats, gameType).gamesLost++;
-                } else if (!m.winnerId) {
-                    // Completed tie (Call Early / manual save with equal scores).
+                } else if (matchIsCountableDraw(m)) {
+                    // Completed tie with real play (not empty 0–0 pregame).
                     player.stats.gamesDrawn = (player.stats.gamesDrawn || 0) + 1;
                     ensureTypeStats(player.stats, gameType).gamesDrawn++;
                 }
@@ -4633,6 +4695,11 @@
             match.winnerId = match.player2Id;
         } else {
             // Draws are valid completed matches (same as Call Match Early with a tied scoreline).
+            // Reject empty 0–0 — that is a name-only pregame, not a result.
+            if (scoreP1 === 0 && scoreP2 === 0 && !(racks && racks.length) &&
+                !(ballsP1 > 0 || ballsP2 > 0)) {
+                throw new Error('Cannot save an empty 0–0 match. Add racks/frames or a real scoreline.');
+            }
             match.winnerId = null;
         }
         match.completedAt = dateIso;
@@ -6547,6 +6614,10 @@
             return { winnerSlot: raw, isDraw: false };
         }
         if (raw === 'draw' || raw === 'tie' || raw === '0') {
+            // Explicit draw marker still requires recorded play (ignore empty 0–0).
+            if (!matchHasRecordedPlay(match)) {
+                return { winnerSlot: null, isDraw: false };
+            }
             return { winnerSlot: null, isDraw: true };
         }
         const scores = match && (match.scores || match.finalScore);
@@ -6560,6 +6631,10 @@
         }
         if (p2 > p1) {
             return { winnerSlot: '2', isDraw: false };
+        }
+        // Tied scoreline: only a draw when there was real play (not pregame 0–0).
+        if (!matchHasRecordedPlay(match)) {
+            return { winnerSlot: null, isDraw: false };
         }
         return { winnerSlot: null, isDraw: true };
     }

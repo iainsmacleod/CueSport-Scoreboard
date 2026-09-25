@@ -1503,19 +1503,27 @@
             await sleep(400);
 
             const preScorePending = cp.PlayerStats.getActivePendingMatch();
-            assert('Match History', 'Pending session starts when both names are set',
-                preScorePending && preScorePending.status === 'active',
+            assert('Match History', 'No local session until breaker / first score',
+                !preScorePending,
                 preScorePending && preScorePending.status);
             cp.document.getElementById('gameInfoTxt').value = 'League Night Test';
             cp.postInfo();
             await sleep(50);
+            // Start like cloud: Breaking Player begins the local match.
+            if (typeof cp.selectRackBreaker === 'function') {
+                cp.selectRackBreaker('1');
+            }
+            await sleep(300);
             const pendingWithInfo = cp.PlayerStats.getActivePendingMatch();
+            assert('Match History', 'Pending session starts on breaker pick',
+                pendingWithInfo && pendingWithInfo.status === 'active',
+                pendingWithInfo && pendingWithInfo.status);
             assert('Match History', 'Pending match stores game info from setup',
                 pendingWithInfo && pendingWithInfo.gameInfo === 'League Night Test',
                 pendingWithInfo && pendingWithInfo.gameInfo);
             cp.setStorageItem('overlayStatsMode', 'h2h');
             const preScoreH2HOverlay = await cp.PlayerStats.buildOverlayStatsPayload();
-            assert('Match History', 'H2H overlay shows 0-0 before first rack',
+            assert('Match History', 'H2H overlay shows 0-0 after breaker before first rack',
                 preScoreH2HOverlay && !preScoreH2HOverlay.emptyMessage &&
                 preScoreH2HOverlay.p1Racks === 0 && preScoreH2HOverlay.p2Racks === 0,
                 preScoreH2HOverlay && JSON.stringify({

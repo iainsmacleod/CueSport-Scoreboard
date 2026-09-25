@@ -1113,6 +1113,21 @@ try {
   );
   assert('reconnect keeps same match id', afterReconnect._private._matchId === matchId);
 
+  // Breaker-only end_match must discard (not write a completed 0-0 draw).
+  let pregame = createDefaultImpromptuState({ player1Name: 'A', player2Name: 'B' });
+  pregame = applyImpromptuCommand(pregame, 'select_breaker', { slot: '1' });
+  assert(
+    'pregame breaker starts cloud session',
+    (pregame.sessionEvents || []).some((ev) => ev.action === 'start'),
+  );
+  const pregameEnd = applyImpromptuCommand(pregame._private, 'end_match', {});
+  assert(
+    'pregame end_match discards empty session',
+    (pregameEnd.sessionEvents || []).some((ev) => ev.action === 'discard')
+      && !(pregameEnd.sessionEvents || []).some((ev) => ev.action === 'end'),
+    JSON.stringify(pregameEnd.sessionEvents),
+  );
+
   // Simulated paid tier: assertCanCreateImpromptuTable respects maxImpromptuTables
   process.env.ALLOW_DEV_AUTH = 'false';
   // Re-import won't reload env in quotas (already loaded). Directly exercise catalog limits.
