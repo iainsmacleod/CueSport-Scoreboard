@@ -1326,14 +1326,20 @@ body.streams-page .landing-main {
  * App shell when signed in: header + scrollable main + in-flow tab bar.
  * Avoids position:fixed — wide tables on Android expand the layout viewport
  * and drag fixed footers off-screen both horizontally and vertically.
+ * --app-vh is set from visualViewport (see viewport-shell.js) so the tab bar
+ * stays at the real screen bottom after mobile keyboard / URL-bar settle.
  */
+html:has(body.has-dash-nav) {
+  height: var(--app-vh, 100dvh);
+  max-height: var(--app-vh, 100dvh);
+  overflow: hidden;
+}
 body.has-dash-nav {
   --content-max: 720px;
   display: flex;
   flex-direction: column;
-  height: 100%;
-  height: 100dvh;
-  max-height: 100dvh;
+  height: var(--app-vh, 100dvh);
+  max-height: var(--app-vh, 100dvh);
   overflow: hidden;
 }
 @media (min-width: 900px) {
@@ -2467,13 +2473,17 @@ button.table-card-create.table-card-create-upgrade .table-card-create-plus {
 body.mobile.has-mobile-nav {
   padding-bottom: 0;
 }
+html:has(body.mobile) {
+  height: var(--app-vh, 100dvh);
+  max-height: var(--app-vh, 100dvh);
+  overflow: hidden;
+}
 body.mobile {
   --content-max: 720px;
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  height: 100dvh;
-  max-height: 100dvh;
+  height: var(--app-vh, 100dvh);
+  max-height: var(--app-vh, 100dvh);
   overflow: hidden;
 }
 body.mobile > header {

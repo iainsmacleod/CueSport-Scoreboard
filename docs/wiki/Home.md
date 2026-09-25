@@ -2,7 +2,7 @@
 
 Practical setup and usage guides for **CueSport Scoreboard** (OBS control panel + browser source) and optional **CueSport Scoreboard Cloud**.
 
-**Current product version:** 8.3.0
+**Current product version:** 8.3.5
 
 ## Start here
 
@@ -57,7 +57,7 @@ The **OBS dock remains the scoring authority**. Mobile and guest clients send co
 
 - Root [README](https://github.com/iainsmacleod/CueSport-Scoreboard/blob/main/README.md) — full reference
 - [backend/README](https://github.com/iainsmacleod/CueSport-Scoreboard/blob/main/backend/README.md) — Cloud server, env vars, Docker
-- [Release notes](https://github.com/iainsmacleod/CueSport-Scoreboard/blob/main/docs/release-notes/8.3.0/RELEASE_NOTES.md) — 8.3.0 ad-hoc tables (current build **8.3.0**)
+- [Release notes](https://github.com/iainsmacleod/CueSport-Scoreboard/blob/main/docs/release-notes/8.3.5/RELEASE_NOTES.md) — 8.3.5 stats parity & polish (current build **8.3.5**)
 
 ## Publishing this wiki
 

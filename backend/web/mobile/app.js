@@ -8,7 +8,7 @@ import {
   createAccountPlayer,
   fetchPublicConfig,
   GAME_TYPES,
-} from '../shared/cloud-client.js?v=8.3.0';
+} from '../shared/cloud-client.js?v=8.3.5';
 import {
   parseRaceTarget,
   isRaceLocked,
@@ -21,12 +21,16 @@ import {
   ensureSupabaseAuth,
   getFreshAccessToken,
   signOutSupabaseSession,
-} from '../shared/supabase-session.js?v=8.3.0';
+} from '../shared/supabase-session.js?v=8.3.5';
 import {
   applyImpromptuCommand,
   hydrateAuthorityState,
   createDefaultImpromptuState,
-} from '../shared/impromptu-authority.js?v=8.3.0.20';
+} from '../shared/impromptu-authority.js?v=8.3.5';
+import {
+  installAppViewportHeightSync,
+  settleAppViewportHeight,
+} from '../shared/viewport-shell.js?v=8.3.5';
 
 let client = null;
 let roomId = '';
@@ -175,6 +179,7 @@ function showMobileNav(visible) {
   if (!nav) return;
   nav.classList.toggle('hidden', !visible);
   document.body.classList.toggle('has-mobile-nav', !!visible);
+  if (visible) settleAppViewportHeight();
 }
 
 function isReplayEnabled(state = lastState) {
@@ -3636,6 +3641,7 @@ wireMatchConfirmModal();
 wireSnookerFoulModal();
 wirePoolRespotModal();
 wireMobileNav();
+installAppViewportHeightSync();
 
 function startBootConnect(message) {
   wantConnection = true;

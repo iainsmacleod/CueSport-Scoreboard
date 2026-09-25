@@ -12,6 +12,7 @@ body.mobile {
   /* Same dock issue: gradient layers default to repeat under a short content box. */
   min-height: 100vh;
   min-height: 100dvh;
+  min-height: var(--app-vh, 100dvh);
   background-color: var(--mobile-bg);
   background-image:
     radial-gradient(circle at 15% 0%, rgba(47, 128, 255, 0.14), transparent 28rem),
