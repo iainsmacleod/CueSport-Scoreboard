@@ -2882,6 +2882,13 @@ body.controls-locked #mobileBottomNav {
   flex: 0 1 auto;
   margin: 0;
   min-width: 0;
+  /* Own stacking context so a focused Player/Event row rises above wrapped date inputs. */
+  position: relative;
+  z-index: 1;
+}
+.stats-toolbar .stats-toolbar-filter:focus-within,
+.stats-toolbar .stats-date-filter:focus-within {
+  z-index: 40;
 }
 .stats-toolbar .stats-player-search,
 .stats-toolbar .stats-event-search {
@@ -2893,6 +2900,11 @@ body.controls-locked #mobileBottomNav {
 .stats-toolbar .stats-filter .autocomplete-wrapper {
   min-width: 0;
   width: 100%;
+  position: relative;
+  z-index: 1;
+}
+.stats-toolbar .stats-filter .autocomplete-wrapper:focus-within {
+  z-index: 45;
 }
 .stats-toolbar .stats-filter input,
 .stats-toolbar .stats-filter .autocomplete-wrapper input {
@@ -3089,6 +3101,7 @@ body.controls-locked #mobileBottomNav {
   opacity: 1;
   background: #1a1b26;
   color: #c0caf5;
+  z-index: 50;
 }
 .stats-filter select,
 .stats-filter input {

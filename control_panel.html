@@ -1039,6 +1039,37 @@ for more information about Salotto please visit https://salotto.app
                     <button type="button" class="stats-tab-btn hover obs28 button active" data-tab="matches" onclick="switchStatsTab('matches')">Recent Matches</button>
                     <button type="button" class="stats-tab-btn hover obs28 button" data-tab="leaderboard" onclick="switchStatsTab('leaderboard')">Leaderboard</button>
                 </div>
+                <div class="stats-toolbar" id="statsModalToolbar">
+                    <label class="stats-filter stats-toolbar-filter">
+                        Player
+                        <div class="autocomplete-wrapper stats-player-search">
+                            <input id="statsModalPlayerSearch" type="search" placeholder="Search or pick a player" maxlength="20" autocomplete="off" aria-label="Search or pick a player" />
+                            <div id="statsModalPlayerAutocomplete" class="autocomplete-list noShow"></div>
+                        </div>
+                    </label>
+                    <label class="stats-filter stats-toolbar-filter">
+                        Event
+                        <div class="autocomplete-wrapper stats-event-search">
+                            <input id="statsModalEventSearch" type="search" placeholder="Filter by event" maxlength="60" autocomplete="off" aria-label="Filter by event" />
+                            <div id="statsModalEventAutocomplete" class="autocomplete-list noShow"></div>
+                        </div>
+                    </label>
+                    <label class="stats-filter stats-date-filter">
+                        From
+                        <span class="stats-date-input-wrap">
+                            <input id="statsModalDateFrom" type="date" aria-label="Match date from" />
+                            <button type="button" class="stats-date-clear" data-clear-date="statsModalDateFrom" title="Clear from date" aria-label="Clear from date" hidden>&times;</button>
+                        </span>
+                    </label>
+                    <label class="stats-filter stats-date-filter">
+                        To
+                        <span class="stats-date-input-wrap">
+                            <input id="statsModalDateTo" type="date" aria-label="Match date to" />
+                            <button type="button" class="stats-date-clear" data-clear-date="statsModalDateTo" title="Clear to date" aria-label="Clear to date" hidden>&times;</button>
+                        </span>
+                    </label>
+                    <button type="button" id="statsModalClearFiltersBtn" class="hover obs28 button stats-danger-btn" title="Clear filters" disabled>Clear</button>
+                </div>
 
                 <div id="statsTab-matches" class="stats-tab-panel">
                     <div class="stats-scroll-panel">

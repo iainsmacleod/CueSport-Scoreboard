@@ -2386,7 +2386,7 @@ async function loadAdminAccountDetail(accountId) {
       ? ''
       : `
       <h3 class="stats-section-title">Complimentary access</h3>
-      <p class="hint">Outside Stripe — no credit card, not billed. Grants Cloud access until the end date. Does not create a subscription. Revoking without an active Stripe plan also revokes all Dock Keys.</p>
+      <p class="hint">Outside Stripe — no credit card, not billed. Grants Cloud access until the end date. Does not create a subscription. Revoking without an active Stripe plan also revokes all Dock Keys and closes ad-hoc tables (in-progress cloud matches are discarded; history is kept).</p>
       <form class="admin-trial-form" id="adminGrantTrialForm">
         <label>
           Tier
@@ -2534,7 +2534,7 @@ async function adminEndTrial() {
   if (!adminSelectedId || isOwnAdminAccount(adminSelectedId)) return;
   const ok = await confirmDashAction({
     title: 'Revoke Complimentary Access',
-    message: 'Clear complimentary access for this account? If they have no active Stripe subscription, all Dock Keys will be revoked and connected docks disconnected. Access falls back to Stripe status otherwise.',
+    message: 'Clear complimentary access for this account? If they have no active Stripe subscription, all Dock Keys will be revoked, connected docks disconnected, and ad-hoc tables closed. Access falls back to Stripe status otherwise.',
     confirmLabel: 'Revoke Access',
     danger: true,
   });
@@ -4837,7 +4837,11 @@ function initStatsPlayerSearch() {
       applyFreeTextFilter();
       return;
     }
-    applyFreeTextFilter();
+    // Keep an autocomplete UUID lock across focus/list refresh; only free-text
+    // re-filter when the user is not locked to a roster pick.
+    if (!statsPlayerFilterId) {
+      applyOverviewFiltersChanged();
+    }
     try {
       const found = browseAll
         ? await resolvePlayersSearch('', 250)
@@ -4866,6 +4870,7 @@ function initStatsPlayerSearch() {
           + `<span class="autocomplete-preview">${escapeHtml(formatPlayerPreview(player))}</span>`;
         item.addEventListener('mousedown', (e) => {
           e.preventDefault();
+          clearTimeout(debounceTimer);
           applyPlayerNameFilter(player);
           hideList();
         });
@@ -4879,6 +4884,8 @@ function initStatsPlayerSearch() {
   };
 
   input.addEventListener('input', () => {
+    // Real keystrokes unlock exact-id filtering (list refresh must not).
+    statsPlayerFilterId = '';
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => refresh(), 150);
   });
@@ -4910,6 +4917,7 @@ function initStatsPlayerSearch() {
       highlight(activeIndex);
     } else if (e.key === 'Enter') {
       e.preventDefault();
+      clearTimeout(debounceTimer);
       if (activeIndex >= 0 && results[activeIndex]) {
         applyPlayerNameFilter(results[activeIndex]);
         hideList();

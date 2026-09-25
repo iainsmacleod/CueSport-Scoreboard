@@ -2506,6 +2506,10 @@
             const modal = cp.document.getElementById('statsModal');
             const modalOpen = modal && cp.getComputedStyle(modal).display !== 'none';
             assert('Stats UI', 'Modal opens', modalOpen);
+            assert('Stats UI', 'Filter toolbar present',
+                !!cp.document.getElementById('statsModalToolbar'));
+            assert('Stats UI', 'Player filter input present',
+                !!cp.document.getElementById('statsModalPlayerSearch'));
             assert('Stats UI', 'Recent Matches tab visible',
                 !cp.document.getElementById('statsTab-matches').classList.contains('noShow'));
             assert('Stats UI', 'Recent Matches tab button present',

@@ -7096,7 +7096,8 @@
         const linkPlayers = opts.linkPlayers !== false;
 
         if (matches.length === 0) {
-            return '<tr><td colspan="' + colspan + '" class="stats-empty">No matches recorded.</td></tr>';
+            return '<tr><td colspan="' + colspan + '" class="stats-empty">' +
+                escapeHtml(opts.emptyMessage || 'No matches recorded.') + '</td></tr>';
         }
 
         return matches.map(function (m) {
@@ -8055,6 +8056,13 @@
     let statsModalSelectedPlayerId = null;
     /** Last overview tab (matches | leaderboard) for Back from player detail. */
     let statsLastOverviewTab = 'matches';
+    /** Exact player id when an autocomplete pick is chosen in the stats modal filter. */
+    let statsModalPlayerFilterId = '';
+    /** Display name for the locked autocomplete pick (for comparison only). */
+    let statsModalPlayerFilterLabel = '';
+    /** Distinct non-empty gameInfo values for the event filter autocomplete. */
+    let statsModalEventInfoCache = [];
+    let statsModalFiltersWired = false;
 
     function sortMatchesNewestFirst(matches) {
         return (matches || []).slice().sort(function (a, b) {
@@ -8079,6 +8087,492 @@
         switchStatsTab(statsLastOverviewTab === 'leaderboard' ? 'leaderboard' : 'matches');
     }
 
+    function getStatsModalFilterState() {
+        return {
+            playerQuery: (document.getElementById('statsModalPlayerSearch')?.value || '').trim().toLowerCase(),
+            playerId: String(statsModalPlayerFilterId || '').trim(),
+            eventQuery: (document.getElementById('statsModalEventSearch')?.value || '').trim().toLowerCase(),
+            dateFrom: String(document.getElementById('statsModalDateFrom')?.value || '').trim(),
+            dateTo: String(document.getElementById('statsModalDateTo')?.value || '').trim()
+        };
+    }
+
+    function statsModalFiltersActive(filters) {
+        const f = filters || getStatsModalFilterState();
+        return !!(f.playerId || f.playerQuery || f.eventQuery || f.dateFrom || f.dateTo);
+    }
+
+    function hasStatsModalPlayerFilter(filters) {
+        const f = filters || getStatsModalFilterState();
+        return !!(f.playerId || f.playerQuery);
+    }
+
+    function hasStatsModalScopeFilter(filters) {
+        const f = filters || getStatsModalFilterState();
+        return !!(f.eventQuery || f.dateFrom || f.dateTo);
+    }
+
+    function matchDateLocalYmd(match) {
+        const raw = match && (match.completedAt || match.startedAt);
+        if (!raw) return '';
+        const d = new Date(raw);
+        if (Number.isNaN(d.getTime())) return '';
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return y + '-' + m + '-' + day;
+    }
+
+    function matchPassesScopeFilters(match, filters) {
+        const f = filters || getStatsModalFilterState();
+        if (f.eventQuery) {
+            const info = String(match.gameInfo || '').toLowerCase();
+            if (!info.includes(f.eventQuery)) return false;
+        }
+        if (f.dateFrom || f.dateTo) {
+            const ymd = matchDateLocalYmd(match);
+            if (!ymd) return false;
+            if (f.dateFrom && ymd < f.dateFrom) return false;
+            if (f.dateTo && ymd > f.dateTo) return false;
+        }
+        return true;
+    }
+
+    function matchPassesPlayerFilter(match, filters) {
+        const f = filters || getStatsModalFilterState();
+        const playerId = String(f.playerId || '').trim();
+        if (playerId) {
+            return String(match.player1Id || '') === playerId || String(match.player2Id || '') === playerId;
+        }
+        const playerQuery = String(f.playerQuery || '').trim();
+        if (!playerQuery) return true;
+        return String(match.player1Name || '').toLowerCase().includes(playerQuery)
+            || String(match.player2Name || '').toLowerCase().includes(playerQuery);
+    }
+
+    function matchPassesStatsModalFilters(match, filters) {
+        return matchPassesScopeFilters(match, filters) && matchPassesPlayerFilter(match, filters);
+    }
+
+    function playerMatchesStatsModalFilter(player, filters) {
+        const f = filters || getStatsModalFilterState();
+        const playerId = String(f.playerId || '').trim();
+        if (playerId) return String(player?.id || '') === playerId;
+        const playerQuery = String(f.playerQuery || '').trim();
+        if (!playerQuery) return true;
+        return String(player?.name || '').toLowerCase().includes(playerQuery);
+    }
+
+    function rebuildStatsModalEventCache(matches) {
+        const set = {};
+        (matches || []).forEach(function (m) {
+            const info = String(m && m.gameInfo || '').trim();
+            if (info) set[info] = true;
+        });
+        statsModalEventInfoCache = Object.keys(set).sort(function (a, b) {
+            return a.localeCompare(b, undefined, { sensitivity: 'base' });
+        });
+    }
+
+    function syncStatsModalClearFiltersBtn() {
+        const btn = document.getElementById('statsModalClearFiltersBtn');
+        if (!btn) return;
+        btn.disabled = !statsModalFiltersActive();
+        document.querySelectorAll('#statsModalToolbar .stats-date-clear').forEach(function (clearBtn) {
+            const inputId = clearBtn.getAttribute('data-clear-date');
+            const input = inputId ? document.getElementById(inputId) : null;
+            clearBtn.hidden = !(input && input.value);
+        });
+    }
+
+    function statsFromMatchesForLeaderboard(matches) {
+        const playerMap = {};
+        function touch(id, name) {
+            const display = String(name || '').trim();
+            const key = String(id || '').trim() || display.toLowerCase();
+            if (!key) return null;
+            if (!playerMap[key]) {
+                playerMap[key] = {
+                    id: key,
+                    name: display || key,
+                    stats: createEmptyStats(),
+                    lastPlayedAt: null
+                };
+            } else if (display) {
+                playerMap[key].name = display;
+            }
+            return playerMap[key];
+        }
+        (matches || []).forEach(function (match) {
+            if (!match || match.status !== 'completed') return;
+            if (isLegacyEmptyCompletedMatch(match)) return;
+            const p1 = touch(match.player1Id, match.player1Name);
+            const p2 = touch(match.player2Id, match.player2Name);
+            if (!p1 || !p2) return;
+
+            const scores = match.scores || match.finalScore || {};
+            const gameType = match.gameType || 'game1';
+            if (!isStraightPoolGameType(gameType)) {
+                const s1 = Number(scores.p1) || 0;
+                const s2 = Number(scores.p2) || 0;
+                p1.stats.racksWon += s1;
+                p1.stats.racksLost += s2;
+                p2.stats.racksWon += s2;
+                p2.stats.racksLost += s1;
+            }
+
+            const result = resolveMatchResult(match);
+            if (result.winnerSlot === '1' || result.winnerSlot === '2') {
+                const winner = result.winnerSlot === '1' ? p1 : p2;
+                const loser = result.winnerSlot === '1' ? p2 : p1;
+                winner.stats.gamesWon += 1;
+                loser.stats.gamesLost += 1;
+            } else if (result.isDraw) {
+                p1.stats.gamesDrawn += 1;
+                p2.stats.gamesDrawn += 1;
+            }
+
+            const playedAt = match.completedAt || match.startedAt;
+            if (playedAt) {
+                if (!p1.lastPlayedAt || playedAt > p1.lastPlayedAt) p1.lastPlayedAt = playedAt;
+                if (!p2.lastPlayedAt || playedAt > p2.lastPlayedAt) p2.lastPlayedAt = playedAt;
+            }
+        });
+        return Object.keys(playerMap).map(function (k) { return playerMap[k]; });
+    }
+
+    function sortLeaderboardPlayers(players) {
+        return (players || []).slice().sort(function (a, b) {
+            const aStats = a.stats || createEmptyStats();
+            const bStats = b.stats || createEmptyStats();
+            const aPlayed = (aStats.gamesWon || 0) + (aStats.gamesDrawn || 0) + (aStats.gamesLost || 0) > 0;
+            const bPlayed = (bStats.gamesWon || 0) + (bStats.gamesDrawn || 0) + (bStats.gamesLost || 0) > 0;
+            if (aPlayed !== bPlayed) return aPlayed ? -1 : 1;
+            if (!aPlayed) {
+                return String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' });
+            }
+            return (bStats.gamesWon || 0) - (aStats.gamesWon || 0)
+                || (bStats.racksWon || 0) - (aStats.racksWon || 0)
+                || String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' });
+        });
+    }
+
+    function renderLeaderboardRows(players, emptyMessage) {
+        if (!players || !players.length) {
+            return '<tr><td colspan="5" class="stats-empty">' + escapeHtml(emptyMessage || 'No players recorded yet.') + '</td></tr>';
+        }
+        return players.map(function (p) {
+            const stats = p.stats || createEmptyStats();
+            const wr = getWinRate(stats);
+            return '<tr class="stats-row" data-player-id="' + escapeHtml(String(p.id || '')) + '">' +
+                '<td>' + escapeHtml(p.name) + '</td>' +
+                '<td>' + formatMatchRecord(stats.gamesWon, stats.gamesDrawn, stats.gamesLost) + '</td>' +
+                '<td>' + wr + '%</td>' +
+                '<td>' + formatWLWithPct(stats.racksWon, stats.racksLost) + '</td>' +
+                '<td>' + formatDate(p.lastPlayedAt) + '</td>' +
+                '</tr>';
+        }).join('');
+    }
+
+    function bindLeaderboardRowClicks(tbody) {
+        if (!tbody) return;
+        tbody.querySelectorAll('.stats-row').forEach(function (row) {
+            row.addEventListener('click', function () {
+                showPlayerDetail(row.dataset.playerId);
+            });
+        });
+    }
+
+    async function applyStatsModalFiltersChanged() {
+        syncStatsModalClearFiltersBtn();
+        const detailTab = document.getElementById('statsTab-detail');
+        const onDetail = detailTab && !detailTab.classList.contains('noShow');
+        await renderRecentMatches();
+        await renderStatsLeaderboard();
+        if (onDetail && statsModalSelectedPlayerId) {
+            await showPlayerDetail(statsModalSelectedPlayerId);
+        }
+    }
+
+    function clearStatsModalFilters() {
+        statsModalPlayerFilterId = '';
+        statsModalPlayerFilterLabel = '';
+        const player = document.getElementById('statsModalPlayerSearch');
+        const event = document.getElementById('statsModalEventSearch');
+        const from = document.getElementById('statsModalDateFrom');
+        const to = document.getElementById('statsModalDateTo');
+        if (player) player.value = '';
+        if (event) event.value = '';
+        if (from) from.value = '';
+        if (to) to.value = '';
+        document.getElementById('statsModalPlayerAutocomplete')?.classList.add('noShow');
+        document.getElementById('statsModalEventAutocomplete')?.classList.add('noShow');
+        applyStatsModalFiltersChanged();
+    }
+
+    function applyStatsModalPlayerFilter(playerOrName) {
+        const input = document.getElementById('statsModalPlayerSearch');
+        if (playerOrName && typeof playerOrName === 'object') {
+            const id = String(playerOrName.id || '').trim();
+            const label = String(playerOrName.name || '').trim().slice(0, 20);
+            statsModalPlayerFilterId = id;
+            statsModalPlayerFilterLabel = label;
+            if (input) input.value = label;
+        } else {
+            statsModalPlayerFilterId = '';
+            statsModalPlayerFilterLabel = '';
+            if (input) input.value = String(playerOrName || '').trim().slice(0, 20);
+        }
+        applyStatsModalFiltersChanged();
+    }
+
+    function initStatsModalFilters() {
+        if (statsModalFiltersWired) return;
+        const playerInput = document.getElementById('statsModalPlayerSearch');
+        const playerList = document.getElementById('statsModalPlayerAutocomplete');
+        const eventInput = document.getElementById('statsModalEventSearch');
+        const eventList = document.getElementById('statsModalEventAutocomplete');
+        const clearBtn = document.getElementById('statsModalClearFiltersBtn');
+        if (!playerInput || !playerList || !eventInput || !eventList) return;
+        statsModalFiltersWired = true;
+
+        let playerDebounce = null;
+        let playerActiveIndex = -1;
+        let playerResults = [];
+        let eventDebounce = null;
+        let eventActiveIndex = -1;
+        let eventResults = [];
+
+        function hidePlayerList() { playerList.classList.add('noShow'); }
+        function showPlayerList() { playerList.classList.remove('noShow'); }
+        function hideEventList() { eventList.classList.add('noShow'); }
+        function showEventList() { eventList.classList.remove('noShow'); }
+
+        function highlightPlayer(index) {
+            playerList.querySelectorAll('.autocomplete-item').forEach(function (item, i) {
+                item.classList.toggle('autocomplete-active', i === index);
+            });
+        }
+        function highlightEvent(index) {
+            eventList.querySelectorAll('.autocomplete-item').forEach(function (item, i) {
+                item.classList.toggle('autocomplete-active', i === index);
+            });
+        }
+
+        function unlockPlayerIdFilter() {
+            statsModalPlayerFilterId = '';
+            statsModalPlayerFilterLabel = '';
+        }
+
+        async function refreshPlayerList(options) {
+            const browseAll = !!(options && options.browseAll);
+            const query = playerInput.value.trim();
+            if (!query && !browseAll) {
+                hidePlayerList();
+                playerList.innerHTML = '';
+                unlockPlayerIdFilter();
+                applyStatsModalFiltersChanged();
+                return;
+            }
+            // Keep an autocomplete UUID lock across focus/list refresh; only free-text
+            // re-filter when the user is not locked to a roster pick.
+            if (!statsModalPlayerFilterId) {
+                applyStatsModalFiltersChanged();
+            }
+            try {
+                playerResults = browseAll
+                    ? await searchPlayers('', 250)
+                    : await searchPlayers(query, 8);
+                playerActiveIndex = -1;
+                playerList.innerHTML = '';
+                playerList.classList.toggle('autocomplete-browse', browseAll);
+                if (!playerResults.length) {
+                    const empty = document.createElement('div');
+                    empty.className = 'autocomplete-item autocomplete-new';
+                    empty.textContent = query
+                        ? ('No roster match — filtering for “' + query + '”')
+                        : 'No saved players yet.';
+                    playerList.appendChild(empty);
+                    showPlayerList();
+                    return;
+                }
+                playerResults.forEach(function (player, index) {
+                    const item = document.createElement('div');
+                    item.className = 'autocomplete-item';
+                    item.dataset.index = String(index);
+                    item.innerHTML = '<span class="autocomplete-name">' + escapeHtml(player.name) + '</span>' +
+                        '<span class="autocomplete-preview">' + escapeHtml(formatPlayerPreview(player.stats)) + '</span>';
+                    item.addEventListener('mousedown', function (e) {
+                        e.preventDefault();
+                        clearTimeout(playerDebounce);
+                        applyStatsModalPlayerFilter(player);
+                        hidePlayerList();
+                    });
+                    playerList.appendChild(item);
+                });
+                showPlayerList();
+                if (browseAll) playerList.scrollTop = 0;
+            } catch (err) {
+                console.error('Stats modal player search error:', err);
+            }
+        }
+
+        function refreshEventList(options) {
+            const browseAll = !!(options && options.browseAll);
+            const query = eventInput.value.trim().toLowerCase();
+            if (!query && !browseAll) {
+                hideEventList();
+                eventList.innerHTML = '';
+                applyStatsModalFiltersChanged();
+                return;
+            }
+            applyStatsModalFiltersChanged();
+            eventResults = (statsModalEventInfoCache || []).filter(function (info) {
+                return !query || String(info).toLowerCase().includes(query);
+            }).slice(0, browseAll ? 250 : 12);
+            eventActiveIndex = -1;
+            eventList.innerHTML = '';
+            eventList.classList.toggle('autocomplete-browse', browseAll);
+            if (!eventResults.length) {
+                const empty = document.createElement('div');
+                empty.className = 'autocomplete-item autocomplete-new';
+                empty.textContent = query
+                    ? ('No event match — filtering for “' + eventInput.value.trim() + '”')
+                    : 'No events recorded yet.';
+                eventList.appendChild(empty);
+                showEventList();
+                return;
+            }
+            eventResults.forEach(function (info, index) {
+                const item = document.createElement('div');
+                item.className = 'autocomplete-item';
+                item.dataset.index = String(index);
+                item.innerHTML = '<span class="autocomplete-name">' + escapeHtml(info) + '</span>';
+                item.addEventListener('mousedown', function (e) {
+                    e.preventDefault();
+                    eventInput.value = String(info || '').trim().slice(0, 60);
+                    hideEventList();
+                    applyStatsModalFiltersChanged();
+                });
+                eventList.appendChild(item);
+            });
+            showEventList();
+            if (browseAll) eventList.scrollTop = 0;
+        }
+
+        playerInput.addEventListener('input', function () {
+            // Real keystrokes unlock exact-id filtering (list refresh must not).
+            unlockPlayerIdFilter();
+            clearTimeout(playerDebounce);
+            playerDebounce = setTimeout(function () { refreshPlayerList(); }, 150);
+        });
+        playerInput.addEventListener('focus', function () {
+            if (playerInput.value.trim()) refreshPlayerList();
+        });
+        playerInput.addEventListener('dblclick', function (e) {
+            e.preventDefault();
+            playerInput.select();
+            refreshPlayerList({ browseAll: true });
+        });
+        playerInput.addEventListener('keydown', function (e) {
+            if (playerList.classList.contains('noShow')) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const query = playerInput.value.trim();
+                    if (query) applyStatsModalPlayerFilter(query);
+                    else {
+                        unlockPlayerIdFilter();
+                        applyStatsModalFiltersChanged();
+                    }
+                }
+                return;
+            }
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                playerActiveIndex = playerActiveIndex < 0 ? 0 : Math.min(playerActiveIndex + 1, playerResults.length - 1);
+                highlightPlayer(playerActiveIndex);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                playerActiveIndex = playerActiveIndex < 0 ? playerResults.length - 1 : Math.max(playerActiveIndex - 1, 0);
+                highlightPlayer(playerActiveIndex);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                clearTimeout(playerDebounce);
+                if (playerActiveIndex >= 0 && playerResults[playerActiveIndex]) {
+                    applyStatsModalPlayerFilter(playerResults[playerActiveIndex]);
+                    hidePlayerList();
+                } else if (playerInput.value.trim()) {
+                    applyStatsModalPlayerFilter(playerInput.value.trim());
+                    hidePlayerList();
+                }
+            } else if (e.key === 'Escape') {
+                hidePlayerList();
+            }
+        });
+
+        eventInput.addEventListener('input', function () {
+            clearTimeout(eventDebounce);
+            eventDebounce = setTimeout(function () { refreshEventList(); }, 150);
+        });
+        eventInput.addEventListener('focus', function () {
+            if (eventInput.value.trim()) refreshEventList();
+        });
+        eventInput.addEventListener('dblclick', function (e) {
+            e.preventDefault();
+            eventInput.select();
+            refreshEventList({ browseAll: true });
+        });
+        eventInput.addEventListener('keydown', function (e) {
+            if (eventList.classList.contains('noShow')) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    applyStatsModalFiltersChanged();
+                }
+                return;
+            }
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                eventActiveIndex = eventActiveIndex < 0 ? 0 : Math.min(eventActiveIndex + 1, eventResults.length - 1);
+                highlightEvent(eventActiveIndex);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                eventActiveIndex = eventActiveIndex < 0 ? eventResults.length - 1 : Math.max(eventActiveIndex - 1, 0);
+                highlightEvent(eventActiveIndex);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (eventActiveIndex >= 0 && eventResults[eventActiveIndex]) {
+                    eventInput.value = String(eventResults[eventActiveIndex] || '').trim().slice(0, 60);
+                    hideEventList();
+                    applyStatsModalFiltersChanged();
+                } else {
+                    hideEventList();
+                    applyStatsModalFiltersChanged();
+                }
+            } else if (e.key === 'Escape') {
+                hideEventList();
+            }
+        });
+
+        document.getElementById('statsModalDateFrom')?.addEventListener('change', applyStatsModalFiltersChanged);
+        document.getElementById('statsModalDateTo')?.addEventListener('change', applyStatsModalFiltersChanged);
+        document.querySelectorAll('#statsModalToolbar .stats-date-clear').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                const inputId = btn.getAttribute('data-clear-date');
+                const input = inputId ? document.getElementById(inputId) : null;
+                if (input) input.value = '';
+                applyStatsModalFiltersChanged();
+            });
+        });
+        clearBtn?.addEventListener('click', clearStatsModalFilters);
+
+        document.addEventListener('click', function (e) {
+            if (!playerInput.contains(e.target) && !playerList.contains(e.target)) hidePlayerList();
+            if (!eventInput.contains(e.target) && !eventList.contains(e.target)) hideEventList();
+        });
+
+        syncStatsModalClearFiltersBtn();
+    }
+
     async function openStatsModal() {
         if (!isStatsTabAvailable()) {
             return;
@@ -8088,12 +8582,14 @@
             return;
         }
         await openDatabase();
+        initStatsModalFilters();
         modal.style.display = 'block';
         const body = modal.querySelector('.stats-modal-body');
         if (body) {
             body.scrollTop = 0;
         }
         updateStatsCloudBanner();
+        syncStatsModalClearFiltersBtn();
         await renderRecentMatches();
         await renderStatsLeaderboard();
         switchStatsTab(statsLastOverviewTab === 'leaderboard' ? 'leaderboard' : 'matches');
@@ -8177,6 +8673,8 @@
         if (!tbody) {
             return;
         }
+        const filters = getStatsModalFilterState();
+        const filteredEmpty = 'No matches match the current filters.';
 
         if (isCloudStatsMode()) {
             tbody.innerHTML = '<tr><td colspan="5" class="stats-empty">Loading cloud matches\u2026</td></tr>';
@@ -8186,32 +8684,49 @@
                     escapeHtml(data.error) + '</td></tr>';
                 return;
             }
+            const adapted = (data.matches || [])
+                .filter(function (m) { return m && m.status === 'completed'; })
+                .map(adaptCloudMatchForUi)
+                .filter(Boolean);
+            rebuildStatsModalEventCache(adapted);
             const matches = sortMatchesNewestFirst(
-                (data.matches || [])
-                    .filter(function (m) { return m && m.status === 'completed'; })
-                    .map(adaptCloudMatchForUi)
-                    .filter(Boolean)
+                adapted.filter(function (m) { return matchPassesStatsModalFilters(m, filters); })
             );
-            tbody.innerHTML = renderMatchHistoryRows(matches, { colspan: 5, linkPlayers: true });
+            tbody.innerHTML = renderMatchHistoryRows(matches, {
+                colspan: 5,
+                linkPlayers: true,
+                emptyMessage: statsModalFiltersActive(filters) ? filteredEmpty : undefined
+            });
             bindStatsMatchInteractions(tbody);
+            syncStatsModalClearFiltersBtn();
             return;
         }
 
-        let matches = sortMatchesNewestFirst(
+        let allCompleted = sortMatchesNewestFirst(
             (await getAllMatches()).filter(function (m) {
                 if (!m) return false;
                 if (isLegacyEmptyCompletedMatch(m)) return false;
                 return m.status === 'completed';
             })
         );
+        rebuildStatsModalEventCache(allCompleted);
+        let matches = allCompleted.filter(function (m) {
+            return matchPassesStatsModalFilters(m, filters);
+        });
         const pending = getEditablePendingMatch();
         if (pending &&
             !isLegacyEmptyCompletedMatch(pending) &&
+            matchPassesStatsModalFilters(pending, filters) &&
             !matches.some(function (m) { return m.id === pending.id; })) {
             matches = [pending].concat(matches);
         }
-        tbody.innerHTML = renderMatchHistoryRows(matches, { colspan: 5, linkPlayers: true });
+        tbody.innerHTML = renderMatchHistoryRows(matches, {
+            colspan: 5,
+            linkPlayers: true,
+            emptyMessage: statsModalFiltersActive(filters) ? filteredEmpty : undefined
+        });
         bindStatsMatchInteractions(tbody);
+        syncStatsModalClearFiltersBtn();
     }
 
     async function renderStatsLeaderboard() {
@@ -8219,80 +8734,95 @@
         if (!tbody) {
             return;
         }
+        const filters = getStatsModalFilterState();
+        const filteredEmpty = 'No players match the current filters.';
 
         if (isCloudStatsMode()) {
-            return renderCloudLeaderboard(tbody);
+            return renderCloudLeaderboard(tbody, filters, filteredEmpty);
         }
 
-        const players = await getAllPlayers();
-        players.sort(function (a, b) {
-            const aStats = a.stats || createEmptyStats();
-            const bStats = b.stats || createEmptyStats();
-            const aPlayed = (aStats.gamesWon || 0) + (aStats.gamesDrawn || 0) + (aStats.gamesLost || 0) > 0;
-            const bPlayed = (bStats.gamesWon || 0) + (bStats.gamesDrawn || 0) + (bStats.gamesLost || 0) > 0;
-            if (aPlayed !== bPlayed) {
-                return aPlayed ? -1 : 1;
-            }
-            if (!aPlayed) {
-                return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
-            }
-            return bStats.gamesWon - aStats.gamesWon
-                || bStats.racksWon - aStats.racksWon
-                || a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
-        });
-
-        if (players.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" class="stats-empty">No players recorded yet.</td></tr>';
-            return;
-        }
-
-        tbody.innerHTML = players.map(function (p) {
-            const stats = p.stats || createEmptyStats();
-            const wr = getWinRate(stats);
-            return '<tr class="stats-row" data-player-id="' + p.id + '">' +
-                '<td>' + escapeHtml(p.name) + '</td>' +
-                '<td>' + formatMatchRecord(stats.gamesWon, stats.gamesDrawn, stats.gamesLost) + '</td>' +
-                '<td>' + wr + '%</td>' +
-                '<td>' + formatWLWithPct(stats.racksWon, stats.racksLost) + '</td>' +
-                '<td>' + formatDate(p.lastPlayedAt) + '</td>' +
-                '</tr>';
-        }).join('');
-
-        tbody.querySelectorAll('.stats-row').forEach(function (row) {
-            row.addEventListener('click', function () {
-                showPlayerDetail(row.dataset.playerId);
+        let players;
+        if (hasStatsModalScopeFilter(filters) || hasStatsModalPlayerFilter(filters)) {
+            const scopedMatches = (await getAllMatches()).filter(function (m) {
+                if (!m || m.status !== 'completed' || isLegacyEmptyCompletedMatch(m)) return false;
+                return matchPassesScopeFilters(m, filters);
             });
-        });
+            players = statsFromMatchesForLeaderboard(scopedMatches);
+            if (hasStatsModalPlayerFilter(filters)) {
+                players = players.filter(function (p) {
+                    return playerMatchesStatsModalFilter(p, filters);
+                });
+            }
+        } else {
+            players = await getAllPlayers();
+        }
+        players = sortLeaderboardPlayers(players);
+
+        tbody.innerHTML = renderLeaderboardRows(
+            players,
+            statsModalFiltersActive(filters) ? filteredEmpty : 'No players recorded yet.'
+        );
+        bindLeaderboardRowClicks(tbody);
+        syncStatsModalClearFiltersBtn();
     }
 
-    async function renderCloudLeaderboard(tbody) {
+    async function renderCloudLeaderboard(tbody, filters, filteredEmpty) {
         tbody.innerHTML = '<tr><td colspan="5" class="stats-empty">Loading cloud stats\u2026</td></tr>';
         const data = await fetchCloudStats();
         if (data.error) {
             tbody.innerHTML = '<tr><td colspan="5" class="stats-empty">Could not load cloud stats: ' + escapeHtml(data.error) + '</td></tr>';
             return;
         }
-        if (!data.players.length) {
-            tbody.innerHTML = '<tr><td colspan="5" class="stats-empty">No cloud match data yet.</td></tr>';
-            return;
-        }
-        tbody.innerHTML = data.players.map(function (p) {
-            const total = (p.gamesWon || 0) + (p.gamesDrawn || 0) + (p.gamesLost || 0);
-            const wr = total > 0 ? Math.round(((p.gamesWon || 0) / total) * 100) : 0;
-            return '<tr class="stats-row" data-player-id="' + escapeHtml(p.id) + '">' +
-                '<td>' + escapeHtml(p.name) + '</td>' +
-                '<td>' + formatMatchRecord(p.gamesWon, p.gamesDrawn, p.gamesLost) + '</td>' +
-                '<td>' + wr + '%</td>' +
-                '<td>' + formatWLWithPct(p.racksWon, p.racksLost) + '</td>' +
-                '<td>' + formatDate(p.lastPlayedAt) + '</td>' +
-                '</tr>';
-        }).join('');
+        filters = filters || getStatsModalFilterState();
+        filteredEmpty = filteredEmpty || 'No players match the current filters.';
 
-        tbody.querySelectorAll('.stats-row').forEach(function (row) {
-            row.addEventListener('click', function () {
-                showPlayerDetail(row.dataset.playerId);
+        let players;
+        if (hasStatsModalScopeFilter(filters) || hasStatsModalPlayerFilter(filters)) {
+            const adapted = (data.matches || [])
+                .filter(function (m) { return m && m.status === 'completed'; })
+                .map(adaptCloudMatchForUi)
+                .filter(Boolean)
+                .filter(function (m) { return matchPassesScopeFilters(m, filters); });
+            players = statsFromMatchesForLeaderboard(adapted).map(function (p) {
+                return {
+                    id: p.id,
+                    name: p.name,
+                    stats: p.stats,
+                    lastPlayedAt: p.lastPlayedAt
+                };
             });
-        });
+            if (hasStatsModalPlayerFilter(filters)) {
+                players = players.filter(function (p) {
+                    return playerMatchesStatsModalFilter(p, filters);
+                });
+            }
+        } else {
+            if (!(data.players || []).length) {
+                tbody.innerHTML = '<tr><td colspan="5" class="stats-empty">No cloud match data yet.</td></tr>';
+                return;
+            }
+            players = (data.players || []).map(function (p) {
+                return {
+                    id: p.id,
+                    name: p.name,
+                    stats: {
+                        gamesWon: p.gamesWon || 0,
+                        gamesDrawn: p.gamesDrawn || 0,
+                        gamesLost: p.gamesLost || 0,
+                        racksWon: p.racksWon || 0,
+                        racksLost: p.racksLost || 0
+                    },
+                    lastPlayedAt: p.lastPlayedAt
+                };
+            });
+        }
+        players = sortLeaderboardPlayers(players);
+        tbody.innerHTML = renderLeaderboardRows(
+            players,
+            statsModalFiltersActive(filters) ? filteredEmpty : 'No cloud match data yet.'
+        );
+        bindLeaderboardRowClicks(tbody);
+        syncStatsModalClearFiltersBtn();
     }
 
     function racksWlHeaderForGameType(gameType) {
@@ -8806,6 +9336,7 @@
         updateStatsActionButtons(cloud);
         var cta = document.getElementById('cloudStatsCtaRow');
         if (cta) cta.style.display = cloud ? '' : 'none';
+        initStatsModalFilters();
         return db;
     }
 

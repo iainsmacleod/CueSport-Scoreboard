@@ -1152,6 +1152,34 @@ const PLAN_DOWNGRADE_DOCK_MESSAGE =
 const PLAN_DOWNGRADE_ADHOC_MESSAGE =
   'Your plan was changed to a lower tier. Ad-hoc tables were cleared — create new ones within your plan limits.';
 
+export const ACCESS_ENDED_ADHOC_MESSAGE =
+  'Your CueSport Scoreboard Cloud access has ended. Ad-hoc tables have been closed.';
+
+/**
+ * Drop unpaired / in-progress cloud match rows for a room before the seat is removed.
+ * Completed match history (paired start+end) is left alone.
+ */
+export function discardOpenRoomMatches(roomId) {
+  if (!roomId) return 0;
+  let deleted = 0;
+  try {
+    const session = sqlite.getRoomSessionState(roomId);
+    const liveKey = session?.sessionId ? String(session.sessionId) : '';
+    if (liveKey) {
+      deleted += Number(sqlite.discardRoomSessionEvents(roomId, liveKey)) || 0;
+    }
+    // Sweep any remaining unpaired session:start rows for this room.
+    let n;
+    do {
+      n = Number(sqlite.discardRoomSessionEvents(roomId)) || 0;
+      deleted += n;
+    } while (n > 0);
+  } catch (_) {
+    /* best-effort — seat delete must still proceed */
+  }
+  return deleted;
+}
+
 /** Kick any live dock holding this API key (used on revoke). */
 export function kickApiKeyDocks(keyId, message = API_KEY_REVOKED_MESSAGE) {
   if (!keyId) return 0;
@@ -1182,16 +1210,51 @@ export function kickApiKeyDocks(keyId, message = API_KEY_REVOKED_MESSAGE) {
 /**
  * After an API key is revoked in SQLite: disconnect docks using it and delete
  * the mapped table so dashboards drop the seat immediately (not after grace).
+ * In-progress cloud matches for that table are discarded; completed history is kept.
  */
 export function revokeApiKeySeat(keyId, message = API_KEY_REVOKED_MESSAGE) {
-  if (!keyId) return { kicked: 0, roomDeleted: false, roomId: null };
+  if (!keyId) return { kicked: 0, roomDeleted: false, roomId: null, matchesDiscarded: 0 };
   const roomId = sqlite.getRoomIdForApiKey(keyId);
   const kicked = kickApiKeyDocks(keyId, message);
   let roomDeleted = false;
+  let matchesDiscarded = 0;
   if (roomId) {
-    roomDeleted = performDeleteRoom(roomId).ok;
+    const result = performDeleteRoom(roomId);
+    roomDeleted = result.ok;
+    matchesDiscarded = Number(result.matchesDiscarded) || 0;
   }
-  return { kicked, roomDeleted, roomId: roomDeleted ? roomId : null };
+  return {
+    kicked,
+    roomDeleted,
+    roomId: roomDeleted ? roomId : null,
+    matchesDiscarded,
+  };
+}
+
+/**
+ * Kick clients and delete every ad-hoc (impromptu) table for an account.
+ * In-progress matches are discarded with the room; completed history is kept.
+ */
+export function deleteAccountAdhocSeats(
+  accountId,
+  {
+    code = 'access_ended',
+    message = ACCESS_ENDED_ADHOC_MESSAGE,
+  } = {},
+) {
+  if (!accountId) return { adhocDeleted: 0, adhocKicked: 0, matchesDiscarded: 0 };
+  const adhocRooms = sqlite.getRoomsForAccount(accountId)
+    .filter((room) => room.kind === 'impromptu');
+  let adhocDeleted = 0;
+  let adhocKicked = 0;
+  let matchesDiscarded = 0;
+  for (const room of adhocRooms) {
+    adhocKicked += kickRoomClients(room.id, { code, message });
+    const result = performDeleteRoom(room.id);
+    if (result.ok) adhocDeleted += 1;
+    matchesDiscarded += Number(result.matchesDiscarded) || 0;
+  }
+  return { adhocDeleted, adhocKicked, matchesDiscarded };
 }
 
 /**
@@ -1206,35 +1269,34 @@ export function resetAccountSeatsForPlanDowngrade(accountId) {
       dockRoomsDeleted: 0,
       adhocDeleted: 0,
       adhocKicked: 0,
+      matchesDiscarded: 0,
     };
   }
   const keyIds = sqlite.revokeAllApiKeysForAccount(accountId);
   let docksKicked = 0;
   let dockRoomsDeleted = 0;
+  let matchesDiscarded = 0;
   for (const keyId of keyIds) {
-    const { kicked, roomDeleted } = revokeApiKeySeat(keyId, PLAN_DOWNGRADE_DOCK_MESSAGE);
+    const { kicked, roomDeleted, matchesDiscarded: discarded } =
+      revokeApiKeySeat(keyId, PLAN_DOWNGRADE_DOCK_MESSAGE);
     docksKicked += kicked;
     if (roomDeleted) dockRoomsDeleted += 1;
+    matchesDiscarded += Number(discarded) || 0;
   }
 
-  const adhocRooms = sqlite.getRoomsForAccount(accountId)
-    .filter((room) => room.kind === 'impromptu');
-  let adhocDeleted = 0;
-  let adhocKicked = 0;
-  for (const room of adhocRooms) {
-    adhocKicked += kickRoomClients(room.id, {
-      code: 'plan_downgrade',
-      message: PLAN_DOWNGRADE_ADHOC_MESSAGE,
-    });
-    if (performDeleteRoom(room.id).ok) adhocDeleted += 1;
-  }
+  const adhoc = deleteAccountAdhocSeats(accountId, {
+    code: 'plan_downgrade',
+    message: PLAN_DOWNGRADE_ADHOC_MESSAGE,
+  });
+  matchesDiscarded += Number(adhoc.matchesDiscarded) || 0;
 
   return {
     keysRevoked: keyIds.length,
     docksKicked,
     dockRoomsDeleted,
-    adhocDeleted,
-    adhocKicked,
+    adhocDeleted: adhoc.adhocDeleted,
+    adhocKicked: adhoc.adhocKicked,
+    matchesDiscarded,
   };
 }
 
@@ -1318,20 +1380,24 @@ export function scheduleRoomCleanup(roomId, graceMs = config.roomCleanupGraceMs)
 }
 
 /**
- * Delete room + kick clients. Never deletes match_events (FK sets room_id NULL).
- * Returns { ok, accountId } for callers that need to refresh dashboards.
+ * Delete room + kick clients. Discards unpaired / in-progress cloud matches for the
+ * seat first. Never deletes completed match history (paired events keep account_id;
+ * FK sets room_id NULL for any remaining rows).
+ * Returns { ok, accountId, matchesDiscarded } for callers that need to refresh dashboards.
  */
 export function performDeleteRoom(roomId) {
-  if (!roomId) return { ok: false, accountId: null };
+  if (!roomId) return { ok: false, accountId: null, matchesDiscarded: 0 };
   const room = sqlite.getRoom(roomId);
   if (!room) {
     cancelRoomCleanup(roomId);
-    return { ok: false, accountId: null };
+    return { ok: false, accountId: null, matchesDiscarded: 0 };
   }
   const accountId = room.account_id;
   cancelRoomCleanup(roomId);
   roomsBeingDeleted.add(roomId);
+  let matchesDiscarded = 0;
   try {
+    matchesDiscarded = discardOpenRoomMatches(roomId);
     kickRoomClients(roomId);
     sqlite.deleteRoom(roomId);
     if (rooms.has(roomId)) {
@@ -1343,7 +1409,7 @@ export function performDeleteRoom(roomId) {
   if (accountId) {
     notifyAccountTables(accountId, { immediate: true });
   }
-  return { ok: true, accountId };
+  return { ok: true, accountId, matchesDiscarded };
 }
 
 function sqliteCutoffFromMsAgo(msAgo) {

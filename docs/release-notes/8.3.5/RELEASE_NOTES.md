@@ -2,7 +2,7 @@
 
 **8.3.0 → 8.3.5** · September 2026
 
-Patch release focused on **local player stats parity** (draws, career fields, empty pregame handling), a clearer **Stats** modal (**Recent Matches** + **Leaderboard**), **dashboard match filters**, **complimentary access expiry**, and scoring/UI polish (illegal 8-ball foul attribution, upload tooltips, mobile shell after sign-in).
+Patch release focused on **local player stats parity** (draws, career fields, empty pregame handling), a clearer **Stats** modal (**Recent Matches** + **Leaderboard**), **match filters on dock and dashboard**, **complimentary access expiry**, and scoring/UI polish (illegal 8-ball foul attribution, upload tooltips, mobile shell after sign-in, Cloud connection copy).
 
 Local OBS scoring continues to work without Cloud. Cloud dashboard / mobile / self-host deployments pick up the same stats and shell fixes.
 
@@ -29,18 +29,21 @@ The dock **Stats** modal is streamlined around what you use mid-session:
 - Tabs: **Recent Matches** and **Leaderboard** (standalone H2H tab removed — open a player for head-to-head)
 - Click a player on the leaderboard (or from a match) for the detail view, with **Back** to return
 - Match winners render in green for quicker scanning
+- **Player / Event / date-range filters** (with autocomplete) — same idea as Cloud Match Stats; the leaderboard rebuilds from the filtered match set when a filter is active
 
 Export / import remains **additive** on schema version 1 — older exports still load; new fields appear when present.
 
 ---
 
-## Dashboard match stats filters
+## Match stats filters (dock + dashboard)
 
-Cloud dashboard match statistics gain practical filters:
+Filter completed matches and scoped leaderboards by:
 
-- Player and event search with autocomplete
-- Date range constraints
-- Clearer leaderboard headers / sorting
+- Player search with autocomplete (pick locks to roster id; free text matches names)
+- Event / game-info autocomplete
+- From / To date range, plus Clear
+
+On the Cloud dashboard this lands on **Match Stats**; on the OBS dock it sits above Recent Matches / Leaderboard in the Stats modal (local IndexedDB and cloud-backed modes).
 
 ---
 
@@ -49,8 +52,12 @@ Cloud dashboard match statistics gain practical filters:
 When complimentary Cloud access ends and there is no active subscription:
 
 - Dock Keys for that account are **revoked** automatically
+- **Ad-hoc tables are closed** (same as plan downgrade seat reset)
+- In-progress cloud matches on revoked seats are **discarded**; completed history is kept
 - Auth / billing sync and WebSocket room auth enforce the expiry
 - Self-host and managed Cloud both use the same path
+
+Manual Dock Key revoke / revoke-all also removes the mapped dock table and discards any open cloud match for that seat.
 
 See the backend README for the expiry behaviour and related config.
 
@@ -65,6 +72,10 @@ An illegal lose-on-8 foul attributes the foul to the **shooter**, not the winner
 ### Control panel tooltips
 
 Logo / file-upload **L2 / L3** hover tips sit outside the button surface (no more clipped scrollbars from `filter` creating a containing block).
+
+### Cloud connection copy
+
+The dock Cloud connection intro drops the self-hosted vs managed explainer and goes straight to sign-in / Dock Key instructions.
 
 ### Visual shell
 

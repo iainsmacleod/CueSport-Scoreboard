@@ -1931,7 +1931,7 @@ label.switch.toggle-disabled {
 	flex-direction: column;
 	align-items: stretch;
 	justify-content: flex-start;
-	max-width: 650px;
+	max-width: 720px;
 	width: 95%;
 	max-height: 88vh;
 	height: auto;
@@ -1956,16 +1956,137 @@ label.switch.toggle-disabled {
 }
 
 .stats-modal-content {
-	max-width: 650px;
+	max-width: 720px;
 	width: 95%;
 }
 
 .stats-tab-bar {
 	display: flex;
+	gap: 6px;
 	flex-wrap: wrap;
-	gap: 4px;
 	margin-bottom: 8px;
-	flex-shrink: 0;
+}
+
+#statsModal .stats-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.45rem;
+	align-items: flex-end;
+	margin: 0 0 0.65rem;
+	position: relative;
+	z-index: 5;
+}
+
+#statsModal .stats-toolbar:focus-within {
+	z-index: 30;
+}
+
+#statsModal .stats-filter {
+	display: flex;
+	flex-direction: column;
+	gap: 0.2rem;
+	font-size: 0.75em;
+	color: rgba(192, 202, 245, 0.95);
+	margin: 0;
+	min-width: 0;
+	/* Own stacking context so a focused Player/Event row rises above wrapped date inputs. */
+	position: relative;
+	z-index: 1;
+}
+
+#statsModal .stats-filter:focus-within {
+	z-index: 40;
+}
+
+#statsModal .stats-toolbar-filter .autocomplete-wrapper {
+	position: relative;
+	min-width: 9rem;
+	width: 11rem;
+	max-width: 13rem;
+	z-index: 1;
+}
+
+#statsModal .stats-toolbar-filter .autocomplete-wrapper:focus-within {
+	z-index: 45;
+}
+
+#statsModal .stats-toolbar .stats-filter input,
+#statsModal .stats-toolbar .stats-filter .autocomplete-wrapper input {
+	width: 100%;
+	min-width: 0;
+	box-sizing: border-box;
+	background: #1a1b26;
+	color: #c0caf5;
+	border: 1px solid #414868;
+	border-radius: 4px;
+	font-size: 0.9em;
+	line-height: 1.15;
+	padding: 0.35rem 0.45rem;
+	min-height: 2rem;
+	margin: 0;
+}
+
+#statsModal .stats-date-filter input[type="date"] {
+	width: 9.5rem;
+	min-width: 9.5rem;
+	padding-right: 1.55rem;
+}
+
+#statsModal .stats-date-input-wrap {
+	position: relative;
+	display: block;
+}
+
+#statsModal .stats-date-clear {
+	appearance: none;
+	position: absolute;
+	right: 1.45rem;
+	top: 50%;
+	transform: translateY(-50%);
+	width: 1.15rem;
+	height: 1.15rem;
+	padding: 0;
+	margin: 0;
+	border: none;
+	border-radius: 999px;
+	background: transparent;
+	color: #a9b1d6;
+	font-size: 1rem;
+	line-height: 1;
+	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+#statsModal .stats-date-clear:hover {
+	color: #fff;
+}
+
+#statsModal .stats-date-clear[hidden] {
+	display: none !important;
+}
+
+#statsModal .stats-toolbar .autocomplete-list {
+	min-width: 100%;
+	max-height: 180px;
+	/* Opaque panel — do not inherit washed-out label color tricks. */
+	opacity: 1;
+	background: #1a1b26;
+	color: #c0caf5;
+	z-index: 50;
+}
+
+#statsModal #statsModalClearFiltersBtn {
+	flex: 0 0 auto;
+	min-height: 2rem;
+	padding: 0.3rem 0.7rem;
+	font-size: 0.85em;
+}
+
+#statsModal #statsModalClearFiltersBtn:disabled {
+	opacity: 0.4;
+	pointer-events: none;
 }
 
 .stats-tab-btn {
@@ -2003,6 +2124,7 @@ label.switch.toggle-disabled {
 }
 
 #statsModal .stats-modal-body .stats-tab-bar,
+#statsModal .stats-modal-body .stats-toolbar,
 #statsModal .stats-modal-body .stats-tab-panel,
 #statsModal #statsPlayerDetail,
 #statsModal .stats-modal-body .stats-section,

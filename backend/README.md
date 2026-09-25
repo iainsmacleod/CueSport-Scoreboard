@@ -169,16 +169,17 @@ Paid tiers are **not** edited by the admin UI; product free trials belong on Str
 
 ### Dock Key revocation when access ends
 
-Relay join is gated by access (above). Separately, **OBS Dock Keys are revoked and seats kicked** when the account loses all remaining access, so expired trials/subscriptions do not require manual key cleanup.
+Relay join is gated by access (above). Separately, **OBS Dock Keys are revoked, ad-hoc tables are closed, and seats kicked** when the account loses all remaining access, so expired trials/subscriptions do not require manual seat cleanup. In-progress cloud matches on those seats are discarded; completed match history is kept.
 
-| Trigger | Keys revoked? | Notes |
-|--------|----------------|-------|
-| Stripe status becomes **`inactive`** (canceled, unpaid trial end, `incomplete_expired`, etc.) via `customer.subscription.updated` / sync | **Yes**, unless complimentary access is still active | Checkout / portal / price mapping unchanged — revoke runs *after* status sync |
-| `customer.subscription.deleted` | **Yes**, unless complimentary remains | Same helper as above |
-| Stripe **`past_due`** (failed renewal, Smart Retries still running) | **No** | Access is already blocked for join; keys kept so a successful retry does not force re-pasting Dock Keys |
-| Admin **Complimentary access** expires (`trial_ends_at` in the past) | **Yes**, if no Stripe `active`/`trialing` remains | Sweeper (~5 min / `COMPLIMENTARY_EXPIRY_SWEEPER_MS`) + on-demand when join/key-create hits `subscription_required` |
-| Admin **DELETE** complimentary (`DELETE /api/admin/accounts/:id/trial`) | **Yes**, if no Stripe access remains | Same as natural complimentary expiry |
-| Plan **downgrade** while still subscribed | **Yes** (all keys + ad-hoc tables) | Existing seat-reset path; match history kept |
+| Trigger | Keys revoked? | Ad-hoc closed? | Notes |
+|--------|----------------|----------------|-------|
+| Stripe status becomes **`inactive`** (canceled, unpaid trial end, `incomplete_expired`, etc.) via `customer.subscription.updated` / sync | **Yes**, unless complimentary access is still active | **Yes** (same gate) | Checkout / portal / price mapping unchanged — revoke runs *after* status sync |
+| `customer.subscription.deleted` | **Yes**, unless complimentary remains | **Yes** | Same helper as above |
+| Stripe **`past_due`** (failed renewal, Smart Retries still running) | **No** | **No** | Access is already blocked for join; keys kept so a successful retry does not force re-pasting Dock Keys |
+| Admin **Complimentary access** expires (`trial_ends_at` in the past) | **Yes**, if no Stripe `active`/`trialing` remains | **Yes** | Sweeper (~5 min / `COMPLIMENTARY_EXPIRY_SWEEPER_MS`) + on-demand when join/key-create hits `subscription_required` |
+| Admin **DELETE** complimentary (`DELETE /api/admin/accounts/:id/trial`) | **Yes**, if no Stripe access remains | **Yes** | Same as natural complimentary expiry |
+| Manual Dock Key revoke / revoke-all | That key / all keys | N/A (key seats only) | Mapped dock table removed; open match discarded |
+| Plan **downgrade** while still subscribed | **Yes** (all keys + ad-hoc tables) | **Yes** | Existing seat-reset path; match history kept |
 
 **`past_due` duration is not set by this app.** Stripe Billing → Revenue recovery / Smart Retries controls how long retries run (Stripe’s recommended default is often ~8 attempts over ~2 weeks) and the end action: cancel, mark unpaid, or leave past_due. Only when Stripe moves the subscription to a status we map to **`inactive`** (or deletes it) do we revoke keys. If the Dashboard is set to “leave past_due”, keys can remain indefinitely while join stays blocked.
 

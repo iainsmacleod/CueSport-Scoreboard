@@ -76,6 +76,41 @@ try {
   ).get(stripeEndedComp.id);
   assert('comp-covered key still active', Number(coveredKeys?.n) === 1, `key=${keptKey?.id}`);
 
+  // Access loss also closes ad-hoc tables and discards in-progress cloud matches.
+  const { account: endedWithAdhoc } = sqlite.ensureAccount('ended-adhoc@example.com', 'auth-ended-adhoc');
+  sqlite.getDb().prepare(
+    `UPDATE accounts SET subscription_status = 'inactive', trial_ends_at = NULL WHERE id = ?`
+  ).run(endedWithAdhoc.id);
+  const endedDockKey = sqlite.createApiKey(endedWithAdhoc.id, 'Ended dock', 'trusted_operator');
+  const endedDockRoom = sqlite.ensureRoomForApiKey(endedWithAdhoc.id, endedDockKey.id, {
+    instanceKey: 'default',
+    label: 'Ended dock',
+  });
+  const openSessionId = 'open-match-session-1';
+  sqlite.setRoomSessionId(endedDockRoom.id, openSessionId);
+  sqlite.insertMatchEvent({
+    accountId: endedWithAdhoc.id,
+    roomId: endedDockRoom.id,
+    sessionId: openSessionId,
+    eventType: 'session:start',
+    payload: { sessionId: openSessionId, matchId: openSessionId, gameType: 'game1' },
+    sourceClient: 'dock',
+    apiKeyId: endedDockKey.id,
+  });
+  const endedAdhoc = sqlite.createImpromptuRoom(endedWithAdhoc.id, 'Live ad-hoc');
+  assert('seeded dock + ad-hoc before access loss', !!endedDockRoom?.id && !!endedAdhoc?.id);
+  const accessLoss = await revokeDockKeysIfNoCloudAccess(endedWithAdhoc.id);
+  assert('access loss revokes keys', accessLoss.revoked && accessLoss.keysRevoked.includes(endedDockKey.id));
+  assert('access loss closes ad-hoc', accessLoss.adhocDeleted >= 1, JSON.stringify(accessLoss));
+  assert('access loss discarded open match', accessLoss.matchesDiscarded >= 1, JSON.stringify(accessLoss));
+  assert('no dock rooms remain after access loss', sqlite.countDockRoomsForAccount(endedWithAdhoc.id) === 0);
+  assert('no ad-hoc rooms remain after access loss', sqlite.countImpromptuRoomsForAccount(endedWithAdhoc.id) === 0);
+  const openStartsLeft = sqlite.getDb().prepare(
+    `SELECT COUNT(*) AS n FROM match_events
+     WHERE account_id = ? AND event_type = 'session:start' AND session_id = ?`
+  ).get(endedWithAdhoc.id, openSessionId);
+  assert('open session:start discarded', Number(openStartsLeft?.n) === 0);
+
   const { account: activeComp } = sqlite.ensureAccount('active-comp@example.com', 'auth-active-comp');
   const future = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
   sqlite.getDb().prepare(

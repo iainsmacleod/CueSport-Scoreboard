@@ -1,6 +1,7 @@
 /**
  * When cloud access ends (complimentary expiry or Stripe inactive) with no remaining
- * access grant, revoke Dock Keys and kick seats — without changing Stripe sync itself.
+ * access grant, revoke Dock Keys, close ad-hoc tables, and kick seats — without
+ * changing Stripe sync itself.
  */
 
 import * as sqlite from '../db/sqlite.js';
@@ -16,8 +17,8 @@ export const SUBSCRIPTION_ENDED_DOCK_MESSAGE =
   'Your CueSport Scoreboard Cloud subscription has ended. Subscribe in the dashboard to create new Dock Keys.';
 
 /**
- * If the account currently has no cloud access, revoke all Dock Keys and kick seats.
- * Safe no-op when complimentary or Stripe access is still valid.
+ * If the account currently has no cloud access, revoke all Dock Keys, close ad-hoc
+ * tables, and kick seats. Safe no-op when complimentary or Stripe access is still valid.
  */
 export async function revokeDockKeysIfNoCloudAccess(
   accountId,
@@ -27,37 +28,75 @@ export async function revokeDockKeysIfNoCloudAccess(
   } = {},
 ) {
   if (!accountId) {
-    return { revoked: false, keysRevoked: [], seatsKicked: 0 };
+    return {
+      revoked: false,
+      keysRevoked: [],
+      seatsKicked: 0,
+      adhocDeleted: 0,
+      adhocKicked: 0,
+      matchesDiscarded: 0,
+    };
   }
   const account = sqlite.getAccountById(accountId);
   if (!account) {
-    return { revoked: false, keysRevoked: [], seatsKicked: 0 };
+    return {
+      revoked: false,
+      keysRevoked: [],
+      seatsKicked: 0,
+      adhocDeleted: 0,
+      adhocKicked: 0,
+      matchesDiscarded: 0,
+    };
   }
   if (hasCloudSubscriptionAccess(account, nowMs)) {
-    return { revoked: false, keysRevoked: [], seatsKicked: 0 };
+    return {
+      revoked: false,
+      keysRevoked: [],
+      seatsKicked: 0,
+      adhocDeleted: 0,
+      adhocKicked: 0,
+      matchesDiscarded: 0,
+    };
   }
+
+  const {
+    revokeApiKeySeat,
+    deleteAccountAdhocSeats,
+    ACCESS_ENDED_ADHOC_MESSAGE,
+  } = await import('../ws/room-hub.js');
 
   const keyIds = sqlite.revokeAllApiKeysForAccount(accountId);
   let seatsKicked = 0;
+  let matchesDiscarded = 0;
   if (keyIds.length) {
-    const { revokeApiKeySeat } = await import('../ws/room-hub.js');
     for (const keyId of keyIds) {
-      const { kicked } = revokeApiKeySeat(keyId, message);
+      const { kicked, matchesDiscarded: discarded } = revokeApiKeySeat(keyId, message);
       seatsKicked += kicked;
+      matchesDiscarded += Number(discarded) || 0;
     }
   }
+
+  const adhoc = deleteAccountAdhocSeats(accountId, {
+    code: 'access_ended',
+    message: ACCESS_ENDED_ADHOC_MESSAGE,
+  });
+  matchesDiscarded += Number(adhoc.matchesDiscarded) || 0;
+
   return {
-    revoked: keyIds.length > 0,
+    revoked: keyIds.length > 0 || adhoc.adhocDeleted > 0,
     keysRevoked: keyIds,
     seatsKicked,
+    adhocDeleted: adhoc.adhocDeleted,
+    adhocKicked: adhoc.adhocKicked,
+    matchesDiscarded,
   };
 }
 
 /**
  * If complimentary access has expired, clear trial_ends_at (and reset tier when inactive).
- * When no subscription access remains, revoke all Dock Keys and kick seats.
+ * When no subscription access remains, revoke all Dock Keys, close ad-hoc tables, and kick seats.
  *
- * @returns {null|{ cleared: true, keysRevoked: string[], seatsKicked: number, hadAccessAfterClear: boolean }}
+ * @returns {null|{ cleared: true, keysRevoked: string[], seatsKicked: number, adhocDeleted: number, adhocKicked: number, matchesDiscarded: number, hadAccessAfterClear: boolean }}
  */
 export async function enforceComplimentaryExpiryForAccount(accountId, nowMs = Date.now()) {
   if (!accountId) return null;
@@ -72,6 +111,9 @@ export async function enforceComplimentaryExpiryForAccount(accountId, nowMs = Da
   const hadAccessAfterClear = hasCloudSubscriptionAccess(updated, nowMs);
   let keysRevoked = [];
   let seatsKicked = 0;
+  let adhocDeleted = 0;
+  let adhocKicked = 0;
+  let matchesDiscarded = 0;
 
   if (!hadAccessAfterClear) {
     const result = await revokeDockKeysIfNoCloudAccess(accountId, {
@@ -80,12 +122,18 @@ export async function enforceComplimentaryExpiryForAccount(accountId, nowMs = Da
     });
     keysRevoked = result.keysRevoked;
     seatsKicked = result.seatsKicked;
+    adhocDeleted = result.adhocDeleted;
+    adhocKicked = result.adhocKicked;
+    matchesDiscarded = result.matchesDiscarded;
   }
 
   return {
     cleared: true,
     keysRevoked,
     seatsKicked,
+    adhocDeleted,
+    adhocKicked,
+    matchesDiscarded,
     hadAccessAfterClear,
   };
 }
