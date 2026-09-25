@@ -5214,6 +5214,7 @@ function creditTrackerRackWin(ballId) {
 /**
  * 8-Ball: game ball potted out of sequence — Active Player loses the rack (opponent scores).
  * Gift racks are not break-and-runs or table runs (opponent did not clear the table).
+ * Counts as a foul on the shooter (illegal 8 / lose on the 8).
  */
 function creditTrackerRackLoss(ballId) {
     const active = getActivePlayerSlot();
@@ -5238,6 +5239,8 @@ function creditTrackerRackLoss(ballId) {
     } else if (window.PlayerStats && typeof window.PlayerStats.noteLastRackWinnerSlot === 'function') {
         window.PlayerStats.noteLastRackWinnerSlot(opponent);
     }
+    // Lose-on-8 is a foul on the shooter; count before recordRackWin reads frame fouls.
+    incrementRackFoul(active);
     // Shooter's illegal/early 8 still counts as a pot before the rack write.
     recordTrackerBallPot(active);
     const scorePromise = postScore("add", opponent, { skipTrackerReset: true, rackRunClass: rackRunClass });
@@ -5249,6 +5252,10 @@ function creditTrackerRackLoss(ballId) {
     maybeShowRackBreakerPickerAfterRackChange();
     refreshLastRackWinnerUi();
     return Promise.resolve(scorePromise).then(function () {
+        // recordRackWin clears after writing; without a session, drop the live counter here.
+        if (getRackFouls("1") > 0 || getRackFouls("2") > 0) {
+            clearRackFouls();
+        }
         refreshLastRackWinnerUi();
         publishCloudStateAfterTrackerChange();
     });

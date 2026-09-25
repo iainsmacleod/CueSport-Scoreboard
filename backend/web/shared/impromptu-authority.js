@@ -415,6 +415,9 @@ function prepareNextRackOrFrame(state, winnerSlot, options = {}) {
     state.playerBallSet = 'p1Open';
     state._ballSetOpenLastPotSlot = '';
     state._ballSetOpenSamePlayerPots = 0;
+    // Dock recordRackWin clears per-rack foul counters after capture; match for pool.
+    state.foulsP1 = 0;
+    state.foulsP2 = 0;
   }
 
   resetRackVisitFlags(state);
@@ -2333,6 +2336,12 @@ export function applyImpromptuCommand(stateIn, action, payload = {}) {
           const winner = gameBallAction === 'loss'
             ? (active === '2' ? '1' : '2')
             : active;
+          // Dock creditTrackerRackLoss: illegal/early 8 is a foul on the shooter.
+          if (gameBallAction === 'loss') {
+            if (active === '2') state.foulsP2 = (Number(state.foulsP2) || 0) + 1;
+            else state.foulsP1 = (Number(state.foulsP1) || 0) + 1;
+            noteMatchFoul(state, active, 1);
+          }
           // Dock creditTrackerRackWin/Loss: count the shooter's game-ball pot before rack write.
           noteBallPot(state, active);
           awardTrackerRack(state, winner, ballId);

@@ -9,10 +9,14 @@ body.mobile {
   --mobile-purple: #9b5cff;
   --mobile-success: #42dd8b;
   --mobile-danger: #ff6b85;
-  background:
+  /* Same dock issue: gradient layers default to repeat under a short content box. */
+  min-height: 100vh;
+  min-height: 100dvh;
+  background-color: var(--mobile-bg);
+  background-image:
     radial-gradient(circle at 15% 0%, rgba(47, 128, 255, 0.14), transparent 28rem),
-    radial-gradient(circle at 95% 10%, rgba(155, 92, 255, 0.11), transparent 24rem),
-    var(--mobile-bg);
+    radial-gradient(circle at 95% 10%, rgba(155, 92, 255, 0.11), transparent 24rem);
+  background-repeat: no-repeat;
   color: var(--mobile-text);
   font-family: Inter, "Segoe UI", system-ui, sans-serif;
 }

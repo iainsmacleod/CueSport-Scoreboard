@@ -760,6 +760,14 @@ try {
       && dry8.state.lastRackWinnerSlot === '1',
     `p1=${dry8.state.p1Score} p2=${dry8.state.p2Score} last=${dry8.state.lastRackWinnerSlot}`,
   );
+  assert(
+    'dry-break incoming 8 foul is on shooter (P2), not winner',
+    dry8._private._matchRacks?.[0]?.foulsP2 === 1
+      && dry8._private._matchRacks?.[0]?.foulsP1 === 0
+      && dry8.state.foulsP1 === 0
+      && dry8.state.foulsP2 === 0,
+    `rack=${JSON.stringify(dry8._private._matchRacks?.[0])} live=${dry8.state.foulsP1}/${dry8.state.foulsP2}`,
+  );
 
   // Same scenario with win-on-break on must still be a loss (not a break win).
   let dryBreakWinFlag = createDefaultImpromptuState({
@@ -797,6 +805,14 @@ try {
       && loss8._private._matchRacks?.[0]?.ballsP1 === 3
       && loss8._private._matchRacks?.[0]?.winnerSlot === '2',
     `balls=${loss8._private._matchBallsP1} rack=${JSON.stringify(loss8._private._matchRacks)}`,
+  );
+  assert(
+    'illegal 8 foul is on shooter (P1), not winner',
+    loss8._private._matchRacks?.[0]?.foulsP1 === 1
+      && loss8._private._matchRacks?.[0]?.foulsP2 === 0
+      && loss8.state.foulsP1 === 0
+      && loss8.state.foulsP2 === 0,
+    `rack=${JSON.stringify(loss8._private._matchRacks?.[0])} live=${loss8.state.foulsP1}/${loss8.state.foulsP2}`,
   );
 
   // Ball-set: second object pot on break assigns group.

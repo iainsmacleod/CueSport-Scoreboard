@@ -3460,6 +3460,18 @@
             assert('RackWin', 'Out-of-sequence 8 is a loss for Active Player',
                 parseInt(cp.getStorageItem('p1ScoreCtrlPanel'), 10) === 0 &&
                 parseInt(cp.getStorageItem('p2ScoreCtrlPanel'), 10) === 1);
+            await cp.PlayerStats.flushRackRecordQueue();
+            const lossPending = cp.PlayerStats.getActivePendingMatch && cp.PlayerStats.getActivePendingMatch();
+            const lossRack = lossPending && lossPending.racks && lossPending.racks[lossPending.racks.length - 1];
+            if (lossRack) {
+                assert('RackWin', 'Out-of-sequence 8 foul on shooter (P1), not winner',
+                    Number(lossRack.foulsP1) === 1 && Number(lossRack.foulsP2) === 0 &&
+                    String(lossRack.winnerSlot) === '2',
+                    JSON.stringify(lossRack));
+            }
+            assert('RackWin', 'Out-of-sequence 8 clears live foul counters',
+                parseInt(cp.getStorageItem('snookerFrameFoulsP1') || '0', 10) === 0 &&
+                parseInt(cp.getStorageItem('snookerFrameFoulsP2') || '0', 10) === 0);
             cp.setStorageItem('p2ScoreCtrlPanel', 0);
             cp.document.getElementById('p2Score').value = '0';
             cp.resetBallTracker();
@@ -3495,6 +3507,16 @@
                 parseInt(cp.getStorageItem('p1ScoreCtrlPanel'), 10) === 1 &&
                 parseInt(cp.getStorageItem('p2ScoreCtrlPanel'), 10) === 0,
                 'p1=' + cp.getStorageItem('p1ScoreCtrlPanel') + ' p2=' + cp.getStorageItem('p2ScoreCtrlPanel'));
+            await cp.PlayerStats.flushRackRecordQueue();
+            const dryLossPending = cp.PlayerStats.getActivePendingMatch && cp.PlayerStats.getActivePendingMatch();
+            const dryLossRack = dryLossPending && dryLossPending.racks &&
+                dryLossPending.racks[dryLossPending.racks.length - 1];
+            if (dryLossRack) {
+                assert('RackWin', 'Dry-break incoming 8 foul on shooter (P2), not winner',
+                    Number(dryLossRack.foulsP2) === 1 && Number(dryLossRack.foulsP1) === 0 &&
+                    String(dryLossRack.winnerSlot) === '1',
+                    JSON.stringify(dryLossRack));
+            }
 
             for (let n = 1; n <= 15; n++) {
                 if (n === 8) {
@@ -3735,6 +3757,46 @@
             cp.document.getElementById('p2Name').setAttribute('data-player-id', brP2.id);
             cp.postNames();
             await sleep(200);
+            cp.setStorageItem('p1ScoreCtrlPanel', 0);
+            cp.setStorageItem('p2ScoreCtrlPanel', 0);
+            cp.document.getElementById('p1Score').value = '0';
+            cp.document.getElementById('p2Score').value = '0';
+            cp.resetBallTracker();
+            // Illegal 8: opponent wins, foul must land on shooter (not winner).
+            cp.setStorageItem('useBallSet', 'no');
+            cp.document.getElementById('ballSetCheckbox').checked = false;
+            cp.useBallSetToggle();
+            cp.setStorageItem('winOnBreakEnabled', 'no');
+            cp.document.getElementById('earlyGameBallCheckbox').checked = false;
+            cp.earlyGameBallToggle();
+            cp.selectRackBreaker('1');
+            await sleep(30);
+            const foulBeforeP1 = await cp.PlayerStats.getPlayer(brP1.id);
+            const foulBeforeP2 = await cp.PlayerStats.getPlayer(brP2.id);
+            const foulBefore1 = (foulBeforeP1 && foulBeforeP1.stats && foulBeforeP1.stats.byGameType &&
+                foulBeforeP1.stats.byGameType.game1 && foulBeforeP1.stats.byGameType.game1.fouls) || 0;
+            const foulBefore2 = (foulBeforeP2 && foulBeforeP2.stats && foulBeforeP2.stats.byGameType &&
+                foulBeforeP2.stats.byGameType.game1 && foulBeforeP2.stats.byGameType.game1.fouls) || 0;
+            cp.togglePot(cp.document.getElementById('ball 1'));
+            await sleep(30);
+            cp.togglePot(cp.document.getElementById('ball 8'));
+            await sleep(200);
+            await cp.PlayerStats.flushRackRecordQueue();
+            const foulPending = cp.PlayerStats.getActivePendingMatch();
+            const foulRack = foulPending && foulPending.racks && foulPending.racks[foulPending.racks.length - 1];
+            assert('RackWin', 'Illegal 8 rack: winner P2, foul on P1',
+                !!(foulRack && String(foulRack.winnerSlot) === '2' &&
+                    Number(foulRack.foulsP1) === 1 && Number(foulRack.foulsP2) === 0),
+                foulRack && JSON.stringify(foulRack));
+            const foulAfterP1 = await cp.PlayerStats.getPlayer(brP1.id);
+            const foulAfterP2 = await cp.PlayerStats.getPlayer(brP2.id);
+            const foulAfter1 = (foulAfterP1 && foulAfterP1.stats && foulAfterP1.stats.byGameType &&
+                foulAfterP1.stats.byGameType.game1 && foulAfterP1.stats.byGameType.game1.fouls) || 0;
+            const foulAfter2 = (foulAfterP2 && foulAfterP2.stats && foulAfterP2.stats.byGameType &&
+                foulAfterP2.stats.byGameType.game1 && foulAfterP2.stats.byGameType.game1.fouls) || 0;
+            assert('RackWin', 'Illegal 8 career foul on shooter, not winner',
+                foulAfter1 === foulBefore1 + 1 && foulAfter2 === foulBefore2,
+                'p1 ' + foulBefore1 + '→' + foulAfter1 + ' p2 ' + foulBefore2 + '→' + foulAfter2);
             cp.setStorageItem('p1ScoreCtrlPanel', 0);
             cp.setStorageItem('p2ScoreCtrlPanel', 0);
             cp.document.getElementById('p1Score').value = '0';
