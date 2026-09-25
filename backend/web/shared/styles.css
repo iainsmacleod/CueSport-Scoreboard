@@ -3251,7 +3251,7 @@ body.controls-locked #mobileBottomNav {
 }
 .stats-winner {
   font-weight: 700;
-  color: #9ece6a;
+  color: #42dd8b;
 }
 .stats-draw {
   font-weight: 600;
@@ -3363,7 +3363,7 @@ body.controls-locked #mobileBottomNav {
   color: #c0caf5;
 }
 .stats-match-player-link.stats-winner {
-  color: #9ece6a;
+  color: #42dd8b;
   font-weight: 700;
 }
 .stats-match-player-link:hover {

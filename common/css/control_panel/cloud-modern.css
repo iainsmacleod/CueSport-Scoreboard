@@ -135,6 +135,26 @@ input[type="submit"],
 	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
 }
 
+/* Match-name links are plain text, not chrome buttons — keep winner green visible. */
+button.stats-match-player-link,
+.stats-match-player-link.button {
+	border: none !important;
+	background: transparent !important;
+	box-shadow: none !important;
+	border-radius: 0 !important;
+	color: inherit !important;
+	padding: 0 !important;
+	min-width: 0 !important;
+	min-height: 0 !important;
+}
+
+.stats-winner,
+button.stats-match-player-link.stats-winner,
+.stats-match-player-link.stats-winner {
+	color: var(--cs-success) !important;
+	font-weight: 700;
+}
+
 button:hover,
 input[type="button"]:hover,
 input[type="submit"]:hover,
@@ -145,6 +165,13 @@ input[type="submit"]:hover,
 	 * (nested inside .button.obs28) position relative to the button, so L2/L3
 	 * hover places the preview off-page and grows body scrollbars. */
 	background: #1a2740 !important;
+}
+
+button.stats-match-player-link:hover,
+.stats-match-player-link.button:hover {
+	border: none !important;
+	background: transparent !important;
+	opacity: 0.9;
 }
 
 #sendPScores,

@@ -2506,30 +2506,60 @@
             const modal = cp.document.getElementById('statsModal');
             const modalOpen = modal && cp.getComputedStyle(modal).display !== 'none';
             assert('Stats UI', 'Modal opens', modalOpen);
-            assert('Stats UI', 'Leaderboard tab visible',
-                !cp.document.getElementById('statsTab-leaderboard').classList.contains('noShow'));
-            cp.switchStatsTab('h2h');
-            await sleep(50);
-            const h2hTab = cp.document.getElementById('statsTab-h2h');
-            assert('Stats UI', 'H2H tab switches', h2hTab && !h2hTab.classList.contains('noShow'));
-            const hiddenRect = cp.document.getElementById('statsTab-leaderboard').getBoundingClientRect();
-            assert('Stats UI', 'Hidden tab takes no space', hiddenRect.height === 0);
+            assert('Stats UI', 'Recent Matches tab visible',
+                !cp.document.getElementById('statsTab-matches').classList.contains('noShow'));
+            assert('Stats UI', 'Recent Matches tab button present',
+                !!cp.document.querySelector('.stats-tab-btn[data-tab="matches"]'));
+            assert('Stats UI', 'No primary Player tab button',
+                !cp.document.querySelector('.stats-tab-btn[data-tab="detail"]'));
+            assert('Stats UI', 'No primary H2H tab button',
+                !cp.document.querySelector('.stats-tab-btn[data-tab="h2h"]') &&
+                !cp.document.getElementById('statsTab-h2h'));
+            cp.switchStatsTab('leaderboard');
+            await sleep(100);
+            const hiddenMatchesRect = cp.document.getElementById('statsTab-matches').getBoundingClientRect();
+            assert('Stats UI', 'Hidden Recent Matches takes no space', hiddenMatchesRect.height === 0);
 
-            cp.switchStatsTab('detail');
-            await sleep(200);
             const lbRows = cp.document.querySelectorAll('#statsLeaderboardBody tr.stats-row');
             if (lbRows.length) {
-                cp.switchStatsTab('leaderboard');
-                await sleep(100);
                 lbRows[0].click();
-                cp.switchStatsTab('detail');
                 await sleep(200);
+                assert('Stats UI', 'Player detail opens from leaderboard',
+                    !cp.document.getElementById('statsTab-detail').classList.contains('noShow'));
+                assert('Stats UI', 'Player detail has Opponent H2H select',
+                    !!cp.document.getElementById('statsPlayerOpponentSelect'));
+                const backBtn = cp.document.querySelector('#statsPlayerDetail .stats-player-back-btn');
                 const editBtn = cp.document.querySelector('#statsPlayerDetail .stats-edit-btn');
+                assert('Stats UI', 'Back button on player detail', !!backBtn);
                 if (editBtn) {
                     const st = cp.getComputedStyle(editBtn);
                     assert('Stats UI', 'Edit button align-items center', st.alignItems === 'center', st.alignItems);
                 } else {
                     assert('Stats UI', 'Edit Name button present', false, 'no edit button');
+                }
+                if (backBtn) {
+                    backBtn.click();
+                    await sleep(100);
+                    assert('Stats UI', 'Back returns to Leaderboard',
+                        !cp.document.getElementById('statsTab-leaderboard').classList.contains('noShow'));
+                }
+            }
+            cp.switchStatsTab('matches');
+            await sleep(150);
+            assert('Stats UI', 'Recent Matches panel visible',
+                !cp.document.getElementById('statsTab-matches').classList.contains('noShow'));
+            const matchNameBtn = cp.document.querySelector('#statsMatchesBody [data-open-player]');
+            if (matchNameBtn) {
+                matchNameBtn.click();
+                await sleep(200);
+                assert('Stats UI', 'Player detail opens from Recent Matches name',
+                    !cp.document.getElementById('statsTab-detail').classList.contains('noShow'));
+                const backFromMatch = cp.document.querySelector('#statsPlayerDetail .stats-player-back-btn');
+                if (backFromMatch) {
+                    backFromMatch.click();
+                    await sleep(100);
+                    assert('Stats UI', 'Back returns to Recent Matches',
+                        !cp.document.getElementById('statsTab-matches').classList.contains('noShow'));
                 }
             }
             cp.closeStatsModal();

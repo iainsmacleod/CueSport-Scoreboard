@@ -1043,12 +1043,33 @@ for more information about Salotto please visit https://salotto.app
             <div class="modal-body stats-modal-body">
                 <div id="statsCloudBanner" class="stats-cloud-banner noShow"></div>
                 <div class="stats-tab-bar">
-                    <button type="button" class="stats-tab-btn hover obs28 button active" data-tab="leaderboard" onclick="switchStatsTab('leaderboard')">Board</button>
-                    <button type="button" class="stats-tab-btn hover obs28 button" data-tab="detail" onclick="switchStatsTab('detail')">Player</button>
-                    <button type="button" class="stats-tab-btn hover obs28 button" data-tab="h2h" onclick="switchStatsTab('h2h')">H2H</button>
+                    <button type="button" class="stats-tab-btn hover obs28 button active" data-tab="matches" onclick="switchStatsTab('matches')">Recent Matches</button>
+                    <button type="button" class="stats-tab-btn hover obs28 button" data-tab="leaderboard" onclick="switchStatsTab('leaderboard')">Leaderboard</button>
                 </div>
 
-                <div id="statsTab-leaderboard" class="stats-tab-panel">
+                <div id="statsTab-matches" class="stats-tab-panel">
+                    <div class="stats-scroll-panel">
+                        <div class="stats-table-wrap">
+                            <table class="stats-table">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Match</th>
+                                        <th>Game</th>
+                                        <th>Score</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="statsMatchesBody">
+                                    <tr><td colspan="5" class="stats-empty">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <p class="stats-hint">Click a player name to view details.</p>
+                </div>
+
+                <div id="statsTab-leaderboard" class="stats-tab-panel noShow">
                     <div class="stats-table-wrap">
                     <table class="stats-table">
                         <thead>
@@ -1070,35 +1091,7 @@ for more information about Salotto please visit https://salotto.app
 
                 <div id="statsTab-detail" class="stats-tab-panel noShow">
                     <div id="statsPlayerDetail">
-                        <p class="stats-empty">Select a player from the leaderboard.</p>
-                    </div>
-                </div>
-
-                <div id="statsTab-h2h" class="stats-tab-panel noShow">
-                    <div class="stats-h2h-player-row">
-                        <div class="stats-h2h-select-col">
-                            <label for="h2hPlayer1Select">Player 1</label>
-                            <select id="h2hPlayer1Select" onchange="refreshH2HView()"></select>
-                        </div>
-                        <div id="h2hPlayer1Stats" class="stats-h2h-inline-stats">
-                            <span class="stats-empty">Select two different players.</span>
-                        </div>
-                    </div>
-                    <div class="stats-h2h-player-row">
-                        <div class="stats-h2h-select-col">
-                            <label for="h2hPlayer2Select">Player 2</label>
-                            <select id="h2hPlayer2Select" onchange="refreshH2HView()"></select>
-                        </div>
-                        <div id="h2hPlayer2Stats" class="stats-h2h-inline-stats"></div>
-                    </div>
-                    <div class="stats-section">
-                        <h4 class="stats-section-title">Match History</h4>
-                        <div id="h2hResults" class="stats-scroll-panel">
-                            <p class="stats-empty">Select two different players.</p>
-                        </div>
-                        <div class="stats-section-actions">
-                            <div class="hover obs28 button stats-edit-btn" onclick="openAddMatchForH2H()">Add Match</div>
-                        </div>
+                        <p class="stats-empty">Select a player from Recent Matches or the Leaderboard.</p>
                     </div>
                 </div>
             </div>

@@ -3959,7 +3959,7 @@
             await abandonActivePendingMatch();
             await resetSessionState();
         }
-        maybeRefreshStatsModalH2H();
+        maybeRefreshStatsModalPlayerH2H();
         broadcastOverlayStatsIfEnabled();
     }
 
@@ -5143,12 +5143,11 @@
     }
 
     async function refreshStatsUI() {
+        await renderRecentMatches();
         await renderStatsLeaderboard();
-        await populateH2HPlayerSelects();
         if (statsModalSelectedPlayerId) {
             await showPlayerDetail(statsModalSelectedPlayerId);
         }
-        await refreshH2HView();
         broadcastOverlayStatsIfEnabled();
     }
 
@@ -6029,14 +6028,14 @@
         scheduleOverlayStatsRebuild();
     }
 
-    function maybeRefreshStatsModalH2H() {
+    function maybeRefreshStatsModalPlayerH2H() {
         const modal = document.getElementById('statsModal');
         if (!modal || modal.style.display !== 'block') {
             return;
         }
-        const h2hPanel = document.getElementById('statsTab-h2h');
-        if (h2hPanel && !h2hPanel.classList.contains('noShow')) {
-            refreshH2HView();
+        const detailTab = document.getElementById('statsTab-detail');
+        if (detailTab && !detailTab.classList.contains('noShow') && statsModalSelectedPlayerId) {
+            refreshPlayerOpponentH2H();
         }
     }
 
@@ -6051,7 +6050,7 @@
             if (typeof bc !== 'undefined') {
                 bc.postMessage({ overlayStats: payload });
             }
-            maybeRefreshStatsModalH2H();
+            maybeRefreshStatsModalPlayerH2H();
             if (window.cloudRelay && typeof window.cloudRelay.pushDockStateSoon === 'function') {
                 window.cloudRelay.pushDockStateSoon(0);
             }
@@ -6713,12 +6712,12 @@
         }
         const body = document.querySelector('#statsModal .stats-modal-body');
         const scrollTop = body ? body.scrollTop : 0;
+        const matchesTab = document.getElementById('statsTab-matches');
         const detailTab = document.getElementById('statsTab-detail');
-        const h2hTab = document.getElementById('statsTab-h2h');
-        if (detailTab && !detailTab.classList.contains('noShow') && statsModalSelectedPlayerId) {
+        if (matchesTab && !matchesTab.classList.contains('noShow')) {
+            await renderRecentMatches();
+        } else if (detailTab && !detailTab.classList.contains('noShow') && statsModalSelectedPlayerId) {
             await showPlayerDetail(statsModalSelectedPlayerId);
-        } else if (h2hTab && !h2hTab.classList.contains('noShow')) {
-            await refreshH2HView();
         }
         if (body) {
             body.scrollTop = scrollTop;
@@ -7838,16 +7837,6 @@
         await confirmDeleteMatch(modal.dataset.matchId);
     }
 
-    function openAddMatchForH2H() {
-        const select1 = document.getElementById('h2hPlayer1Select');
-        const select2 = document.getElementById('h2hPlayer2Select');
-        if (!select1 || !select2 || !select1.value || !select2.value || select1.value === select2.value) {
-            alert('Select two different players first.');
-            return;
-        }
-        openMatchEditModal(null, select1.value, select2.value);
-    }
-
     function openAddMatchForPlayer() {
         const select = document.getElementById('statsPlayerOpponentSelect');
         if (!statsModalSelectedPlayerId) {
@@ -8064,6 +8053,31 @@
 
     // --- Stats Modal UI ---
     let statsModalSelectedPlayerId = null;
+    /** Last overview tab (matches | leaderboard) for Back from player detail. */
+    let statsLastOverviewTab = 'matches';
+
+    function sortMatchesNewestFirst(matches) {
+        return (matches || []).slice().sort(function (a, b) {
+            const dateA = (a && (a.completedAt || a.startedAt)) || '';
+            const dateB = (b && (b.completedAt || b.startedAt)) || '';
+            return dateB.localeCompare(dateA);
+        });
+    }
+
+    function isLegacyEmptyCompletedMatch(m) {
+        return !!(m && m.status === 'completed' && !matchHasRecordedPlay(m) && !m.winnerId);
+    }
+
+    function playerDetailBackButtonHtml() {
+        return '<button type="button" class="hover obs28 button stats-player-back-btn" ' +
+            'onclick="backFromPlayerDetail()" title="Back to ' +
+            (statsLastOverviewTab === 'leaderboard' ? 'Leaderboard' : 'Recent Matches') + '">' +
+            'Back</button>';
+    }
+
+    function backFromPlayerDetail() {
+        switchStatsTab(statsLastOverviewTab === 'leaderboard' ? 'leaderboard' : 'matches');
+    }
 
     async function openStatsModal() {
         if (!isStatsTabAvailable()) {
@@ -8080,9 +8094,9 @@
             body.scrollTop = 0;
         }
         updateStatsCloudBanner();
+        await renderRecentMatches();
         await renderStatsLeaderboard();
-        await populateH2HPlayerSelects();
-        switchStatsTab('leaderboard');
+        switchStatsTab(statsLastOverviewTab === 'leaderboard' ? 'leaderboard' : 'matches');
     }
 
     function updateStatsCloudBanner() {
@@ -8090,9 +8104,9 @@
         if (!banner) return;
         var cloud = isCloudStatsMode();
         if (cloud) {
-            banner.textContent = 'Showing cloud-backed stats. Click a player to view and edit matches.';
+            banner.textContent = 'Showing cloud-backed stats. Open Recent Matches or the Leaderboard, then click a player for details.';
         } else {
-            banner.textContent = 'Showing local stats.';
+            banner.textContent = 'Showing local stats. Open Recent Matches or the Leaderboard, then click a player for details.';
         }
         banner.classList.remove('noShow');
         updateStatsActionButtons(cloud);
@@ -8124,16 +8138,23 @@
     }
 
     function switchStatsTab(tabName) {
-        const allowed = { leaderboard: true, detail: true, h2h: true };
+        const allowed = { matches: true, leaderboard: true, detail: true };
         if (!allowed[tabName]) {
-            tabName = 'leaderboard';
+            tabName = 'matches';
+        }
+        if (tabName === 'matches' || tabName === 'leaderboard') {
+            statsLastOverviewTab = tabName;
         }
         const previousBtn = document.querySelector('.stats-tab-btn.active');
-        const previousTab = previousBtn ? previousBtn.dataset.tab : null;
+        const previousPanel = document.querySelector('.stats-tab-panel:not(.noShow)');
+        const previousTab = previousBtn
+            ? previousBtn.dataset.tab
+            : (previousPanel && previousPanel.id ? previousPanel.id.replace('statsTab-', '') : null);
         const tabChanged = previousTab !== tabName;
 
         document.querySelectorAll('.stats-tab-btn').forEach(function (btn) {
-            btn.classList.toggle('active', btn.dataset.tab === tabName);
+            // Detail has no tab button — keep overview buttons inactive while detail is open.
+            btn.classList.toggle('active', tabName !== 'detail' && btn.dataset.tab === tabName);
         });
         document.querySelectorAll('.stats-tab-panel').forEach(function (panel) {
             panel.classList.toggle('noShow', panel.id !== 'statsTab-' + tabName);
@@ -8144,9 +8165,53 @@
         if (body && tabChanged) {
             body.scrollTop = 0;
         }
-        if (tabName === 'h2h') {
-            refreshH2HView();
+        if (tabName === 'matches') {
+            renderRecentMatches();
+        } else if (tabName === 'leaderboard') {
+            renderStatsLeaderboard();
         }
+    }
+
+    async function renderRecentMatches() {
+        const tbody = document.getElementById('statsMatchesBody');
+        if (!tbody) {
+            return;
+        }
+
+        if (isCloudStatsMode()) {
+            tbody.innerHTML = '<tr><td colspan="5" class="stats-empty">Loading cloud matches\u2026</td></tr>';
+            const data = await fetchCloudStats();
+            if (data.error) {
+                tbody.innerHTML = '<tr><td colspan="5" class="stats-empty">Could not load cloud matches: ' +
+                    escapeHtml(data.error) + '</td></tr>';
+                return;
+            }
+            const matches = sortMatchesNewestFirst(
+                (data.matches || [])
+                    .filter(function (m) { return m && m.status === 'completed'; })
+                    .map(adaptCloudMatchForUi)
+                    .filter(Boolean)
+            );
+            tbody.innerHTML = renderMatchHistoryRows(matches, { colspan: 5, linkPlayers: true });
+            bindStatsMatchInteractions(tbody);
+            return;
+        }
+
+        let matches = sortMatchesNewestFirst(
+            (await getAllMatches()).filter(function (m) {
+                if (!m) return false;
+                if (isLegacyEmptyCompletedMatch(m)) return false;
+                return m.status === 'completed';
+            })
+        );
+        const pending = getEditablePendingMatch();
+        if (pending &&
+            !isLegacyEmptyCompletedMatch(pending) &&
+            !matches.some(function (m) { return m.id === pending.id; })) {
+            matches = [pending].concat(matches);
+        }
+        tbody.innerHTML = renderMatchHistoryRows(matches, { colspan: 5, linkPlayers: true });
+        bindStatsMatchInteractions(tbody);
     }
 
     async function renderStatsLeaderboard() {
@@ -8466,28 +8531,6 @@
         return html;
     }
 
-    function renderInlineH2HStats(playerId, otherId, h2h) {
-        if (!h2h || !playerId || !otherId) {
-            return '<span class="stats-empty">&mdash;</span>';
-        }
-        const showBalls = showsBallStats();
-        const showFouls = showsFoulStats();
-        const racksWord = usesFrameTerminology() ? 'Frames' : 'Racks';
-        if (!h2hSummaryHasDisplayableActivity(h2h, playerId, otherId)) {
-            return '<span class="stats-empty">No recorded matches</span>';
-        }
-        const hb = (h2h.highestBreak && h2h.highestBreak[playerId]) || 0;
-        const fouls = (h2h.fouls && h2h.fouls[playerId]) || 0;
-        return 'Matches Won ' + formatMatchupScore(h2h.gamesWon[playerId] || 0, h2h.gamesWon[otherId] || 0) +
-            ((h2h.gamesDrawn && ((h2h.gamesDrawn[playerId] || 0) > 0 || (h2h.gamesDrawn[otherId] || 0) > 0))
-                ? (' · Drawn ' + formatMatchupScore(h2h.gamesDrawn[playerId] || 0, h2h.gamesDrawn[otherId] || 0))
-                : '') +
-            ' · ' + racksWord + ' Won ' + formatMatchupScore(h2h.racksWon[playerId] || 0, h2h.racksWon[otherId] || 0) +
-            (hb ? ' · HB ' + hb : '') +
-            (showBalls ? ' · Balls Potted ' + (h2h.ballsWon[playerId] || 0) : '') +
-            (showFouls && fouls ? ' · Fouls ' + fouls : '');
-    }
-
     function renderPlayerMatchHistoryRows(playerId, matches) {
         return renderMatchHistoryRows(matches, { viewerPlayerId: playerId, colspan: 5 });
     }
@@ -8541,6 +8584,7 @@
 
         detailPanel.innerHTML =
             '<div class="stats-player-header">' +
+            playerDetailBackButtonHtml() +
             '<h3>' + escapeHtml(player.name) + '</h3>' +
             '<div class="stats-player-header-actions">' +
             '<div class="hover obs28 button stats-edit-btn" onclick="promptRenamePlayer()">Edit Name</div>' +
@@ -8626,6 +8670,7 @@
 
         detailPanel.innerHTML =
             '<div class="stats-player-header">' +
+            playerDetailBackButtonHtml() +
             '<h3>' + escapeHtml(player.name) + '</h3>' +
             (playerActions
                 ? ('<div class="stats-player-header-actions">' + playerActions + '</div>')
@@ -8655,108 +8700,6 @@
         }
         await refreshPlayerOpponentH2H();
         switchStatsTab('detail');
-    }
-
-    async function populateH2HPlayerSelects() {
-        const select1 = document.getElementById('h2hPlayer1Select');
-        const select2 = document.getElementById('h2hPlayer2Select');
-        if (!select1 || !select2) {
-            return;
-        }
-        const prev1 = select1.value;
-        const prev2 = select2.value;
-        let players;
-        if (isCloudStatsMode()) {
-            const cloud = await fetchCloudStats();
-            players = (cloud.players || []).map(function (p) {
-                return { id: p.id, name: p.name };
-            });
-        } else {
-            players = await getAllPlayers();
-        }
-        players.sort(function (a, b) { return a.name.localeCompare(b.name); });
-
-        const options = players.map(function (p) {
-            return '<option value="' + p.id + '">' + escapeHtml(p.name) + '</option>';
-        }).join('');
-
-        select1.innerHTML = '<option value="">-- Select --</option>' + options;
-        select2.innerHTML = '<option value="">-- Select --</option>' + options;
-
-        if (prev1 && select1.querySelector('option[value="' + prev1 + '"]')) {
-            select1.value = prev1;
-        } else {
-            const p1Id = getPlayerIdFromInput('1');
-            if (p1Id) {
-                select1.value = p1Id;
-            }
-        }
-        if (prev2 && select2.querySelector('option[value="' + prev2 + '"]')) {
-            select2.value = prev2;
-        } else {
-            const p2Id = getPlayerIdFromInput('2');
-            if (p2Id) {
-                select2.value = p2Id;
-            }
-        }
-    }
-
-    async function refreshH2HView() {
-        const select1 = document.getElementById('h2hPlayer1Select');
-        const select2 = document.getElementById('h2hPlayer2Select');
-        const stats1 = document.getElementById('h2hPlayer1Stats');
-        const stats2 = document.getElementById('h2hPlayer2Stats');
-        const container = document.getElementById('h2hResults');
-        if (!select1 || !select2 || !container) {
-            return;
-        }
-
-        const id1 = select1.value;
-        const id2 = select2.value;
-        if (!id1 || !id2 || id1 === id2) {
-            if (stats1) {
-                stats1.innerHTML = '<span class="stats-empty">Select two different players.</span>';
-            }
-            if (stats2) {
-                stats2.innerHTML = '';
-            }
-            container.innerHTML = '<p class="stats-empty">Select two different players.</p>';
-            return;
-        }
-
-        const h2h = isCloudStatsMode()
-            ? buildCloudHeadToHead(id1, id2, await fetchCloudStats())
-            : await getHeadToHead(id1, id2);
-        if (stats1) {
-            stats1.innerHTML = renderInlineH2HStats(id1, id2, h2h);
-        }
-        if (stats2) {
-            stats2.innerHTML = renderInlineH2HStats(id2, id1, h2h);
-        }
-
-        if (!h2h) {
-            container.innerHTML = '<p class="stats-empty">No head-to-head data.</p>';
-            return;
-        }
-
-        if (h2h.matches.length === 0) {
-            container.innerHTML = '<p class="stats-empty">No matches recorded between these players.</p>';
-            return;
-        }
-
-        container.innerHTML = wrapStatsTableHtml(
-            '<table class="stats-table"><thead><tr><th>Date</th><th>Match</th><th>Game</th><th>Score</th><th>Actions</th></tr></thead><tbody>' +
-            renderMatchHistoryRows(h2h.matches, {
-                colspan: 5,
-                linkPlayers: true,
-                h2h: {
-                    id1: id1,
-                    name1: h2h.player1.name,
-                    name2: h2h.player2.name
-                }
-            }) + '</tbody></table>'
-        );
-        bindStatsMatchInteractions(container);
     }
 
     async function estimateStatsStorage() {
@@ -8812,10 +8755,9 @@
             result.matches + ' match(es) loaded.');
         statsModalSelectedPlayerId = null;
         document.getElementById('statsPlayerDetail').innerHTML =
-            '<p class="stats-empty">Select a player from the leaderboard.</p>';
+            '<p class="stats-empty">Select a player from Recent Matches or the Leaderboard.</p>';
+        await renderRecentMatches();
         await renderStatsLeaderboard();
-        await populateH2HPlayerSelects();
-        await refreshH2HView();
         broadcastOverlayStatsIfEnabled();
     }
 
@@ -8835,18 +8777,10 @@
             window.resetCurrentGame({ skipStatsAbandon: true });
         }
         statsModalSelectedPlayerId = null;
+        await renderRecentMatches();
         await renderStatsLeaderboard();
-        await populateH2HPlayerSelects();
-        document.getElementById('statsPlayerDetail').innerHTML = '<p class="stats-empty">Select a player from the leaderboard.</p>';
-        const h2hStats1 = document.getElementById('h2hPlayer1Stats');
-        const h2hStats2 = document.getElementById('h2hPlayer2Stats');
-        if (h2hStats1) {
-            h2hStats1.innerHTML = '<span class="stats-empty">Select two different players.</span>';
-        }
-        if (h2hStats2) {
-            h2hStats2.innerHTML = '';
-        }
-        document.getElementById('h2hResults').innerHTML = '<p class="stats-empty">Select two different players.</p>';
+        document.getElementById('statsPlayerDetail').innerHTML =
+            '<p class="stats-empty">Select a player from Recent Matches or the Leaderboard.</p>';
         broadcastOverlayStatsIfEnabled();
     }
 
@@ -8950,9 +8884,9 @@
     window.updateStatsTabAvailability = updateStatsTabAvailability;
     window.closeStatsModal = closeStatsModal;
     window.switchStatsTab = switchStatsTab;
+    window.backFromPlayerDetail = backFromPlayerDetail;
     window.onStatVisibilityToggle = onStatVisibilityToggle;
     window.onStatsVisibilityGameTypeChange = onStatsVisibilityGameTypeChange;
-    window.refreshH2HView = refreshH2HView;
     window.refreshPlayerOpponentH2H = refreshPlayerOpponentH2H;
     window.exportStatsJson = exportStatsJson;
     window.importStatsJsonFile = function () {
@@ -8982,7 +8916,6 @@
     window.saveMatchFromModal = saveMatchFromModal;
     window.deleteMatchFromModal = deleteMatchFromModal;
     window.confirmDeleteMatch = confirmDeleteMatch;
-    window.openAddMatchForH2H = openAddMatchForH2H;
     window.openAddMatchForPlayer = openAddMatchForPlayer;
     window.promptRenamePlayer = openPlayerRenameModal;
     window.openPlayerRenameModal = openPlayerRenameModal;

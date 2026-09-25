@@ -1973,6 +1973,10 @@ label.switch.toggle-disabled {
 	font-size: 0.85em;
 }
 
+.stats-tab-btn[data-tab="matches"] {
+	min-width: 7.5rem;
+}
+
 .stats-tab-btn.active {
 	background: green;
 	color: black;
@@ -2283,9 +2287,17 @@ label.switch.toggle-disabled {
 	border-bottom: 1px solid rgba(255, 255, 255, 0.12);
 }
 
+.stats-player-header .stats-player-back-btn {
+	flex: 0 0 auto;
+	min-width: 0;
+	margin-right: 2px;
+}
+
 .stats-player-header h3 {
 	margin: 0;
 	font-size: 1.15em;
+	flex: 1 1 auto;
+	min-width: 0;
 }
 
 .stats-player-header-actions {
@@ -2551,7 +2563,7 @@ label.switch.toggle-disabled {
 
 .stats-winner {
 	font-weight: 700;
-	color: #9ece6a;
+	color: #42dd8b;
 }
 
 .stats-match-when {
@@ -2658,7 +2670,7 @@ label.switch.toggle-disabled {
 }
 
 .stats-match-player-link.stats-winner {
-	color: #9ece6a;
+	color: #42dd8b;
 	font-weight: 700;
 }
 
