@@ -10,6 +10,10 @@ const SUPABASE_JS_URL = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49
 let clientPromise = null;
 let clientConfigKey = '';
 let authListenerBound = false;
+/** @type {{ unsubscribe: () => void } | null } */
+let authStateSubscription = null;
+/** Bumped on local sign-out so stale onAuthStateChange callbacks cannot wipe a new session. */
+let authEpoch = 0;
 
 export function getStoredAccessToken() {
   return localStorage.getItem(CUESPORT_TOKEN_KEY) || '';
@@ -58,6 +62,14 @@ export async function getSupabaseClient(config) {
   return clientPromise;
 }
 
+function clearAuthListener() {
+  try {
+    authStateSubscription?.unsubscribe?.();
+  } catch (_) { /* ignore */ }
+  authStateSubscription = null;
+  authListenerBound = false;
+}
+
 /**
  * Bind onAuthStateChange once so TOKEN_REFRESHED keeps cuesport_token fresh.
  * @param {{ supabaseUrl?: string, supabasePublishableKey?: string }} config
@@ -66,13 +78,26 @@ export async function ensureSupabaseAuth(config) {
   if (!canUseSupabase(config)) return null;
   const supabase = await getSupabaseClient(config);
   if (!authListenerBound) {
-    supabase.auth.onAuthStateChange((event, session) => {
+    const epochAtBind = authEpoch;
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+      // Ignore events from a client that was signed out / replaced.
+      if (epochAtBind !== authEpoch) return;
       if (session?.access_token) {
         setStoredAccessToken(session.access_token);
-      } else if (event === 'SIGNED_OUT') {
-        setStoredAccessToken('');
+        return;
+      }
+      if (event === 'SIGNED_OUT') {
+        // SIGNED_OUT can race a new sign-in (account switch). Only clear when
+        // there is truly no session left on this client.
+        void supabase.auth.getSession().then(({ data: sessionData }) => {
+          if (epochAtBind !== authEpoch) return;
+          if (!sessionData?.session?.access_token) {
+            setStoredAccessToken('');
+          }
+        }).catch(() => { /* ignore */ });
       }
     });
+    authStateSubscription = data?.subscription || null;
     authListenerBound = true;
   }
   // Hydrate / refresh persisted session into cuesport_token.
@@ -169,6 +194,8 @@ export async function getFreshAccessToken(config) {
 /** Clear Supabase session and cuesport_token (local sign-out). */
 export async function signOutSupabaseSession(config) {
   setStoredAccessToken('');
+  authEpoch += 1;
+  clearAuthListener();
   try {
     if (canUseSupabase(config)) {
       const supabase = await getSupabaseClient(config);
@@ -184,5 +211,5 @@ export async function signOutSupabaseSession(config) {
   // Drop the shared client so the next sign-in cannot revive an in-memory session.
   clientPromise = null;
   clientConfigKey = '';
-  authListenerBound = false;
+  clearAuthListener();
 }

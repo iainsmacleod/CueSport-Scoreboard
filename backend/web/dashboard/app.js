@@ -4762,7 +4762,8 @@ async function renderDashboard() {
     await applyDashboardMe(me);
   } catch (err) {
     const msg = String(err?.message || '');
-    if (dashPublicConfigCache && /unauthorized|invalid|expired|token|session/i.test(msg)) {
+    const looksLikeAuth = /unauthorized|invalid|expired|token|session|forbidden|revoked/i.test(msg);
+    if (dashPublicConfigCache && looksLikeAuth) {
       try {
         const refreshed = await getFreshAccessToken(dashPublicConfigCache);
         if (refreshed) {
@@ -4771,6 +4772,17 @@ async function renderDashboard() {
           return;
         }
       } catch (_) { /* fall through */ }
+    }
+    // Network / server blips must not wipe a valid login — only true auth failures do.
+    if (!looksLikeAuth) {
+      setError(err.message || 'Could not load dashboard. Check your connection and try again.');
+      finishDashboardBoot();
+      // Keep whatever shell we already have (login or dashboard).
+      if (!lastAccount) {
+        show('loginSection', true);
+        show('dashboardSection', false);
+      }
+      return;
     }
     stopLiveFeed();
     setStoredAccessToken('');
@@ -5981,10 +5993,14 @@ fetchPublicConfig(getServerUrl())
     if (config?.supabaseUrl && config?.supabasePublishableKey) {
       await ensureSupabaseAuth(config);
     }
+    // Wait for session hydrate before the first shell render — otherwise a cold
+    // load can flash/stick on Sign In even with a valid persisted Supabase session.
+    await renderDashboard();
   })
-  .catch(() => {
+  .catch(async () => {
     // Keep panes hidden until config loads; show unavailable if request fails.
     applyDashLoginCapabilities({});
+    await renderDashboard();
   });
 
 let liveFeedHiddenAt = 0;
@@ -6037,6 +6053,8 @@ if (window.location.search.includes('auth=callback') || window.location.hash.inc
       if (token) setStoredAccessToken(token);
     }
     history.replaceState({}, '', window.location.pathname + window.location.search);
+    // Hash/callback sign-in finishes after the initial boot render — enter the dashboard.
+    await renderDashboard();
   })();
 }
 
@@ -6341,4 +6359,5 @@ setMatchModalActionButtons();
 
 initTablesSetupCarousel();
 installAppViewportHeightSync();
-renderDashboard();
+// Initial shell render is kicked from fetchPublicConfig → ensureSupabaseAuth so
+// persisted Google sessions are hydrated before we decide Sign In vs dashboard.

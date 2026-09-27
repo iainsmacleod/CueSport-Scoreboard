@@ -77,6 +77,7 @@ Logo / file-upload **L2 / L3** hover tips sit outside the button surface (no mor
 
 - The dock Cloud connection intro drops the self-hosted vs managed explainer and goes straight to sign-in / Dock Key instructions.
 - Dashboard **Sign Out** now awaits clearing the persisted Supabase session (and resets in-memory account caches) before redirect, so switching Google accounts on a phone no longer rehydrates the previous user’s tables/stats. **Clear All Logins** already forced a clean slate via server session invalidation.
+- Dashboard boot waits for Supabase session hydrate before the first shell render, and network blips no longer wipe a valid login — fixes “signed in, then bounced back to Sign In”.
 
 ### Visual shell
 
