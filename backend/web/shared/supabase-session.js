@@ -72,6 +72,8 @@ function clearAuthListener() {
 
 /**
  * Bind onAuthStateChange once so TOKEN_REFRESHED keeps cuesport_token fresh.
+ * Resolves only after the first auth event so cold boot never decides Sign In
+ * vs app before the persisted session has been applied.
  * @param {{ supabaseUrl?: string, supabasePublishableKey?: string }} config
  */
 export async function ensureSupabaseAuth(config) {
@@ -79,26 +81,41 @@ export async function ensureSupabaseAuth(config) {
   const supabase = await getSupabaseClient(config);
   if (!authListenerBound) {
     const epochAtBind = authEpoch;
-    const { data } = supabase.auth.onAuthStateChange((event, session) => {
-      // Ignore events from a client that was signed out / replaced.
-      if (epochAtBind !== authEpoch) return;
-      if (session?.access_token) {
-        setStoredAccessToken(session.access_token);
-        return;
-      }
-      if (event === 'SIGNED_OUT') {
-        // SIGNED_OUT can race a new sign-in (account switch). Only clear when
-        // there is truly no session left on this client.
-        void supabase.auth.getSession().then(({ data: sessionData }) => {
-          if (epochAtBind !== authEpoch) return;
-          if (!sessionData?.session?.access_token) {
-            setStoredAccessToken('');
-          }
-        }).catch(() => { /* ignore */ });
-      }
+    await new Promise((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        resolve();
+      };
+      const { data } = supabase.auth.onAuthStateChange((event, session) => {
+        // Ignore events from a client that was signed out / replaced.
+        if (epochAtBind !== authEpoch) return;
+        if (session?.access_token) {
+          setStoredAccessToken(session.access_token);
+          finish();
+          return;
+        }
+        if (event === 'SIGNED_OUT') {
+          // SIGNED_OUT can race a new sign-in (account switch). Only clear when
+          // there is truly no session left on this client.
+          void supabase.auth.getSession().then(({ data: sessionData }) => {
+            if (epochAtBind !== authEpoch) return;
+            if (!sessionData?.session?.access_token) {
+              setStoredAccessToken('');
+            }
+          }).catch(() => { /* ignore */ });
+        }
+        // INITIAL_SESSION (with or without a session) means storage was read.
+        if (event === 'INITIAL_SESSION' || event === 'SIGNED_OUT') {
+          finish();
+        }
+      });
+      authStateSubscription = data?.subscription || null;
+      authListenerBound = true;
+      // Safety: never block boot if the first event is delayed.
+      setTimeout(finish, 1500);
     });
-    authStateSubscription = data?.subscription || null;
-    authListenerBound = true;
   }
   // Hydrate / refresh persisted session into cuesport_token.
   try {

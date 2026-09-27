@@ -38,7 +38,7 @@ import {
   adoptOAuthHashSession,
   getFreshAccessToken,
   signOutSupabaseSession,
-} from '../shared/supabase-session.js?v=8.3.5';
+} from '../shared/supabase-session.js?v=8.3.5.1';
 import {
   installAppViewportHeightSync,
   settleAppViewportHeight,
@@ -171,6 +171,24 @@ function finishDashboardBoot() {
   boot.setAttribute('aria-busy', 'false');
   boot.classList.add('hidden');
 }
+
+/** Reveal login or app shell, then drop the boot spinner (never the reverse). */
+function resolveBootShell(mode) {
+  if (mode === 'app') {
+    show('loginSection', false);
+    show('dashboardSection', true);
+  } else {
+    show('dashboardSection', false);
+    show('loginSection', true);
+    if (dashPublicConfigCache) {
+      initOfficialGoogleButton(dashPublicConfigCache).catch(() => {});
+    }
+  }
+  finishDashboardBoot();
+}
+
+/** Ignore stale overlapping renderDashboard() calls (boot / OAuth / sign-in races). */
+let renderDashboardSeq = 0;
 
 function setError(msg) {
   const text = msg || '';
@@ -501,11 +519,7 @@ async function localSignOut({ clearServer = false, redirectHome = false } = {}) 
     window.location.replace('/');
     return;
   }
-  show('loginSection', true);
-  show('dashboardSection', false);
-  if (dashPublicConfigCache) {
-    initOfficialGoogleButton(dashPublicConfigCache).catch(() => {});
-  }
+  resolveBootShell('login');
 }
 
 function gameTypeLabel(id) {
@@ -4710,8 +4724,12 @@ async function connectLiveFeed() {
   }
 }
 
-async function applyDashboardMe(me) {
+async function applyDashboardMe(me, { renderSeq = renderDashboardSeq } = {}) {
+  if (renderSeq !== renderDashboardSeq) return;
   lastAccount = me.account || null;
+  // Show the signed-in shell immediately so the boot spinner never drops onto the
+  // login page while billing / tables still load.
+  resolveBootShell('app');
   const emailEl = document.getElementById('userEmail');
   if (emailEl) emailEl.textContent = me.account.email;
   canSimulatePlanUser = !!(me.can_simulate_plan || me.is_platform_admin || dashPublicConfigCache?.allowDevAuth);
@@ -4721,6 +4739,7 @@ async function applyDashboardMe(me) {
   syncSimulatedPlanSelect(me);
   renderApiKeys(me.api_keys);
   await refreshBillingUi(me.account, me.billing);
+  if (renderSeq !== renderDashboardSeq) return;
   ownDashboardRooms = me.rooms || [];
   if (isViewingOtherAccount()) {
     await refreshTablesForCurrentView();
@@ -4729,12 +4748,11 @@ async function applyDashboardMe(me) {
     renderTableCards(me.rooms);
     renderDebugRooms(me.rooms);
   }
+  if (renderSeq !== renderDashboardSeq) return;
   if (isPlatformAdminUser) {
     await loadPlatformAccountFilterOptions().catch(() => {});
   }
-  show('loginSection', false);
-  show('dashboardSection', true);
-  finishDashboardBoot();
+  if (renderSeq !== renderDashboardSeq) return;
   wantLiveFeed = true;
   clearReconnect();
   connectLiveFeed().catch(() => {});
@@ -4743,32 +4761,45 @@ async function applyDashboardMe(me) {
 }
 
 async function renderDashboard() {
+  const renderSeq = ++renderDashboardSeq;
   let token = getToken();
+  // Cold boot can race cuesport_token vs Supabase storage — hydrate once more
+  // before committing to the Sign In shell.
+  if (!token && dashPublicConfigCache) {
+    try {
+      await ensureSupabaseAuth(dashPublicConfigCache);
+    } catch (_) { /* ignore */ }
+    if (renderSeq !== renderDashboardSeq) return;
+    token = getToken();
+  }
   if (!token) {
-    stopLiveFeed();
-    lastTablesFingerprint = '';
-    lastAccount = null;
-    setPlatformAdminUi(false);
-    finishDashboardBoot();
-    show('loginSection', true);
-    show('dashboardSection', false);
+    if (renderSeq !== renderDashboardSeq) return;
+    resolveBootShell('login');
     return;
   }
+  // Token present ⇒ show the app shell immediately so the Sign In page (and
+  // Google button) never flashes while /api/me / billing still load.
+  resolveBootShell('app');
   try {
     if (dashPublicConfigCache) {
       token = await getFreshAccessToken(dashPublicConfigCache) || token;
     }
+    if (renderSeq !== renderDashboardSeq) return;
     const me = await fetchMe(getServerUrl(), token);
-    await applyDashboardMe(me);
+    if (renderSeq !== renderDashboardSeq) return;
+    await applyDashboardMe(me, { renderSeq });
   } catch (err) {
+    if (renderSeq !== renderDashboardSeq) return;
     const msg = String(err?.message || '');
     const looksLikeAuth = /unauthorized|invalid|expired|token|session|forbidden|revoked/i.test(msg);
     if (dashPublicConfigCache && looksLikeAuth) {
       try {
         const refreshed = await getFreshAccessToken(dashPublicConfigCache);
+        if (renderSeq !== renderDashboardSeq) return;
         if (refreshed) {
           const me = await fetchMe(getServerUrl(), refreshed);
-          await applyDashboardMe(me);
+          if (renderSeq !== renderDashboardSeq) return;
+          await applyDashboardMe(me, { renderSeq });
           return;
         }
       } catch (_) { /* fall through */ }
@@ -4776,12 +4807,7 @@ async function renderDashboard() {
     // Network / server blips must not wipe a valid login — only true auth failures do.
     if (!looksLikeAuth) {
       setError(err.message || 'Could not load dashboard. Check your connection and try again.');
-      finishDashboardBoot();
-      // Keep whatever shell we already have (login or dashboard).
-      if (!lastAccount) {
-        show('loginSection', true);
-        show('dashboardSection', false);
-      }
+      resolveBootShell('app');
       return;
     }
     stopLiveFeed();
@@ -4791,14 +4817,13 @@ async function renderDashboard() {
         await signOutSupabaseSession(dashPublicConfigCache);
       } catch (_) { /* ignore */ }
     }
+    if (renderSeq !== renderDashboardSeq) return;
     statsData = null;
     statsLoaded = false;
     lastAccount = null;
     setPlatformAdminUi(false);
     setError(err.message);
-    finishDashboardBoot();
-    show('loginSection', true);
-    show('dashboardSection', false);
+    resolveBootShell('login');
   }
 }
 
@@ -5943,7 +5968,8 @@ function applyDashLoginCapabilities(config) {
     managedPane?.classList.remove('hidden');
     selfHostPane?.classList.add('hidden');
     setDashLoginTitle('managed');
-    initOfficialGoogleButton(config);
+    // Google button is mounted only when the login shell is actually shown —
+    // avoids GIS work (and any flash) during authenticated boot.
     return;
   }
   if (!google && selfHost) {
@@ -5957,7 +5983,6 @@ function applyDashLoginCapabilities(config) {
   managedPane?.classList.remove('hidden');
   selfHostPane?.classList.add('hidden');
   setDashLoginTitle('managed');
-  initOfficialGoogleButton(config);
 }
 
 function showDashLoginManagedPane() {
@@ -5987,19 +6012,38 @@ document.getElementById('dashShowManagedLink')?.addEventListener('click', (event
   showDashLoginManagedPane();
 });
 
+const hasOAuthReturn =
+  window.location.search.includes('auth=callback') ||
+  window.location.hash.includes('access_token');
+
+async function adoptOAuthReturnIfNeeded(config) {
+  if (!hasOAuthReturn) return;
+  try {
+    await adoptOAuthHashSession(config);
+  } catch (_) {
+    const hash = window.location.hash.slice(1);
+    const params = new URLSearchParams(hash);
+    const token = params.get('access_token');
+    if (token) setStoredAccessToken(token);
+  }
+  history.replaceState({}, '', window.location.pathname + window.location.search);
+}
+
 fetchPublicConfig(getServerUrl())
   .then(async (config) => {
     applyDashLoginCapabilities(config);
     if (config?.supabaseUrl && config?.supabasePublishableKey) {
       await ensureSupabaseAuth(config);
     }
-    // Wait for session hydrate before the first shell render — otherwise a cold
-    // load can flash/stick on Sign In even with a valid persisted Supabase session.
+    await adoptOAuthReturnIfNeeded(config);
+    // Wait for session hydrate (+ OAuth adopt) before the first shell render —
+    // otherwise a cold load can flash Sign In even with a valid session.
     await renderDashboard();
   })
   .catch(async () => {
     // Keep panes hidden until config loads; show unavailable if request fails.
     applyDashLoginCapabilities({});
+    await adoptOAuthReturnIfNeeded(dashPublicConfigCache || {});
     await renderDashboard();
   });
 
@@ -6026,8 +6070,7 @@ window.addEventListener('pageshow', (ev) => {
     // bfcache restore after Sign Out can flash the previous account; force a clean shell.
     if (!getToken()) {
       stopLiveFeed();
-      show('loginSection', true);
-      show('dashboardSection', false);
+      resolveBootShell('login');
       return;
     }
     ensureLiveFeed({ force: true });
@@ -6039,24 +6082,6 @@ window.addEventListener('pageshow', (ev) => {
 window.addEventListener('online', () => {
   ensureLiveFeed({ force: true });
 });
-
-if (window.location.search.includes('auth=callback') || window.location.hash.includes('access_token')) {
-  (async () => {
-    try {
-      const config = dashPublicConfigCache || await fetchPublicConfig(getServerUrl());
-      dashPublicConfigCache = config;
-      await adoptOAuthHashSession(config);
-    } catch (_) {
-      const hash = window.location.hash.slice(1);
-      const params = new URLSearchParams(hash);
-      const token = params.get('access_token');
-      if (token) setStoredAccessToken(token);
-    }
-    history.replaceState({}, '', window.location.pathname + window.location.search);
-    // Hash/callback sign-in finishes after the initial boot render — enter the dashboard.
-    await renderDashboard();
-  })();
-}
 
 function initMatchPlayerAutocomplete() {
   initMatchPlayerAutocompleteForSlot('1', 'statsMatchP1', 'statsMatchP1Autocomplete');
