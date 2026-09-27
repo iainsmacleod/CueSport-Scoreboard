@@ -458,29 +458,47 @@ function getToken() {
 }
 
 /** Clear the local dashboard session; optionally return to the public homepage. */
-function localSignOut({ clearServer = false, redirectHome = false } = {}) {
+async function localSignOut({ clearServer = false, redirectHome = false } = {}) {
+  stopLiveFeed();
   setStoredAccessToken('');
   const config = dashPublicConfigCache;
-  if (config) {
-    signOutSupabaseSession(config).catch(() => {});
-  }
   if (clearServer) localStorage.removeItem(SERVER_KEY);
   wantLiveFeed = false;
-  stopLiveFeed();
-  stopPlatformTablesPolling();
   lastTablesFingerprint = '';
   lastAccount = null;
   lastDashboardRooms = [];
   ownDashboardRooms = [];
   statsData = null;
   statsLoaded = false;
+  statsLoading = false;
+  selectedPlayerKey = '';
+  statsPlayerFilterId = '';
+  playerRenameEditing = false;
+  playerDetailOpponentFilter = '';
+  playerDetailGameFilter = '';
+  cachedEventInfoOptions = [];
+  platformViewAccountId = '';
+  platformAccountsForFilter = [];
+  adminSelectedId = '';
+  adminAccountsCache = [];
   setPlatformAdminUi(false);
   setError('');
   try {
     window.google?.accounts?.id?.disableAutoSelect?.();
   } catch (_) { /* ignore */ }
+  // Must finish before redirect — otherwise ensureSupabaseAuth on the next visit
+  // rehydrates the previous account and the phone shows their tables/stats again.
+  if (config) {
+    try {
+      await signOutSupabaseSession(config);
+    } catch (_) { /* ignore */ }
+  } else {
+    try {
+      localStorage.removeItem('cuesport-supabase-auth');
+    } catch (_) { /* ignore */ }
+  }
   if (redirectHome) {
-    window.location.assign('/');
+    window.location.replace('/');
     return;
   }
   show('loginSection', true);
@@ -4675,7 +4693,7 @@ async function connectLiveFeed() {
       || e.code === 'room_forbidden'
       || e.code === 'session_revoked'
     ) {
-      localSignOut({ redirectHome: true });
+      localSignOut({ redirectHome: true }).catch(() => {});
     }
   });
   client.on('close', () => {
@@ -4757,7 +4775,9 @@ async function renderDashboard() {
     stopLiveFeed();
     setStoredAccessToken('');
     if (dashPublicConfigCache) {
-      signOutSupabaseSession(dashPublicConfigCache).catch(() => {});
+      try {
+        await signOutSupabaseSession(dashPublicConfigCache);
+      } catch (_) { /* ignore */ }
     }
     statsData = null;
     statsLoaded = false;
@@ -5609,7 +5629,7 @@ document.getElementById('signOutBtn')?.addEventListener('click', async () => {
     confirmLabel: 'Sign Out',
   });
   if (!ok) return;
-  localSignOut({ clearServer: true, redirectHome: true });
+  await localSignOut({ clearServer: true, redirectHome: true });
 });
 
 document.getElementById('invalidateSessionsBtn')?.addEventListener('click', async () => {
@@ -5631,7 +5651,7 @@ document.getElementById('invalidateSessionsBtn')?.addEventListener('click', asyn
     setError(err.message);
     return;
   }
-  localSignOut({ redirectHome: true });
+  await localSignOut({ redirectHome: true });
 });
 
 document.getElementById('revokeAllGuestsBtn')?.addEventListener('click', async () => {
@@ -5742,9 +5762,19 @@ async function handleGoogleCredentialResponse(response) {
   }
   try {
     stopLiveFeed();
+    // Drop previous account UI before adopting the new session (account switch on phone).
+    lastAccount = null;
+    lastDashboardRooms = [];
+    ownDashboardRooms = [];
+    statsData = null;
+    statsLoaded = false;
+    selectedPlayerKey = '';
+    statsPlayerFilterId = '';
+    platformViewAccountId = '';
+    adminSelectedId = '';
+    lastTablesFingerprint = '';
     await signInWithGoogleIdToken(config, response.credential);
     localStorage.setItem(SERVER_KEY, getServerUrl());
-    lastTablesFingerprint = '';
     window.history.replaceState({}, '', window.location.pathname + window.location.search);
     await renderDashboard();
   } catch (err) {
@@ -5977,6 +6007,13 @@ document.addEventListener('visibilitychange', () => {
 
 window.addEventListener('pageshow', (ev) => {
   if (ev.persisted) {
+    // bfcache restore after Sign Out can flash the previous account; force a clean shell.
+    if (!getToken()) {
+      stopLiveFeed();
+      show('loginSection', true);
+      show('dashboardSection', false);
+      return;
+    }
     ensureLiveFeed({ force: true });
   } else if (!document.hidden) {
     ensureLiveFeed();

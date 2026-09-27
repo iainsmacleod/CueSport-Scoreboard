@@ -169,9 +169,20 @@ export async function getFreshAccessToken(config) {
 /** Clear Supabase session and cuesport_token (local sign-out). */
 export async function signOutSupabaseSession(config) {
   setStoredAccessToken('');
-  if (!canUseSupabase(config)) return;
   try {
-    const supabase = await getSupabaseClient(config);
-    await supabase.auth.signOut();
+    if (canUseSupabase(config)) {
+      const supabase = await getSupabaseClient(config);
+      // Local scope is enough for account switching on this device; await so
+      // persistSession storage is cleared before navigation / next sign-in.
+      await supabase.auth.signOut({ scope: 'local' });
+    }
   } catch (_) { /* ignore */ }
+  // Belt-and-suspenders: aborted navigations can leave the persisted session behind.
+  try {
+    localStorage.removeItem(SUPABASE_STORAGE_KEY);
+  } catch (_) { /* ignore */ }
+  // Drop the shared client so the next sign-in cannot revive an in-memory session.
+  clientPromise = null;
+  clientConfigKey = '';
+  authListenerBound = false;
 }

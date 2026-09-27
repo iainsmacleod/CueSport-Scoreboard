@@ -1035,36 +1035,40 @@ function stayConnectedWithRetry(message) {
  * Leave Connecting/Control, optionally wipe cuesport_token, and show login with a reason.
  * Used for revoke, expired token, and hung connect recovery.
  */
-function forceRelogin(reason, { clearToken = true } = {}) {
+async function forceRelogin(reason, { clearToken = true } = {}) {
   wantConnection = false;
   clearReconnectTimer();
   setReconnectBanner(false);
-  if (clearToken) {
-    setStoredAccessToken('');
-    signOutSupabaseSession(mobilePublicConfigCache || {}).catch(() => {});
-  }
   if (client) {
     try { client.disconnect(); } catch (_) { /* ignore */ }
     client = null;
   }
   dockPresent = false;
   setConnectionStatus('disconnected');
+  if (clearToken) {
+    setStoredAccessToken('');
+    try {
+      await signOutSupabaseSession(mobilePublicConfigCache || {});
+    } catch (_) { /* ignore */ }
+  }
   showLogin();
   setError(reason || '');
   syncLoginPanel();
 }
 
-function leaveTableForHome({ clearToken = false } = {}) {
+async function leaveTableForHome({ clearToken = false } = {}) {
   wantConnection = false;
   clearReconnectTimer();
   setReconnectBanner(false);
-  if (clearToken) {
-    setStoredAccessToken('');
-    signOutSupabaseSession(mobilePublicConfigCache || {}).catch(() => {});
-  }
   if (client) {
     try { client.disconnect(); } catch (_) { /* ignore */ }
     client = null;
+  }
+  if (clearToken) {
+    setStoredAccessToken('');
+    try {
+      await signOutSupabaseSession(mobilePublicConfigCache || {});
+    } catch (_) { /* ignore */ }
   }
   if (!clearToken && !isGuestMode) {
     const q = isImpromptuTable() ? '?impromptu=closed' : '';

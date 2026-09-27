@@ -73,9 +73,10 @@ An illegal lose-on-8 foul attributes the foul to the **shooter**, not the winner
 
 Logo / file-upload **L2 / L3** hover tips sit outside the button surface (no more clipped scrollbars from `filter` creating a containing block).
 
-### Cloud connection copy
+### Cloud connection copy / account switch
 
-The dock Cloud connection intro drops the self-hosted vs managed explainer and goes straight to sign-in / Dock Key instructions.
+- The dock Cloud connection intro drops the self-hosted vs managed explainer and goes straight to sign-in / Dock Key instructions.
+- Dashboard **Sign Out** now awaits clearing the persisted Supabase session (and resets in-memory account caches) before redirect, so switching Google accounts on a phone no longer rehydrates the previous user’s tables/stats. **Clear All Logins** already forced a clean slate via server session invalidation.
 
 ### Visual shell
 
