@@ -252,6 +252,12 @@ window.onload = function () {
 	if (getStorageItem("snookerClearedColors") === null) {
 		setStorageItem("snookerClearedColors", "[]");
 	}
+	if (getStorageItem("snookerRespottedBlack") === null) {
+		setStorageItem("snookerRespottedBlack", "no");
+	}
+	if (getStorageItem("snookerRespottedBlackCooldown") === null) {
+		setStorageItem("snookerRespottedBlackCooldown", "no");
+	}
 	if (getStorageItem("snookerGoldenBallFouled") === null) {
 		setStorageItem("snookerGoldenBallFouled", "no");
 	}

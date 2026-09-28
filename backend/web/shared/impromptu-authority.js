@@ -176,6 +176,7 @@ function ensureSnookerFrameState(state) {
   state._snookerFoulAwaitingPlayerChange = !!state._snookerFoulAwaitingPlayerChange;
   state._snookerGoldenBallFouled = !!state._snookerGoldenBallFouled;
   state._snookerAfterFreeball = !!state._snookerAfterFreeball;
+  state._snookerRespottedBlack = !!state._snookerRespottedBlack;
 }
 
 function isSnookerColorCleared(state, num) {
@@ -185,6 +186,11 @@ function isSnookerColorCleared(state, num) {
 function markSnookerColorCleared(state, num) {
   if (!state._snookerCleared) state._snookerCleared = {};
   state._snookerCleared[`ball ${num}`] = true;
+}
+
+function unmarkSnookerColorCleared(state, num) {
+  if (!state._snookerCleared) return;
+  delete state._snookerCleared[`ball ${num}`];
 }
 
 function getNextSnookerClearanceColor(state) {
@@ -201,6 +207,15 @@ function getNextSnookerClearanceColor(state) {
 function isOnlySnookerBlackRemaining(state) {
   if ((Number(state._snookerRedsPotted) || 0) < 15) return false;
   return getNextSnookerClearanceColor(state) === 7;
+}
+
+/** Foul on a respotted black ends the deciding period (black stays down). */
+function resolveSnookerRespottedBlackOnFoul(state) {
+  if (!state._snookerRespottedBlack) return false;
+  markSnookerColorCleared(state, 7);
+  state._snookerRespottedBlack = false;
+  state._cooldown = null;
+  return true;
 }
 
 function clearSnookerBreakTracking(state) {
@@ -293,6 +308,8 @@ function resetSnookerFrame(state) {
   state._snookerFoulAwaitingPlayerChange = false;
   state._snookerGoldenBallFouled = false;
   state._snookerAfterFreeball = false;
+  state._snookerRespottedBlack = false;
+  state._cooldown = null;
 }
 
 /**
@@ -1065,6 +1082,10 @@ function buildBallGrid(state) {
         if (clearance) {
           ballFaded = isSnookerColorCleared(state, n);
           ballDisabled = locked || ballFaded || n !== nextClearance;
+          // Respotted black: brief cooldown before deciding black is live again.
+          if (onCooldown && n === 7 && state._snookerRespottedBlack) {
+            ballDisabled = true;
+          }
         } else {
           // Reds / color-after-red: colors re-spot — never permanently fade.
           ballFaded = false;
@@ -1282,6 +1303,7 @@ function captureSnookerUndoSnapshot(state) {
     freeBallOffered: !!state._snookerFreeBallOffered,
     redsPotted: Number(state._snookerRedsPotted) || 0,
     clearedColors: { ...(state._snookerCleared || {}) },
+    respottedBlack: !!state._snookerRespottedBlack,
     goldenBallFouled: !!state._snookerGoldenBallFouled,
     currentBreak: Number(state._snookerBreak) || 0,
     breakBalls: { ...(state._snookerBreakBallCounts || {}) },
@@ -1360,6 +1382,7 @@ function captureScoringBefore(state) {
     _snookerFoulAwaitingPlayerChange: !!state._snookerFoulAwaitingPlayerChange,
     _snookerGoldenBallFouled: !!state._snookerGoldenBallFouled,
     _snookerAfterFreeball: !!state._snookerAfterFreeball,
+    _snookerRespottedBlack: !!state._snookerRespottedBlack,
   };
 }
 
@@ -1407,6 +1430,7 @@ function applyScoringBefore(state, before) {
     state._snookerFoulAwaitingPlayerChange = !!before._snookerFoulAwaitingPlayerChange;
     state._snookerGoldenBallFouled = !!before._snookerGoldenBallFouled;
     state._snookerAfterFreeball = !!before._snookerAfterFreeball;
+    state._snookerRespottedBlack = !!before._snookerRespottedBlack;
   }
 }
 
@@ -1420,6 +1444,8 @@ function applySnookerUndoSnapshot(state, snap) {
   state._snookerFreeBallOffered = !!snap.freeBallOffered;
   state._snookerRedsPotted = Number(snap.redsPotted) || 0;
   state._snookerCleared = { ...(snap.clearedColors || {}) };
+  state._snookerRespottedBlack = !!snap.respottedBlack;
+  state._cooldown = null;
   state._snookerGoldenBallFouled = !!snap.goldenBallFouled;
   state._snookerBreak = Number(snap.currentBreak) || 0;
   state._snookerBreakBallCounts = { ...(snap.breakBalls || {}) };
@@ -1555,6 +1581,7 @@ function publicState(state) {
   delete cleaned._snookerFoulAwaitingPlayerChange;
   delete cleaned._snookerGoldenBallFouled;
   delete cleaned._snookerAfterFreeball;
+  delete cleaned._snookerRespottedBlack;
   delete cleaned._pocketOwners;
   delete cleaned._cooldown;
   delete cleaned._ballSetOpenLastPotSlot;
@@ -1630,6 +1657,7 @@ export function createDefaultImpromptuState(overrides = {}) {
     _snookerFoulAwaitingPlayerChange: false,
     _snookerGoldenBallFouled: false,
     _snookerAfterFreeball: false,
+    _snookerRespottedBlack: false,
     _pocketOwners: {},
     _cooldown: null,
     _ballSetOpenLastPotSlot: '',
@@ -1724,6 +1752,7 @@ export function hydrateAuthorityState(liveState, options = {}) {
   }
 
   const prev = options.previous && typeof options.previous === 'object' ? options.previous : null;
+  base._snookerRespottedBlack = !!(prev && prev._snookerRespottedBlack);
   const roomSessionId = options.sessionId ? String(options.sessionId) : '';
   const publishedMatchId = liveState?.matchId ? String(liveState.matchId) : '';
   // Prefer continuity: prior in-memory session → published matchId → room session_id.
@@ -2237,6 +2266,13 @@ export function applyImpromptuCommand(stateIn, action, payload = {}) {
               publish = false;
               break;
             }
+            // Respotted-black cooldown: ignore clicks until the brief re-spot delay ends.
+            if (num === 7 && state._snookerRespottedBlack
+              && state._cooldown && state._cooldown.ballId === 'ball 7'
+              && (!state._cooldown.until || Date.now() < state._cooldown.until)) {
+              publish = false;
+              break;
+            }
           }
           const pts = SNOOKER_POINTS[ballId] || 0;
           pushSnookerUndo(state);
@@ -2247,8 +2283,21 @@ export function applyImpromptuCommand(stateIn, action, payload = {}) {
           noteSnookerFrameHighFromBreak(state);
           noteBallPot(state, state.activePlayer === '2' ? '2' : '1');
           if (clearance) {
-            // Colors stay down only during final clearance.
-            markSnookerColorCleared(state, num);
+            // Colors stay down only during final clearance — except a tying black
+            // (WPBSA respotted black until pot or foul decides the frame).
+            const p1Pts = Number(state.p1Balls) || 0;
+            const p2Pts = Number(state.p2Balls) || 0;
+            if (num === 7 && p1Pts === p2Pts) {
+              state._snookerRespottedBlack = true;
+              unmarkSnookerColorCleared(state, 7);
+              startTrackerCooldown(state, 'ball 7', 'respot_black');
+            } else {
+              markSnookerColorCleared(state, num);
+              if (num === 7) {
+                state._snookerRespottedBlack = false;
+                state._cooldown = null;
+              }
+            }
           }
           // Re-spot after color-on-red; after 15th red's color, phase=red starts clearance.
           state._snookerAfterFreeball = false;
@@ -2443,6 +2492,8 @@ export function applyImpromptuCommand(stateIn, action, payload = {}) {
         state._snookerGoldenBallFouled = true;
         markSnookerColorCleared(state, 8);
       }
+      // WPBSA: a foul ends a respotted-black deciding period.
+      resolveSnookerRespottedBlackOnFoul(state);
       bumpActivity();
       break;
     }

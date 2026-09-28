@@ -5147,8 +5147,105 @@
             assert('Snooker', 'Clearance enables green after yellow',
                 green && !green.classList.contains('snooker-ball-disabled') &&
                 yellow && yellow.classList.contains('snooker-ball-disabled'));
+
+            // Respotted black: potting black to a tie leaves black on for a deciding shot.
+            cp.setSnookerClearedColors([2, 3, 4, 5, 6]);
+            cp.setSnookerRedsPotted(15);
+            cp.setSnookerPhase('red');
+            cp.setSnookerRespottedBlack(false);
+            cp.clearSnookerRespottedBlackCooldown();
+            cp.setStorageItem('p1BallsCtrlPanel', '50');
+            cp.setStorageItem('p2BallsCtrlPanel', '57');
+            cp.document.getElementById('p1Balls').value = '50';
+            cp.document.getElementById('p2Balls').value = '57';
+            cp.setStorageItem('activePlayer', '1');
+            cp.document.getElementById('playerToggleCheckbox').checked = true;
+            cp.updateSnookerBallAvailability();
+            assert('Snooker', 'Clearance enables black when only black remains',
+                black && !black.classList.contains('snooker-ball-disabled'));
+            await cp.handleSnookerBallClick(black);
+            await sleep(50);
+            assert('Snooker', 'Tying black pot starts respotted black',
+                cp.isSnookerRespottedBlack() === true && cp.isSnookerColorCleared(7) === false,
+                JSON.stringify({
+                    respotted: cp.isSnookerRespottedBlack(),
+                    cleared: cp.isSnookerColorCleared(7),
+                    p1: cp.getStorageItem('p1BallsCtrlPanel'),
+                    p2: cp.getStorageItem('p2BallsCtrlPanel')
+                }));
+            assert('Snooker', 'Respotted black briefly disabled after tie pot',
+                black && black.classList.contains('snooker-ball-disabled') &&
+                cp.isSnookerRespottedBlackCooldown() === true);
+            assert('Snooker', 'Tied scores after respotted black pot',
+                parseInt(cp.getStorageItem('p1BallsCtrlPanel'), 10) === 57 &&
+                parseInt(cp.getStorageItem('p2BallsCtrlPanel'), 10) === 57);
+            await sleep(550);
+            cp.updateSnookerBallAvailability();
+            assert('Snooker', 'Respotted black re-enabled after short delay',
+                black && !black.classList.contains('snooker-ball-disabled') &&
+                cp.isSnookerRespottedBlackCooldown() !== true &&
+                cp.isSnookerRespottedBlack() === true);
+            assert('Snooker', 'Foul still available during respotted black',
+                foulBall && !foulBall.classList.contains('snooker-ball-disabled'));
+            assert('Snooker', 'Free ball stays disabled during respotted black',
+                freeBall && freeBall.classList.contains('snooker-ball-disabled'));
+            await cp.handleSnookerBallClick(black);
+            await sleep(50);
+            assert('Snooker', 'Deciding black pot clears respotted black',
+                cp.isSnookerRespottedBlack() !== true && cp.isSnookerColorCleared(7) === true &&
+                parseInt(cp.getStorageItem('p1BallsCtrlPanel'), 10) === 64,
+                JSON.stringify({
+                    respotted: cp.isSnookerRespottedBlack(),
+                    cleared: cp.isSnookerColorCleared(7),
+                    p1: cp.getStorageItem('p1BallsCtrlPanel')
+                }));
+            assert('Snooker', 'Foul disabled after deciding black',
+                foulBall && foulBall.classList.contains('snooker-ball-disabled'));
+
+            // Unequal black pot (no tie) leaves black cleared with no respot.
+            cp.setSnookerClearedColors([2, 3, 4, 5, 6]);
+            cp.setSnookerRedsPotted(15);
+            cp.setSnookerPhase('red');
+            cp.setSnookerRespottedBlack(false);
+            cp.clearSnookerRespottedBlackCooldown();
+            cp.setStorageItem('p1BallsCtrlPanel', '60');
+            cp.setStorageItem('p2BallsCtrlPanel', '50');
+            cp.document.getElementById('p1Balls').value = '60';
+            cp.document.getElementById('p2Balls').value = '50';
+            cp.setStorageItem('activePlayer', '1');
+            cp.document.getElementById('playerToggleCheckbox').checked = true;
+            cp.updateSnookerBallAvailability();
+            await cp.handleSnookerBallClick(black);
+            await sleep(50);
+            assert('Snooker', 'Unequal black pot does not respot',
+                cp.isSnookerRespottedBlack() !== true && cp.isSnookerColorCleared(7) === true &&
+                parseInt(cp.getStorageItem('p1BallsCtrlPanel'), 10) === 67);
+
+            // Foul ends a respotted-black deciding period.
+            cp.setSnookerClearedColors([2, 3, 4, 5, 6]);
+            cp.setSnookerRedsPotted(15);
+            cp.setSnookerPhase('red');
+            cp.setSnookerRespottedBlack(true);
+            cp.clearSnookerRespottedBlackCooldown();
+            cp.setStorageItem('p1BallsCtrlPanel', '57');
+            cp.setStorageItem('p2BallsCtrlPanel', '57');
+            cp.setStorageItem('activePlayer', '1');
+            cp.document.getElementById('playerToggleCheckbox').checked = true;
+            cp.updateSnookerBallAvailability();
+            cp.openSnookerFoulPicker();
+            cp.selectSnookerFoul(cp.document.querySelector('#snookerFoulTargets [data-foul="black"]'));
+            await sleep(50);
+            assert('Snooker', 'Foul ends respotted black period',
+                cp.isSnookerRespottedBlack() !== true && cp.isSnookerColorCleared(7) === true,
+                JSON.stringify({
+                    respotted: cp.isSnookerRespottedBlack(),
+                    cleared: cp.isSnookerColorCleared(7)
+                }));
+
             cp.setSnookerClearedColors([]);
             cp.setSnookerRedsPotted(0);
+            cp.setSnookerRespottedBlack(false);
+            cp.clearSnookerRespottedBlackCooldown();
             cp.setStorageItem('snookerCurrentBreak', '0');
             assert('Snooker', 'Overlay stats are scoped to Snooker game type',
                 snookerOverlay.gameType === 'game8');

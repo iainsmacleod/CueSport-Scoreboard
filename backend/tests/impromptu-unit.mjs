@@ -242,6 +242,79 @@ try {
   assert('yellow stays cleared', yellowDown && yellowDown.faded && yellowDown.disabled);
   assert('green next in clearance', greenNext && !greenNext.disabled && !greenNext.faded);
 
+  // Respotted black: potting black to a tie leaves black on (with brief cooldown).
+  let respotBlack = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game8', ballSelection: 'snooker',
+    rackBreakerSlot: '1', activePlayer: '1',
+    p1Balls: 50, p2Balls: 57,
+    _snookerRedsPotted: 15,
+    _snookerPhase: 'red',
+    _snookerCleared: {
+      'ball 2': true, 'ball 3': true, 'ball 4': true, 'ball 5': true, 'ball 6': true,
+    },
+  });
+  const afterTieBlack = applyImpromptuCommand(respotBlack, 'snooker_ball', { ballId: 'ball 7' });
+  assert('tying black pot starts respotted black', afterTieBlack._private._snookerRespottedBlack === true);
+  assert(
+    'tying black stays uncleared',
+    !afterTieBlack._private._snookerCleared['ball 7'],
+    JSON.stringify(afterTieBlack._private._snookerCleared),
+  );
+  assert(
+    'tied scores after respotted black pot',
+    afterTieBlack.state.p1Balls === 57 && afterTieBlack.state.p2Balls === 57,
+    `p1=${afterTieBlack.state.p1Balls} p2=${afterTieBlack.state.p2Balls}`,
+  );
+  assert(
+    'respotted black enters cooldown',
+    afterTieBlack._private._cooldown
+      && afterTieBlack._private._cooldown.ballId === 'ball 7'
+      && afterTieBlack._private._cooldown.mode === 'respot_black',
+    JSON.stringify(afterTieBlack._private._cooldown),
+  );
+  const blackCool = (afterTieBlack.state.ballGrid?.balls || []).find((b) => b.id === 'ball 7');
+  assert('respotted black disabled during cooldown', blackCool && blackCool.disabled === true);
+  // Reject click while cooldown is active.
+  const duringCool = applyImpromptuCommand(afterTieBlack._private, 'snooker_ball', { ballId: 'ball 7' });
+  assert('respotted black click rejected during cooldown', duringCool.publish === false);
+  // Expire cooldown and pot the deciding black.
+  afterTieBlack._private._cooldown = null;
+  const afterDecide = applyImpromptuCommand(afterTieBlack._private, 'snooker_ball', { ballId: 'ball 7' });
+  assert('deciding black clears respotted flag', afterDecide._private._snookerRespottedBlack !== true);
+  assert('deciding black stays cleared', !!afterDecide._private._snookerCleared['ball 7']);
+  assert('deciding black awards 7', afterDecide.state.p1Balls === 64, String(afterDecide.state.p1Balls));
+
+  // Unequal black pot does not respot.
+  let noTie = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game8', ballSelection: 'snooker',
+    rackBreakerSlot: '1', activePlayer: '1',
+    p1Balls: 60, p2Balls: 50,
+    _snookerRedsPotted: 15,
+    _snookerPhase: 'red',
+    _snookerCleared: {
+      'ball 2': true, 'ball 3': true, 'ball 4': true, 'ball 5': true, 'ball 6': true,
+    },
+  });
+  const afterUnequal = applyImpromptuCommand(noTie, 'snooker_ball', { ballId: 'ball 7' });
+  assert('unequal black pot does not respot', afterUnequal._private._snookerRespottedBlack !== true);
+  assert('unequal black stays cleared', !!afterUnequal._private._snookerCleared['ball 7']);
+
+  // Foul ends a respotted-black deciding period.
+  let foulRespot = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game8', ballSelection: 'snooker',
+    rackBreakerSlot: '1', activePlayer: '1',
+    p1Balls: 57, p2Balls: 57,
+    _snookerRedsPotted: 15,
+    _snookerPhase: 'red',
+    _snookerRespottedBlack: true,
+    _snookerCleared: {
+      'ball 2': true, 'ball 3': true, 'ball 4': true, 'ball 5': true, 'ball 6': true,
+    },
+  });
+  const afterFoulRespot = applyImpromptuCommand(foulRespot, 'snooker_foul', { foulKey: 'black' });
+  assert('foul ends respotted black', afterFoulRespot._private._snookerRespottedBlack !== true);
+  assert('foul clears respotted black ball', !!afterFoulRespot._private._snookerCleared['ball 7']);
+
   // Snooker free ball after foul (dock switches player + offers Free Ball in one step).
   let free = createDefaultImpromptuState({
     player1Name: 'A', player2Name: 'B', gameType: 'game8', ballSelection: 'snooker',

@@ -1195,6 +1195,8 @@ function resetSnookerSequenceState(options) {
         setSnookerRedsPotted(0);
         setSnookerClearedColors([]);
         setSnookerGoldenBallFouled(false);
+        setSnookerRespottedBlack(false);
+        clearSnookerRespottedBlackCooldown();
     }
     setSnookerPhase("red");
     setSnookerAfterFreeball(false);
@@ -1235,6 +1237,67 @@ function markSnookerColorCleared(ballNum) {
 
 function isSnookerColorCleared(ballNum) {
     return getSnookerClearedColors().indexOf(ballNum) !== -1;
+}
+
+/** WPBSA: after black ties the frame, black is respotted until pot or foul decides it. */
+function isSnookerRespottedBlack() {
+    return getStorageItem("snookerRespottedBlack") === "yes";
+}
+
+function setSnookerRespottedBlack(on) {
+    setStorageItem("snookerRespottedBlack", on ? "yes" : "no");
+}
+
+let snookerRespottedBlackTimer = null;
+const SNOOKER_RESPOTTED_BLACK_COOLDOWN_MS = 500;
+
+function isSnookerRespottedBlackCooldown() {
+    return getStorageItem("snookerRespottedBlackCooldown") === "yes";
+}
+
+function clearSnookerRespottedBlackCooldown() {
+    if (snookerRespottedBlackTimer) {
+        clearTimeout(snookerRespottedBlackTimer);
+        snookerRespottedBlackTimer = null;
+    }
+    setStorageItem("snookerRespottedBlackCooldown", "no");
+    const black = document.getElementById("ball 7");
+    if (black) {
+        black.classList.remove("ball-win-cooldown");
+    }
+}
+
+/**
+ * Brief pause before the respotted black is clickable again (referee re-spot feel).
+ * Matches tracker rack-win / early-game-ball cooldown duration.
+ */
+function startSnookerRespottedBlackCooldown() {
+    clearSnookerRespottedBlackCooldown();
+    setStorageItem("snookerRespottedBlackCooldown", "yes");
+    const black = document.getElementById("ball 7");
+    if (black) {
+        black.classList.add("snooker-ball-disabled", "ball-win-cooldown");
+        black.setAttribute("aria-disabled", "true");
+    }
+    snookerRespottedBlackTimer = setTimeout(function () {
+        snookerRespottedBlackTimer = null;
+        setStorageItem("snookerRespottedBlackCooldown", "no");
+        if (black) {
+            black.classList.remove("ball-win-cooldown", "snooker-ball-clicked");
+        }
+        updateSnookerBallAvailability();
+    }, SNOOKER_RESPOTTED_BLACK_COOLDOWN_MS);
+}
+
+/** Foul on a respotted black ends the deciding period (black stays down). */
+function resolveSnookerRespottedBlackOnFoul() {
+    if (!isSnookerRespottedBlack()) {
+        return false;
+    }
+    markSnookerColorCleared(7);
+    setSnookerRespottedBlack(false);
+    clearSnookerRespottedBlackCooldown();
+    return true;
 }
 
 function getSnookerCurrentBreak() {
@@ -1830,6 +1893,7 @@ function captureSnookerUndoSnapshot() {
         freeBallOffered: isSnookerFreeBallOffered(),
         redsPotted: getSnookerRedsPotted(),
         clearedColors: getSnookerClearedColors().slice(),
+        respottedBlack: isSnookerRespottedBlack(),
         goldenBallFouled: isSnookerGoldenBallFouled(),
         currentBreak: getSnookerCurrentBreak(),
         breakBalls: Object.assign({}, getSnookerBreakBallCounts()),
@@ -2535,6 +2599,8 @@ async function undoLastSnookerAction() {
     setSnookerFreeBallOffered(!!snap.freeBallOffered);
     setSnookerRedsPotted(snap.redsPotted || 0);
     setSnookerClearedColors(Array.isArray(snap.clearedColors) ? snap.clearedColors : []);
+    setSnookerRespottedBlack(!!snap.respottedBlack);
+    clearSnookerRespottedBlackCooldown();
     setSnookerGoldenBallFouled(!!snap.goldenBallFouled);
     setSnookerCurrentBreak(snap.currentBreak || 0);
     setSnookerBreakBallCounts(
@@ -3075,6 +3141,11 @@ function updateSnookerBallAvailability() {
             const el = document.getElementById("ball " + i);
             if (el && el.classList.contains("snooker-ball-clicked") && i !== nextClearanceColor) {
                 setSnookerBallDisabled(i, true);
+                continue;
+            }
+            // Respotted black: brief cooldown before the deciding black is live again.
+            if (i === 7 && isSnookerRespottedBlack() && isSnookerRespottedBlackCooldown()) {
+                setSnookerBallDisabled(7, true);
                 continue;
             }
             setSnookerBallDisabled(i, i !== nextClearanceColor);
@@ -3832,6 +3903,8 @@ function applySnookerFoulByKey(foulKey) {
         if (foulKey === "gold") {
             removeSnookerGoldenBallFromPlay();
         }
+        // WPBSA: a foul ends a respotted-black deciding period.
+        resolveSnookerRespottedBlackOnFoul();
         commitSnookerUndoSnapshot(undoSnap, null);
         updateSnookerBallAvailability();
         updateSnookerGoldVisibility();
@@ -4009,8 +4082,29 @@ async function handleSnookerBallClick(element) {
         setSnookerAfterFreeball(false);
 
         if (clearance) {
-            // Colors-only phase: potting a color removes it for the rest of the frame.
+            // Colors-only phase: potting a color removes it for the rest of the frame —
+            // except a tying black, which is respotted until pot or foul decides the frame.
+            const p1Pts = parseInt(getStorageItem("p1BallsCtrlPanel"), 10) || 0;
+            const p2Pts = parseInt(getStorageItem("p2BallsCtrlPanel"), 10) || 0;
+            if (num === 7 && p1Pts === p2Pts) {
+                // Leave black uncleared; start cooldown before it can be potted again.
+                setSnookerRespottedBlack(true);
+                flashSnookerColorFeedback(element, function () {
+                    setSnookerPhase("red");
+                    startSnookerRespottedBlackCooldown();
+                    updateSnookerBallAvailability();
+                    refreshSnookerOverlayStats();
+                });
+                refreshSnookerOverlayStats();
+                await recordSnookerBallPotted(scorer);
+                commitSnookerUndoSnapshot(undoSnap, scorer);
+                return;
+            }
             markSnookerColorCleared(num);
+            if (num === 7) {
+                setSnookerRespottedBlack(false);
+                clearSnookerRespottedBlackCooldown();
+            }
             flashSnookerColorFeedback(element, function () {
                 setSnookerPhase("red");
                 updateSnookerBallAvailability();
