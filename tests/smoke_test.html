@@ -730,7 +730,7 @@
                     sharedStyles.indexOf('grid-template-columns: repeat(3, minmax(0, 1fr))') !== -1);
                 assert('Cloud Dashboard', 'Sign Out and Clear All Logins return home',
                     (dashboardAppSource.match(/localSignOut\(\{[^}]*redirectHome: true[^}]*\}\)/g) || []).length >= 2 &&
-                    dashboardAppSource.indexOf("window.location.assign('/')") !== -1 &&
+                    dashboardAppSource.indexOf("window.location.replace('/')") !== -1 &&
                     dashboardSource.indexOf('Clear All Logins') !== -1);
                 assert('Cloud Navigation', 'Dashboard uses a stable loading shell before auth resolves',
                     !!dashboardDoc.querySelector('#dashboardBoot.app-boot') &&
@@ -779,7 +779,7 @@
                     sharedStyles.indexOf('--content-max: 720px;') !== -1 &&
                     sharedStyles.indexOf('body.mobile > header .mobile-header-row') !== -1 &&
                     sharedStyles.indexOf('body.mobile > main#app') !== -1 &&
-                    sharedStyles.indexOf('height: 100dvh;') !== -1 &&
+                    sharedStyles.indexOf('var(--app-vh, 100dvh)') !== -1 &&
                     sharedStyles.indexOf('position: static;') !== -1);
                 assert('Cloud Mobile', 'Desktop header and footer widen without stretching mobile-first main',
                     sharedStyles.indexOf('body.mobile .mobile-bottom-nav-inner') !== -1 &&
@@ -1863,8 +1863,8 @@
             cp.setStorageItem('raceInfo', '2');
             cp.postNames();
             await sleep(300);
-            cp.performResetScores({ endMatch: false });
-            await sleep(200);
+            await cp.performResetScores({ endMatch: false });
+            await sleep(50);
             cp.postScore('add', '1');
             await sleep(300);
             cp.postScore('add', '1');
@@ -1881,8 +1881,8 @@
                 completedMatch && JSON.stringify(completedMatch.finalScore));
 
             const completedMatchId = completedMatch && completedMatch.id;
-            cp.performResetScores({ endMatch: true });
-            await sleep(400);
+            await cp.performResetScores({ endMatch: true });
+            await sleep(50);
             const matchesAfterEnd = await cp.PlayerStats.getMatchesForPlayer(histP1.id);
             const matchAfterEnd = matchesAfterEnd.find(function (m) { return m.id === completedMatchId; });
             assert('Match History', 'End Match preserves completed final score',
@@ -1894,17 +1894,50 @@
                 parseInt(cp.getStorageItem('p1ScoreCtrlPanel'), 10) === 0);
 
             // Call Match Early must flush async rack writes and match finalScore to racks[]
+            // Prior sections may leave snooker selected (race "5" → first to 3). Force pool.
+            await cp.performResetScores({ endMatch: true });
+            await sleep(50);
+            if (typeof cp.gameType === 'function') {
+                cp.document.getElementById('gameTypeSelect').value = 'game1';
+                await cp.gameType('game1');
+                await sleep(50);
+            }
+            cp.document.getElementById('p1Name').value = histP1.name;
+            cp.document.getElementById('p2Name').value = histP2.name;
+            cp.document.getElementById('p1Name').setAttribute('data-player-id', histP1.id);
+            cp.document.getElementById('p2Name').setAttribute('data-player-id', histP2.id);
             cp.document.getElementById('raceInfoTxt').value = '5';
             cp.setStorageItem('raceInfo', '5');
-            cp.performResetScores({ endMatch: false });
-            await sleep(200);
-            cp.postScore('add', '1');
-            cp.postScore('add', '2');
-            cp.postScore('add', '1');
-            cp.postScore('add', '2');
-            cp.postScore('add', '1');
-            // No sleep between scores — callGame flushes the rack queue itself.
+            if (typeof cp.postNames === 'function') cp.postNames();
+            if (typeof cp.postInfo === 'function') cp.postInfo();
+            await sleep(50);
+            if (typeof cp.selectRackBreaker === 'function') {
+                cp.selectRackBreaker('1');
+                await sleep(100);
+            }
+            // Await each rack so session / completion flags stay coherent after End Match.
+            await cp.postScore('add', '1');
+            await cp.postScore('add', '2');
+            await cp.postScore('add', '1');
+            await cp.postScore('add', '2');
+            await cp.postScore('add', '1');
             const pendingBeforeEarly = cp.PlayerStats.getActivePendingMatch();
+            const raceNow = typeof cp.getRaceTarget === 'function' ? cp.getRaceTarget() : null;
+            const scoresNow = {
+                p1: parseInt(cp.getStorageItem('p1ScoreCtrlPanel'), 10) || 0,
+                p2: parseInt(cp.getStorageItem('p2ScoreCtrlPanel'), 10) || 0
+            };
+            assert('Match History', 'Call Match Early has live session',
+                !!(pendingBeforeEarly && pendingBeforeEarly.status === 'active' &&
+                    cp.PlayerStats.canCallGame() && scoresNow.p1 === 3 && scoresNow.p2 === 2 &&
+                    raceNow === 5),
+                JSON.stringify({
+                    status: pendingBeforeEarly && pendingBeforeEarly.status,
+                    canCall: cp.PlayerStats.canCallGame(),
+                    scores: scoresNow,
+                    race: raceNow,
+                    gameType: cp.getStorageItem('gameType')
+                }));
             const earlySaved = await cp.PlayerStats.callGame();
             assert('Match History', 'Call Match Early saves with pending racks', earlySaved === true);
             const earlyMatches = await cp.PlayerStats.getMatchesForPlayer(histP1.id);
@@ -1969,17 +2002,21 @@
             if (typeof cp.gameType === 'function') cp.gameType('game1');
             cp.document.getElementById('raceInfoTxt').value = '5';
             cp.setStorageItem('raceInfo', '5');
-            cp.performResetScores({ endMatch: false });
-            await sleep(150);
-            cp.postScore('add', '1');
-            cp.postScore('add', '2');
-            await sleep(100);
+            if (typeof cp.postInfo === 'function') cp.postInfo();
+            await cp.performResetScores({ endMatch: true });
+            await sleep(50);
+            if (typeof cp.selectRackBreaker === 'function') {
+                cp.selectRackBreaker('1');
+                await sleep(80);
+            }
+            await cp.postScore('add', '1');
+            await cp.postScore('add', '2');
             const beforeCallDrawA = window.StatsParity.typedCareerFromLocalPlayer(
                 await cp.PlayerStats.getPlayer(drawA.id), 'game1');
             const callDrawOk = await cp.PlayerStats.callGame();
             assert('Local Parity', 'Call Early tied saves', callDrawOk === true);
-            cp.performResetScores({ endMatch: true });
-            await sleep(200);
+            await cp.performResetScores({ endMatch: true });
+            await sleep(100);
             const afterCallDrawA = window.StatsParity.typedCareerFromLocalPlayer(
                 await cp.PlayerStats.getPlayer(drawA.id), 'game1');
             assert('Local Parity', 'Call Early tied gamesDrawn +1',
@@ -2503,6 +2540,9 @@
             // --- Stats modal UI ---
             cp.openStatsModal();
             await sleep(250);
+            // openStatsModal may restore last overview tab (leaderboard); force matches for this check.
+            cp.switchStatsTab('matches');
+            await sleep(50);
             const modal = cp.document.getElementById('statsModal');
             const modalOpen = modal && cp.getComputedStyle(modal).display !== 'none';
             assert('Stats UI', 'Modal opens', modalOpen);
@@ -2624,6 +2664,8 @@
             cp.setStorageItem('raceInfo', '5');
             if (typeof cp.postNames === 'function') { cp.postNames(); }
             await sleep(200);
+            await cp.performResetScores({ endMatch: true });
+            await sleep(50);
             // Mode after Ball Scoring is on — gating clears mode when scoring is off.
             cp.setStorageItem('overlayStatsMode', 'p1');
             if (typeof cp.PlayerStats.syncOverlayButtonsFromStorage === 'function') {

@@ -935,32 +935,52 @@
         const opts = options || {};
         const gameTypeFilter = opts.gameType || null;
         const players = cloudData.players || [];
-        const p1 = players.find(function (p) { return cloudPlayerKey(p.id || p.name) === id1; });
-        const p2 = players.find(function (p) { return cloudPlayerKey(p.id || p.name) === id2; });
+        function findCloudH2HPlayer(key) {
+            return players.find(function (p) {
+                return cloudPlayerKey(p.id) === key || cloudPlayerKey(p.name) === key;
+            }) || null;
+        }
+        const p1 = findCloudH2HPlayer(id1);
+        const p2 = findCloudH2HPlayer(id2);
         if (!p1 || !p2) return null;
+        // Prefer roster UUIDs as summary keys so callers comparing ensurePlayer().id match.
+        const key1 = cloudPlayerKey(p1.id) || id1;
+        const key2 = cloudPlayerKey(p2.id) || id2;
+        const name1 = cloudPlayerKey(p1.name);
+        const name2 = cloudPlayerKey(p2.name);
+        function involvesH2HPlayer(raw, key, nameKey) {
+            return cloudMatchInvolvesPlayer(raw, key) ||
+                (nameKey && cloudMatchInvolvesPlayer(raw, nameKey));
+        }
         const p1Matches = (cloudData.matches || []).filter(function (m) {
-            return m && m.status === 'completed' && cloudMatchInvolvesPlayer(m, playerId1);
+            return m && m.status === 'completed' && involvesH2HPlayer(m, key1, name1);
         });
         const p2Matches = (cloudData.matches || []).filter(function (m) {
-            return m && m.status === 'completed' && cloudMatchInvolvesPlayer(m, playerId2);
+            return m && m.status === 'completed' && involvesH2HPlayer(m, key2, name2);
         });
         const summary = {
             player1: buildCloudPlayerDetailShape(p1, p1Matches),
             player2: buildCloudPlayerDetailShape(p2, p2Matches),
-            gamesWon: { [id1]: 0, [id2]: 0 },
-            gamesDrawn: { [id1]: 0, [id2]: 0 },
-            racksWon: { [id1]: 0, [id2]: 0 },
-            ballsWon: { [id1]: 0, [id2]: 0 },
-            highestBreak: { [id1]: 0, [id2]: 0 },
-            highestRun: { [id1]: 0, [id2]: 0 },
-            fouls: { [id1]: 0, [id2]: 0 },
+            gamesWon: { [key1]: 0, [key2]: 0 },
+            gamesDrawn: { [key1]: 0, [key2]: 0 },
+            racksWon: { [key1]: 0, [key2]: 0 },
+            ballsWon: { [key1]: 0, [key2]: 0 },
+            highestBreak: { [key1]: 0, [key2]: 0 },
+            highestRun: { [key1]: 0, [key2]: 0 },
+            fouls: { [key1]: 0, [key2]: 0 },
             matches: [],
             lastPlayedAt: null,
             gameType: gameTypeFilter
         };
+        function matchSideIsPlayer1(m) {
+            return cloudPlayerKey(m.player1Id) === key1 ||
+                cloudPlayerKey(m.player1Name) === name1 ||
+                cloudPlayerKey(m.player1Id) === id1 ||
+                cloudPlayerKey(m.player1Name) === id1;
+        }
         (cloudData.matches || []).forEach(function (raw) {
             if (!raw || raw.status !== 'completed') return;
-            if (!cloudMatchInvolvesPlayer(raw, playerId1) || !cloudMatchInvolvesPlayer(raw, playerId2)) {
+            if (!involvesH2HPlayer(raw, key1, name1) || !involvesH2HPlayer(raw, key2, name2)) {
                 return;
             }
             const m = adaptCloudMatchForUi(raw);
@@ -968,8 +988,8 @@
                 return;
             }
             summary.matches.push(m);
-            const m1Key = (cloudPlayerKey(m.player1Id) === id1 || cloudPlayerKey(m.player1Name) === id1) ? id1 : id2;
-            const m2Key = m1Key === id1 ? id2 : id1;
+            const m1Key = matchSideIsPlayer1(m) ? key1 : key2;
+            const m2Key = m1Key === key1 ? key2 : key1;
             if (m.winnerSlot === '1') {
                 summary.gamesWon[m1Key] = (summary.gamesWon[m1Key] || 0) + 1;
             } else if (m.winnerSlot === '2') {
@@ -2795,6 +2815,44 @@
         await Promise.all([putPlayer(winner), putPlayer(loser)]);
     }
 
+    function mutateDrawDelta(p1, p2, gameType, delta, now) {
+        if (!p1 || !p2 || !delta) return;
+        p1.stats.gamesDrawn = (p1.stats.gamesDrawn || 0) + delta;
+        p2.stats.gamesDrawn = (p2.stats.gamesDrawn || 0) + delta;
+        if (p1.stats.gamesDrawn < 0) p1.stats.gamesDrawn = 0;
+        if (p2.stats.gamesDrawn < 0) p2.stats.gamesDrawn = 0;
+        const t1 = ensureTypeStats(p1.stats, gameType);
+        const t2 = ensureTypeStats(p2.stats, gameType);
+        t1.gamesDrawn = (t1.gamesDrawn || 0) + delta;
+        t2.gamesDrawn = (t2.gamesDrawn || 0) + delta;
+        if (t1.gamesDrawn < 0) t1.gamesDrawn = 0;
+        if (t2.gamesDrawn < 0) t2.gamesDrawn = 0;
+        if (delta > 0) {
+            p1.lastPlayedAt = now;
+            p2.lastPlayedAt = now;
+        }
+        p1.updatedAt = now;
+        p2.updatedAt = now;
+    }
+
+    /** Incremental gamesDrawn — mirrors applyGameDelta for tied Call Match Early / saveMatch. */
+    async function applyDrawDelta(playerId1, playerId2, gameType, delta) {
+        if (activeMatchSession.duplicateNames) {
+            return;
+        }
+        if (!playerId1 || !playerId2 || playerId1 === playerId2 || !delta) {
+            return;
+        }
+        const now = new Date().toISOString();
+        const p1 = await getPlayer(playerId1);
+        const p2 = await getPlayer(playerId2);
+        if (!p1 || !p2) {
+            return;
+        }
+        mutateDrawDelta(p1, p2, gameType, delta, now);
+        await Promise.all([putPlayer(p1), putPlayer(p2)]);
+    }
+
     function getSlotPlayerIds(slot) {
         const p1 = activeMatchSession.player1Id || getPlayerIdFromInput('1');
         const p2 = activeMatchSession.player2Id || getPlayerIdFromInput('2');
@@ -3818,9 +3876,17 @@
             match.status = 'completed';
             match.completedAt = now;
             match.winnerId = null;
+            match.winnerSlot = 'draw';
             match.finalScore = { p1: scoreP1, p2: scoreP2 };
             captureActiveMatchGameInfo();
             await putMatch(match);
+            // Same incremental career write as finalizeMatchCompletion → applyGameDelta.
+            await applyDrawDelta(
+                match.player1Id || activeMatchSession.player1Id,
+                match.player2Id || activeMatchSession.player2Id,
+                match.gameType || activeMatchSession.gameType || 'game1',
+                1
+            );
             ensureCloudMatchStarted('call_early');
             activeMatchSession.status = 'completed';
             activeMatchSession.matchCompletedRecorded = true;
@@ -3832,8 +3898,6 @@
                     winnerSlot: 'draw',
                 }));
                 invalidateCloudStatsCache();
-            } else {
-                await recomputePlayersForMatch(match);
             }
             broadcastOverlayStatsIfEnabled();
         }
@@ -3844,15 +3908,20 @@
         if (!activeMatchSession.matchCompletedRecorded) {
             return;
         }
-        const winnerId = match.winnerId;
-        const loserId = winnerId === activeMatchSession.player1Id
-            ? activeMatchSession.player2Id
-            : activeMatchSession.player1Id;
-
-        await applyGameDelta(winnerId, loserId, activeMatchSession.gameType, -1);
+        const gameType = activeMatchSession.gameType || (match && match.gameType) || 'game1';
+        if (match && matchIsCountableDraw(match)) {
+            await applyDrawDelta(match.player1Id, match.player2Id, gameType, -1);
+        } else {
+            const winnerId = match.winnerId;
+            const loserId = winnerId === activeMatchSession.player1Id
+                ? activeMatchSession.player2Id
+                : activeMatchSession.player1Id;
+            await applyGameDelta(winnerId, loserId, gameType, -1);
+        }
         match.status = 'active';
         match.completedAt = null;
         match.winnerId = null;
+        match.winnerSlot = null;
         await deleteMatchFromStore(match.id);
         activeMatchSession.status = 'active';
         activeMatchSession.matchCompletedRecorded = false;
@@ -4691,8 +4760,10 @@
 
         if (scoreP1 > scoreP2) {
             match.winnerId = match.player1Id;
+            match.winnerSlot = '1';
         } else if (scoreP2 > scoreP1) {
             match.winnerId = match.player2Id;
+            match.winnerSlot = '2';
         } else {
             // Draws are valid completed matches (same as Call Match Early with a tied scoreline).
             // Reject empty 0–0 — that is a name-only pregame, not a result.
@@ -4701,6 +4772,7 @@
                 throw new Error('Cannot save an empty 0–0 match. Add racks/frames or a real scoreline.');
             }
             match.winnerId = null;
+            match.winnerSlot = 'draw';
         }
         match.completedAt = dateIso;
         match.status = 'completed';

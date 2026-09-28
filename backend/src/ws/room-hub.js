@@ -429,6 +429,7 @@ function resolveRoomIdForJoin(msg, auth, client) {
       const room = sqlite.ensureRoomForApiKey(auth.account.id, apiKeyId, {
         instanceKey: msg.instance_id || 'default',
         label: msg.instance_label || null,
+        clientVersion: msg.client_version || msg.version || null,
       });
       if (!room) {
         return { error: 'room_forbidden', message: 'No access to this table' };
@@ -442,6 +443,7 @@ function resolveRoomIdForJoin(msg, auth, client) {
     const room = sqlite.ensureRoomForApiKey(auth.account.id, apiKeyId, {
       instanceKey: msg.instance_id || 'default',
       label: msg.instance_label || null,
+      clientVersion: msg.client_version || msg.version || null,
     });
     if (!room) {
       return { error: 'room_create_failed', message: 'Could not create table for this Dock Key' };
@@ -605,7 +607,9 @@ async function handleRoomClientJoin(ws, meta, msg, authenticateJoin) {
     meta.accountId = accountId;
 
     if (client === 'dock' && meta.apiKeyId) {
-      sqlite.touchRoomDockByApiKey(meta.apiKeyId, msg.instance_id || 'default');
+      const clientVersion = msg.client_version || msg.version || null;
+      meta.clientVersion = clientVersion ? String(clientVersion).trim().slice(0, 40) || null : null;
+      sqlite.touchRoomDockByApiKey(meta.apiKeyId, msg.instance_id || 'default', meta.clientVersion);
     }
   }
 
@@ -1022,6 +1026,26 @@ export function roomHasConnectedDock(roomId) {
     if (conn.client === 'dock' && conn.ws.readyState === 1) return true;
   }
   return false;
+}
+
+/**
+ * Live dock connection counts for platform-admin account list.
+ */
+export function getActiveSeatCountsByAccount(accountIds = null) {
+  const filter = accountIds ? new Set(accountIds) : null;
+  const byAccount = new Map();
+
+  for (const [ws, meta] of connections) {
+    if (ws.readyState !== 1 || !meta?.accountId || meta.client !== 'dock') continue;
+    if (filter && !filter.has(meta.accountId)) continue;
+    byAccount.set(meta.accountId, (byAccount.get(meta.accountId) || 0) + 1);
+  }
+
+  const out = {};
+  for (const [accountId, active_dock_count] of byAccount) {
+    out[accountId] = { active_dock_count };
+  }
+  return out;
 }
 
 /**

@@ -2363,13 +2363,14 @@ function renderAdminAccountsTable() {
   const body = document.getElementById('adminAccountsBody');
   if (!body) return;
   if (!adminAccountsCache.length) {
-    body.innerHTML = '<tr><td colspan="8">No accounts</td></tr>';
+    body.innerHTML = '<tr><td colspan="9">No accounts</td></tr>';
     return;
   }
   body.innerHTML = adminAccountsCache.map((a) => {
     const classes = [];
     if (a.id === adminSelectedId) classes.push('admin-row-selected');
     if (isOwnAdminAccount(a.id)) classes.push('admin-row-self');
+    const dockVersion = a.dock_client_version ? String(a.dock_client_version).trim() : '';
     return `
     <tr data-admin-account-id="${escapeHtml(a.id)}" class="${classes.join(' ')}" tabindex="0">
       <td>${escapeHtml(a.email)}${isOwnAdminAccount(a.id) ? ' <span class="admin-self-badge">You</span>' : ''}</td>
@@ -2377,8 +2378,9 @@ function renderAdminAccountsTable() {
       <td>${escapeHtml(adminTierLabel(a))}</td>
       <td>${escapeHtml(formatComplimentaryUntil(a.trial_ends_at))}</td>
       <td>${Number(a.api_key_count) || 0}</td>
-      <td>${Number(a.dock_room_count) || 0}</td>
-      <td>${Number(a.impromptu_room_count) || 0}</td>
+      <td>${Number(a.active_dock_count) || 0}</td>
+      <td>${Number(a.active_adhoc_count) || 0}</td>
+      <td>${escapeHtml(dockVersion || '—')}</td>
       <td>${escapeHtml(a.last_activity_at ? formatLocalDate(a.last_activity_at) : '—')}</td>
     </tr>
   `;
@@ -2483,7 +2485,7 @@ async function loadAdminAccountDetail(accountId) {
         <div><strong>Quota:</strong> ${
           quota?.limits
             ? `${quota.usage?.apiKeys ?? 0}/${quota.limits.maxApiKeys == null ? '∞' : quota.limits.maxApiKeys} keys · `
-              + `${quota.usage?.rooms ?? 0}/${quota.limits.maxRooms == null ? '∞' : quota.limits.maxRooms} OBS · `
+              + `${quota.usage?.rooms ?? 0}/${quota.limits.maxRooms == null ? '∞' : quota.limits.maxRooms} Dock · `
               + `${quota.usage?.impromptuTables ?? 0}/${quota.limits.maxImpromptuTables == null ? '∞' : quota.limits.maxImpromptuTables} ad-hoc`
             : '—'
         }</div>
@@ -2502,16 +2504,19 @@ async function loadAdminAccountDetail(accountId) {
       <ul class="admin-room-list">
         ${rooms.length ? rooms.map((r) => {
           const isImpromptu = r.kind === 'impromptu';
-          const kindLabel = isImpromptu ? 'Ad-hoc' : 'OBS';
+          const kindLabel = isImpromptu ? 'Ad-hoc' : 'Dock';
           const name = isImpromptu
             ? (r.label || r.dock_label || 'Ad-hoc Table')
             : (r.dock_label || r.label || r.id);
           const seen = isImpromptu
             ? (r.last_seen_at ? `Updated ${formatLocalDate(r.last_seen_at)}` : 'No recent activity')
             : (r.last_seen_at ? `Seen ${formatLocalDate(r.last_seen_at)}` : 'No dock seen');
+          const version = !isImpromptu && r.dock_client_version
+            ? ` · v${escapeHtml(String(r.dock_client_version).trim())}`
+            : '';
           return `
           <li>
-            <span><strong>${escapeHtml(kindLabel)}</strong> · ${escapeHtml(name)} · guests ${Number(r.guest_link_count) || 0}</span>
+            <span><strong>${escapeHtml(kindLabel)}</strong> · ${escapeHtml(name)} · guests ${Number(r.guest_link_count) || 0}${version}</span>
             <span class="hint">${escapeHtml(seen)}</span>
           </li>
         `;

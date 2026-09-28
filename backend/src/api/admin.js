@@ -12,6 +12,7 @@ import {
   roomHasConnectedDock,
   getRoomCleanupAfter,
   resolveRoomApiKeyId,
+  getActiveSeatCountsByAccount,
 } from '../ws/room-hub.js';
 import { hasCloudSubscriptionAccess } from '../lib/subscription-access.js';
 import {
@@ -86,7 +87,20 @@ export async function registerAdminRoutes(app) {
     if (!auth) return;
     const q = typeof request.query.q === 'string' ? request.query.q : '';
     const limit = request.query.limit || '100';
-    return { accounts: sqlite.listAccountsForAdmin({ q, limit }) };
+    const accounts = sqlite.listAccountsForAdmin({ q, limit });
+    const live = getActiveSeatCountsByAccount(accounts.map((a) => a.id));
+    return {
+      accounts: accounts.map((account) => {
+        const seats = live[account.id] || {};
+        return {
+          ...account,
+          // Connected OBS docks (live WebSockets).
+          active_dock_count: Number(seats.active_dock_count) || 0,
+          // Open ad-hoc seats (rooms exist only while the seat is held).
+          active_adhoc_count: Number(account.impromptu_room_count) || 0,
+        };
+      }),
+    };
   });
 
   app.get('/api/admin/accounts/:id', async (request, reply) => {

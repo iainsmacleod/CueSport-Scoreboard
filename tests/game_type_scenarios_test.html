@@ -521,10 +521,11 @@
   async function finishMatch(cp) {
     if (typeof cp.PlayerStats.callGame === 'function') {
       await cp.PlayerStats.callGame();
-    } else {
-      cp.performResetScores({ endMatch: true });
     }
-    await sleep(200);
+    if (typeof cp.performResetScores === 'function') {
+      await cp.performResetScores({ endMatch: true });
+    }
+    await sleep(100);
   }
 
   async function runPoolGameScenarios(cp, assert, game, tag, rand) {
@@ -968,6 +969,12 @@
   }
 
   async function playTiedCallEarly(cp, p1, p2, gameInfo) {
+    // Clear any prior completed session (e.g. finishMatch left matchCompletedRecorded).
+    if (typeof cp.performResetScores === 'function') {
+      await cp.performResetScores({ endMatch: true });
+    } else if (cp.PlayerStats && typeof cp.PlayerStats.onResetScores === 'function') {
+      await cp.PlayerStats.onResetScores({ endMatch: true });
+    }
     await setPlayers(cp, p1, p2);
     await setupGame(cp, 'game1', 5);
     cp.document.getElementById('gameInfoTxt').value = gameInfo;
@@ -1044,9 +1051,9 @@
     assert('Parity', 'Local Call Early draw saved', drawSaved === true);
     // End Match / clear board after Call Early
     if (typeof cp.performResetScores === 'function') {
-      cp.performResetScores({ endMatch: true });
+      await cp.performResetScores({ endMatch: true });
     }
-    await sleep(200);
+    await sleep(100);
     const afterD1 = await snapshotLocalTyped(cp, drawP1.id, 'game1');
     const afterD2 = await snapshotLocalTyped(cp, drawP2.id, 'game1');
     const localDrawDelta1 = SP.careerDelta(beforeD1, afterD1);
@@ -1177,7 +1184,7 @@
       const cDrawSaved = await playTiedCallEarly(cp, cDraw1, cDraw2, 'Parity cloud draw ' + tag);
       assert('Parity', 'Cloud Call Early draw saved', cDrawSaved === true);
       if (typeof cp.performResetScores === 'function') {
-        cp.performResetScores({ endMatch: true });
+        await cp.performResetScores({ endMatch: true });
       }
       await sleep(500);
       const cAfterD1 = await snapshotCloudTyped(cp, drawName1, 'game1');

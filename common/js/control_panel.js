@@ -7255,23 +7255,24 @@ function performResetScores(options) {
             const opts = endMatch
                 ? { endMatch: true }
                 : (fromCloudAbandon ? { skipCloudDiscard: true } : undefined);
-            window.PlayerStats.onResetScores(opts).then(function () {
+            return window.PlayerStats.onResetScores(opts).then(function () {
                 updateScoreControlAvailability();
                 restoreRackBreakerPromptAfterScoreReset();
                 publishCloudStateAfterScoreReset();
+                clearScoreFieldsDirty();
             }).catch(function (err) {
                 console.error('PlayerStats onResetScores error:', err);
                 updateScoreControlAvailability();
                 restoreRackBreakerPromptAfterScoreReset();
                 publishCloudStateAfterScoreReset();
+                clearScoreFieldsDirty();
             });
-        } else {
-            updateScoreControlAvailability();
-            restoreRackBreakerPromptAfterScoreReset();
-            publishCloudStateAfterScoreReset();
         }
-
+        updateScoreControlAvailability();
+        restoreRackBreakerPromptAfterScoreReset();
+        publishCloudStateAfterScoreReset();
         clearScoreFieldsDirty();
+        return Promise.resolve();
 }
 
 function resetBallSet() {

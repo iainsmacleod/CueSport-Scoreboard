@@ -3414,6 +3414,25 @@ async function run() {
         );
       }
 
+      // Self-host simulated-plan downgrade (unrestricted → streamer) revokes Dock Keys.
+      // Mint a fresh key so subscription-gate + revoke-all still have a live seat to exercise.
+      {
+        const gateKeyRes = await fetchJson('/api/api-keys', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${tokenFresh}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            label: `Gate Key ${Date.now()}`,
+            role: 'trusted_operator',
+          }),
+        });
+        if (gateKeyRes.ok && gateKeyRes.body?.key) {
+          apiKey = gateKeyRes.body.key;
+        }
+      }
+
       // WS subscription gate: inactive + support trial / trialing (mutate SQLite, restore after)
       if (accountId && apiKey) {
         let gateRoomId = roomId;
@@ -3514,9 +3533,44 @@ async function run() {
               }
             }
 
+            // Expired-trial auth fire-and-forgets complimentary expiry, which revokes Dock Keys
+            // and deletes dock rooms. Wait, then rebuild a seat before Stripe trialing checks.
+            await sleep(200);
+            if (gateDock?.ws) {
+              try { gateDock.ws.close(); } catch { /* ignore */ }
+              gateDock = null;
+              await sleep(80);
+            }
             db.prepare(
               `UPDATE accounts SET subscription_status = 'trialing', trial_ends_at = NULL WHERE id = ?`
             ).run(accountId);
+            {
+              const rebuildKey = await fetchJson('/api/api-keys', {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${tokenFresh}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  label: `Trialing Gate ${Date.now()}`,
+                  role: 'trusted_operator',
+                }),
+              });
+              if (rebuildKey.ok && rebuildKey.body?.key) {
+                apiKey = rebuildKey.body.key;
+                try {
+                  gateDock = await wsJoin({
+                    client: 'dock',
+                    apiKey,
+                    instanceId: `admin-gate-trialing-${Date.now()}`,
+                  });
+                  gateRoomId = gateDock.data.room_id;
+                } catch (e) {
+                  assert('Dock ready for Stripe trialing gate', false, e.message);
+                  gateRoomId = null;
+                }
+              }
+            }
             try {
               const trialing = await wsJoin({
                 roomId: gateRoomId,
@@ -3540,6 +3594,29 @@ async function run() {
           try { gateDock.ws.close(); } catch { /* ignore */ }
           await sleep(80);
         }
+      }
+    }
+
+    // Ensure at least one live key remains for revoke-all (expiry may have cleared seats).
+    {
+      const meKeys = await fetchJson('/api/me', {
+        headers: { Authorization: `Bearer ${tokenFresh}` },
+      });
+      const activeKeys = Array.isArray(meKeys.body?.api_keys)
+        ? meKeys.body.api_keys.filter((k) => !k.revoked_at)
+        : [];
+      if (!activeKeys.length) {
+        await fetchJson('/api/api-keys', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${tokenFresh}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            label: `Revoke-All Seed ${Date.now()}`,
+            role: 'trusted_operator',
+          }),
+        });
       }
     }
 

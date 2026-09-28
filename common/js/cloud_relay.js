@@ -250,6 +250,13 @@
             }
             msg.api_key = apiKey;
             if (token) msg.access_token = token;
+            // Release version from control_panel.html (versionNum) for admin upgrade tracking.
+            const dockVersion = (typeof versionNum !== 'undefined' && versionNum)
+                ? String(versionNum).trim()
+                : (typeof window !== 'undefined' && window.versionNum
+                    ? String(window.versionNum).trim()
+                    : '');
+            if (dockVersion) msg.client_version = dockVersion;
             // Room is assigned from the Dock Key on the server; do not send a cached UUID.
         } else if (token) {
             msg.access_token = token;
