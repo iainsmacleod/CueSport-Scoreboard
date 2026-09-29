@@ -2435,9 +2435,9 @@ function formatAdminSubscriptionStatus(account) {
   if (account?.is_platform_admin) {
     const sim = String(account.simulated_plan || '').trim().toLowerCase();
     if (sim && sim !== 'unrestricted' && sim !== 'platform_admin' && sim !== 'selfhost') {
-      return `Platform admin · Simulating ${formatAdminTierLabel(sim)}`;
+      return `Simulating ${formatAdminTierLabel(sim)}`;
     }
-    return 'Platform admin · Unrestricted';
+    return 'Unrestricted';
   }
   const status = String(account?.subscription_status || '').toLowerCase();
   if (status === 'trialing') return 'Active (trial)';
@@ -2571,13 +2571,6 @@ async function loadAdminAccountDetail(accountId) {
     const statusLabel = account.is_platform_admin
       ? formatAdminSubscriptionStatus(account)
       : (describePaidBillingState(account, { html: false }) || formatAdminSubscriptionStatus(account));
-    const simulatedPlanLabel = (() => {
-      const sim = String(account.simulated_plan || '').trim().toLowerCase();
-      if (sim && sim !== 'unrestricted' && sim !== 'platform_admin' && sim !== 'selfhost') {
-        return formatAdminTierLabel(sim);
-      }
-      return 'Unrestricted';
-    })();
     body.innerHTML = `
       ${selfNote}
       <div class="admin-detail-meta">
@@ -2587,9 +2580,6 @@ async function loadAdminAccountDetail(accountId) {
             ? ` <span class="hint">(billing field: ${escapeHtml(formatAdminTierLabel(account.subscription_tier))})</span>`
             : ''
         }</div>
-        ${account.is_platform_admin
-          ? `<div><strong>Simulated plan:</strong> ${escapeHtml(simulatedPlanLabel)}</div>`
-          : ''}
         <div><strong>Complimentary:</strong> ${escapeHtml(formatComplimentaryUntil(account.trial_ends_at))}</div>
         <div><strong>Created:</strong> ${escapeHtml(account.created_at ? formatLocalDate(account.created_at) : '—')}</div>
         <div><strong>Quota:</strong> ${
