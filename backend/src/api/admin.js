@@ -18,6 +18,7 @@ import { hasCloudSubscriptionAccess } from '../lib/subscription-access.js';
 import {
   cancelCustomerSubscriptions,
   customerHasPriorSubscription,
+  getSubscriptionBillingSummary,
   listCancelableCustomerSubscriptions,
 } from '../lib/stripe-billing.js';
 import { deleteSupabaseAuthUser } from '../lib/supabase-admin.js';
@@ -109,8 +110,19 @@ export async function registerAdminRoutes(app) {
     const detail = sqlite.getAccountAdminDetail(request.params.id);
     if (!detail) return reply.code(404).send({ error: 'Account not found' });
     const account = sqlite.getAccountById(detail.id);
+    let billingSummary = null;
+    try {
+      billingSummary = await getSubscriptionBillingSummary(account || detail);
+    } catch {
+      billingSummary = null;
+    }
+    const status = String(detail.subscription_status || '').toLowerCase();
     return {
-      account: detail,
+      account: {
+        ...detail,
+        is_trialing: status === 'trialing',
+        billing_summary: billingSummary,
+      },
       quota: account ? getAccountQuota(account) : null,
     };
   });

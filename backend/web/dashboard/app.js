@@ -2433,6 +2433,17 @@ function formatAdminTierLabel(value) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+/** Short Status column label from stored Stripe-mapped status (no live Stripe call). */
+function formatAdminSubscriptionStatus(account) {
+  const status = String(account?.subscription_status || '').toLowerCase();
+  if (status === 'trialing') return 'Active (trial)';
+  if (status === 'active') return 'Active';
+  if (status === 'past_due') return 'Past due';
+  if (status === 'inactive') return 'Cancelled';
+  if (!status) return '—';
+  return formatAdminTierLabel(status);
+}
+
 function adminTierLabel(account) {
   if (account?.is_platform_admin) return 'Platform Admin';
   return formatAdminTierLabel(account?.subscription_tier_display || account?.subscription_tier);
@@ -2453,7 +2464,7 @@ function renderAdminAccountsTable() {
     return `
     <tr data-admin-account-id="${escapeHtml(a.id)}" class="${classes.join(' ')}" tabindex="0">
       <td>${escapeHtml(a.email)}${isOwnAdminAccount(a.id) ? ' <span class="admin-self-badge">You</span>' : ''}</td>
-      <td>${escapeHtml(a.subscription_status || '—')}</td>
+      <td>${escapeHtml(formatAdminSubscriptionStatus(a))}</td>
       <td>${escapeHtml(adminTierLabel(a))}</td>
       <td>${escapeHtml(formatComplimentaryUntil(a.trial_ends_at))}</td>
       <td>${Number(a.api_key_count) || 0}</td>
@@ -2550,10 +2561,12 @@ async function loadAdminAccountDetail(accountId) {
           </li>
         `).join('')
       : '<li class="hint">No active keys</li>';
+    const paidStatus = describePaidBillingState(account, { html: false });
+    const statusLabel = paidStatus || formatAdminSubscriptionStatus(account);
     body.innerHTML = `
       ${selfNote}
       <div class="admin-detail-meta">
-        <div><strong>Status:</strong> ${escapeHtml(account.subscription_status || '—')}</div>
+        <div><strong>Status:</strong> ${escapeHtml(statusLabel)}</div>
         <div><strong>Tier:</strong> ${escapeHtml(adminTierLabel(account))}${
           account.is_platform_admin && account.subscription_tier
             ? ` <span class="hint">(billing field: ${escapeHtml(formatAdminTierLabel(account.subscription_tier))})</span>`
