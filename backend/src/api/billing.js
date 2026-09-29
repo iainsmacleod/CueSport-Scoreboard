@@ -54,6 +54,7 @@ async function ensureStripeCustomer(account) {
     const clearPaidStatus = status === 'active' || status === 'trialing' || status === 'past_due';
     sqlite.updateAccountSubscription(account.id, {
       stripeSubscriptionId: null,
+      cancelAtPeriodEnd: false,
       ...(clearPaidStatus ? { subscriptionStatus: 'inactive' } : {}),
     });
   }
@@ -85,6 +86,7 @@ async function syncAccountFromSubscription(accountId, subscription) {
       ? subscription.customer
       : subscription.customer?.id,
     stripeSubscriptionId: subscription.id,
+    cancelAtPeriodEnd: status === 'inactive' ? false : !!subscription.cancel_at_period_end,
   });
   if (
     (status === 'active' || status === 'trialing' || status === 'past_due')
@@ -285,6 +287,7 @@ export async function registerBillingRoutes(app) {
       sqlite.updateAccountSubscription(auth.account.id, {
         stripeSubscriptionId: null,
         subscriptionStatus: 'inactive',
+        cancelAtPeriodEnd: false,
       });
       sqlite.setAccountStripeCustomerId(auth.account.id, null);
       return reply.code(400).send({
@@ -378,6 +381,7 @@ async function handleStripeEvent(event, log) {
         stripeCustomerId: typeof subscription.customer === 'string'
           ? subscription.customer
           : subscription.customer?.id,
+        cancelAtPeriodEnd: false,
       });
       // Period ended / canceled — revoke keys unless complimentary access remains.
       const seatReset = await revokeDockKeysIfNoCloudAccess(accountId);

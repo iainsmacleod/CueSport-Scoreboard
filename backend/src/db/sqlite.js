@@ -169,6 +169,11 @@ function ensureAccountColumns(database) {
     // Platform admin: null/unrestricted = no caps; otherwise a catalog tier id for testing.
     database.exec('ALTER TABLE accounts ADD COLUMN simulated_plan TEXT');
   }
+  if (!cols.has('cancel_at_period_end')) {
+    database.exec(
+      'ALTER TABLE accounts ADD COLUMN cancel_at_period_end INTEGER NOT NULL DEFAULT 0'
+    );
+  }
 }
 
 function ensureAccountIdentityRecordColumns(database) {
@@ -616,6 +621,7 @@ export function updateAccountSubscription(accountId, {
   subscriptionTier,
   stripeCustomerId,
   stripeSubscriptionId,
+  cancelAtPeriodEnd,
 } = {}) {
   const existing = getAccountById(accountId);
   if (!existing) return null;
@@ -631,14 +637,18 @@ export function updateAccountSubscription(accountId, {
   const nextSubId = stripeSubscriptionId !== undefined
     ? (stripeSubscriptionId || null)
     : (existing.stripe_subscription_id || null);
+  const nextCancelAtPeriodEnd = cancelAtPeriodEnd !== undefined
+    ? (cancelAtPeriodEnd ? 1 : 0)
+    : (Number(existing.cancel_at_period_end) ? 1 : 0);
   getDb().prepare(
     `UPDATE accounts
      SET subscription_status = ?,
          subscription_tier = ?,
          stripe_customer_id = ?,
-         stripe_subscription_id = ?
+         stripe_subscription_id = ?,
+         cancel_at_period_end = ?
      WHERE id = ?`
-  ).run(nextStatus, nextTier, nextCustomer, nextSubId, accountId);
+  ).run(nextStatus, nextTier, nextCustomer, nextSubId, nextCancelAtPeriodEnd, accountId);
   return getAccountById(accountId);
 }
 
@@ -909,6 +919,7 @@ export function invalidateAllSessions(accountId) {
 const ADMIN_ACCOUNT_SELECT = `
   SELECT a.id, a.auth_user_id, a.email, a.created_at, a.subscription_status, a.subscription_tier,
          a.trial_ends_at, a.stripe_customer_id, a.stripe_subscription_id, a.simulated_plan,
+         a.cancel_at_period_end,
          a.session_epoch, a.sessions_invalid_after, a.deletion_status,
          a.deletion_started_at, a.deletion_error,
          (SELECT COUNT(*) FROM api_keys ak WHERE ak.account_id = a.id AND ak.revoked_at IS NULL) AS api_key_count,
@@ -957,6 +968,7 @@ function mapAdminAccountRow(row) {
     stripe_customer_id: row.stripe_customer_id || null,
     stripe_subscription_id: row.stripe_subscription_id || null,
     simulated_plan: row.simulated_plan || null,
+    cancel_at_period_end: !!Number(row.cancel_at_period_end),
     deletion_status: row.deletion_status || 'active',
     deletion_started_at: row.deletion_started_at || null,
     deletion_error: row.deletion_error || null,

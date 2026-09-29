@@ -141,6 +141,7 @@ export async function registerAccountRoutes(app) {
         trial_ends_at: account.trial_ends_at || null,
         stripe_customer_id: account.stripe_customer_id || null,
         stripe_subscription_id: account.stripe_subscription_id || null,
+        cancel_at_period_end: !!Number(account.cancel_at_period_end),
         has_subscription_access: hasAccess,
         is_complimentary: complimentary,
         needs_plan: !hasAccess && !config.allowDevAuth,

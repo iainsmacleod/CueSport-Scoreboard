@@ -929,7 +929,10 @@ function describePaidBillingState(account, { html = false } = {}) {
     || '—';
   const priceLabel = formatMoneyFromStripe(summary?.unitAmount, summary?.currency, summary?.interval);
   const esc = html ? escapeHtml : (v) => String(v ?? '');
-  const cancelScheduled = !!summary?.cancelAtPeriodEnd;
+  const cancelScheduled = !!(
+    summary?.cancelAtPeriodEnd
+    ?? account?.cancel_at_period_end
+  );
   const cancelDate = formatBillingDate(
     summary?.cancelAt || summary?.trialEnd || summary?.currentPeriodEnd
   );
@@ -949,19 +952,19 @@ function describePaidBillingState(account, { html = false } = {}) {
 
   if (isTrialing) {
     if (cancelScheduled) {
-      const cancelBit = cancelDate ? ` · Cancels ${esc(cancelDate)}` : ' · Cancels at period end';
-      return `${esc(planName)} · Active · Free trial${cancelBit}`;
+      const endBit = cancelDate ? ` · ends ${esc(cancelDate)}` : '';
+      return `${esc(planName)} · Active (Cancelled)${endBit}`;
     }
     const endBit = trialEnd ? ` · ends ${esc(trialEnd)}` : '';
     const then = priceLabel ? ` · then ${esc(priceLabel)}` : '';
-    return `${esc(planName)} · Active · Free trial${endBit}${then}`;
+    return `${esc(planName)} · Active (Trial)${endBit}${then}`;
   }
 
   if (status === 'active' || account?.stripe_subscription_id) {
     const priceBit = priceLabel ? ` · ${esc(priceLabel)}` : '';
     if (cancelScheduled) {
-      const cancelBit = cancelDate ? ` · Cancels ${esc(cancelDate)}` : ' · Cancels at period end';
-      return `${esc(planName)} · Active${priceBit}${cancelBit}`;
+      const endBit = cancelDate ? ` · ends ${esc(cancelDate)}` : '';
+      return `${esc(planName)} · Active (Cancelled)${priceBit}${endBit}`;
     }
     const renewBit = renews ? ` · renews ${esc(renews)}` : '';
     return `${esc(planName)} · Active${priceBit}${renewBit}`;
@@ -2440,8 +2443,13 @@ function formatAdminSubscriptionStatus(account) {
     return 'Unrestricted';
   }
   const status = String(account?.subscription_status || '').toLowerCase();
-  if (status === 'trialing') return 'Active (trial)';
-  if (status === 'active') return 'Active';
+  const cancelScheduled = !!account?.cancel_at_period_end;
+  if (status === 'trialing') {
+    return cancelScheduled ? 'Active (Cancelled)' : 'Active (Trial)';
+  }
+  if (status === 'active') {
+    return cancelScheduled ? 'Active (Cancelled)' : 'Active';
+  }
   if (status === 'past_due') return 'Past due';
   if (status === 'inactive') {
     // Default for new accounts is inactive — only call it Cancelled if they had a Stripe sub.

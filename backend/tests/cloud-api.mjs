@@ -377,7 +377,8 @@ async function run() {
     'Dashboard billing status uses Active/Cancelled lifecycle copy',
     dashJsText.includes('describePaidBillingState')
       && dashJsText.includes('cancelAtPeriodEnd')
-      && dashJsText.includes(' · Active')
+      && dashJsText.includes('Active (Cancelled)')
+      && dashJsText.includes('Active (Trial)')
       && dashJsText.includes('Cancelled')
   );
 
