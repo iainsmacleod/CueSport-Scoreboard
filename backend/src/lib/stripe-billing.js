@@ -293,6 +293,8 @@ export async function buildPlansCatalogFromStripe() {
  *   interval: string|null,
  *   currentPeriodEnd: string|null,
  *   trialEnd: string|null,
+ *   cancelAtPeriodEnd: boolean,
+ *   cancelAt: string|null,
  * }|null>}
  */
 export async function getSubscriptionBillingSummary(account) {
@@ -313,6 +315,11 @@ export async function getSubscriptionBillingSummary(account) {
     const price = item?.price;
     const priceId = price?.id || null;
     const tier = priceIdToTier(priceId) || account.subscription_tier || null;
+    const cancelAtPeriodEnd = !!subscription.cancel_at_period_end;
+    const cancelAt = unixToIso(subscription.cancel_at)
+      || (cancelAtPeriodEnd
+        ? unixToIso(subscription.trial_end || subscription.current_period_end)
+        : null);
     const value = {
       planName: tier ? getTierDisplayName(tier) : (price?.nickname || null),
       tier,
@@ -322,6 +329,8 @@ export async function getSubscriptionBillingSummary(account) {
       interval: price?.recurring?.interval || null,
       currentPeriodEnd: unixToIso(subscription.current_period_end),
       trialEnd: unixToIso(subscription.trial_end),
+      cancelAtPeriodEnd,
+      cancelAt,
     };
     subscriptionSummaryCache.set(subscriptionId, {
       expiresAt: Date.now() + PRICE_CACHE_TTL_MS,

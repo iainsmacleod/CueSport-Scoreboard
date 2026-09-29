@@ -919,6 +919,60 @@ function isComplimentaryActive(account) {
   return !!(d && d.getTime() > Date.now());
 }
 
+/** Human billing lifecycle label from Stripe summary + account fields. */
+function describePaidBillingState(account, { html = false } = {}) {
+  const summary = account?.billing_summary || null;
+  const status = String(summary?.status || account?.subscription_status || '').toLowerCase();
+  const planName = summary?.planName
+    || account?.subscription_tier_display
+    || account?.subscription_tier
+    || '—';
+  const priceLabel = formatMoneyFromStripe(summary?.unitAmount, summary?.currency, summary?.interval);
+  const esc = html ? escapeHtml : (v) => String(v ?? '');
+  const cancelScheduled = !!summary?.cancelAtPeriodEnd;
+  const cancelDate = formatBillingDate(
+    summary?.cancelAt || summary?.trialEnd || summary?.currentPeriodEnd
+  );
+  const trialEnd = formatBillingDate(summary?.trialEnd || summary?.currentPeriodEnd);
+  const renews = formatBillingDate(summary?.currentPeriodEnd);
+  const isTrialing = status === 'trialing' || !!account?.is_trialing;
+
+  if (status === 'inactive' && !isTrialing && !account?.stripe_subscription_id) {
+    return null;
+  }
+
+  if (status === 'inactive' && !isTrialing) {
+    return `${esc(planName)} · Cancelled`;
+  }
+
+  if (status === 'past_due') {
+    const priceBit = priceLabel ? ` · ${esc(priceLabel)}` : '';
+    return `${esc(planName)} · Active${priceBit} · payment past due`;
+  }
+
+  if (isTrialing) {
+    if (cancelScheduled) {
+      const cancelBit = cancelDate ? ` · Cancels ${esc(cancelDate)}` : ' · Cancels at period end';
+      return `${esc(planName)} · Active · Free trial${cancelBit}`;
+    }
+    const endBit = trialEnd ? ` · ends ${esc(trialEnd)}` : '';
+    const then = priceLabel ? ` · then ${esc(priceLabel)}` : '';
+    return `${esc(planName)} · Active · Free trial${endBit}${then}`;
+  }
+
+  if (status === 'active' || account?.stripe_subscription_id) {
+    const priceBit = priceLabel ? ` · ${esc(priceLabel)}` : '';
+    if (cancelScheduled) {
+      const cancelBit = cancelDate ? ` · Cancels ${esc(cancelDate)}` : ' · Cancels at period end';
+      return `${esc(planName)} · Active${priceBit}${cancelBit}`;
+    }
+    const renewBit = renews ? ` · renews ${esc(renews)}` : '';
+    return `${esc(planName)} · Active${priceBit}${renewBit}`;
+  }
+
+  return null;
+}
+
 function buildAccountPlanLineHtml(account, quota) {
   const display = quota?.tierDisplayName || account?.subscription_tier_display || account?.subscription_tier || '—';
   const platformUnlimited = !!(quota?.platform_admin_unlimited || (isPlatformAdminUser && quota?.limits?.maxApiKeys == null));
@@ -944,28 +998,8 @@ function buildAccountPlanLineHtml(account, quota) {
     return `Complimentary · ${escapeHtml(tierLabel)} · until ${escapeHtml(until)} <span class="hint">(no card / not billed)</span>`;
   }
 
-  const summary = account?.billing_summary;
-  const status = String(account?.subscription_status || '').toLowerCase();
-  const stripeStatus = String(summary?.status || status).toLowerCase();
-  const planName = summary?.planName || account?.subscription_tier_display || display;
-  const priceLabel = formatMoneyFromStripe(summary?.unitAmount, summary?.currency, summary?.interval);
-
-  if (stripeStatus === 'trialing' || account?.is_trialing) {
-    const ends = formatBillingDate(summary?.trialEnd || summary?.currentPeriodEnd);
-    const then = priceLabel ? ` · then ${escapeHtml(priceLabel)}` : '';
-    const endBit = ends ? ` · ends ${escapeHtml(ends)}` : '';
-    return `${escapeHtml(planName)} · Free trial${endBit}${then}`;
-  }
-
-  if (stripeStatus === 'active' || stripeStatus === 'past_due' || account?.stripe_subscription_id) {
-    const renews = formatBillingDate(summary?.currentPeriodEnd);
-    const priceBit = priceLabel ? ` · ${escapeHtml(priceLabel)}` : '';
-    if (stripeStatus === 'past_due') {
-      return `${escapeHtml(planName)}${priceBit} · payment past due`;
-    }
-    const renewBit = renews ? ` · renews ${escapeHtml(renews)}` : '';
-    return `${escapeHtml(planName)}${priceBit}${renewBit}`;
-  }
+  const paidLine = describePaidBillingState(account, { html: true });
+  if (paidLine) return paidLine;
 
   if (account?.needs_plan) {
     return 'Inactive — choose a plan in <a href="#billingPanel" class="dash-account-link">Account</a> to unlock Cloud';
@@ -1408,16 +1442,11 @@ function renderBillingPanel(account, billingMeta, plansPayload) {
     statusText = `Complimentary access until ${until} (${display}) — no card, not billed. You can still subscribe via Stripe below.`;
   } else if (account?.needs_plan) {
     statusText = buildNeedsPlanStatusText(account, plansPayload, streamerTrialDays, streamerPrice);
-  } else if (account?.is_trialing) {
-    const summary = account.billing_summary;
-    const ends = formatBillingDate(summary?.trialEnd || summary?.currentPeriodEnd);
-    const price = formatMoneyFromStripe(summary?.unitAmount, summary?.currency, summary?.interval);
-    statusText = `Current: ${display} · Free trial${ends ? ` ends ${ends}` : ''}${price ? ` · then ${price}` : ''}. Manage payment methods and cancellation in the Stripe Customer Portal.`;
   } else {
-    const summary = account.billing_summary;
-    const price = formatMoneyFromStripe(summary?.unitAmount, summary?.currency, summary?.interval);
-    const renews = formatBillingDate(summary?.currentPeriodEnd);
-    statusText = `Current: ${display} (${status})${price ? ` · ${price}` : ''}${renews ? ` · renews ${renews}` : ''}. Manage payment methods and cancellation in the Stripe Customer Portal.`;
+    const paidLine = describePaidBillingState(account, { html: false });
+    statusText = paidLine
+      ? `Current: ${paidLine}. Manage payment methods and cancellation in the Stripe Customer Portal.`
+      : `Current: ${display} (${status}). Manage payment methods and cancellation in the Stripe Customer Portal.`;
   }
 
   if (statusEl) statusEl.textContent = statusText;

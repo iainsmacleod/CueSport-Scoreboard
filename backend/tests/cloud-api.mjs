@@ -373,6 +373,13 @@ async function run() {
     'Dashboard billing CTA supports free-trial styling',
     dashJsText.includes('billing-cta-trial') && dashJsText.includes('Free Trial')
   );
+  assert(
+    'Dashboard billing status uses Active/Cancelled lifecycle copy',
+    dashJsText.includes('describePaidBillingState')
+      && dashJsText.includes('cancelAtPeriodEnd')
+      && dashJsText.includes(' · Active')
+      && dashJsText.includes('Cancelled')
+  );
 
   const googleLogo = await fetch(`${BASE}/web/shared/google/g-logo.svg`);
   assert('GET /web/shared/google/g-logo.svg', googleLogo.ok);
