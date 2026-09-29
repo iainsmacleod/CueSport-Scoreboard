@@ -2,6 +2,7 @@ import * as sqlite from '../db/sqlite.js';
 import { config } from '../config.js';
 import { isAccountAdminAuth } from '../lib/dock-roles.js';
 import {
+  accessEndsAtFromSubscription,
   buildPlansCatalogFromStripe,
   customerHasPriorSubscription,
   getStripe,
@@ -55,6 +56,7 @@ async function ensureStripeCustomer(account) {
     sqlite.updateAccountSubscription(account.id, {
       stripeSubscriptionId: null,
       cancelAtPeriodEnd: false,
+      accessEndsAt: null,
       ...(clearPaidStatus ? { subscriptionStatus: 'inactive' } : {}),
     });
   }
@@ -87,6 +89,7 @@ async function syncAccountFromSubscription(accountId, subscription) {
       : subscription.customer?.id,
     stripeSubscriptionId: subscription.id,
     cancelAtPeriodEnd: status === 'inactive' ? false : !!subscription.cancel_at_period_end,
+    accessEndsAt: accessEndsAtFromSubscription(subscription, status),
   });
   if (
     (status === 'active' || status === 'trialing' || status === 'past_due')
@@ -288,6 +291,7 @@ export async function registerBillingRoutes(app) {
         stripeSubscriptionId: null,
         subscriptionStatus: 'inactive',
         cancelAtPeriodEnd: false,
+        accessEndsAt: null,
       });
       sqlite.setAccountStripeCustomerId(auth.account.id, null);
       return reply.code(400).send({
@@ -382,6 +386,7 @@ async function handleStripeEvent(event, log) {
           ? subscription.customer
           : subscription.customer?.id,
         cancelAtPeriodEnd: false,
+        accessEndsAt: null,
       });
       // Period ended / canceled — revoke keys unless complimentary access remains.
       const seatReset = await revokeDockKeysIfNoCloudAccess(accountId);

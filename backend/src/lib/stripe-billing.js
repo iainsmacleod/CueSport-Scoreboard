@@ -356,6 +356,16 @@ export function mapStripeSubscriptionStatus(status) {
   return s || 'inactive';
 }
 
+/** ISO end of current paid entitlement from a Stripe subscription object. */
+export function accessEndsAtFromSubscription(subscription, mappedStatus) {
+  const status = String(mappedStatus || mapStripeSubscriptionStatus(subscription?.status) || '').toLowerCase();
+  if (!subscription || status === 'inactive') return null;
+  if (status === 'trialing') {
+    return unixToIso(subscription.trial_end || subscription.current_period_end);
+  }
+  return unixToIso(subscription.current_period_end || subscription.trial_end);
+}
+
 export function tierFromSubscription(subscription) {
   const item = subscription?.items?.data?.[0];
   const priceId = item?.price?.id || item?.plan?.id || null;

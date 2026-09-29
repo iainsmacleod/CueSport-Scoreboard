@@ -2442,6 +2442,9 @@ function formatAdminSubscriptionStatus(account) {
     }
     return 'Unrestricted';
   }
+  if (isComplimentaryActive(account)) {
+    return `Complimentary (${adminTierLabel(account)})`;
+  }
   const status = String(account?.subscription_status || '').toLowerCase();
   const cancelScheduled = !!account?.cancel_at_period_end;
   if (status === 'trialing') {
@@ -2457,6 +2460,21 @@ function formatAdminSubscriptionStatus(account) {
   }
   if (!status) return '—';
   return formatAdminTierLabel(status);
+}
+
+/** Access End Date: complimentary end when active, else paid entitlement end. */
+function formatAdminAccessEndDate(account) {
+  if (isComplimentaryActive(account)) {
+    return formatBillingDate(account.trial_ends_at) || '—';
+  }
+  if (account?.access_ends_at) {
+    return formatBillingDate(account.access_ends_at) || '—';
+  }
+  const summary = account?.billing_summary;
+  const fromSummary = formatBillingDate(
+    summary?.cancelAt || summary?.trialEnd || summary?.currentPeriodEnd
+  );
+  return fromSummary || '—';
 }
 
 function adminTierLabel(account) {
@@ -2481,7 +2499,7 @@ function renderAdminAccountsTable() {
       <td>${escapeHtml(a.email)}${isOwnAdminAccount(a.id) ? ' <span class="admin-self-badge">You</span>' : ''}</td>
       <td>${escapeHtml(formatAdminSubscriptionStatus(a))}</td>
       <td>${escapeHtml(adminTierLabel(a))}</td>
-      <td>${escapeHtml(formatComplimentaryUntil(a.trial_ends_at))}</td>
+      <td>${escapeHtml(formatAdminAccessEndDate(a))}</td>
       <td>${Number(a.api_key_count) || 0}</td>
       <td>${Number(a.active_dock_count) || 0}</td>
       <td>${Number(a.active_adhoc_count) || 0}</td>
@@ -2576,7 +2594,7 @@ async function loadAdminAccountDetail(accountId) {
           </li>
         `).join('')
       : '<li class="hint">No active keys</li>';
-    const statusLabel = account.is_platform_admin
+    const statusLabel = (account.is_platform_admin || isComplimentaryActive(account))
       ? formatAdminSubscriptionStatus(account)
       : (describePaidBillingState(account, { html: false }) || formatAdminSubscriptionStatus(account));
     body.innerHTML = `
@@ -2588,7 +2606,7 @@ async function loadAdminAccountDetail(accountId) {
             ? ` <span class="hint">(billing field: ${escapeHtml(formatAdminTierLabel(account.subscription_tier))})</span>`
             : ''
         }</div>
-        <div><strong>Complimentary:</strong> ${escapeHtml(formatComplimentaryUntil(account.trial_ends_at))}</div>
+        <div><strong>Access End Date:</strong> ${escapeHtml(formatAdminAccessEndDate(account))}</div>
         <div><strong>Created:</strong> ${escapeHtml(account.created_at ? formatLocalDate(account.created_at) : '—')}</div>
         <div><strong>Quota:</strong> ${
           quota?.limits

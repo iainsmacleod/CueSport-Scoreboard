@@ -381,6 +381,12 @@ async function run() {
       && dashJsText.includes('Active (Trial)')
       && dashJsText.includes('Cancelled')
   );
+  assert(
+    'Dashboard admin Access End Date column',
+    dashHtmlText.includes('Access End Date')
+      && dashJsText.includes('formatAdminAccessEndDate')
+      && dashJsText.includes('Complimentary (')
+  );
 
   const googleLogo = await fetch(`${BASE}/web/shared/google/g-logo.svg`);
   assert('GET /web/shared/google/g-logo.svg', googleLogo.ok);
