@@ -417,9 +417,8 @@
           const limits = plan.limits || {};
           const priceLabel = formatMoneyFromStripe(plan.unitAmount, plan.currency, plan.interval);
           let priceText = priceLabel || 'See checkout';
-          if (plan.trialDays && priceLabel) priceText = `${plan.trialDays}-day free trial, then ${priceLabel}`;
-          else if (plan.trialDays) priceText = `${plan.trialDays}-day free trial (card required)`;
-          const btnLabel = plan.trialDays ? 'Start free trial' : 'Get started';
+          if (plan.trialDays && priceLabel) priceText = `${plan.trialDays}-day free trial (new customers), then ${priceLabel}`;
+          else if (plan.trialDays) priceText = `${plan.trialDays}-day free trial for new customers (card required)`;
           card.innerHTML = `
             <h3>${escapeHtml(plan.displayName || plan.id)}</h3>
             <p class="billing-plan-limits">${escapeHtml(String(limits.maxApiKeys ?? '—'))} dock keys · ${escapeHtml(String(limits.maxImpromptuTables ?? '—'))} ad-hoc tables · up to ${escapeHtml(String(limits.maxControlConnectionsPerRoom ?? '—'))} mobile/guest per table</p>
@@ -427,8 +426,13 @@
           `;
           const btn = document.createElement('button');
           btn.type = 'button';
-          btn.className = 'btn primary';
-          btn.textContent = btnLabel;
+          if (plan.trialDays) {
+            btn.className = 'btn primary billing-cta-trial';
+            btn.innerHTML = '<strong>Free Trial</strong>';
+          } else {
+            btn.className = 'btn primary';
+            btn.textContent = 'Get started';
+          }
           btn.addEventListener('click', () => goSubscribe(plan.id));
           card.appendChild(btn);
           grid.appendChild(card);

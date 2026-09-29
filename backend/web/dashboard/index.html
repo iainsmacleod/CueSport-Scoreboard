@@ -141,9 +141,8 @@
         <div id="tablesBillingPromo" class="panel billing-promo-panel hidden">
           <h2>Choose a plan to unlock Cloud</h2>
           <p id="tablesBillingStatusLine" class="hint"></p>
-          <div id="tablesBillingPlanPicker" class="billing-plan-grid"></div>
-          <div class="billing-terms-row">
-            <label id="tablesBillingTermsLabel" class="billing-terms-check hint">
+          <div class="billing-terms-row billing-terms-row--above">
+            <label id="tablesBillingTermsLabel" class="billing-terms-check billing-terms-check--soft hint">
               <input type="checkbox" id="tablesBillingAcceptTerms" />
               <span>
                 I agree to the
@@ -153,6 +152,7 @@
               </span>
             </label>
           </div>
+          <div id="tablesBillingPlanPicker" class="billing-plan-grid"></div>
           <p id="tablesBillingNotice" class="hint hidden" aria-live="polite"></p>
         </div>
         <div id="tablesStartRow" class="tables-start-row hidden">
@@ -449,9 +449,8 @@
               </p>
               <div id="billingPanel" class="account-billing-details hidden">
                 <p id="billingStatusLine" class="hint"></p>
-                <div id="billingPlanPicker" class="billing-plan-grid"></div>
-                <div class="billing-terms-row">
-                  <label id="billingTermsLabel" class="billing-terms-check hint">
+                <div class="billing-terms-row billing-terms-row--above">
+                  <label id="billingTermsLabel" class="billing-terms-check billing-terms-check--soft hint">
                     <input type="checkbox" id="billingAcceptTerms" />
                     <span>
                       I agree to the
@@ -461,6 +460,7 @@
                     </span>
                   </label>
                 </div>
+                <div id="billingPlanPicker" class="billing-plan-grid"></div>
                 <div class="row account-section-actions billing-actions">
                   <button type="button" id="manageBillingBtn" class="btn secondary dash-action-btn hidden">Manage Subscription</button>
                 </div>

@@ -1114,11 +1114,53 @@ function setBillingNotice(msg) {
   });
 }
 
+const BILLING_TERMS_CONSENT_LABEL = 'I agree to Terms & Privacy';
+const BILLING_TRIAL_CTA_HTML = '<strong>Free Trial</strong>';
+
 function billingTermsAccepted() {
   return !!(
     document.getElementById('billingAcceptTerms')?.checked
     || document.getElementById('tablesBillingAcceptTerms')?.checked
   );
+}
+
+function setBillingTermsAccepted(accepted) {
+  const checked = !!accepted;
+  const termsMain = document.getElementById('billingAcceptTerms');
+  const termsTables = document.getElementById('tablesBillingAcceptTerms');
+  if (termsMain) termsMain.checked = checked;
+  if (termsTables) termsTables.checked = checked;
+}
+
+function focusBillingTermsControl() {
+  const tablesPromo = document.getElementById('tablesBillingPromo');
+  const tablesVisible = !!(tablesPromo && !tablesPromo.classList.contains('hidden'));
+  const labelId = tablesVisible ? 'tablesBillingTermsLabel' : 'billingTermsLabel';
+  const checkboxId = tablesVisible ? 'tablesBillingAcceptTerms' : 'billingAcceptTerms';
+  document.getElementById(labelId)?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+  document.getElementById(checkboxId)?.focus?.();
+}
+
+function applyBillingCheckoutButtonLabel(btn, accepted) {
+  if (!btn) return;
+  const isTrial = btn.dataset.billingTrial === '1';
+  if (!accepted) {
+    btn.textContent = BILLING_TERMS_CONSENT_LABEL;
+    return;
+  }
+  if (isTrial) {
+    btn.innerHTML = BILLING_TRIAL_CTA_HTML;
+    return;
+  }
+  btn.textContent = btn.dataset.billingLabel || 'Subscribe';
+}
+
+function syncBillingCheckoutButtons() {
+  const accepted = billingTermsAccepted();
+  document.querySelectorAll(
+    '#billingPlanPicker .billing-plan-card .btn.primary[data-billing-action],'
+    + '#tablesBillingPlanPicker .billing-plan-card .btn.primary[data-billing-action]'
+  ).forEach((btn) => applyBillingCheckoutButtonLabel(btn, accepted));
 }
 
 function buildNeedsPlanStatusText(account, plansPayload, streamerTrialDays, streamerPrice) {
@@ -1127,7 +1169,7 @@ function buildNeedsPlanStatusText(account, plansPayload, streamerTrialDays, stre
     const thenBit = streamerPrice
       ? ` After the trial you are charged ${streamerPrice} automatically unless you cancel.`
       : ' After the trial you are charged the Streamer monthly price automatically unless you cancel.';
-    planBit = `Streamer includes a ${streamerTrialDays}-day free trial (card required at Checkout; cancel before it ends to avoid charges).${thenBit}`;
+    planBit = `Streamer includes a ${streamerTrialDays}-day free trial for new customers (card required at Checkout; cancel before it ends to avoid charges).${thenBit}`;
   } else if (plansPayload?.trialConfigured && plansPayload?.trialEligible === false) {
     planBit = streamerPrice
       ? `Streamer bills ${streamerPrice} immediately (free trial already used on this email).`
@@ -1173,9 +1215,9 @@ function fillBillingPlanPicker(grid, account, billingMeta, plansPayload) {
       const priceEl = document.createElement('p');
       priceEl.className = 'billing-plan-price hint';
       if (plan.trialDays && priceLabel) {
-        priceEl.textContent = `${plan.trialDays}-day free trial, then ${priceLabel}`;
+        priceEl.textContent = `${plan.trialDays}-day free trial (new customers), then ${priceLabel}`;
       } else if (plan.trialDays) {
-        priceEl.textContent = `${plan.trialDays}-day free trial (card required)`;
+        priceEl.textContent = `${plan.trialDays}-day free trial for new customers (card required)`;
       } else if (priceLabel) {
         priceEl.textContent = priceLabel;
       }
@@ -1198,13 +1240,21 @@ function fillBillingPlanPicker(grid, account, billingMeta, plansPayload) {
     } else if (plan.checkout && billingMeta?.stripeConfigured) {
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'btn primary';
-      if (account?.needs_plan || isComplimentaryActive(account)) {
-        btn.textContent = plan.trialDays ? 'Start free trial' : 'Subscribe';
-      } else {
-        btn.textContent = 'Switch / subscribe';
-      }
-      btn.addEventListener('click', () => checkoutTier(plan.id));
+      const isTrialCta = !!(plan.trialDays && (account?.needs_plan || isComplimentaryActive(account)));
+      const actionLabel = (account?.needs_plan || isComplimentaryActive(account))
+        ? (isTrialCta ? 'Start free trial' : 'Subscribe')
+        : 'Switch / subscribe';
+      btn.className = isTrialCta ? 'btn primary billing-cta-trial' : 'btn primary';
+      btn.dataset.billingAction = 'checkout';
+      btn.dataset.billingLabel = actionLabel;
+      btn.dataset.billingTrial = isTrialCta ? '1' : '0';
+      btn.addEventListener('click', () => {
+        if (!billingTermsAccepted()) {
+          setBillingTermsAccepted(true);
+          syncBillingCheckoutButtons();
+        }
+        checkoutTier(plan.id);
+      });
       card.appendChild(btn);
     } else {
       const note = document.createElement('p');
@@ -1214,6 +1264,7 @@ function fillBillingPlanPicker(grid, account, billingMeta, plansPayload) {
     }
     grid.appendChild(card);
   });
+  syncBillingCheckoutButtons();
 }
 
 async function startPortal() {
@@ -1233,6 +1284,7 @@ async function startPortal() {
 async function checkoutTier(tierId) {
   if (!billingTermsAccepted()) {
     setBillingNotice('Accept the Terms of Service and Privacy Policy before checkout.');
+    focusBillingTermsControl();
     return;
   }
   try {
@@ -1307,10 +1359,8 @@ async function consumeSubscribeIntent(account) {
     setBillingNotice('Checkout canceled. Choose a plan anytime under Account.');
     return;
   }
-  const termsMain = document.getElementById('billingAcceptTerms');
-  const termsTables = document.getElementById('tablesBillingAcceptTerms');
-  if (termsMain) termsMain.checked = true;
-  if (termsTables) termsTables.checked = true;
+  setBillingTermsAccepted(true);
+  syncBillingCheckoutButtons();
   await checkoutTier(tier);
 }
 
@@ -5649,6 +5699,12 @@ document.getElementById('revokeAllDockKeysBtn')?.addEventListener('click', async
   }
 });
 document.getElementById('simulatedPlanSelect')?.addEventListener('change', onSimulatedPlanChange);
+['billingAcceptTerms', 'tablesBillingAcceptTerms'].forEach((id) => {
+  document.getElementById(id)?.addEventListener('change', (event) => {
+    setBillingTermsAccepted(!!event.target.checked);
+    syncBillingCheckoutButtons();
+  });
+});
 document.getElementById('dashCreateKeyCancelBtn')?.addEventListener('click', () => closeDockKeyModal());
 document.getElementById('dashCreateKeySubmitBtn')?.addEventListener('click', () => submitDockKeyModal());
 document.getElementById('dashCreateKeyRole')?.addEventListener('change', (event) => {

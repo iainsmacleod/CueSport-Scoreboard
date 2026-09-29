@@ -4020,6 +4020,21 @@ body.controls-locked #mobileBottomNav {
   line-height: 1.35;
   flex: 1;
 }
+.billing-plan-card .billing-plan-price {
+  margin: 0;
+  padding-top: 0.55rem;
+  border-top: 1px solid rgba(65, 72, 104, 0.9);
+  line-height: 1.35;
+}
+.billing-plan-card > .btn {
+  width: 100%;
+  min-height: 2.75rem;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0.15rem;
+}
 .billing-plan-card.is-current {
   border: 2px solid #9ece6a;
   background: rgba(158, 206, 106, 0.08);
@@ -4044,6 +4059,9 @@ body.controls-locked #mobileBottomNav {
   margin: 0.25rem 0 1rem;
   clear: both;
 }
+.billing-terms-row--above {
+  margin: 0.35rem 0 0.15rem;
+}
 .billing-terms-check {
   display: flex;
   flex-direction: row;
@@ -4053,6 +4071,9 @@ body.controls-locked #mobileBottomNav {
   max-width: 40rem;
   margin: 0;
   box-sizing: border-box;
+}
+.billing-terms-check--soft {
+  opacity: 0.82;
 }
 .billing-terms-check > span {
   flex: 1 1 auto;
@@ -4067,6 +4088,71 @@ body.controls-locked #mobileBottomNav {
   margin: 0.2rem 0 0;
   flex: 0 0 auto;
   align-self: flex-start;
+}
+@property --billing-cta-sparkle-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+body.dashboard-page .btn.primary.billing-cta-trial,
+body.landing-home .btn.primary.billing-cta-trial,
+body.streams-page .btn.primary.billing-cta-trial {
+  position: relative;
+  isolation: isolate;
+  color: #102014;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  border: 2px solid transparent;
+  background:
+    linear-gradient(135deg, #2f8f55 0%, #5fbf6a 45%, #9ece6a 100%) padding-box,
+    conic-gradient(
+      from var(--billing-cta-sparkle-angle),
+      #6fbf6a 0deg,
+      #f6ffc4 40deg,
+      #ffffff 70deg,
+      #8dffb8 110deg,
+      #6fbf6a 160deg,
+      #fff59a 210deg,
+      #ffffff 250deg,
+      #b8f06a 300deg,
+      #6fbf6a 360deg
+    ) border-box;
+  box-shadow:
+    0 0 0 1px rgba(158, 206, 106, 0.22),
+    0 0.35rem 0.9rem rgba(61, 155, 95, 0.3),
+    0 0 12px rgba(184, 240, 106, 0.22);
+  animation: billing-cta-sparkle-spin 1.6s linear infinite;
+}
+body.dashboard-page .btn.primary.billing-cta-trial:hover:not(:disabled),
+body.landing-home .btn.primary.billing-cta-trial:hover:not(:disabled),
+body.streams-page .btn.primary.billing-cta-trial:hover:not(:disabled) {
+  filter: brightness(1.06);
+  border-color: transparent;
+  color: #102014;
+  box-shadow:
+    0 0 0 1px rgba(196, 240, 138, 0.45),
+    0 0.4rem 1.05rem rgba(61, 155, 95, 0.4),
+    0 0 16px rgba(255, 245, 154, 0.28);
+}
+body.dashboard-page .btn.primary.billing-cta-trial strong,
+body.landing-home .btn.primary.billing-cta-trial strong,
+body.streams-page .btn.primary.billing-cta-trial strong {
+  font-weight: 800;
+}
+@keyframes billing-cta-sparkle-spin {
+  to {
+    --billing-cta-sparkle-angle: 360deg;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.dashboard-page .btn.primary.billing-cta-trial,
+  body.landing-home .btn.primary.billing-cta-trial,
+  body.streams-page .btn.primary.billing-cta-trial {
+    animation: none;
+    background:
+      linear-gradient(135deg, #2f8f55 0%, #5fbf6a 45%, #9ece6a 100%) padding-box,
+      linear-gradient(135deg, #c8f08a, #fff4a8, #8dffb8) border-box;
+  }
 }
 .plan-trial-badge {
   display: inline-block;

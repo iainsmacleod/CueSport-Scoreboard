@@ -332,6 +332,7 @@ async function run() {
 
   const dashJs = await fetch(`${BASE}/web/dashboard/app.js`);
   assert('GET /web/dashboard/app.js', dashJs.ok);
+  const dashJsText = await dashJs.text();
 
   const dashHtml = await fetch(`${BASE}/dashboard`);
   assert('GET /dashboard HTML', dashHtml.ok);
@@ -349,6 +350,28 @@ async function run() {
   assert(
     'Dashboard has billing panel markup',
     dashHtmlText.includes('id="billingPanel"') && dashHtmlText.includes('id="billingAcceptTerms"')
+  );
+  const tablesPromoIdx = dashHtmlText.indexOf('id="tablesBillingPromo"');
+  const tablesTermsIdx = dashHtmlText.indexOf('id="tablesBillingAcceptTerms"');
+  const tablesPickerIdx = dashHtmlText.indexOf('id="tablesBillingPlanPicker"');
+  assert(
+    'Tables billing Terms appear above plan picker',
+    tablesPromoIdx >= 0
+      && tablesTermsIdx > tablesPromoIdx
+      && tablesPickerIdx > tablesTermsIdx
+  );
+  const billingPanelIdx = dashHtmlText.indexOf('id="billingPanel"');
+  const billingTermsIdx = dashHtmlText.indexOf('id="billingAcceptTerms"');
+  const billingPickerIdx = dashHtmlText.indexOf('id="billingPlanPicker"');
+  assert(
+    'Account billing Terms appear above plan picker',
+    billingPanelIdx >= 0
+      && billingTermsIdx > billingPanelIdx
+      && billingPickerIdx > billingTermsIdx
+  );
+  assert(
+    'Dashboard billing CTA supports free-trial styling',
+    dashJsText.includes('billing-cta-trial') && dashJsText.includes('Free Trial')
   );
 
   const googleLogo = await fetch(`${BASE}/web/shared/google/g-logo.svg`);
