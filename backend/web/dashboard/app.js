@@ -4165,6 +4165,8 @@ function syncMatchExtrasVisibility(gameType) {
   setLabel('statsMatchScoreP2Label', `Balls · ${p2}`);
   setLabel('statsMatchHrP1Label', `Longest run · ${p1}`);
   setLabel('statsMatchHrP2Label', `Longest run · ${p2}`);
+  setLabel('statsMatchFoulsP1Label', `Fouls · ${p1}`);
+  setLabel('statsMatchFoulsP2Label', `Fouls · ${p2}`);
   const word = gt === 'game8' ? 'Frame' : 'Rack';
   const words = gt === 'game8' ? 'Frames' : 'Racks';
   const label = document.getElementById('statsMatchRacksEditorLabel');
@@ -4341,6 +4343,15 @@ function readRackExtraFieldsFromRow(row) {
     entry.highestRunP1 = clampDashScore(hr1.value);
     entry.highestRunP2 = clampDashScore(row.querySelector('.stats-rack-hr-p2')?.value);
   }
+  const balls1 = row.querySelector('.stats-rack-balls-p1');
+  if (balls1) {
+    entry.ballsP1 = clampDashScore(balls1.value);
+    entry.ballsP2 = clampDashScore(row.querySelector('.stats-rack-balls-p2')?.value);
+  }
+  const bnr = row.querySelector('.stats-rack-bnr');
+  if (bnr && bnr.checked) entry.breakAndRun = true;
+  const tr = row.querySelector('.stats-rack-tr');
+  if (tr && tr.checked) entry.tableRun = true;
   return entry;
 }
 
@@ -4398,6 +4409,9 @@ function renderDashMatchRacksEditor(racks) {
   const gameType = document.getElementById('statsMatchGameType')?.value || 'game1';
   const isSnooker = gameType === 'game8';
   const isStraight = gameType === 'game4';
+  const showRackBalls = showsBallsFields(gameType) && !isSnooker && !isStraight;
+  const showRunOuts = gameType === 'game1' || gameType === 'game2' || gameType === 'game3' ||
+    gameType === 'game5' || gameType === 'game6';
   syncMatchExtrasVisibility(gameType);
   const list = Array.isArray(racks) ? racks.slice() : [];
   const word = gameType === 'game8' ? 'Frame' : 'Rack';
@@ -4414,6 +4428,12 @@ function renderDashMatchRacksEditor(racks) {
     html += `<th>Pts ${p1}</th><th>Pts ${p2}</th><th>HB ${p1}</th><th>HB ${p2}</th>`;
   } else if (isStraight) {
     html += `<th>Run ${p1}</th><th>Run ${p2}</th>`;
+  }
+  if (showRackBalls) {
+    html += `<th>Balls ${p1}</th><th>Balls ${p2}</th>`;
+  }
+  if (showRunOuts) {
+    html += '<th>B&amp;R</th><th>TR</th>';
   }
   html += `<th>Fouls ${p1}</th><th>Fouls ${p2}</th><th class="stats-rack-edit-actions-col"></th></tr></thead><tbody>`;
   list.forEach((r, index) => {
@@ -4438,6 +4458,14 @@ function renderDashMatchRacksEditor(racks) {
       html += `<td><input type="number" class="stats-rack-hr-p1" min="0" max="999" value="${clampDashScore(r.highestRunP1 != null ? r.highestRunP1 : r.highestBreakP1)}" /></td>
         <td><input type="number" class="stats-rack-hr-p2" min="0" max="999" value="${clampDashScore(r.highestRunP2 != null ? r.highestRunP2 : r.highestBreakP2)}" /></td>`;
     }
+    if (showRackBalls) {
+      html += `<td><input type="number" class="stats-rack-balls-p1" min="0" max="999" value="${clampDashScore(r.ballsP1)}" /></td>
+        <td><input type="number" class="stats-rack-balls-p2" min="0" max="999" value="${clampDashScore(r.ballsP2)}" /></td>`;
+    }
+    if (showRunOuts) {
+      html += `<td><input type="checkbox" class="stats-rack-bnr" title="Break &amp; Run"${r.breakAndRun ? ' checked' : ''} /></td>
+        <td><input type="checkbox" class="stats-rack-tr" title="Table Run"${r.tableRun ? ' checked' : ''} /></td>`;
+    }
     html += `<td><input type="number" class="stats-rack-fouls-p1" min="0" max="999" value="${clampDashScore(r.foulsP1)}" /></td>
       <td><input type="number" class="stats-rack-fouls-p2" min="0" max="999" value="${clampDashScore(r.foulsP2)}" /></td>
       <td class="stats-rack-edit-actions">
@@ -4456,6 +4484,7 @@ function renderDashMatchRacksEditor(racks) {
   });
   editor.querySelectorAll('input').forEach((el) => {
     el.addEventListener('input', syncMatchModalSaveEnabled);
+    el.addEventListener('change', syncMatchModalSaveEnabled);
   });
   editor.querySelectorAll('.stats-rack-delete-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -4493,8 +4522,28 @@ function serializeDashEditorRacksForCloud(editorRacks) {
     if (r.breakerSlot === '1' || r.breakerSlot === '2') {
       out.breakerSlot = String(r.breakerSlot);
     }
+    if (r.breakAndRun) out.breakAndRun = true;
+    if (r.tableRun) out.tableRun = true;
+    if (r.ballsP1 != null || r.ballsP2 != null) {
+      out.ballsP1 = clampDashScore(r.ballsP1);
+      out.ballsP2 = clampDashScore(r.ballsP2);
+    }
     return out;
   }).filter(Boolean);
+}
+
+function sumDashRackBalls(racks) {
+  let p1 = 0;
+  let p2 = 0;
+  let any = false;
+  (racks || []).forEach((r) => {
+    if (r.ballsP1 != null || r.ballsP2 != null) {
+      any = true;
+      p1 += clampDashScore(r.ballsP1);
+      p2 += clampDashScore(r.ballsP2);
+    }
+  });
+  return any ? { p1, p2 } : null;
 }
 
 function readMatchModalSnapshot() {
@@ -4510,6 +4559,8 @@ function readMatchModalSnapshot() {
     scoreP2: numField('statsMatchScoreP2'),
     highestRunP1: numField('statsMatchHrP1'),
     highestRunP2: numField('statsMatchHrP2'),
+    foulsP1: numField('statsMatchFoulsP1'),
+    foulsP2: numField('statsMatchFoulsP2'),
     racks: serializeDashEditorRacksForCloud(collectDashMatchRacksFromEditor()),
   };
 }
@@ -4545,6 +4596,10 @@ function openMatchModal(startEventId) {
   const hr2El = document.getElementById('statsMatchHrP2');
   if (hr1El) hr1El.value = Number(match.highestRunP1) || 0;
   if (hr2El) hr2El.value = Number(match.highestRunP2) || 0;
+  const fouls1El = document.getElementById('statsMatchFoulsP1');
+  const fouls2El = document.getElementById('statsMatchFoulsP2');
+  if (fouls1El) fouls1El.value = Number(match.foulsP1) || 0;
+  if (fouls2El) fouls2El.value = Number(match.foulsP2) || 0;
   matchEditPlayerNames = {
     p1: match.player1Name || 'Player 1',
     p2: match.player2Name || 'Player 2',
@@ -4574,6 +4629,8 @@ async function saveMatchModal(event) {
   let racks;
   let highestRunP1 = 0;
   let highestRunP2 = 0;
+  let foulsP1 = 0;
+  let foulsP2 = 0;
   if (straight) {
     scores = {
       p1: clampDashScore(document.getElementById('statsMatchScoreP1')?.value),
@@ -4582,6 +4639,8 @@ async function saveMatchModal(event) {
     racks = [];
     highestRunP1 = clampDashScore(document.getElementById('statsMatchHrP1')?.value);
     highestRunP2 = clampDashScore(document.getElementById('statsMatchHrP2')?.value);
+    foulsP1 = clampDashScore(document.getElementById('statsMatchFoulsP1')?.value);
+    foulsP2 = clampDashScore(document.getElementById('statsMatchFoulsP2')?.value);
   } else {
     const editorRacks = collectDashMatchRacksFromEditor();
     if (!editorRacks.length) {
@@ -4610,6 +4669,13 @@ async function saveMatchModal(event) {
       setDashMatchModalBusy(false);
       return;
     }
+    let ballsP1 = document.getElementById('statsMatchBallsP1').value;
+    let ballsP2 = document.getElementById('statsMatchBallsP2').value;
+    const rackBallSum = sumDashRackBalls(racks);
+    if (rackBallSum) {
+      ballsP1 = rackBallSum.p1;
+      ballsP2 = rackBallSum.p2;
+    }
     const body = {
       player1Name: p1,
       player2Name: p2,
@@ -4620,12 +4686,14 @@ async function saveMatchModal(event) {
       scores,
       racks,
       completedAt: dateVal ? `${dateVal}T12:00:00.000Z` : undefined,
-      ballsP1: document.getElementById('statsMatchBallsP1').value,
-      ballsP2: document.getElementById('statsMatchBallsP2').value,
+      ballsP1,
+      ballsP2,
     };
     if (straight) {
       body.highestRunP1 = highestRunP1;
       body.highestRunP2 = highestRunP2;
+      body.foulsP1 = foulsP1;
+      body.foulsP2 = foulsP2;
     }
     await updateAccountMatch(getServerUrl(), getToken(), startEventId, body);
     matchModalBusy = false;

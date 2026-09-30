@@ -339,6 +339,20 @@ export async function registerEventRoutes(app) {
       foulsP2: clampScore(rackExtras ? rackExtras.foulsP2 : (body.foulsP2 ?? prevEnd.foulsP2 ?? 0)),
     };
     if (normalizedRacks && normalizedRacks.length > 0) {
+      let rackBallsP1 = 0;
+      let rackBallsP2 = 0;
+      let anyRackBalls = false;
+      for (const r of normalizedRacks) {
+        if (r.ballsP1 != null || r.ballsP2 != null) {
+          anyRackBalls = true;
+          rackBallsP1 += clampScore(r.ballsP1);
+          rackBallsP2 += clampScore(r.ballsP2);
+        }
+      }
+      if (anyRackBalls) {
+        endPayload.ballsP1 = rackBallsP1;
+        endPayload.ballsP2 = rackBallsP2;
+      }
       endPayload.racks = normalizedRacks;
     } else if (gameType === 'game4' && normalizedRacks) {
       endPayload.racks = [];

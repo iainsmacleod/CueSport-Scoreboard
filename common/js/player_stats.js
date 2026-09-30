@@ -1159,6 +1159,21 @@
         return { p1: p1, p2: p2 };
     }
 
+    /** Sum per-rack balls when any rack carries ballsP*; null if none. */
+    function sumBallsFromEditorRacks(racks) {
+        let p1 = 0;
+        let p2 = 0;
+        let any = false;
+        (racks || []).forEach(function (r) {
+            if (r.ballsP1 != null || r.ballsP2 != null) {
+                any = true;
+                p1 += clampScore(r.ballsP1);
+                p2 += clampScore(r.ballsP2);
+            }
+        });
+        return any ? { p1: p1, p2: p2 } : null;
+    }
+
     function populateCloudMatchEditForm(match) {
         const modal = document.getElementById('statsMatchEditModal');
         const title = document.getElementById('statsMatchEditTitle');
@@ -1234,6 +1249,13 @@
         const dateVal = document.getElementById('statsMatchDate').value;
         setMatchEditBusy(true, 'save');
         try {
+            let ballsP1 = readNumInput('statsMatchBallsP1');
+            let ballsP2 = readNumInput('statsMatchBallsP2');
+            const rackBallSum = sumBallsFromEditorRacks(racks);
+            if (rackBallSum) {
+                ballsP1 = rackBallSum.p1;
+                ballsP2 = rackBallSum.p2;
+            }
             const body = {
                 player1Name: modal.dataset.player1Name || matchEditPlayerNames.p1,
                 player2Name: modal.dataset.player2Name || matchEditPlayerNames.p2,
@@ -1242,8 +1264,8 @@
                 scores: scores,
                 racks: racks,
                 completedAt: dateVal ? (dateVal + 'T12:00:00.000Z') : undefined,
-                ballsP1: readNumInput('statsMatchBallsP1'),
-                ballsP2: readNumInput('statsMatchBallsP2')
+                ballsP1: ballsP1,
+                ballsP2: ballsP2
             };
             if (straight) {
                 body.highestRunP1 = highestRunP1;
@@ -1694,6 +1716,26 @@
             sessionId: matchId,
             reason: reason || 'abandon'
         });
+    }
+
+    function emitCloudSessionReopen(matchId, reason) {
+        if (!matchId) {
+            return;
+        }
+        emitCloudSession('reopen', {
+            matchId: matchId,
+            sessionId: matchId,
+            reason: reason || 'undo_completion'
+        });
+    }
+
+    function confirmReopenFinishedMatch() {
+        if (typeof window.confirm !== 'function') {
+            return true;
+        }
+        return window.confirm(
+            'Reopen this finished match? Cloud history for this race will update when you finish again.'
+        );
     }
 
     function generateId() {
@@ -2881,6 +2923,9 @@
     }
 
     async function recordRackWinInternal(playerSlot, options) {
+        if (activeMatchSession.matchCompletedRecorded) {
+            return;
+        }
         const ready = await ensureActiveSession();
         if (!ready || activeMatchSession.duplicateNames) {
             return;
@@ -2892,6 +2937,9 @@
         const context = getCurrentContext();
         const match = getActivePendingMatch();
         if (!match) {
+            return;
+        }
+        if (activeMatchSession.matchCompletedRecorded) {
             return;
         }
 
@@ -3145,6 +3193,13 @@
      * and frame win (if not tied). Race-to uses frame wins, not in-frame points.
      */
     async function recordSnookerFrame(frameData) {
+        return enqueueStatsWrite(() => recordSnookerFrameInternal(frameData));
+    }
+
+    async function recordSnookerFrameInternal(frameData) {
+        if (activeMatchSession.matchCompletedRecorded) {
+            return;
+        }
         const data = frameData || {};
         const p1Score = parseInt(data.p1Score, 10) || 0;
         const p2Score = parseInt(data.p2Score, 10) || 0;
@@ -3172,6 +3227,9 @@
             return;
         }
         await materializeSessionPlayersIfNeeded();
+        if (activeMatchSession.matchCompletedRecorded) {
+            return;
+        }
         ensureCloudMatchStarted('snooker_frame');
 
         const match = getActivePendingMatch();
@@ -3279,6 +3337,9 @@
 
         if (isStraightPoolGameType(context.gameType)) {
             if (activeMatchSession.matchCompletedRecorded) {
+                if (!confirmReopenFinishedMatch()) {
+                    return;
+                }
                 await revertMatchCompletion(match);
             }
             if (activeMatchSession.straightPoolRunSlot === playerSlot &&
@@ -3300,6 +3361,13 @@
             return;
         }
 
+        if (activeMatchSession.matchCompletedRecorded) {
+            if (!confirmReopenFinishedMatch()) {
+                return;
+            }
+            await revertMatchCompletion(match);
+        }
+
         const lastRack = match.racks[match.racks.length - 1];
         const winnerId = lastRack.winnerId;
         const loserId = winnerId === activeMatchSession.player1Id
@@ -3313,10 +3381,6 @@
                     || match.racks[match.racks.length - 1].startedAt)
                 : match.startedAt)
             || null;
-
-        if (activeMatchSession.matchCompletedRecorded) {
-            await revertMatchCompletion(match);
-        }
 
         await applyRackDelta(winnerId, loserId, context.gameType, -1);
         if (isTrackerRackWinGameType(context.gameType) && lastRack.winnerId === winnerId) {
@@ -3351,6 +3415,9 @@
     }
 
     async function recordBallWinInternal(playerSlot) {
+        if (activeMatchSession.matchCompletedRecorded) {
+            return;
+        }
         const ready = await ensureActiveSession();
         if (!ready || activeMatchSession.duplicateNames) {
             return;
@@ -3361,6 +3428,9 @@
             return;
         }
         await materializeSessionPlayersIfNeeded();
+        if (activeMatchSession.matchCompletedRecorded) {
+            return;
+        }
         ensureCloudMatchStarted('ball');
 
         const ids = getSlotPlayerIds(playerSlot);
@@ -3643,14 +3713,18 @@
             }
             row.rackNumber = i + 1;
         }
-        match.finalScore = { p1: wantP1, p2: wantP2 };
+        // Never invent racks for a higher board score — finalScore follows recorded rows.
+        match.finalScore = {
+            p1: wantP1 - Math.max(0, leftP1),
+            p2: wantP2 - Math.max(0, leftP2)
+        };
     }
 
     /**
-     * Append any missing rack rows so match.racks counts match the live scoreboard.
-     * Used before Call Match Early / End Match so async recordRackWin cannot under-count.
+     * Align match.racks with the live scoreboard without inventing bare racks.
+     * Remaps stale winnerIds when enough rows exist; otherwise keeps recorded rack
+     * counts (after flushRackRecordQueue, real writes should already be present).
      * Straight Pool skips this — points are not racks.
-     * Also remaps existing rows when winnerId was stale but enough rack rows already exist.
      */
     async function reconcileMatchRacksWithScores(match, scores) {
         if (!match || !scores) {
@@ -3674,7 +3748,6 @@
         let p2Have = match.racks.filter(function (r) {
             return r.winnerId === p2Id || String(r.winnerSlot) === '2';
         }).length;
-        const now = new Date().toISOString();
         const missingP1 = wantP1 - p1Have;
         const missingP2 = wantP2 - p2Have;
         // Already have enough rack rows for the scoreline — do not duplicate when
@@ -3714,38 +3787,10 @@
             return;
         }
 
-        const [p1Player, p2Player] = await Promise.all([getPlayer(p1Id), getPlayer(p2Id)]);
-        while (p1Have < wantP1) {
-            const entry = {
-                rackNumber: match.racks.length + 1,
-                winnerId: p1Id,
-                winnerSlot: '1',
-                timestamp: now
-            };
-            match.racks.push(entry);
-            if (p1Player && p2Player) {
-                mutateRackDelta(p1Player, p2Player, gameType, 1, now);
-            }
-            p1Have += 1;
-        }
-        while (p2Have < wantP2) {
-            const entry = {
-                rackNumber: match.racks.length + 1,
-                winnerId: p2Id,
-                winnerSlot: '2',
-                timestamp: now
-            };
-            match.racks.push(entry);
-            if (p1Player && p2Player) {
-                mutateRackDelta(p2Player, p1Player, gameType, 1, now);
-            }
-            p2Have += 1;
-        }
-        if (p1Player && p2Player) {
-            await Promise.all([putPlayer(p1Player), putPlayer(p2Player)]);
-        }
-
-        match.finalScore = { p1: wantP1, p2: wantP2 };
+        // Do not invent bare winner-only racks when the scoreboard is ahead of
+        // recorded play — that produced empty 0-stat history rows after Call Early.
+        // Prefer actual rack winner counts (flush should have caught real writes).
+        match.finalScore = { p1: p1Have, p2: p2Have };
         if (match.racks.length > 0) {
             const last = match.racks[match.racks.length - 1];
             activeMatchSession.lastRackWinnerSlot = resolveWinnerSlot(last.winnerId, p1Id, p2Id)
@@ -3925,6 +3970,10 @@
         await deleteMatchFromStore(match.id);
         activeMatchSession.status = 'active';
         activeMatchSession.matchCompletedRecorded = false;
+        if (activeMatchSession.cloudSessionStarted && match && match.id) {
+            emitCloudSessionReopen(match.id, 'undo_completion');
+            invalidateCloudStatsCache();
+        }
         await persistPendingSession();
         broadcastOverlayStatsIfEnabled();
     }
@@ -4046,8 +4095,10 @@
         if (endMatch) {
             // End Match: rack/frame stats are already stored on the match row. The scoreboard
             // is cleared before this runs, so do not persist finalScore from live storage.
+            // Call Match Early / race_complete already emitted session:end — skip a thin
+            // redundant end_match that races preferSessionEnd.
             const match = getActivePendingMatch();
-            if (activeMatchSession.cloudSessionStarted) {
+            if (activeMatchSession.cloudSessionStarted && !activeMatchSession.matchCompletedRecorded) {
                 emitCloudSession('end', buildCloudMatchEndPayload(match, { reason: 'end_match' }));
                 invalidateCloudStatsCache();
             }
@@ -7528,6 +7579,9 @@
             return;
         }
 
+        const showRackBalls = gameTypeHasBallScoring(gameType) && !isSnooker && !isStraight;
+        const showRunOuts = isTrackerRackWinGameType(gameType);
+
         let html = '<table class="stats-table stats-rack-edit-table"><thead><tr>' +
             '<th>#</th><th>Winner</th>';
         if (isSnooker) {
@@ -7538,6 +7592,13 @@
         } else if (isStraight) {
             html += '<th>Run ' + escapeHtml(matchEditPlayerNames.p1) + '</th>' +
                 '<th>Run ' + escapeHtml(matchEditPlayerNames.p2) + '</th>';
+        }
+        if (showRackBalls) {
+            html += '<th>Balls ' + escapeHtml(matchEditPlayerNames.p1) + '</th>' +
+                '<th>Balls ' + escapeHtml(matchEditPlayerNames.p2) + '</th>';
+        }
+        if (showRunOuts) {
+            html += '<th>B&amp;R</th><th>TR</th>';
         }
         html += '<th>Fouls ' + escapeHtml(matchEditPlayerNames.p1) + '</th>' +
             '<th>Fouls ' + escapeHtml(matchEditPlayerNames.p2) + '</th>';
@@ -7563,16 +7624,6 @@
             if (breakerSlot) {
                 dataAttrs.push('data-breaker-slot="' + breakerSlot + '"');
             }
-            if (r.breakAndRun) {
-                dataAttrs.push('data-break-and-run="1"');
-            }
-            if (r.tableRun) {
-                dataAttrs.push('data-table-run="1"');
-            }
-            if (r.ballsP1 != null || r.ballsP2 != null) {
-                dataAttrs.push('data-balls-p1="' + clampScore(r.ballsP1) + '"');
-                dataAttrs.push('data-balls-p2="' + clampScore(r.ballsP2) + '"');
-            }
             html += '<tr class="stats-rack-edit-row"' +
                 (dataAttrs.length ? ' ' + dataAttrs.join(' ') : '') + '>' +
                 '<td>' + (index + 1) + '</td>' +
@@ -7596,6 +7647,18 @@
                     '<td><input type="number" class="stats-rack-hr-p2" min="0" max="999" value="' +
                     clampScore(r.highestRunP2 != null ? r.highestRunP2 : r.highestBreakP2) + '" /></td>';
             }
+            if (showRackBalls) {
+                html += '<td><input type="number" class="stats-rack-balls-p1" min="0" max="999" value="' +
+                    clampScore(r.ballsP1) + '" /></td>' +
+                    '<td><input type="number" class="stats-rack-balls-p2" min="0" max="999" value="' +
+                    clampScore(r.ballsP2) + '" /></td>';
+            }
+            if (showRunOuts) {
+                html += '<td><input type="checkbox" class="stats-rack-bnr" title="Break &amp; Run"' +
+                    (r.breakAndRun ? ' checked' : '') + ' /></td>' +
+                    '<td><input type="checkbox" class="stats-rack-tr" title="Table Run"' +
+                    (r.tableRun ? ' checked' : '') + ' /></td>';
+            }
             html += '<td><input type="number" class="stats-rack-fouls-p1" min="0" max="999" value="' +
                 clampScore(r.foulsP1) + '" /></td>' +
                 '<td><input type="number" class="stats-rack-fouls-p2" min="0" max="999" value="' +
@@ -7613,17 +7676,31 @@
         if (!row) {
             return entry;
         }
-        if (row.getAttribute('data-break-and-run') === '1') {
+        const bnr = row.querySelector('.stats-rack-bnr');
+        const tr = row.querySelector('.stats-rack-tr');
+        if (bnr) {
+            if (bnr.checked) {
+                entry.breakAndRun = true;
+            }
+        } else if (row.getAttribute('data-break-and-run') === '1') {
             entry.breakAndRun = true;
         }
-        if (row.getAttribute('data-table-run') === '1') {
+        if (tr) {
+            if (tr.checked) {
+                entry.tableRun = true;
+            }
+        } else if (row.getAttribute('data-table-run') === '1') {
             entry.tableRun = true;
         }
         const breaker = row.getAttribute('data-breaker-slot');
         if (breaker === '1' || breaker === '2') {
             entry.breakerSlot = breaker;
         }
-        if (row.hasAttribute('data-balls-p1') || row.hasAttribute('data-balls-p2')) {
+        const balls1 = row.querySelector('.stats-rack-balls-p1');
+        if (balls1) {
+            entry.ballsP1 = clampScore(balls1.value);
+            entry.ballsP2 = clampScore((row.querySelector('.stats-rack-balls-p2') || {}).value);
+        } else if (row.hasAttribute('data-balls-p1') || row.hasAttribute('data-balls-p2')) {
             entry.ballsP1 = clampScore(row.getAttribute('data-balls-p1'));
             entry.ballsP2 = clampScore(row.getAttribute('data-balls-p2'));
         }
@@ -7830,6 +7907,11 @@
                 Object.assign(payload, readStraightMatchScorePayload());
             } else {
                 payload.racks = collectMatchRacksFromEditor();
+                const rackBallSum = sumBallsFromEditorRacks(payload.racks);
+                if (rackBallSum) {
+                    payload.ballsP1 = rackBallSum.p1;
+                    payload.ballsP2 = rackBallSum.p2;
+                }
             }
             if (inProgress) {
                 await savePendingMatchEdit(payload);
@@ -9511,6 +9593,7 @@
     window.updateMatchBallFieldsVisibility = updateMatchBallFieldsVisibility;
     window.onStatsMatchGameTypeChange = onStatsMatchGameTypeChange;
     window.updateMatchScoreSummary = updateMatchScoreSummary;
+    window.renderMatchRacksEditor = renderMatchRacksEditor;
     window.addMatchRackRow = addMatchRackRow;
     window.removeLastMatchRackRow = removeLastMatchRackRow;
     window.toggleMatchRacksExpanded = toggleMatchRacksExpanded;

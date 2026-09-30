@@ -7258,15 +7258,14 @@ function confirmResetScores() {
 
 function performCallGame() {
     if (!window.PlayerStats || typeof window.PlayerStats.callGame !== "function") {
-        return;
+        return Promise.resolve();
     }
-    window.PlayerStats.callGame().then(function (saved) {
+    return window.PlayerStats.callGame().then(function (saved) {
         if (saved) {
-            performResetScores({ endMatch: true });
-        } else {
-            updateCallGameButton();
-            updateScoreControlAvailability();
+            return performResetScores({ endMatch: true });
         }
+        updateCallGameButton();
+        updateScoreControlAvailability();
     }).catch(function (err) {
         console.error("PlayerStats callGame error:", err);
         alert("Call Match Early failed: " + err.message);

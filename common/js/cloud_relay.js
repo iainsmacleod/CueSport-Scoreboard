@@ -24,6 +24,8 @@
     let isBlockedByServer = false;
     let blockedReason = null;
     let replaying = false;
+    /** Serialize inbound mobile/guest commands so Call Early cannot race rack/frame writes. */
+    let commandQueue = Promise.resolve();
     let lastState = {};
     let commandHandlers = [];
     let stateHandlers = [];
@@ -197,6 +199,17 @@
             console.warn('cloudRelay: command ignored (not joined):', msg.action);
             return;
         }
+        commandQueue = commandQueue.then(function () {
+            return dispatchOneCommand(msg);
+        }, function () {
+            return dispatchOneCommand(msg);
+        });
+        commandQueue.catch(function (err) {
+            console.error('cloudRelay command handler error', err);
+        });
+    }
+
+    function dispatchOneCommand(msg) {
         replaying = true;
         const pending = [];
         try {
@@ -207,7 +220,7 @@
             replaying = false;
             throw err;
         }
-        Promise.all(pending).catch(function (err) {
+        return Promise.all(pending).catch(function (err) {
             console.error('cloudRelay command handler error', err);
         }).finally(function () {
             replaying = false;

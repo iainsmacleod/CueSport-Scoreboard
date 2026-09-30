@@ -952,6 +952,30 @@ function handleSession(ws, meta, msg) {
       }
     }
     return;
+  } else if (action === 'reopen') {
+    // Undo finishing rack after race_complete: drop only session:end, keep start, Live again.
+    const matchKey = payload.matchId || payload.sessionId || sessionId || null;
+    const result = matchKey
+      ? sqlite.reopenRoomMatchSession(meta.roomId, matchKey)
+      : { deleted: 0, sessionId: null };
+    sessionId = result.sessionId || null;
+    broadcast(meta.roomId, {
+      type: 'session',
+      room_id: meta.roomId,
+      action: 'reopen',
+      session_id: sessionId,
+      payload: Object.assign({}, payload, {
+        deleted: result.deleted,
+        sessionId,
+        matchId: matchKey,
+      }),
+      source: meta.client,
+      ts: new Date().toISOString(),
+    }, ws);
+    if (meta.accountId) {
+      notifyAccountTables(meta.accountId, { immediate: true });
+    }
+    return;
   }
 
   // Persist before clearing room session on end so the end row keeps session_id for pairing.

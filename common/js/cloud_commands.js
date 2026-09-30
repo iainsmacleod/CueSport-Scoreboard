@@ -316,11 +316,9 @@
                 if (typeof window.canResetOrEndMatch === 'function' && !window.canResetOrEndMatch()) {
                     return Promise.resolve();
                 }
-                performResetScores({ endMatch: true });
-                return Promise.resolve().then(publishAfterScoring);
+                return Promise.resolve(performResetScores({ endMatch: true })).then(publishAfterScoring);
             case 'call_match_early':
-                performCallGame();
-                return Promise.resolve().then(publishAfterScoring);
+                return Promise.resolve(performCallGame()).then(publishAfterScoring);
             case 'instant_replay':
                 return Promise.resolve(
                     typeof triggerInstantReplay === 'function' ? triggerInstantReplay() : undefined
@@ -391,7 +389,7 @@
         if (window.__cloudCommandsBound) return;
         window.__cloudCommandsBound = true;
         window.cloudRelay.onCommand(function (action, payload) {
-            Promise.resolve(runCommand(action, payload)).catch(function (err) {
+            return Promise.resolve(runCommand(action, payload)).catch(function (err) {
                 console.error('cloud_commands:', err);
                 if ((action === 'toggle_streaming' || action === 'set_replay_controls' ||
                     action === 'set_stream_monitoring') && typeof alert === 'function') {

@@ -1159,6 +1159,47 @@ export function findMatchingSessionEnd(roomId, matchKey) {
   return null;
 }
 
+/** Newest session:start for this room whose payload/session matches matchKey. */
+export function findMatchingSessionStart(roomId, matchKey) {
+  if (!roomId || !matchKey) return null;
+  const key = String(matchKey);
+  for (const row of getMatchEvents(roomId, 100)) {
+    if (row.event_type !== 'session:start') continue;
+    const payload = row.payload || {};
+    const keys = [row.session_id, payload.sessionId, payload.matchId]
+      .filter(Boolean)
+      .map(String);
+    if (keys.includes(key)) return row;
+  }
+  return null;
+}
+
+/**
+ * Undo completion: delete only session:end for matchKey, keep session:start,
+ * and restore the room's live session id so the match shows Live again.
+ */
+export function reopenRoomMatchSession(roomId, matchKey) {
+  if (!roomId || !matchKey) {
+    return { deleted: 0, sessionId: null };
+  }
+  const key = String(matchKey);
+  const end = findMatchingSessionEnd(roomId, key);
+  let deleted = 0;
+  if (end) {
+    deleted = deleteMatchEvents([end.id]);
+  }
+  const start = findMatchingSessionStart(roomId, key);
+  const startPayload = (start && start.payload) || {};
+  const sessionId = String(
+    (start && start.session_id) ||
+    startPayload.sessionId ||
+    startPayload.matchId ||
+    key
+  );
+  setRoomSessionId(roomId, sessionId);
+  return { deleted, sessionId, startId: start ? start.id : null };
+}
+
 /** Newest session start/end events for an account (then reversed for pairing). */
 export function getAccountSessionEvents(accountId, limit = 5000) {
   const cap = Math.min(Math.max(parseInt(limit, 10) || 5000, 1), 10000);
@@ -1249,13 +1290,20 @@ export function discardRoomSessionEvents(roomId, matchKey) {
     ].filter(Boolean).map(String);
   }
 
-  // Explicit key: only delete matching rows. A miss deletes nothing.
+  // Explicit key: only delete matching open (unpaired) starts — never wipe a
+  // completed start+end pair (undo_to_start after a finished race).
   if (key) {
-    const ids = [];
+    const matching = [];
+    let hasEnd = false;
     for (const row of rows) {
-      if (rowKeys(row).includes(key)) ids.push(row.id);
+      if (!rowKeys(row).includes(key)) continue;
+      matching.push(row);
+      if (row.event_type === 'session:end') hasEnd = true;
     }
-    return deleteMatchEvents(ids);
+    if (hasEnd) {
+      return 0;
+    }
+    return deleteMatchEvents(matching.map((row) => row.id));
   }
 
   // No key: drop the newest unpaired session:start for this room.

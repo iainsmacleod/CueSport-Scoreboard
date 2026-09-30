@@ -2072,6 +2072,65 @@
                 editTyped && (editTyped.breakAndRuns || 0) >= 1,
                 editTyped && JSON.stringify(editTyped));
 
+            // Match edit UI exposes B&R / balls for pool racks (not hidden data-attrs only).
+            cp.document.getElementById('statsMatchGameType').value = 'game1';
+            if (typeof cp.renderMatchRacksEditor === 'function') {
+                cp.renderMatchRacksEditor([{
+                    winnerId: '1',
+                    breakAndRun: true,
+                    tableRun: false,
+                    ballsP1: 8,
+                    ballsP2: 0,
+                    foulsP1: 0,
+                    foulsP2: 0,
+                    breakerSlot: '1'
+                }]);
+            }
+            const rackEdit = cp.document.getElementById('statsMatchRacksEditor');
+            const bnrBox = rackEdit && rackEdit.querySelector('.stats-rack-bnr');
+            const ballsIn = rackEdit && rackEdit.querySelector('.stats-rack-balls-p1');
+            assert('Local Parity', 'Pool rack editor shows B&R checkbox',
+                !!(bnrBox && bnrBox.checked),
+                rackEdit && rackEdit.innerHTML.slice(0, 280));
+            assert('Local Parity', 'Pool rack editor shows balls input',
+                !!(ballsIn && Number(ballsIn.value) === 8),
+                ballsIn && ballsIn.value);
+
+            // Overlapped snooker frame write + flush: Call Early must not invent bare racks.
+            const raceSnA = await cp.PlayerStats.ensurePlayer(tag + '_RaceSnA');
+            const raceSnB = await cp.PlayerStats.ensurePlayer(tag + '_RaceSnB');
+            cp.document.getElementById('gameTypeSelect').value = 'game8';
+            await cp.gameType('game8');
+            cp.document.getElementById('p1Name').value = raceSnA.name;
+            cp.document.getElementById('p2Name').value = raceSnB.name;
+            cp.document.getElementById('p1Name').setAttribute('data-player-id', raceSnA.id);
+            cp.document.getElementById('p2Name').setAttribute('data-player-id', raceSnB.id);
+            cp.document.getElementById('raceInfoTxt').value = 'Race to 9';
+            if (typeof cp.postNames === 'function') { cp.postNames(); }
+            await sleep(200);
+            const frameRaceP = cp.PlayerStats.recordSnookerFrame({
+                p1Score: 42,
+                p2Score: 7,
+                highBreakP1: 30,
+                highBreakP2: 0,
+                winnerSlot: '1'
+            });
+            await cp.PlayerStats.flushRackRecordQueue();
+            await frameRaceP;
+            const pendingRace = cp.PlayerStats.getActivePendingMatch();
+            const rackCountAfterFlush = pendingRace && pendingRace.racks ? pendingRace.racks.length : 0;
+            assert('Local Parity', 'Snooker frame on write queue before Call Early',
+                rackCountAfterFlush >= 1,
+                pendingRace && JSON.stringify(pendingRace.racks));
+            if (pendingRace && pendingRace.racks) {
+                const bare = pendingRace.racks.some(function (r) {
+                    return !r.frameScore && (r.highestBreakP1 == null) && (r.highestBreakP2 == null);
+                });
+                assert('Local Parity', 'No bare synthetic snooker frames after flush',
+                    !bare,
+                    JSON.stringify(pendingRace.racks));
+            }
+
             const hrA = await cp.PlayerStats.ensurePlayer(tag + '_HrA');
             const hrB = await cp.PlayerStats.ensurePlayer(tag + '_HrB');
             const beforeHr = window.StatsParity.typedCareerFromLocalPlayer(
