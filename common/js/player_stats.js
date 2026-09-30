@@ -1264,9 +1264,12 @@
                 scores: scores,
                 racks: racks,
                 completedAt: dateVal ? (dateVal + 'T12:00:00.000Z') : undefined,
-                ballsP1: ballsP1,
-                ballsP2: ballsP2
             };
+            // Only send balls when racks provide them (derived). Otherwise leave cloud totals unchanged.
+            if (rackBallSum) {
+                body.ballsP1 = ballsP1;
+                body.ballsP2 = ballsP2;
+            }
             if (straight) {
                 body.highestRunP1 = highestRunP1;
                 body.highestRunP2 = highestRunP2;
@@ -7282,13 +7285,6 @@
                 label: 'Edit',
                 title: 'Edit match'
             }));
-            actions.push(statsActionButton({
-                className: 'stats-delete-btn',
-                attrs: 'onclick="confirmDeleteMatch(\'' + String(matchId).replace(/'/g, "\\'") + '\')"',
-                icon: 'clear',
-                label: 'Del',
-                title: 'Delete match'
-            }));
         }
         return '<td class="stats-match-actions">' + actions.join('') + '</td>';
     }
@@ -7495,30 +7491,11 @@
 
     function updateMatchBallFieldsVisibility() {
         const row = document.getElementById('statsMatchBallsRow');
-        const select = document.getElementById('statsMatchGameType');
         if (!row) {
             return;
         }
-        const show = gameTypeHasBallScoring(select && select.value);
-        row.classList.toggle('noShow', !show);
-        const p1Label = document.getElementById('statsMatchBallsP1Label');
-        const p2Label = document.getElementById('statsMatchBallsP2Label');
-        if (p1Label) {
-            p1Label.textContent = 'Balls potted (' + matchEditPlayerNames.p1 + ', optional):';
-        }
-        if (p2Label) {
-            p2Label.textContent = 'Balls potted (' + matchEditPlayerNames.p2 + ', optional):';
-        }
-        if (!show) {
-            const p1 = document.getElementById('statsMatchBallsP1');
-            const p2 = document.getElementById('statsMatchBallsP2');
-            if (p1) {
-                p1.value = 0;
-            }
-            if (p2) {
-                p2.value = 0;
-            }
-        }
+        // Match totals come from per-rack balls (pool) or live pot events — not editable here.
+        row.classList.add('noShow');
     }
 
     function updateMatchScoreSummary() {
@@ -7900,8 +7877,8 @@
                 date: document.getElementById('statsMatchDate').value,
                 gameType: gameType,
                 gameInfo: (document.getElementById('statsMatchGameInfo') || {}).value || '',
-                ballsP1: document.getElementById('statsMatchBallsP1').value,
-                ballsP2: document.getElementById('statsMatchBallsP2').value
+                ballsP1: 0,
+                ballsP2: 0
             };
             if (isStraightPoolGameType(gameType)) {
                 Object.assign(payload, readStraightMatchScorePayload());
@@ -7911,6 +7888,10 @@
                 if (rackBallSum) {
                     payload.ballsP1 = rackBallSum.p1;
                     payload.ballsP2 = rackBallSum.p2;
+                } else {
+                    // Preserve previously stored match totals when racks have no ball columns.
+                    payload.ballsP1 = document.getElementById('statsMatchBallsP1').value;
+                    payload.ballsP2 = document.getElementById('statsMatchBallsP2').value;
                 }
             }
             if (inProgress) {

@@ -4150,7 +4150,7 @@ function showsBallsFields(gameType) {
 function syncMatchExtrasVisibility(gameType) {
   const gt = gameType || document.getElementById('statsMatchGameType')?.value || 'game1';
   const straight = gt === 'game4';
-  document.getElementById('statsMatchExtrasBalls')?.classList.toggle('hidden', !showsBallsFields(gt));
+  document.getElementById('statsMatchExtrasBalls')?.classList.toggle('hidden', true);
   document.getElementById('statsMatchStraightFields')?.classList.toggle('hidden', !straight);
   document.getElementById('statsMatchRacksEditorWrap')?.classList.toggle('hidden', straight);
   const p1 = matchModalPlayerName('1') || matchEditPlayerNames.p1 || 'P1';
@@ -4669,8 +4669,8 @@ async function saveMatchModal(event) {
       setDashMatchModalBusy(false);
       return;
     }
-    let ballsP1 = document.getElementById('statsMatchBallsP1').value;
-    let ballsP2 = document.getElementById('statsMatchBallsP2').value;
+    let ballsP1;
+    let ballsP2;
     const rackBallSum = sumDashRackBalls(racks);
     if (rackBallSum) {
       ballsP1 = rackBallSum.p1;
@@ -4686,9 +4686,11 @@ async function saveMatchModal(event) {
       scores,
       racks,
       completedAt: dateVal ? `${dateVal}T12:00:00.000Z` : undefined,
-      ballsP1,
-      ballsP2,
     };
+    if (rackBallSum) {
+      body.ballsP1 = ballsP1;
+      body.ballsP2 = ballsP2;
+    }
     if (straight) {
       body.highestRunP1 = highestRunP1;
       body.highestRunP2 = highestRunP2;

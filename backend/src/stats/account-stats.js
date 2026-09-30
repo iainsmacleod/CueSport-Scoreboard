@@ -81,26 +81,31 @@ export function pairSessionEvents(events) {
     }
   }
 
+  // Pass 1: register every start. Date edits can move session:end.created_at earlier than
+  // session:start; a single chronological pass would then miss the keyed pair and show Live.
   for (const ev of chronological) {
-    if (ev.event_type === 'session:start') {
-      const key = ev.payload?.sessionId || ev.session_id || ev.id;
-      const rec = { start: ev, end: null };
-      byKey.set(key, rec);
-      records.push(rec);
-      pushUnmatched(ev.room_id, rec);
-    } else if (ev.event_type === 'session:end') {
-      const key = ev.payload?.matchId || ev.payload?.sessionId || ev.session_id;
-      let rec = key ? byKey.get(key) : null;
-      if (!rec) {
-        const stack = unmatchedByRoom.get(ev.room_id) || [];
-        rec = stack[stack.length - 1] || null;
-      }
-      if (rec) {
-        // Do not let a later thin end_match overwrite race_complete / call_early.
-        rec.end = preferSessionEnd(rec.end, ev);
-        // Always clear from the start's room stack — end.room_id may differ (room delete / remap).
-        takeUnmatched(rec.start?.room_id, rec);
-      }
+    if (ev.event_type !== 'session:start') continue;
+    const key = ev.payload?.sessionId || ev.session_id || ev.id;
+    const rec = { start: ev, end: null };
+    byKey.set(key, rec);
+    records.push(rec);
+    pushUnmatched(ev.room_id, rec);
+  }
+
+  // Pass 2: attach ends (keyed first, then LIFO unmatched in the room).
+  for (const ev of chronological) {
+    if (ev.event_type !== 'session:end') continue;
+    const key = ev.payload?.matchId || ev.payload?.sessionId || ev.session_id;
+    let rec = key ? byKey.get(key) : null;
+    if (!rec) {
+      const stack = unmatchedByRoom.get(ev.room_id) || [];
+      rec = stack[stack.length - 1] || null;
+    }
+    if (rec) {
+      // Do not let a later thin end_match overwrite race_complete / call_early.
+      rec.end = preferSessionEnd(rec.end, ev);
+      // Always clear from the start's room stack — end.room_id may differ (room delete / remap).
+      takeUnmatched(rec.start?.room_id, rec);
     }
   }
   return records;

@@ -3009,12 +3009,12 @@
 
             cp.document.getElementById('statsMatchGameType').value = 'game1';
             cp.updateMatchBallFieldsVisibility();
-            assert('Ball Stats', 'Match form shows balls for 8-Ball',
-                !cp.document.getElementById('statsMatchBallsRow').classList.contains('noShow'));
+            assert('Ball Stats', 'Match form hides total balls (derived from racks)',
+                cp.document.getElementById('statsMatchBallsRow').classList.contains('noShow'));
             cp.document.getElementById('statsMatchGameType').value = 'game5';
             cp.updateMatchBallFieldsVisibility();
-            assert('Ball Stats', 'Match form shows balls for Bank',
-                !cp.document.getElementById('statsMatchBallsRow').classList.contains('noShow'));
+            assert('Ball Stats', 'Match form hides total balls for Bank too',
+                cp.document.getElementById('statsMatchBallsRow').classList.contains('noShow'));
 
             bs.applyOverlayStats({
                 visible: true,
@@ -4816,8 +4816,8 @@
 
             cp.document.getElementById('statsMatchGameType').value = 'game8';
             cp.updateMatchBallFieldsVisibility();
-            assert('Snooker', 'Match form shows balls for Snooker',
-                !cp.document.getElementById('statsMatchBallsRow').classList.contains('noShow'));
+            assert('Snooker', 'Match form hides total balls (not frame-editable)',
+                cp.document.getElementById('statsMatchBallsRow').classList.contains('noShow'));
 
             cp.setStorageItem('overlayStatsMode', 'p1');
             cp.setStorageItem('activePlayer', '1');

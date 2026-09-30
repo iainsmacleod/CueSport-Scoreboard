@@ -198,6 +198,43 @@ async function run() {
     );
   }
 
+  // Unit: end.created_at before start (dashboard date noon) must still pair by match key.
+  {
+    const events = [
+      {
+        id: 'start-late',
+        room_id: 'room-date',
+        event_type: 'session:start',
+        session_id: 's-date',
+        created_at: '2030-06-15 20:00:00',
+        payload: { sessionId: 's-date', matchId: 's-date', player1: 'A', player2: 'B', gameType: 'game1' },
+      },
+      {
+        id: 'end-early-noon',
+        room_id: 'room-date',
+        event_type: 'session:end',
+        session_id: 's-date',
+        created_at: '2030-06-15 12:00:00',
+        payload: {
+          matchId: 's-date',
+          sessionId: 's-date',
+          reason: 'edited',
+          winnerSlot: '1',
+          scores: { p1: 3, p2: 1 },
+        },
+      },
+    ];
+    // Newest-first like getAccountSessionEvents
+    events.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+    const pairs = pairSessionEvents(events);
+    const rec = pairs.find((p) => p.start?.id === 'start-late');
+    assert(
+      'pairSessionEvents: end before start still pairs by matchId (not Live)',
+      !!rec?.end && rec.end.id === 'end-early-noon' && rec.start.id === 'start-late',
+      rec?.end ? `end=${rec.end.id}` : 'no end — would show Live'
+    );
+  }
+
   // Unit: prefer race_complete over a later thin end_match (dock double-end).
   {
     const raceEnd = {
@@ -1900,6 +1937,63 @@ async function run() {
           'Winner derived from scores',
           !!updatedMatch && updatedMatch.winnerSlot === '2'
         );
+        assert(
+          'PATCH keeps match completed (not Live)',
+          !!updatedMatch && updatedMatch.status === 'completed',
+          updatedMatch ? `status=${updatedMatch.status}` : 'match missing'
+        );
+
+        // Regression: date-picker noon UTC must not move end before start (Live orphan).
+        {
+          const forceDb = new Database(SQLITE_PATH);
+          const startEv = forceDb.prepare(
+            'SELECT id, session_id, payload FROM match_events WHERE id = ?'
+          ).get(editable.startEventId);
+          const startPayload = JSON.parse(startEv?.payload || '{}');
+          const matchKey = String(startPayload.sessionId || startPayload.matchId || startEv?.session_id || '');
+          forceDb.prepare(
+            `UPDATE match_events SET created_at = '2030-06-15 20:00:00' WHERE id = ?`
+          ).run(editable.startEventId);
+          const endEv = forceDb.prepare(
+            `SELECT id, payload FROM match_events
+             WHERE event_type = 'session:end'
+               AND (session_id = ? OR payload LIKE ?)
+             ORDER BY created_at DESC LIMIT 1`
+          ).get(matchKey, `%"${matchKey}"%`);
+          if (endEv?.id) {
+            forceDb.prepare(
+              `UPDATE match_events SET created_at = '2030-06-15 20:05:00' WHERE id = ?`
+            ).run(endEv.id);
+          }
+          forceDb.close();
+          if (endEv?.id) {
+            const earlyDatePatch = await fetchJson(`/api/stats/matches/${editable.startEventId}`, {
+              method: 'PATCH',
+              headers: {
+                Authorization: `Bearer ${tokenFresh}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                player1Name: 'Alice',
+                player2Name: 'Bob',
+                gameType: 'game1',
+                scores: { p1: 3, p2: 7 },
+                completedAt: '2030-06-15T12:00:00.000Z',
+              }),
+            });
+            assert('PATCH early calendar noon accepted', earlyDatePatch.ok && earlyDatePatch.body.ok === true);
+            const statsAfterEarlyDate = await fetchJson('/api/stats', {
+              headers: { Authorization: `Bearer ${tokenFresh}` },
+            });
+            const afterEarly = (statsAfterEarlyDate.body.matches || [])
+              .find((m) => m.startEventId === editable.startEventId);
+            assert(
+              'PATCH date edit keeps completed (end not before start)',
+              !!afterEarly && afterEarly.status === 'completed',
+              afterEarly ? `status=${afterEarly.status}` : 'match missing'
+            );
+          }
+        }
 
         const drawPatch = await fetchJson(`/api/stats/matches/${editable.startEventId}`, {
           method: 'PATCH',

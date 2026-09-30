@@ -99,6 +99,31 @@ function toSqliteDateTime(value) {
   return d.toISOString().slice(0, 19).replace('T', ' ');
 }
 
+/** Parse SQLite/ISO timestamps to epoch ms (treat naive SQLite as UTC). */
+function parseEventTimeMs(value) {
+  if (!value) return NaN;
+  const s = String(value).trim();
+  if (!s) return NaN;
+  if (s.includes('T')) return Date.parse(s);
+  return Date.parse(s.replace(' ', 'T') + (s.endsWith('Z') ? '' : 'Z'));
+}
+
+/**
+ * session:end.created_at drives pairing order. Dashboard date edits send
+ * `YYYY-MM-DDT12:00:00.000Z`, which can land *before* session:start and leave
+ * the match unpaired (shown as Live). Never allow end to precede start.
+ */
+function resolveEndCreatedAt(requestedValue, startCreatedAt) {
+  const requested = toSqliteDateTime(requestedValue);
+  if (!requested) return null;
+  const startMs = parseEventTimeMs(startCreatedAt);
+  const reqMs = parseEventTimeMs(requested);
+  if (Number.isFinite(startMs) && Number.isFinite(reqMs) && reqMs < startMs) {
+    return toSqliteDateTime(new Date(startMs + 1000).toISOString());
+  }
+  return requested;
+}
+
 function deriveWinnerSlot(p1, p2) {
   if (p1 > p2) return '1';
   if (p2 > p1) return '2';
@@ -285,7 +310,7 @@ export async function registerEventRoutes(app) {
       };
       winnerSlot = deriveWinnerSlot(scores.p1, scores.p2);
     }
-    const completedAt = toSqliteDateTime(body.completedAt);
+    const completedAt = resolveEndCreatedAt(body.completedAt, pair.start.created_at);
 
     const gameInfo = String(body.gameInfo != null ? body.gameInfo : (prevStart.gameInfo || '')).trim().slice(0, 60);
     const startPayload = {
