@@ -1147,6 +1147,142 @@
       !!(reSaved && reSaved.racks && reSaved.racks[0] && Number(reSaved.racks[0].ballsP1) === 8),
       reSaved && JSON.stringify(reSaved.racks && reSaved.racks[0]));
 
+    // Edit preserve: rack duration survives normalizeRacksPayload / editor collect → saveMatch
+    const durP1 = await cp.PlayerStats.ensurePlayer(('PD' + tag + '1').slice(0, 20));
+    const durP2 = await cp.PlayerStats.ensurePlayer(('PD' + tag + '2').slice(0, 20));
+    const beforeDurP1 = await snapshotLocalTyped(cp, durP1.id, 'game1');
+    const beforeDurP2 = await snapshotLocalTyped(cp, durP2.id, 'game1');
+    const timedSaved = await cp.PlayerStats.saveMatch({
+      player1Id: durP1.id,
+      player2Id: durP2.id,
+      gameType: 'game1',
+      gameInfo: 'Parity duration ' + tag,
+      racks: [
+        {
+          winnerId: '1',
+          breakerSlot: '1',
+          breakAndRun: true,
+          ballsP1: 8,
+          ballsP2: 0,
+          foulsP1: 0,
+          foulsP2: 0,
+          startedAt: '2026-09-01T12:00:00.000Z',
+          timestamp: '2026-09-01T12:05:00.000Z',
+          durationSeconds: 300,
+        },
+        {
+          winnerId: '2',
+          breakerSlot: '2',
+          tableRun: true,
+          ballsP1: 0,
+          ballsP2: 7,
+          foulsP1: 0,
+          foulsP2: 1,
+          startedAt: '2026-09-01T12:05:00.000Z',
+          timestamp: '2026-09-01T12:12:00.000Z',
+          durationSeconds: 420,
+        },
+      ],
+      ballsP1: 8,
+      ballsP2: 7,
+      date: '2026-09-01',
+    });
+    assert('Parity', 'Timed match seed has rack durations',
+      !!(timedSaved && timedSaved.racks &&
+        Number(timedSaved.racks[0].durationSeconds) === 300 &&
+        Number(timedSaved.racks[1].durationSeconds) === 420),
+      timedSaved && JSON.stringify(timedSaved.racks));
+    // Simulate modal collect → save: open editor, flip rack 2 winner, collect, re-save.
+    if (typeof cp.openMatchEditModal === 'function') {
+      cp.openMatchEditModal(timedSaved.id);
+    }
+    let editor = null;
+    let rows = [];
+    for (let wait = 0; wait < 40; wait++) {
+      await sleep(50);
+      editor = cp.document.getElementById('statsMatchRacksEditor');
+      rows = editor ? editor.querySelectorAll('tr.stats-rack-edit-row') : [];
+      if (rows.length === 2) break;
+    }
+    assert('Parity', 'Timed match editor rows rendered', rows.length === 2, String(rows.length));
+    if (rows[1]) {
+      const winnerSel = rows[1].querySelector('.stats-rack-winner');
+      if (winnerSel) winnerSel.value = '1';
+    }
+    let collected = typeof cp.collectMatchRacksFromEditor === 'function'
+      ? cp.collectMatchRacksFromEditor()
+      : null;
+    // Fallback: build from data attrs if collect is unavailable.
+    if (!collected && rows.length === 2) {
+      collected = Array.from(rows).map(function (row) {
+        const winnerId = (row.querySelector('.stats-rack-winner') || {}).value || '';
+        const entry = { winnerId: winnerId };
+        const ts = row.getAttribute('data-timestamp');
+        const started = row.getAttribute('data-started-at');
+        const durAttr = row.getAttribute('data-duration-seconds');
+        if (ts) entry.timestamp = ts;
+        if (started) entry.startedAt = started;
+        if (durAttr != null && durAttr !== '') entry.durationSeconds = Number(durAttr);
+        const balls1 = row.querySelector('.stats-rack-balls-p1');
+        if (balls1) {
+          entry.ballsP1 = Number(balls1.value) || 0;
+          entry.ballsP2 = Number((row.querySelector('.stats-rack-balls-p2') || {}).value) || 0;
+        }
+        const bnr = row.querySelector('.stats-rack-bnr');
+        if (bnr && bnr.checked) entry.breakAndRun = true;
+        const tr = row.querySelector('.stats-rack-tr');
+        if (tr && tr.checked) entry.tableRun = true;
+        entry.foulsP1 = Number((row.querySelector('.stats-rack-fouls-p1') || {}).value) || 0;
+        entry.foulsP2 = Number((row.querySelector('.stats-rack-fouls-p2') || {}).value) || 0;
+        return entry;
+      }).filter(function (r) { return r.winnerId; });
+    }
+    if (typeof cp.closeMatchEditModal === 'function') {
+      cp.closeMatchEditModal();
+    }
+    assert('Parity', 'Editor collect keeps rack durations',
+      !!(collected && collected.length === 2 &&
+        Number(collected[0].durationSeconds) === 300 &&
+        Number(collected[1].durationSeconds) === 420),
+      collected && JSON.stringify(collected));
+    const durReSaved = await cp.PlayerStats.saveMatch({
+      id: timedSaved.id,
+      player1Id: durP1.id,
+      player2Id: durP2.id,
+      gameType: 'game1',
+      gameInfo: timedSaved.gameInfo,
+      racks: collected || timedSaved.racks,
+      ballsP1: 8,
+      ballsP2: 7,
+      date: '2026-09-01',
+    });
+    assert('Parity', 'Re-save preserves rack 1 duration',
+      !!(durReSaved && durReSaved.racks && Number(durReSaved.racks[0].durationSeconds) === 300),
+      durReSaved && JSON.stringify(durReSaved.racks && durReSaved.racks[0]));
+    assert('Parity', 'Re-save preserves rack 2 duration',
+      !!(durReSaved && durReSaved.racks && Number(durReSaved.racks[1].durationSeconds) === 420),
+      durReSaved && JSON.stringify(durReSaved.racks && durReSaved.racks[1]));
+    assert('Parity', 'Re-save preserves startedAt/timestamp',
+      !!(durReSaved && durReSaved.racks &&
+        durReSaved.racks[0].startedAt === '2026-09-01T12:00:00.000Z' &&
+        durReSaved.racks[0].timestamp === '2026-09-01T12:05:00.000Z'),
+      durReSaved && JSON.stringify(durReSaved.racks && durReSaved.racks[0]));
+    // Flipped rack 2 winner → P1 wins 2–0; careers should reflect the edit.
+    const editedFs = (durReSaved && durReSaved.finalScore) || {};
+    assert('Parity', 'Edited score is 2-0 after flip',
+      !!(Number(editedFs.p1) === 2 && Number(editedFs.p2) === 0),
+      `${editedFs.p1}-${editedFs.p2}`);
+    const afterDurP1 = await snapshotLocalTyped(cp, durP1.id, 'game1');
+    const afterDurP2 = await snapshotLocalTyped(cp, durP2.id, 'game1');
+    const durDelta1 = SP.careerDelta(beforeDurP1, afterDurP1);
+    const durDelta2 = SP.careerDelta(beforeDurP2, afterDurP2);
+    assert('Parity', 'Career after timed edit: P1 gamesWon +1',
+      durDelta1.gamesWon >= 1,
+      JSON.stringify(durDelta1));
+    assert('Parity', 'Career after timed edit: P2 gamesLost +1',
+      durDelta2.gamesLost >= 1,
+      JSON.stringify(durDelta2));
+
     // Straight HR local
     const stP1 = await cp.PlayerStats.ensurePlayer(('PS' + tag + '1').slice(0, 20));
     const stP2 = await cp.PlayerStats.ensurePlayer(('PS' + tag + '2').slice(0, 20));

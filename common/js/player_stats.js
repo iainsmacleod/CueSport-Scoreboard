@@ -1113,6 +1113,16 @@
                 foulsP1: clampScore(r.foulsP1),
                 foulsP2: clampScore(r.foulsP2)
             };
+            if (r.timestamp) {
+                out.timestamp = String(r.timestamp);
+            }
+            if (r.startedAt) {
+                out.startedAt = String(r.startedAt);
+            }
+            const dur = Number(r.durationSeconds);
+            if (Number.isFinite(dur) && dur >= 0) {
+                out.durationSeconds = Math.round(dur);
+            }
             if (r.frameScore && typeof r.frameScore === 'object') {
                 out.frameScore = {
                     p1: clampScore(r.frameScore.p1),
@@ -5103,6 +5113,13 @@
             } else if (winnerId === player2Id) {
                 entry.winnerSlot = '2';
             }
+            if (raw.startedAt) {
+                entry.startedAt = String(raw.startedAt);
+            }
+            const dur = Number(raw.durationSeconds);
+            if (Number.isFinite(dur) && dur >= 0) {
+                entry.durationSeconds = Math.round(dur);
+            }
             if (isSnooker) {
                 const p1Pts = clampScore(raw.frameScore && raw.frameScore.p1 != null ? raw.frameScore.p1 : raw.pointsP1);
                 const p2Pts = clampScore(raw.frameScore && raw.frameScore.p2 != null ? raw.frameScore.p2 : raw.pointsP2);
@@ -7601,6 +7618,17 @@
             if (breakerSlot) {
                 dataAttrs.push('data-breaker-slot="' + breakerSlot + '"');
             }
+            // Preserve rack timing across edit re-renders (not shown as inputs).
+            if (r.timestamp) {
+                dataAttrs.push('data-timestamp="' + escapeHtml(String(r.timestamp)) + '"');
+            }
+            if (r.startedAt) {
+                dataAttrs.push('data-started-at="' + escapeHtml(String(r.startedAt)) + '"');
+            }
+            const rackDur = Number(r.durationSeconds);
+            if (Number.isFinite(rackDur) && rackDur >= 0) {
+                dataAttrs.push('data-duration-seconds="' + Math.round(rackDur) + '"');
+            }
             html += '<tr class="stats-rack-edit-row"' +
                 (dataAttrs.length ? ' ' + dataAttrs.join(' ') : '') + '>' +
                 '<td>' + (index + 1) + '</td>' +
@@ -7684,6 +7712,28 @@
         return entry;
     }
 
+    function readRackTimingFieldsFromRow(row) {
+        const entry = {};
+        if (!row) {
+            return entry;
+        }
+        const ts = row.getAttribute('data-timestamp');
+        if (ts) {
+            entry.timestamp = ts;
+        }
+        const started = row.getAttribute('data-started-at');
+        if (started) {
+            entry.startedAt = started;
+        }
+        if (row.hasAttribute('data-duration-seconds')) {
+            const dur = Number(row.getAttribute('data-duration-seconds'));
+            if (Number.isFinite(dur) && dur >= 0) {
+                entry.durationSeconds = Math.round(dur);
+            }
+        }
+        return entry;
+    }
+
     function readRackExtraFieldsFromRow(row) {
         const entry = {};
         const pts1 = row.querySelector('.stats-rack-pts-p1');
@@ -7709,6 +7759,7 @@
             entry.highestRunP2 = clampScore((row.querySelector('.stats-rack-hr-p2') || {}).value);
         }
         Object.assign(entry, readRackRunOutFieldsFromRow(row));
+        Object.assign(entry, readRackTimingFieldsFromRow(row));
         return entry;
     }
 
@@ -9575,6 +9626,7 @@
     window.onStatsMatchGameTypeChange = onStatsMatchGameTypeChange;
     window.updateMatchScoreSummary = updateMatchScoreSummary;
     window.renderMatchRacksEditor = renderMatchRacksEditor;
+    window.collectMatchRacksFromEditor = collectMatchRacksFromEditor;
     window.addMatchRackRow = addMatchRackRow;
     window.removeLastMatchRackRow = removeLastMatchRackRow;
     window.toggleMatchRacksExpanded = toggleMatchRacksExpanded;

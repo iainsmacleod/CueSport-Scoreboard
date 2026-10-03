@@ -1943,6 +1943,209 @@ async function run() {
           updatedMatch ? `status=${updatedMatch.status}` : 'match missing'
         );
 
+        // Play → edit: rack durations survive PATCH when clients omit timing.
+        {
+          const durSuffix = Date.now().toString(36).slice(-6);
+          const durSessionId = `stats-dur-${durSuffix}`;
+          const durP1 = `DurP1_${durSuffix}`;
+          const durP2 = `DurP2_${durSuffix}`;
+          dock2.ws.send(JSON.stringify({
+            type: 'session',
+            room_id: roomId,
+            action: 'start',
+            payload: {
+              gameType: 'game1',
+              player1: durP1,
+              player2: durP2,
+              sessionId: durSessionId,
+              gameInfo: `CloudDur ${durSuffix}`,
+            },
+          }));
+          await sleep(300);
+          dock2.ws.send(JSON.stringify({
+            type: 'session',
+            room_id: roomId,
+            action: 'end',
+            payload: {
+              matchId: durSessionId,
+              sessionId: durSessionId,
+              winnerSlot: '1',
+              scores: { p1: 2, p2: 1 },
+              reason: 'race_complete',
+              breakAndRunsP1: 1,
+              tableRunsP2: 1,
+              ballsP1: 16,
+              ballsP2: 7,
+              racks: [
+                {
+                  rackNumber: 1,
+                  winnerSlot: '1',
+                  breakAndRun: true,
+                  ballsP1: 8,
+                  ballsP2: 0,
+                  foulsP1: 0,
+                  foulsP2: 0,
+                  startedAt: '2026-09-01T12:00:00.000Z',
+                  timestamp: '2026-09-01T12:05:00.000Z',
+                  durationSeconds: 300,
+                },
+                {
+                  rackNumber: 2,
+                  winnerSlot: '2',
+                  tableRun: true,
+                  ballsP1: 0,
+                  ballsP2: 7,
+                  foulsP1: 0,
+                  foulsP2: 1,
+                  startedAt: '2026-09-01T12:05:00.000Z',
+                  timestamp: '2026-09-01T12:12:00.000Z',
+                  durationSeconds: 420,
+                },
+                {
+                  rackNumber: 3,
+                  winnerSlot: '1',
+                  ballsP1: 8,
+                  ballsP2: 0,
+                  foulsP1: 0,
+                  foulsP2: 0,
+                  startedAt: '2026-09-01T12:12:00.000Z',
+                  timestamp: '2026-09-01T12:18:00.000Z',
+                  durationSeconds: 360,
+                },
+              ],
+            },
+          }));
+          await sleep(400);
+          const durStats = await fetchJson('/api/stats', {
+            headers: { Authorization: `Bearer ${tokenFresh}` },
+          });
+          const durMatch = (durStats.body.matches || []).find(
+            (m) => m.status === 'completed' &&
+              ((m.id === durSessionId) || (m.player1Name === durP1 && m.player2Name === durP2)),
+          );
+          assert('Duration match in history', !!durMatch && !!durMatch.startEventId, `session=${durSessionId}`);
+          assert(
+            'Duration match seeded rack timings',
+            !!(durMatch && Array.isArray(durMatch.racks) &&
+              Number(durMatch.racks[0]?.durationSeconds) === 300 &&
+              Number(durMatch.racks[1]?.durationSeconds) === 420 &&
+              Number(durMatch.racks[2]?.durationSeconds) === 360),
+            durMatch && JSON.stringify(durMatch.racks),
+          );
+          const beforeCareerP1 = (durStats.body.players || []).find((p) => p.name === durP1);
+          const beforeCareerP2 = (durStats.body.players || []).find((p) => p.name === durP2);
+          assert('Duration match P1 career win', !!(beforeCareerP1 && beforeCareerP1.gamesWon >= 1));
+
+          // PATCH racks without timing (legacy editor) — durations must be preserved.
+          const omitPatch = await fetchJson(`/api/stats/matches/${durMatch.startEventId}`, {
+            method: 'PATCH',
+            headers: {
+              Authorization: `Bearer ${tokenFresh}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              player1Name: durP1,
+              player2Name: durP2,
+              gameType: 'game1',
+              racks: [
+                { winnerSlot: '1', breakAndRun: true, ballsP1: 8, ballsP2: 0, foulsP1: 0, foulsP2: 0 },
+                { winnerSlot: '1', ballsP1: 8, ballsP2: 0, foulsP1: 0, foulsP2: 0 },
+                { winnerSlot: '1', ballsP1: 8, ballsP2: 0, foulsP1: 0, foulsP2: 0 },
+              ],
+            }),
+          });
+          assert('PATCH omit-duration ok', omitPatch.ok && omitPatch.body.ok === true, JSON.stringify(omitPatch.body));
+          const afterOmit = await fetchJson('/api/stats', {
+            headers: { Authorization: `Bearer ${tokenFresh}` },
+          });
+          const omitMatch = (afterOmit.body.matches || []).find((m) => m.startEventId === durMatch.startEventId);
+          assert(
+            'PATCH omit-duration preserves rack durations',
+            !!(omitMatch &&
+              Number(omitMatch.racks?.[0]?.durationSeconds) === 300 &&
+              Number(omitMatch.racks?.[1]?.durationSeconds) === 420 &&
+              Number(omitMatch.racks?.[2]?.durationSeconds) === 360),
+            omitMatch && JSON.stringify(omitMatch.racks),
+          );
+          assert(
+            'PATCH omit-duration preserves startedAt',
+            omitMatch?.racks?.[0]?.startedAt === '2026-09-01T12:00:00.000Z',
+            omitMatch && String(omitMatch.racks?.[0]?.startedAt),
+          );
+          assert(
+            'PATCH omit-duration updates score to 3-0',
+            !!(omitMatch && omitMatch.scores?.p1 === 3 && omitMatch.scores?.p2 === 0),
+            omitMatch && JSON.stringify(omitMatch.scores),
+          );
+          const afterOmitP1 = (afterOmit.body.players || []).find((p) => p.name === durP1);
+          const afterOmitP2 = (afterOmit.body.players || []).find((p) => p.name === durP2);
+          assert(
+            'Career still shows P1 win after timed edit',
+            !!(afterOmitP1 && afterOmitP1.gamesWon >= (beforeCareerP1?.gamesWon || 1)),
+            JSON.stringify({ before: beforeCareerP1, after: afterOmitP1 }),
+          );
+          assert(
+            'Career still shows P2 loss after timed edit',
+            !!(afterOmitP2 && afterOmitP2.gamesLost >= (beforeCareerP2?.gamesLost || 1)),
+            JSON.stringify({ before: beforeCareerP2, after: afterOmitP2 }),
+          );
+
+          // PATCH with explicit durations — new values must stick.
+          const includePatch = await fetchJson(`/api/stats/matches/${durMatch.startEventId}`, {
+            method: 'PATCH',
+            headers: {
+              Authorization: `Bearer ${tokenFresh}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              player1Name: durP1,
+              player2Name: durP2,
+              gameType: 'game1',
+              racks: [
+                {
+                  winnerSlot: '1',
+                  breakAndRun: true,
+                  ballsP1: 8,
+                  ballsP2: 0,
+                  foulsP1: 0,
+                  foulsP2: 0,
+                  durationSeconds: 111,
+                  startedAt: '2026-09-02T10:00:00.000Z',
+                  timestamp: '2026-09-02T10:01:51.000Z',
+                },
+                {
+                  winnerSlot: '2',
+                  ballsP1: 0,
+                  ballsP2: 7,
+                  foulsP1: 0,
+                  foulsP2: 0,
+                  durationSeconds: 222,
+                  startedAt: '2026-09-02T10:01:51.000Z',
+                  timestamp: '2026-09-02T10:05:33.000Z',
+                },
+              ],
+            }),
+          });
+          assert('PATCH include-duration ok', includePatch.ok && includePatch.body.ok === true, JSON.stringify(includePatch.body));
+          const afterInclude = await fetchJson('/api/stats', {
+            headers: { Authorization: `Bearer ${tokenFresh}` },
+          });
+          const includeMatch = (afterInclude.body.matches || []).find((m) => m.startEventId === durMatch.startEventId);
+          assert(
+            'PATCH include-duration updates rack timings',
+            !!(includeMatch &&
+              Number(includeMatch.racks?.[0]?.durationSeconds) === 111 &&
+              Number(includeMatch.racks?.[1]?.durationSeconds) === 222 &&
+              includeMatch.racks?.[0]?.startedAt === '2026-09-02T10:00:00.000Z'),
+            includeMatch && JSON.stringify(includeMatch.racks),
+          );
+          assert(
+            'PATCH include-duration updates score to 1-1',
+            !!(includeMatch && includeMatch.scores?.p1 === 1 && includeMatch.scores?.p2 === 1),
+            includeMatch && JSON.stringify(includeMatch.scores),
+          );
+        }
+
         // Regression: date-picker noon UTC must not move end before start (Live orphan).
         {
           const forceDb = new Database(SQLITE_PATH);

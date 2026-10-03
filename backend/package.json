@@ -8,12 +8,13 @@
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "migrate": "node src/db/migrate.js",
-    "test": "node tests/cloud-api.mjs && node tests/impromptu-unit.mjs && node tests/complimentary-expiry-unit.mjs && node tests/session-reopen-unit.mjs",
+    "test": "node tests/cloud-api.mjs && node tests/impromptu-unit.mjs && node tests/complimentary-expiry-unit.mjs && node tests/session-reopen-unit.mjs && node tests/rack-timing-unit.mjs",
     "test:cloud": "node tests/cloud-api.mjs",
     "test:account-deletion": "node tests/account-deletion-unit.mjs",
     "test:impromptu": "node tests/impromptu-unit.mjs",
     "test:complimentary-expiry": "node tests/complimentary-expiry-unit.mjs",
-    "test:session-reopen": "node tests/session-reopen-unit.mjs"
+    "test:session-reopen": "node tests/session-reopen-unit.mjs",
+    "test:rack-timing": "node tests/rack-timing-unit.mjs"
   },
   "engines": {
     "node": ">=18"

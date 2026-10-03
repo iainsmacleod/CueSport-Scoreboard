@@ -182,6 +182,37 @@ function normalizeCloudRacks(rawRacks, gameType) {
   return racks;
 }
 
+/**
+ * When editors omit rack timing, keep prior duration/startedAt/timestamp by index.
+ * Does not invent values — only copies missing fields from previous racks.
+ * @param {object[]} incoming
+ * @param {object[]|null|undefined} previous
+ */
+export function mergeRackTimingFromPrevious(incoming, previous) {
+  if (!Array.isArray(incoming) || !incoming.length) return incoming || [];
+  const prev = Array.isArray(previous) ? previous : [];
+  return incoming.map((rack, index) => {
+    if (!rack || typeof rack !== 'object') return rack;
+    const prior = prev[index];
+    if (!prior || typeof prior !== 'object') return rack;
+    const out = { ...rack };
+    const hasDur = Number.isFinite(Number(out.durationSeconds)) && Number(out.durationSeconds) >= 0;
+    if (!hasDur) {
+      const priorDur = Number(prior.durationSeconds);
+      if (Number.isFinite(priorDur) && priorDur >= 0) {
+        out.durationSeconds = Math.round(priorDur);
+      }
+    }
+    if (!out.startedAt && prior.startedAt) {
+      out.startedAt = String(prior.startedAt);
+    }
+    if (!out.timestamp && prior.timestamp) {
+      out.timestamp = String(prior.timestamp);
+    }
+    return out;
+  });
+}
+
 function aggregateExtrasFromRacks(racks, gameType) {
   const extras = {
     scores: { p1: 0, p2: 0 },
@@ -378,7 +409,8 @@ export async function registerEventRoutes(app) {
         endPayload.ballsP1 = rackBallsP1;
         endPayload.ballsP2 = rackBallsP2;
       }
-      endPayload.racks = normalizedRacks;
+      // Editors historically omitted timing — preserve from the previous end payload.
+      endPayload.racks = mergeRackTimingFromPrevious(normalizedRacks, prevEnd.racks);
     } else if (gameType === 'game4' && normalizedRacks) {
       endPayload.racks = [];
     } else if (Array.isArray(prevEnd.racks)) {
