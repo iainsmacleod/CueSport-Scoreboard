@@ -352,8 +352,15 @@ function setGuestShareRevealed(revealed) {
   const qr = document.getElementById('shareQrImg');
   const placeholder = document.getElementById('shareQrPlaceholder');
   const status = document.getElementById('shareStatus');
+  const nameEl = document.getElementById('shareLinkName');
   if (wrap) wrap.classList.toggle('is-obscured', !guestShareRevealed);
   if (urlEl) urlEl.classList.toggle('is-obscured', !guestShareRevealed);
+
+  if (nameEl) {
+    const label = String(cachedGuestShareLabel || '').trim() || 'Guest link';
+    nameEl.textContent = `${label} QR Code`;
+    nameEl.classList.toggle('is-placeholder', !String(cachedGuestShareLabel || '').trim());
+  }
 
   if (qr) {
     if (guestShareRevealed && cachedGuestShareUrl) {
@@ -385,8 +392,7 @@ function setGuestShareRevealed(revealed) {
       status.textContent = 'Preparing link…';
       status.classList.remove('hidden');
     } else {
-      const label = cachedGuestShareLabel || 'Guest link';
-      status.textContent = guestShareRevealed ? `${label} — visible` : `${label} — hidden`;
+      status.textContent = guestShareRevealed ? 'QR & URL visible' : 'Hidden — press Show';
       status.classList.remove('hidden');
     }
   }

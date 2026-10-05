@@ -117,12 +117,14 @@ body.mobile .btn.stream-active,
 body.mobile .btn.stats-active,
 body.mobile .btn.monitor-active,
 body.mobile .btn.rack-breaker-current,
-body.mobile .btn.rack-breaker-current:disabled {
+body.mobile .btn.rack-breaker-current:disabled,
+body.mobile .guest-link-item.is-current {
   opacity: 1;
   color: #fff;
   font-weight: 800;
   background: linear-gradient(135deg, rgba(47, 128, 255, 0.55), rgba(155, 92, 255, 0.42));
   border-color: var(--mobile-blue);
+  outline: none;
   box-shadow:
     0 0 0 1px rgba(47, 128, 255, 0.45),
     0 0 18px rgba(47, 128, 255, 0.28),
@@ -187,7 +189,8 @@ body.mobile .score-row:nth-child(even) .score-value {
 }
 
 body.mobile .slot-name,
-body.mobile .share-links-heading {
+body.mobile .share-links-heading,
+body.mobile .share-link-name {
   color: #bba0ff;
 }
 

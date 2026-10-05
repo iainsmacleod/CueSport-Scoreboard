@@ -136,6 +136,22 @@
         if (el) el.textContent = text || '';
     }
 
+    function setLinkNameHeader(label) {
+        const el = document.getElementById('cloudRemoteLinkName');
+        if (!el) return;
+        const name = String(label || '').trim() || 'Guest link';
+        el.textContent = name + ' QR Code';
+        el.classList.toggle('is-placeholder', !String(label || '').trim());
+    }
+
+    function setRevealStatus(revealed) {
+        if (!selectedUrl) {
+            setStatus('Waiting for the guest link…');
+            return;
+        }
+        setStatus(revealed ? 'QR & URL visible' : 'Hidden — press Show');
+    }
+
     function guestUrl(link) {
         if (!link) return '';
         if (link.url) return link.url;
@@ -250,6 +266,7 @@
         selectedLabel = '';
         cachedLinks = [];
         setLinkRevealed(false);
+        setLinkNameHeader('');
         setStatus('');
         const list = document.getElementById('cloudRemoteExtraList');
         if (list) list.innerHTML = '';
@@ -269,16 +286,13 @@
         selectedToken = nextToken;
         selectedUrl = guestUrl(link);
         selectedLabel = link && link.label ? link.label : '';
+        setLinkNameHeader(selectedLabel);
         if (!selectedUrl) {
             setLinkRevealed(false);
             setStatus('Waiting for the guest link…');
         } else {
             setLinkRevealed(keepReveal);
-            setStatus(
-                keepReveal
-                    ? ((selectedLabel || 'Guest link') + ' — visible')
-                    : ((selectedLabel || 'Guest link') + ' — hidden')
-            );
+            setRevealStatus(keepReveal);
         }
         const list = document.getElementById('cloudRemoteExtraList');
         if (!list) return;
@@ -377,7 +391,7 @@
         linkRevealed = false;
         setLinkRevealed(false);
         if (selectedLabel || selectedUrl) {
-            setStatus((selectedLabel || 'Guest link') + ' — hidden');
+            setRevealStatus(false);
         }
     }
 
@@ -445,8 +459,7 @@
     function toggleReveal() {
         if (!selectedUrl) return;
         setLinkRevealed(!linkRevealed);
-        if (linkRevealed) setStatus((selectedLabel || 'Guest link') + ' — visible');
-        else setStatus((selectedLabel || 'Guest link') + ' — hidden');
+        setRevealStatus(linkRevealed);
     }
 
     async function copyRemoteUrl() {

@@ -2632,6 +2632,20 @@ body.controls-locked #mobileBottomNav {
 }
 .share-panel h2 { margin-top: 0; text-align: center; }
 .share-limitations { text-align: center; margin-bottom: 1rem; }
+.share-link-name {
+  margin: 0.75rem 0 0.35rem;
+  padding: 0;
+  text-align: left;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.25;
+  color: inherit;
+}
+.share-link-name.is-placeholder {
+  opacity: 0.72;
+  font-weight: 600;
+}
 .share-qr-wrap {
   display: flex;
   flex-direction: column;
@@ -2690,8 +2704,12 @@ body.controls-locked #mobileBottomNav {
   background: rgba(125, 207, 255, 0.08);
 }
 .token-list-item.guest-link-item.is-current {
-  background: rgba(125, 207, 255, 0.14);
-  outline: 1px solid rgba(125, 207, 255, 0.35);
+  background: #565f89;
+  outline: 2px solid #7aa2f7;
+  outline-offset: -2px;
+  border-color: transparent;
+  color: #fff;
+  font-weight: 700;
 }
 .token-list-item > .api-key-summary,
 .token-list-item > span {
@@ -2700,7 +2718,7 @@ body.controls-locked #mobileBottomNav {
   word-break: break-word;
 }
 .token-list-item.is-current span {
-  color: #7dcfff;
+  color: inherit;
 }
 .dash-guest-panel .share-links-heading {
   margin-top: 1.5rem;

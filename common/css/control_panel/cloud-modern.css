@@ -93,7 +93,8 @@ body {
 }
 
 .section-header,
-.section-header-with-controls {
+.section-header-with-controls,
+.cloud-remote-link-name {
 	background: linear-gradient(90deg, rgba(47, 128, 255, 0.13), rgba(155, 92, 255, 0.08)) !important;
 	color: var(--cs-text) !important;
 	border: 1px solid var(--cs-border) !important;
@@ -262,7 +263,8 @@ select:disabled,
 
 /* Active player is intentionally disabled (no re-select); keep it visually selected. */
 .rack-breaker-btn.rack-breaker-current,
-.rack-breaker-btn.rack-breaker-current:disabled {
+.rack-breaker-btn.rack-breaker-current:disabled,
+.cloud-remote-link-item.is-current {
 	opacity: 1 !important;
 	background: linear-gradient(135deg, rgba(47, 128, 255, 0.55), rgba(155, 92, 255, 0.42)) !important;
 	border-color: var(--cs-blue) !important;

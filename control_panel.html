@@ -22,8 +22,8 @@ for more information about Salotto please visit https://salotto.app
     <link rel="stylesheet" href="./common/css/control_panel/grey.css?v=8.0.0" />
     <link rel="stylesheet" href="./common/css/control_panel/light.css?v=8.0.0" />
     <link rel="stylesheet" href="./common/css/control_panel/rachni.css?v=8.0.0" />
-    <link rel="stylesheet" href="./common/css/control_panel/required.css?v=8.4.0.2" />
-    <link id="cloudModernTheme" rel="stylesheet" href="./common/css/control_panel/cloud-modern.css?v=8.4.0.2" disabled />
+    <link rel="stylesheet" href="./common/css/control_panel/required.css?v=8.4.0.5" />
+    <link id="cloudModernTheme" rel="stylesheet" href="./common/css/control_panel/cloud-modern.css?v=8.4.0.5" disabled />
     <script>
         //---------------------------------------------------------------------------------------------
         var versionNum = "8.4.0";
@@ -39,7 +39,7 @@ for more information about Salotto please visit https://salotto.app
     <script src="./common/js/control_panel.js?v=8.4.0.2"></script>
     <script src="./common/js/cloud_commands.js?v=8.4.0"></script>
     <script src="./common/js/cloud_auth.js?v=8.0.0.4"></script>
-    <script src="./common/js/cloud_remote.js?v=8.4.0"></script>
+    <script src="./common/js/cloud_remote.js?v=8.4.0.4"></script>
     <script src="hotkeys.js?v=8.0.0"></script>
 
     <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
@@ -637,6 +637,7 @@ for more information about Salotto please visit https://salotto.app
             <div class="section-header" id="cloudRemoteSectionHeader">Guest control</div>
             <p class="stats-tab-help" id="cloudRemoteHelp">Share guest links for this table. The default OBS Dock Owner link is for elevated remote control (scoring, Stream, Share). Named guest links are for scorers only — no names, Stream, or Share. One device per link; QR and URL stay hidden until Show.</p>
             <div class="cloud-remote-default">
+                <h3 class="section-header cloud-remote-link-name" id="cloudRemoteLinkName">Guest link QR Code</h3>
                 <div class="cloud-remote-qr-wrap is-obscured" id="cloudRemoteQrWrap">
                     <img id="cloudRemoteQr" class="noShow" alt="Guest control QR code" />
                     <div class="cloud-remote-qr-placeholder" id="cloudRemoteQrPlaceholder" aria-hidden="true"></div>
