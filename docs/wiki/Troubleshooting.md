@@ -51,8 +51,14 @@ Clip **×** only clears the path in CueSport — delete video files on disk your
 
 - Dock must be online (dashboard table card shows connected).
 - Cloud socket must be up on the phone.
-- Guest link: only one device at a time; revoke and recreate if stuck “in use”.
+- Guest link: only one device at a time. If you see “already in use” after switching networks (Wi‑Fi ↔ cellular), tap **Take over this link** on the guest page, or wait for the other session to disconnect. Same-tab reconnects reclaim automatically on updated clients.
+- Dock Key “In use”: use **Take over Dock Key** on the Cloud status row if this is your dock (disconnects the other dock).
 - Standard guests cannot use Stream/Share — use an OBS Dock Owner guest link or sign in on `/m/...`.
+
+## Admin last connection detail missing after redeploy
+
+- Live online counts reset until docks reconnect (expected).
+- Last dock version / last seen are stored on the Dock Key and should survive room cleanup and redeploys when `backend/data/` is persisted.
 
 ## Promote Live Stream not listing
 

@@ -8,7 +8,8 @@ import {
   createAccountPlayer,
   fetchPublicConfig,
   GAME_TYPES,
-} from '../shared/cloud-client.js?v=8.4.0.1';
+  getOrCreateClientSessionId,
+} from '../shared/cloud-client.js?v=8.4.0.5';
 import {
   parseRaceTarget,
   isRaceLocked,
@@ -1130,6 +1131,22 @@ function setError(msg) {
     pageErr.textContent = onLogin ? '' : text;
     pageErr.classList.toggle('hidden', onLogin || !text);
   }
+  if (!text) setTakeoverSeatVisible(false);
+}
+
+function setTakeoverSeatVisible(visible) {
+  const btn = document.getElementById('takeoverSeatBtn');
+  if (btn) btn.classList.toggle('hidden', !visible);
+}
+
+function showGuestLinkInUse(message) {
+  wantConnection = false;
+  clearReconnectTimer();
+  setReconnectBanner(false);
+  show('connectingSection', false);
+  setConnectionStatus('disconnected');
+  setError(message || 'This guest link is already in use on another device.');
+  setTakeoverSeatVisible(!!guestToken);
 }
 
 function gameTypeLabel(id) {
@@ -3319,7 +3336,7 @@ function wireReplayEditButtons() {
   });
 }
 
-async function connectGuestSession({ quiet, isCurrent }) {
+async function connectGuestSession({ quiet, isCurrent, takeover = false }) {
   isDockOwnerGuest = false;
   isViewOnly = false;
   applyViewOnlyUI();
@@ -3327,10 +3344,13 @@ async function connectGuestSession({ quiet, isCurrent }) {
   if (client) {
     try { client.disconnect(); } catch (_) { /* ignore */ }
   }
+  const clientSessionId = getOrCreateClientSessionId(`guest:${guestToken}`);
   client = new CloudClient({
     serverUrl: window.location.origin,
     guestToken,
     client: 'mobile_guest',
+    clientSessionId,
+    takeover: !!takeover,
   });
   client.on('state', applyState);
   wireClientLifecycle(client);
@@ -3341,19 +3361,17 @@ async function connectGuestSession({ quiet, isCurrent }) {
       return;
     }
     if (e.code === 'guest_link_in_use') {
-      wantConnection = false;
-      clearReconnectTimer();
-      setReconnectBanner(false);
-      show('connectingSection', false);
-      setConnectionStatus('disconnected');
-      setError(e.message || 'This guest link is already in use on another device.');
+      showGuestLinkInUse(e.message);
       return;
     }
     setError(e.message || e.code || 'Connection failed');
   });
   try {
-    const joined = await client.connect();
+    const joined = await client.connect({ takeover: !!takeover });
     if (!isCurrent()) return;
+    setTakeoverSeatVisible(false);
+    // Clear one-shot takeover so later soft reconnects don't keep displacing.
+    client.takeover = false;
     isDockOwnerGuest = !!joined.is_dock_owner;
     if (joined.room_id) roomId = joined.room_id;
     roomKind = joined.room_kind === 'impromptu' ? 'impromptu' : 'dock';
@@ -3395,10 +3413,7 @@ async function connectGuestSession({ quiet, isCurrent }) {
       return;
     }
     if (err?.code === 'guest_link_in_use') {
-      wantConnection = false;
-      clearReconnectTimer();
-      setReconnectBanner(false);
-      setError(err.message || 'This guest link is already in use on another device.');
+      showGuestLinkInUse(err.message);
       return;
     }
     if (quiet) {
@@ -3580,8 +3595,10 @@ async function connectAuthenticatedSession({ quiet, isCurrent }) {
 
 async function connect(options = {}) {
   const quiet = !!(options && options.quiet);
+  const takeover = !!(options && options.takeover);
   const epoch = ++connectEpoch;
   setError('');
+  setTakeoverSeatVisible(false);
   const ctx = pathContext();
   guestToken = ctx.guestToken || '';
   isGuestMode = !!guestToken;
@@ -3598,7 +3615,7 @@ async function connect(options = {}) {
   const isCurrent = () => epoch === connectEpoch;
 
   if (isGuestMode) {
-    return connectGuestSession({ quiet, isCurrent });
+    return connectGuestSession({ quiet, isCurrent, takeover });
   }
   return connectAuthenticatedSession({ quiet, isCurrent });
 }
@@ -3651,6 +3668,13 @@ function clearSavedLogin() {
 }
 document.getElementById('reconnectBtn')?.addEventListener('click', () => {
   ensureConnection({ force: true });
+});
+
+document.getElementById('takeoverSeatBtn')?.addEventListener('click', () => {
+  if (!guestToken) return;
+  if (!window.confirm('Take over this guest link? The other device using it will be disconnected.')) return;
+  setTakeoverSeatVisible(false);
+  connect({ takeover: true }).catch(() => {});
 });
 
 document.addEventListener('visibilitychange', () => {

@@ -33,7 +33,7 @@ for more information about Salotto please visit https://salotto.app
     <script src="./common/js/jquery.js?v=8.0.0"></script>
     <script src="./common/js/scoreboard_helpers.js?v=8.0.0"></script>
     <script src="./common/js/match_racks.js?v=8.0.0"></script>
-    <script src="./common/js/cloud_relay.js?v=8.4.0"></script>
+    <script src="./common/js/cloud_relay.js?v=8.4.0.6"></script>
     <script src="./common/js/stream_sharing.js?v=8.0.0.6"></script>
     <script src="./common/js/player_stats.js?v=8.4.0"></script>
     <script src="./common/js/control_panel.js?v=8.4.0.2"></script>
@@ -777,6 +777,7 @@ for more information about Salotto please visit https://salotto.app
                     </div>
                     <div class="field cloud-status" id="cloudStatusRow">
                         <span id="cloudSignedInEmail" class="noShow"></span><span id="cloudStatusSep" class="noShow">&nbsp;|&nbsp;</span><span>Status: <span id="cloudRelayStatus">Off</span></span>
+                        <button type="button" class="hover obs28 button noShow" id="cloudDockTakeoverBtn" onclick="window.cloudRelay && window.cloudRelay.takeoverDockSeat()" title="Disconnect the other dock using this key">Take over Dock Key</button>
                     </div>
                 </div>
             </div>

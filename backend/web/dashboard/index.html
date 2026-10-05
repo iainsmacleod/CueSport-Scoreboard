@@ -35,35 +35,6 @@
     </section>
     <section id="loginSection" class="panel hidden">
       <h2 id="loginSectionTitle">Sign In</h2>
-      <section class="dash-login-feature-grid" aria-label="Cloud feature highlights">
-        <article class="dash-login-feature-card">
-          <span class="dash-login-feature-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="9" y1="18" x2="15" y2="18"/><path d="m9 11 2 2 4-4"/></svg>
-          </span>
-          <div>
-            <h3>Score From Anywhere</h3>
-            <p>Control matches from your phone or give a scorer a focused guest link without sharing account access.</p>
-          </div>
-        </article>
-        <article class="dash-login-feature-card">
-          <span class="dash-login-feature-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-          </span>
-          <div>
-            <h3>Manage Every Table</h3>
-            <p>Connect each OBS scoreboard with its own Dock Key, then see and manage every active table in one dashboard.</p>
-          </div>
-        </article>
-        <article class="dash-login-feature-card">
-          <span class="dash-login-feature-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="20" x2="4" y2="10"/><line x1="10" y1="20" x2="10" y2="4"/><line x1="16" y1="20" x2="16" y2="13"/><line x1="22" y1="20" x2="2" y2="20"/><path d="m4 8 6-5 6 8 5-5"/></svg>
-          </span>
-          <div>
-            <h3>Keep the Match Story</h3>
-            <p>Review searchable results and player statistics, and help viewers discover your promoted stream when you go live.</p>
-          </div>
-        </article>
-      </section>
       <div id="dashLoginManagedPane" class="dash-login-pane hidden">
         <div class="dash-login-intro hint">
           <p id="dashManagedIntroManaged">
@@ -121,6 +92,35 @@
         <code>ALLOW_DEV_AUTH</code> with <code>DEV_AUTH_SECRET</code> for self-host.
       </p>
       <p id="loginError" class="error hidden" role="alert"></p>
+      <section class="dash-login-feature-grid" aria-label="Cloud feature highlights">
+        <article class="dash-login-feature-card">
+          <span class="dash-login-feature-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="9" y1="18" x2="15" y2="18"/><path d="m9 11 2 2 4-4"/></svg>
+          </span>
+          <div>
+            <h3>Score From Anywhere</h3>
+            <p>Control matches from your phone or give a scorer a focused guest link without sharing account access.</p>
+          </div>
+        </article>
+        <article class="dash-login-feature-card">
+          <span class="dash-login-feature-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          </span>
+          <div>
+            <h3>Manage Every Table</h3>
+            <p>Connect each OBS scoreboard with its own Dock Key, then see and manage every active table in one dashboard.</p>
+          </div>
+        </article>
+        <article class="dash-login-feature-card">
+          <span class="dash-login-feature-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="20" x2="4" y2="10"/><line x1="10" y1="20" x2="10" y2="4"/><line x1="16" y1="20" x2="16" y2="13"/><line x1="22" y1="20" x2="2" y2="20"/><path d="m4 8 6-5 6 8 5-5"/></svg>
+          </span>
+          <div>
+            <h3>Keep the Match Story</h3>
+            <p>Review searchable results and player statistics, and help viewers discover your promoted stream when you go live.</p>
+          </div>
+        </article>
+      </section>
     </section>
 
     <section id="dashboardSection" class="hidden">
@@ -492,7 +492,6 @@
       </div>
 
       <div id="tabAdmin" class="dash-tab-panel hidden">
-        <div id="adminAccountMount"></div>
         <div class="panel">
           <h2>Platform Admin</h2>
           <p class="hint">
@@ -538,6 +537,7 @@
           </div>
           <div id="adminDetailBody"></div>
         </div>
+        <div id="adminAccountMount"></div>
       </div>
 
       <p id="error" class="error hidden"></p>

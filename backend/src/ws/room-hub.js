@@ -18,6 +18,9 @@ const connections = new Map();
 /** apiKeyId -> Set<ws> for fast revoke/kick (Option A seats) */
 const docksByApiKeyId = new Map();
 
+/** guestToken -> Set<ws> for one-device guest seat checks */
+const guestsByToken = new Map();
+
 /** accountId -> Set<ws> for dashboard live table feeds */
 const accountDashboards = new Map();
 
@@ -106,36 +109,57 @@ function send(ws, message) {
   }
 }
 
-function trackDockApiKey(ws, keyId) {
-  if (!ws || !keyId) return;
-  let set = docksByApiKeyId.get(keyId);
+function trackKeyedSocket(index, key, ws) {
+  if (!ws || !key) return;
+  let set = index.get(key);
   if (!set) {
     set = new Set();
-    docksByApiKeyId.set(keyId, set);
+    index.set(key, set);
   }
   set.add(ws);
 }
 
-function untrackDockApiKey(ws, keyId) {
-  if (!ws || !keyId) return;
-  const set = docksByApiKeyId.get(keyId);
+function untrackKeyedSocket(index, key, ws) {
+  if (!ws || !key) return;
+  const set = index.get(key);
   if (!set) return;
   set.delete(ws);
-  if (!set.size) docksByApiKeyId.delete(keyId);
+  if (!set.size) index.delete(key);
 }
 
-function findDockUsingApiKey(keyId, excludeWs = null) {
-  if (!keyId) return null;
-  const set = docksByApiKeyId.get(keyId);
+function findLiveKeyedSocket(index, key, excludeWs, metaMatch) {
+  if (!key) return null;
+  const set = index.get(key);
   if (set) {
     for (const ws of set) {
       if (excludeWs && ws === excludeWs) continue;
-      if (ws.readyState === 1) {
-        const meta = connections.get(ws);
-        if (meta) return { ws, meta };
-      }
+      if (ws.readyState !== 1) continue;
+      const meta = connections.get(ws);
+      if (meta && (!metaMatch || metaMatch(meta))) return { ws, meta };
     }
   }
+  return null;
+}
+
+function trackDockApiKey(ws, keyId) {
+  trackKeyedSocket(docksByApiKeyId, keyId, ws);
+}
+
+function untrackDockApiKey(ws, keyId) {
+  untrackKeyedSocket(docksByApiKeyId, keyId, ws);
+}
+
+function trackGuestToken(ws, token) {
+  trackKeyedSocket(guestsByToken, token, ws);
+}
+
+function untrackGuestToken(ws, token) {
+  untrackKeyedSocket(guestsByToken, token, ws);
+}
+
+function findDockUsingApiKey(keyId, excludeWs = null) {
+  const hit = findLiveKeyedSocket(docksByApiKeyId, keyId, excludeWs, (meta) => meta.apiKeyId === keyId);
+  if (hit) return hit;
   // Fallback scan (in case index missed an in-flight join)
   for (const [ws, meta] of connections) {
     if (excludeWs && ws === excludeWs) continue;
@@ -145,17 +169,87 @@ function findDockUsingApiKey(keyId, excludeWs = null) {
   return null;
 }
 
+function findLiveGuestToken(token, excludeWs = null) {
+  const hit = findLiveKeyedSocket(
+    guestsByToken,
+    token,
+    excludeWs,
+    (meta) => meta.client === 'mobile_guest' && meta.guestToken === token
+  );
+  if (hit) return hit;
+  for (const [ws, meta] of connections) {
+    if (excludeWs && ws === excludeWs) continue;
+    if (meta.client !== 'mobile_guest' || meta.guestToken !== token) continue;
+    if (ws.readyState === 1) return { ws, meta };
+  }
+  return null;
+}
+
 const API_KEY_IN_USE_MESSAGE =
-  'This OBS Dock Key is already in use by another dock. Create a new key in Account settings on the Cloud dashboard and paste it into this dock.';
+  'This OBS Dock Key is already in use by another dock. Use Take over if this is your dock, or create a new key in Account settings.';
+
+const GUEST_LINK_IN_USE_MESSAGE =
+  'This guest link is already in use on another device. Use Take over if this is your device, wait for that session to disconnect, or create a new guest link.';
+
+const SEAT_DISPLACED_MESSAGE =
+  'Another session took over this connection. Reconnect if that was unintended.';
+
+function normalizeClientSessionId(raw) {
+  const s = String(raw || '').trim();
+  if (!s || s.length > 80) return '';
+  return s;
+}
+
+function wantsTakeover(msg) {
+  return msg?.takeover === true || msg?.takeover === 1 || msg?.takeover === 'true';
+}
+
+/** Close a live seat holder so the incoming join can proceed. */
+function displaceSeatHolder(holder, code = 'seat_displaced', message = SEAT_DISPLACED_MESSAGE) {
+  if (!holder?.ws) return;
+  send(holder.ws, { type: 'error', code, message });
+  try { holder.ws.close(); } catch (_) { /* ignore */ }
+}
 
 /**
- * If this key already has a live dock, return an error for the incoming join.
- * Does not disconnect the existing dock (avoids disrupting an active match/stats).
+ * Resolve one-seat-per-token/key conflict.
+ * Same client_session_id → silent reclaim. takeover:true → displace any holder.
+ * Otherwise reject (does not kick) for backward compatibility.
  */
-function apiKeyDockSeatConflict(keyId, incomingWs) {
+function resolveSeatConflict(holder, {
+  incomingSessionId = '',
+  takeover = false,
+  inUseError,
+  inUseMessage,
+} = {}) {
+  if (!holder) return null;
+  const holderSession = normalizeClientSessionId(holder.meta?.clientSessionId);
+  const incoming = normalizeClientSessionId(incomingSessionId);
+  if (takeover || (incoming && holderSession && incoming === holderSession)) {
+    displaceSeatHolder(holder);
+    return null;
+  }
+  return { error: inUseError, message: inUseMessage };
+}
+
+function apiKeyDockSeatConflict(keyId, incomingWs, opts = {}) {
   if (!keyId) return null;
-  if (!findDockUsingApiKey(keyId, incomingWs)) return null;
-  return { error: 'api_key_in_use', message: API_KEY_IN_USE_MESSAGE };
+  return resolveSeatConflict(findDockUsingApiKey(keyId, incomingWs), {
+    ...opts,
+    incomingSessionId: opts.clientSessionId || '',
+    inUseError: 'api_key_in_use',
+    inUseMessage: API_KEY_IN_USE_MESSAGE,
+  });
+}
+
+function guestTokenSessionConflict(token, incomingWs, opts = {}) {
+  if (!token) return null;
+  return resolveSeatConflict(findLiveGuestToken(token, incomingWs), {
+    ...opts,
+    incomingSessionId: opts.clientSessionId || '',
+    inUseError: 'guest_link_in_use',
+    inUseMessage: GUEST_LINK_IN_USE_MESSAGE,
+  });
 }
 
 function findLiveDockApiKeyId(roomId) {
@@ -272,6 +366,9 @@ export function handleConnection(ws) {
     if (meta.apiKeyId) {
       untrackDockApiKey(ws, meta.apiKeyId);
     }
+    if (meta.guestToken) {
+      untrackGuestToken(ws, meta.guestToken);
+    }
 
     if (meta.client === 'dashboard' && meta.accountId) {
       removeAccountDashboard(meta.accountId, ws);
@@ -377,26 +474,6 @@ const GUEST_ALLOWED_COMMANDS = new Set([
   // Restart / End / Call Match Early (same match controls as admin remote).
   'reset_scores', 'end_match', 'call_match_early',
 ]);
-
-function findLiveGuestToken(token, excludeWs = null) {
-  if (!token) return null;
-  for (const [ws, meta] of connections) {
-    if (excludeWs && ws === excludeWs) continue;
-    if (meta.client !== 'mobile_guest' || meta.guestToken !== token) continue;
-    if (ws.readyState === 1) return { ws, meta };
-  }
-  return null;
-}
-
-const GUEST_LINK_IN_USE_MESSAGE =
-  'This guest link is already in use on another device. Wait for that session to disconnect, or create a new guest link.';
-
-/** One live socket per guest token; reject additional joins without kicking the first. */
-function guestTokenSessionConflict(token, incomingWs) {
-  if (!token) return null;
-  if (!findLiveGuestToken(token, incomingWs)) return null;
-  return { error: 'guest_link_in_use', message: GUEST_LINK_IN_USE_MESSAGE };
-}
 
 function countControlConnections(roomId, excludeWs = null) {
   let n = 0;
@@ -513,6 +590,10 @@ async function handleRoomClientJoin(ws, meta, msg, authenticateJoin) {
   let roomId = msg.room_id || msg.room;
   let accountId = null;
 
+  const clientSessionId = normalizeClientSessionId(msg.client_session_id || msg.clientSessionId);
+  const takeover = wantsTakeover(msg);
+  if (clientSessionId) meta.clientSessionId = clientSessionId;
+
   if (msg.guest_token) {
     const guest = sqlite.findGuestToken(msg.guest_token);
     if (!guest) {
@@ -528,7 +609,7 @@ async function handleRoomClientJoin(ws, meta, msg, authenticateJoin) {
       });
       return;
     }
-    const conflict = guestTokenSessionConflict(msg.guest_token, ws);
+    const conflict = guestTokenSessionConflict(msg.guest_token, ws, { clientSessionId, takeover });
     if (conflict) {
       send(ws, { type: 'error', code: conflict.error, message: conflict.message });
       return;
@@ -541,6 +622,7 @@ async function handleRoomClientJoin(ws, meta, msg, authenticateJoin) {
     meta.guestToken = msg.guest_token;
     meta.isDockOwnerGuest = sqlite.isDefaultDockOwnerGuestToken(guest);
     meta.guestLabel = guest.label || null;
+    trackGuestToken(ws, msg.guest_token);
   } else {
     // Docks must use an OBS Dock Key (same seat model for hosted + self-host).
     if (client === 'dock' && !msg.api_key) {
@@ -566,9 +648,9 @@ async function handleRoomClientJoin(ws, meta, msg, authenticateJoin) {
       return;
     }
 
-    // Option A: one key = one dock. Reject if another dock already holds this key.
+    // Option A: one key = one dock. Same-session reclaim / takeover, else reject.
     if (client === 'dock' && auth.authMethod === 'api_key' && auth.keyId) {
-      const conflict = apiKeyDockSeatConflict(auth.keyId, ws);
+      const conflict = apiKeyDockSeatConflict(auth.keyId, ws, { clientSessionId, takeover });
       if (conflict) {
         send(ws, { type: 'error', code: conflict.error, message: conflict.message });
         return;

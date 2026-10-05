@@ -302,7 +302,7 @@
             replay functionality.
           </p>
           <p class="hint share-limitations">
-            Each guest link allows only one active device at a time. QR and URL stay hidden until you press Show.
+            Each guest link allows only one active device at a time. After a network switch, this tab reclaims automatically; otherwise use Take over. QR and URL stay hidden until you press Show.
           </p>
           <h3 id="shareLinkName" class="share-link-name">Guest link QR Code</h3>
           <div id="shareQrWrap" class="share-qr-wrap dash-guest-qr-wrap is-obscured">
@@ -336,6 +336,7 @@
       </div>
     </section>
     <p id="error" class="error hidden"></p>
+    <button type="button" id="takeoverSeatBtn" class="btn primary block hidden">Take over this link</button>
   </main>
 
   <nav id="mobileBottomNav" class="mobile-bottom-nav hidden" aria-label="Cloud control navigation">
@@ -432,6 +433,6 @@
       <div id="poolRespotTargets" class="snooker-foul-targets"></div>
     </div>
   </div>
-  <script type="module" src="/web/mobile/app.js?v=8.4.0.4"></script>
+  <script type="module" src="/web/mobile/app.js?v=8.4.0.6"></script>
 </body>
 </html>

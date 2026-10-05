@@ -678,7 +678,7 @@ input, select {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.8rem;
-  margin: 1rem 0 1.15rem;
+  margin: 1.25rem 0 0;
 }
 .dash-login-feature-card {
   display: flex;

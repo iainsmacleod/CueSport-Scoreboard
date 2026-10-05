@@ -7,6 +7,8 @@ export class CloudClient {
     this.accessToken = options.accessToken || '';
     this.apiKey = options.apiKey || '';
     this.guestToken = options.guestToken || '';
+    this.clientSessionId = options.clientSessionId || '';
+    this.takeover = !!options.takeover;
     this.ws = null;
     this.handlers = {
       state: [],
@@ -117,6 +119,8 @@ export class CloudClient {
 
   connect(options = {}) {
     const timeoutMs = Number.isFinite(options.timeoutMs) ? options.timeoutMs : 10000;
+    const takeover = options.takeover != null ? !!options.takeover : this.takeover;
+    if (options.clientSessionId) this.clientSessionId = String(options.clientSessionId);
     this._intentionalClose = false;
     return new Promise((resolve, reject) => {
       let settled = false;
@@ -171,6 +175,8 @@ export class CloudClient {
         }
         if (this.accessToken) msg.access_token = this.accessToken;
         else if (this.apiKey) msg.api_key = this.apiKey;
+        if (this.clientSessionId) msg.client_session_id = this.clientSessionId;
+        if (takeover) msg.takeover = true;
         this.ws.send(JSON.stringify(msg));
       };
       this.ws.onmessage = (ev) => {
@@ -721,3 +727,23 @@ export const GAME_TYPES = [
   { id: 'game7', label: 'Custom' },
   { id: 'game8', label: 'Snooker' },
 ];
+
+/** Persist a tab-scoped seat session id for reclaim after network switches. */
+export function getOrCreateClientSessionId(storageKey) {
+  const key = String(storageKey || '').trim();
+  const mint = () => (typeof crypto !== 'undefined' && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : `sess-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  if (!key || typeof sessionStorage === 'undefined') return mint();
+  const fullKey = `cuesport_client_session:${key}`;
+  try {
+    let id = sessionStorage.getItem(fullKey);
+    if (!id) {
+      id = mint();
+      sessionStorage.setItem(fullKey, id);
+    }
+    return id;
+  } catch (_) {
+    return mint();
+  }
+}

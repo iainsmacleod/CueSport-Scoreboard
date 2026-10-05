@@ -219,7 +219,11 @@
         let guestWs;
         if (guestToken) {
           try {
-            guestWs = await wsJoin({ guest_token: guestToken, client: 'mobile_guest' });
+            guestWs = await wsJoin({
+              guest_token: guestToken,
+              client: 'mobile_guest',
+              client_session_id: 'browser-guest-a',
+            });
             assert('WS join guest', guestWs.data.client === 'mobile_guest');
           } catch (e) {
             assert('WS join guest', false, e.message);
@@ -228,13 +232,50 @@
           if (guestWs) {
             let secondBlocked = false;
             try {
-              await wsJoin({ guest_token: guestToken, client: 'mobile_guest' });
+              await wsJoin({
+                guest_token: guestToken,
+                client: 'mobile_guest',
+                client_session_id: 'browser-guest-b',
+              });
             } catch (e) {
               secondBlocked = e.code === 'guest_link_in_use';
               assert('Guest second join rejected', secondBlocked, e.message);
             }
             if (!secondBlocked) {
               assert('Guest second join rejected', false, 'expected guest_link_in_use');
+            }
+
+            try {
+              const reclaim = await wsJoin({
+                guest_token: guestToken,
+                client: 'mobile_guest',
+                client_session_id: 'browser-guest-a',
+              });
+              assert('Guest same-session reclaim', reclaim.data.client === 'mobile_guest');
+              guestWs.ws.close();
+              reclaim.ws.close();
+              guestWs = reclaim;
+            } catch (e) {
+              assert('Guest same-session reclaim', false, e.message);
+            }
+
+            try {
+              guestWs = await wsJoin({
+                guest_token: guestToken,
+                client: 'mobile_guest',
+                client_session_id: 'browser-guest-hold',
+              });
+              const take = await wsJoin({
+                guest_token: guestToken,
+                client: 'mobile_guest',
+                client_session_id: 'browser-guest-take',
+                takeover: true,
+              });
+              assert('Guest takeover', take.data.client === 'mobile_guest');
+              guestWs.ws.close();
+              guestWs = take;
+            } catch (e) {
+              assert('Guest takeover', false, e.message);
             }
 
             try {

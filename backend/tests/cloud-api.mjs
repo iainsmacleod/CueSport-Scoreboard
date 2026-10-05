@@ -63,7 +63,31 @@ function waitForWsErrorThenClose(ws, timeoutMs = 8000) {
   });
 }
 
-function wsJoin({ roomId, client, accessToken, apiKey, guestToken, timeoutMs = 8000, instanceId }) {
+/** Assert a second join displaces the first holder (reclaim or takeover). */
+async function assertSeatDisplace(name, holderWs, joinFn) {
+  const displacedP = waitForWsErrorThenClose(holderWs);
+  const next = await joinFn();
+  const displaced = await displacedP;
+  assert(
+    `${name} displaces prior`,
+    displaced.code === 'seat_displaced' || displaced.code === 'closed',
+    displaced.code
+  );
+  return next;
+}
+
+function wsJoin({
+  roomId,
+  client,
+  accessToken,
+  apiKey,
+  guestToken,
+  timeoutMs = 8000,
+  instanceId,
+  clientSessionId,
+  takeover,
+  clientVersion,
+}) {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(`${WS_BASE}/ws`);
     const timer = setTimeout(() => {
@@ -87,6 +111,9 @@ function wsJoin({ roomId, client, accessToken, apiKey, guestToken, timeoutMs = 8
       if (accessToken) msg.access_token = accessToken;
       if (apiKey) msg.api_key = apiKey;
       if (instanceId) msg.instance_id = instanceId;
+      if (clientSessionId) msg.client_session_id = clientSessionId;
+      if (takeover) msg.takeover = true;
+      if (clientVersion) msg.client_version = clientVersion;
       ws.send(JSON.stringify(msg));
     });
 
@@ -1575,10 +1602,21 @@ async function run() {
     if (apiKey) {
       let seatA;
       try {
-        seatA = await wsJoin({ client: 'dock', apiKey, instanceId: smokeInstance });
+        seatA = await wsJoin({
+          client: 'dock',
+          apiKey,
+          instanceId: smokeInstance,
+          clientSessionId: 'dock-sess-a',
+          clientVersion: '8.4.0-test',
+        });
         let rejected = false;
         try {
-          await wsJoin({ client: 'dock', apiKey, instanceId: `${smokeInstance}-b` });
+          await wsJoin({
+            client: 'dock',
+            apiKey,
+            instanceId: `${smokeInstance}-b`,
+            clientSessionId: 'dock-sess-b',
+          });
         } catch (e) {
           rejected = e.code === 'api_key_in_use' || /already in use/i.test(e.message);
           assert('Same API key rejects second dock', rejected, e.message);
@@ -1587,8 +1625,63 @@ async function run() {
           assert('Same API key rejects second dock', false, 'second dock was allowed');
         }
         assert('First dock kept after conflict', seatA.ws.readyState === 1);
-        seatA.ws.close();
+
+        // Same client_session_id reclaim displaces the first seat.
+        const seatReclaim = await assertSeatDisplace(
+          'Same session reclaim',
+          seatA.ws,
+          () => wsJoin({
+            client: 'dock',
+            apiKey,
+            instanceId: `${smokeInstance}-reclaim`,
+            clientSessionId: 'dock-sess-a',
+            clientVersion: '8.4.0-reclaim',
+          })
+        );
+        assert('Same session reclaim joins dock', !!seatReclaim.data.room_id);
+        seatReclaim.ws.close();
         await new Promise((r) => setTimeout(r, 100));
+
+        // Different session + takeover displaces the holder.
+        const holder = await wsJoin({
+          client: 'dock',
+          apiKey,
+          instanceId: smokeInstance,
+          clientSessionId: 'dock-sess-holder',
+        });
+        const taker = await assertSeatDisplace(
+          'Dock takeover',
+          holder.ws,
+          () => wsJoin({
+            client: 'dock',
+            apiKey,
+            instanceId: `${smokeInstance}-take`,
+            clientSessionId: 'dock-sess-taker',
+            takeover: true,
+          })
+        );
+        assert('Dock takeover joins', !!taker.data.room_id);
+        taker.ws.close();
+        await new Promise((r) => setTimeout(r, 100));
+
+        // Last connection detail survives on the api_key even after disconnect.
+        if (apiKeyId) {
+          const localDb = new Database(SQLITE_PATH);
+          const keyRow = localDb.prepare(
+            'SELECT last_client_version, last_seen_at FROM api_keys WHERE id = ?'
+          ).get(apiKeyId);
+          localDb.close();
+          assert(
+            'api_keys.last_client_version persisted',
+            !!(keyRow && keyRow.last_client_version),
+            keyRow?.last_client_version || 'missing'
+          );
+          assert(
+            'api_keys.last_seen_at persisted',
+            !!(keyRow && keyRow.last_seen_at),
+            keyRow?.last_seen_at || 'missing'
+          );
+        }
       } catch (e) {
         assert('Same API key rejects second dock', false, e.message);
         if (seatA) try { seatA.ws.close(); } catch (_) { /* ignore */ }
@@ -2970,12 +3063,18 @@ async function run() {
       assert('POST replacement guest-link', guestLink2.ok && !!guestLink2.body.token);
 
       try {
-        const guestWs = await wsJoin({ guestToken: guestLink2.body.token });
+        const guestWs = await wsJoin({
+          guestToken: guestLink2.body.token,
+          clientSessionId: 'guest-sess-a',
+        });
         assert('WS join guest token', guestWs.data.client === 'mobile_guest');
 
         let secondRejected = false;
         try {
-          await wsJoin({ guestToken: guestLink2.body.token });
+          await wsJoin({
+            guestToken: guestLink2.body.token,
+            clientSessionId: 'guest-sess-b',
+          });
         } catch (e) {
           secondRejected = e.code === 'guest_link_in_use';
           assert('Second guest join rejected while first active', secondRejected, e.message);
@@ -2984,7 +3083,28 @@ async function run() {
           assert('Second guest join rejected while first active', false, 'expected guest_link_in_use');
         }
 
-        guestWs.ws.close();
+        const guestReclaim = await assertSeatDisplace(
+          'Guest same-session reclaim',
+          guestWs.ws,
+          () => wsJoin({
+            guestToken: guestLink2.body.token,
+            clientSessionId: 'guest-sess-a',
+          })
+        );
+        assert('Guest same-session reclaim joins', guestReclaim.data.client === 'mobile_guest');
+
+        const guestTake = await assertSeatDisplace(
+          'Guest takeover',
+          guestReclaim.ws,
+          () => wsJoin({
+            guestToken: guestLink2.body.token,
+            clientSessionId: 'guest-sess-take',
+            takeover: true,
+          })
+        );
+        assert('Guest takeover joins', guestTake.data.client === 'mobile_guest');
+
+        guestTake.ws.close();
         await new Promise((r) => setTimeout(r, 150));
         const guestWs2 = await wsJoin({ guestToken: guestLink2.body.token });
         assert('Guest can reconnect after prior session closes', guestWs2.data.client === 'mobile_guest');

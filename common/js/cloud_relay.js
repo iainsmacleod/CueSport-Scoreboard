@@ -23,6 +23,9 @@
     let isJoined = false;
     let isBlockedByServer = false;
     let blockedReason = null;
+    /** Soft seat conflict: key in use elsewhere; offer Take over without disabling Cloud. */
+    let seatConflictActive = false;
+    let joinWithTakeover = false;
     let replaying = false;
     /** Serialize inbound mobile/guest commands so Call Early cannot race rack/frame writes. */
     let commandQueue = Promise.resolve();
@@ -270,6 +273,12 @@
                     ? String(window.versionNum).trim()
                     : '');
             if (dockVersion) msg.client_version = dockVersion;
+            const sessionId = getOrCreateDockClientSessionId(apiKey);
+            if (sessionId) msg.client_session_id = sessionId;
+            if (joinWithTakeover) {
+                msg.takeover = true;
+                joinWithTakeover = false;
+            }
             // Room is assigned from the Dock Key on the server; do not send a cached UUID.
         } else if (token) {
             msg.access_token = token;
@@ -282,6 +291,29 @@
             return false;
         }
         return sendRaw(msg);
+    }
+
+    function getOrCreateDockClientSessionId(apiKey) {
+        const key = String(apiKey || '').trim();
+        if (!key) return '';
+        const storageKey = 'dock:' + key.slice(0, 24);
+        if (typeof sessionStorage === 'undefined') return newClientSessionId();
+        const fullKey = 'cuesport_client_session:' + storageKey;
+        try {
+            let id = sessionStorage.getItem(fullKey);
+            if (!id) {
+                id = newClientSessionId();
+                sessionStorage.setItem(fullKey, id);
+            }
+            return id;
+        } catch (_) {
+            return newClientSessionId();
+        }
+    }
+
+    function newClientSessionId() {
+        if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+        return 'dock-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10);
     }
 
     function sendEvent(payload) {
@@ -951,7 +983,7 @@
             ws.onclose = function () {
                 isConnected = false;
                 isJoined = false;
-                if (isBlockedByServer) {
+                if (isBlockedByServer || seatConflictActive) {
                     endReconnectGrace({ dropQueues: true });
                     updateCloudUI();
                     return;
@@ -1008,6 +1040,7 @@
     function handleMessage(data) {
         if (data.type === 'joined') {
             isJoined = true;
+            seatConflictActive = false;
             endReconnectGrace({ dropQueues: false });
             if (data.room_id) setStorageItem('roomId', data.room_id);
             dockRole = data.role || null;
@@ -1063,16 +1096,23 @@
                 }
                 pendingStats.clear();
             }
+            if (data.code === 'api_key_in_use') {
+                applySeatConflict(data.message);
+                console.error('cloudRelay error:', data.code, data.message);
+                if (typeof alert === 'function') {
+                    alert(`CueSport Scoreboard Cloud: ${data.message || data.code}`);
+                }
+                return;
+            }
             if (
                 data.code === 'subscription_required' ||
                 data.code === 'invalid_api_key' ||
                 data.code === 'api_key_revoked' ||
                 data.code === 'dock_key_required' ||
                 data.code === 'room_deleted' ||
-                data.code === 'room_limit' ||
-                data.code === 'api_key_in_use'
+                data.code === 'room_limit'
             ) {
-                // Hard auth/seat errors — stop reconnect fighting and sync dock UI.
+                // Hard auth errors — stop reconnect fighting and sync dock UI.
                 applyServerBlock(data.message);
             }
             console.error('cloudRelay error:', data.code, data.message);
@@ -1131,30 +1171,75 @@
     function clearBlockedState() {
         isBlockedByServer = false;
         blockedReason = null;
+        seatConflictActive = false;
     }
 
-    /** Disable Cloud, kill the socket, and show Blocked / toggle off. */
-    function applyServerBlock(message) {
-        isBlockedByServer = true;
-        blockedReason = message || 'Access denied';
-        setStorageItem('enabled', 'false');
-        isEnabled = false;
+    /** Drop the live socket without toggling Cloud enabled / credentials. */
+    function abortLiveSocket({ exhaustReconnect = false } = {}) {
         if (reconnectTimer) {
             clearTimeout(reconnectTimer);
             reconnectTimer = null;
         }
-        reconnectAttempts = 0;
+        if (exhaustReconnect) reconnectAttempts = MAX_RECONNECT_ATTEMPTS;
+        else reconnectAttempts = 0;
         endReconnectGrace({ dropQueues: true });
         if (ws) {
             try { ws.onclose = null; } catch (_) { /* ignore */ }
             try { ws.onerror = null; } catch (_) { /* ignore */ }
             try { ws.onmessage = null; } catch (_) { /* ignore */ }
-            try { if (ws.readyState === 1 || ws.readyState === 0) ws.close(); } catch (_) { /* ignore */ }
+            try { ws.onopen = null; } catch (_) { /* ignore */ }
+            try {
+                if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) ws.close();
+            } catch (_) { /* ignore */ }
             ws = null;
         }
         isConnected = false;
         isJoined = false;
         hadControlClient = false;
+    }
+
+    /**
+     * Soft seat conflict: keep Cloud enabled + credentials, stop reconnect loop,
+     * and expose Take over so the operator can displace the other dock.
+     */
+    function applySeatConflict(message) {
+        seatConflictActive = true;
+        isBlockedByServer = false;
+        blockedReason = message || API_KEY_IN_USE_FALLBACK;
+        abortLiveSocket({ exhaustReconnect: true });
+        updateCloudUI();
+    }
+
+    const API_KEY_IN_USE_FALLBACK =
+        'This OBS Dock Key is already in use by another dock. Use Take over if this is your dock.';
+
+    /** Operator-confirmed displace of the other dock holding this key. */
+    function takeoverDockSeat() {
+        if (!getApiKey()) {
+            alert('Paste an OBS Dock Key before taking over.');
+            return;
+        }
+        if (!window.confirm('Take over this Dock Key? The other dock using it will be disconnected.')) {
+            return;
+        }
+        clearBlockedState();
+        joinWithTakeover = true;
+        reconnectAttempts = 0;
+        isEnabled = true;
+        setStorageItem('enabled', 'true');
+        disconnect();
+        connect();
+        updateCloudUI();
+    }
+
+    /** Disable Cloud, kill the socket, and show Blocked / toggle off. */
+    function applyServerBlock(message) {
+        seatConflictActive = false;
+        isBlockedByServer = true;
+        blockedReason = message || 'Access denied';
+        setStorageItem('enabled', 'false');
+        isEnabled = false;
+        abortLiveSocket({ exhaustReconnect: false });
         updateCloudUI();
     }
 
@@ -1226,9 +1311,11 @@
     function updateCloudUI() {
         const statusEl = document.getElementById('cloudRelayStatus');
         const toggle = document.getElementById('cloudRelayToggle');
+        const takeoverBtn = document.getElementById('cloudDockTakeoverBtn');
         const reconnecting = isCloudReconnecting();
         if (statusEl) {
             if (isBlockedByServer) statusEl.textContent = 'Blocked';
+            else if (seatConflictActive) statusEl.textContent = 'In use';
             else if (isCloudConnected()) statusEl.textContent = 'Connected';
             else if (reconnecting) statusEl.textContent = 'Reconnecting…';
             else if (isEnabled) statusEl.textContent = 'Connecting…';
@@ -1236,9 +1323,14 @@
             const roomId = isCloudConnected() ? getRoomId() : '';
             if (roomId) {
                 statusEl.title = `OBS Dock UUID: ${roomId}`;
+            } else if (seatConflictActive && blockedReason) {
+                statusEl.title = blockedReason;
             } else {
                 statusEl.removeAttribute('title');
             }
+        }
+        if (takeoverBtn) {
+            takeoverBtn.classList.toggle('noShow', !seatConflictActive);
         }
         if (toggle) toggle.checked = isEnabled;
         try {
@@ -1303,6 +1395,7 @@
         ensureBallScoringForMobileControl,
         init,
         updateCloudUI,
+        takeoverDockSeat,
         getServerUrl,
         getRoomId,
         getAccessToken,

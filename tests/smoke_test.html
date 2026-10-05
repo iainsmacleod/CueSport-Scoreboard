@@ -720,6 +720,33 @@
                 assert('Cloud Website', 'Dashboard brand has no version text',
                     (dashboardDoc.querySelector('.site-brand h1')?.textContent || '').trim() ===
                         'CueSport Scoreboard Cloud');
+                assert('Cloud Website', 'Landing hero appears after marketing carousel',
+                    (() => {
+                      const marketing = landingDoc.getElementById('landingMarketing');
+                      if (!marketing) return false;
+                      const children = [...marketing.children];
+                      const carouselIdx = children.findIndex((el) => el.classList.contains('marketing-carousel-panel'));
+                      const heroIdx = children.findIndex((el) => el.classList.contains('hero'));
+                      return carouselIdx >= 0 && heroIdx > carouselIdx;
+                    })());
+                assert('Cloud Dashboard', 'Sign-in controls appear above feature cards',
+                    (() => {
+                      const login = dashboardDoc.getElementById('loginSection');
+                      if (!login) return false;
+                      const children = [...login.children];
+                      const managedIdx = children.findIndex((el) => el.id === 'dashLoginManagedPane');
+                      const gridIdx = children.findIndex((el) => el.classList.contains('dash-login-feature-grid'));
+                      return managedIdx >= 0 && gridIdx > managedIdx;
+                    })());
+                assert('Cloud Dashboard', 'Admin account mount (incl. Sign Out) is below platform tools',
+                    (() => {
+                      const admin = dashboardDoc.getElementById('tabAdmin');
+                      if (!admin) return false;
+                      const children = [...admin.children];
+                      const mountIdx = children.findIndex((el) => el.id === 'adminAccountMount');
+                      const toolsIdx = children.findIndex((el) => el.querySelector?.('#adminAccountsTable'));
+                      return mountIdx > toolsIdx && mountIdx === children.length - 1;
+                    })());
                 assert('Cloud Dashboard', 'Sign-in page has three current-feature cards',
                     dashboardDoc.querySelectorAll('#loginSection .dash-login-feature-card').length === 3 &&
                     !dashboardDoc.querySelector('#dashLoginManagedPane .dash-login-feature-grid') &&

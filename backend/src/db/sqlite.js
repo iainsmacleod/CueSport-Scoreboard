@@ -197,6 +197,33 @@ function ensureApiKeyColumns(database) {
   if (!cols.has('role')) {
     database.exec(`ALTER TABLE api_keys ADD COLUMN role TEXT NOT NULL DEFAULT '${DEFAULT_DOCK_KEY_ROLE}'`);
   }
+  if (!cols.has('last_client_version')) {
+    database.exec('ALTER TABLE api_keys ADD COLUMN last_client_version TEXT');
+  }
+  if (!cols.has('last_seen_at')) {
+    database.exec('ALTER TABLE api_keys ADD COLUMN last_seen_at TEXT');
+  }
+  // One-time backfill from live room_docks so admin detail survives room prune after upgrade.
+  try {
+    database.exec(`
+      UPDATE api_keys
+         SET last_seen_at = (
+               SELECT d.last_seen_at FROM room_docks d
+                WHERE d.api_key_id = api_keys.id
+                ORDER BY d.last_seen_at DESC LIMIT 1
+             ),
+             last_client_version = COALESCE(
+               last_client_version,
+               (SELECT d.client_version FROM room_docks d
+                 WHERE d.api_key_id = api_keys.id
+                   AND d.client_version IS NOT NULL
+                   AND TRIM(d.client_version) != ''
+                 ORDER BY d.last_seen_at DESC LIMIT 1)
+             )
+       WHERE last_seen_at IS NULL
+         AND EXISTS (SELECT 1 FROM room_docks d WHERE d.api_key_id = api_keys.id)
+    `);
+  } catch (_) { /* room_docks may be mid-migrate */ }
   // Legacy signup keys were labeled "Default" — rename to the numbered scheme.
   database.prepare(
     `UPDATE api_keys SET label = 'OBS Dock Key 1'
@@ -943,13 +970,35 @@ const ADMIN_ACCOUNT_SELECT = `
          (SELECT COUNT(*) FROM rooms r WHERE r.account_id = a.id AND COALESCE(r.kind, 'dock') = 'dock') AS dock_room_count,
          (SELECT COUNT(*) FROM rooms r WHERE r.account_id = a.id AND r.kind = 'impromptu') AS impromptu_room_count,
          (SELECT COUNT(*) FROM room_guest_tokens g WHERE g.account_id = a.id AND g.revoked_at IS NULL) AS guest_link_count,
-         (SELECT MAX(d.last_seen_at) FROM room_docks d WHERE d.account_id = a.id) AS last_dock_seen_at,
-         (SELECT d.client_version FROM room_docks d
-          WHERE d.account_id = a.id
-            AND d.client_version IS NOT NULL
-            AND TRIM(d.client_version) != ''
-          ORDER BY d.last_seen_at DESC
-          LIMIT 1) AS dock_client_version
+         MAX(
+           (SELECT MAX(d.last_seen_at) FROM room_docks d WHERE d.account_id = a.id),
+           (SELECT MAX(ak.last_seen_at) FROM api_keys ak WHERE ak.account_id = a.id)
+         ) AS last_dock_seen_at,
+         CASE
+           WHEN COALESCE(
+             (SELECT MAX(d.last_seen_at) FROM room_docks d
+               WHERE d.account_id = a.id
+                 AND d.client_version IS NOT NULL AND TRIM(d.client_version) != ''),
+             ''
+           ) >= COALESCE(
+             (SELECT MAX(ak.last_seen_at) FROM api_keys ak
+               WHERE ak.account_id = a.id
+                 AND ak.last_client_version IS NOT NULL AND TRIM(ak.last_client_version) != ''),
+             ''
+           )
+           THEN (
+             SELECT d.client_version FROM room_docks d
+              WHERE d.account_id = a.id
+                AND d.client_version IS NOT NULL AND TRIM(d.client_version) != ''
+              ORDER BY d.last_seen_at DESC LIMIT 1
+           )
+           ELSE (
+             SELECT ak.last_client_version FROM api_keys ak
+              WHERE ak.account_id = a.id
+                AND ak.last_client_version IS NOT NULL AND TRIM(ak.last_client_version) != ''
+              ORDER BY ak.last_seen_at DESC LIMIT 1
+           )
+         END AS dock_client_version
   FROM accounts a
 `;
 
@@ -1387,6 +1436,11 @@ export function peekRoomDockByApiKey(apiKeyId) {
   ).get(apiKeyId) || null;
 }
 
+function normalizeDockClientVersion(clientVersion) {
+  if (clientVersion == null) return null;
+  return String(clientVersion).trim().slice(0, 40) || null;
+}
+
 /**
  * One room per Dock Key under an account.
  * Callers must enforce room quotas before create (see room-hub).
@@ -1397,7 +1451,7 @@ export function ensureRoomForApiKey(accountId, apiKeyId, { instanceKey, label, c
   const key = (instanceKey || 'default').trim() || 'default';
   const keyLabel = connectionLabelForApiKey(apiKeyId);
   const resolvedLabel = keyLabel || label || null;
-  const version = clientVersion != null ? String(clientVersion).trim().slice(0, 40) || null : null;
+  const version = normalizeDockClientVersion(clientVersion);
   let row = peekRoomDockByApiKey(apiKeyId);
   if (row) {
     if (row.account_id !== accountId) {
@@ -1410,6 +1464,7 @@ export function ensureRoomForApiKey(accountId, apiKeyId, { instanceKey, label, c
         client_version = COALESCE(?, client_version)
        WHERE api_key_id = ?`
     ).run(key, resolvedLabel, version, apiKeyId);
+    touchApiKeyLastSeen(apiKeyId, version);
     if (resolvedLabel) {
       database.prepare('UPDATE rooms SET label = ? WHERE id = ?').run(resolvedLabel, row.room_id);
     }
@@ -1425,6 +1480,7 @@ export function ensureRoomForApiKey(accountId, apiKeyId, { instanceKey, label, c
     `INSERT INTO room_docks (room_id, account_id, api_key_id, instance_key, label, client_version, last_seen_at)
      VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`
   ).run(roomId, accountId, apiKeyId, key, roomLabel, version);
+  touchApiKeyLastSeen(apiKeyId, version);
   return getRoom(roomId);
 }
 
@@ -1450,16 +1506,27 @@ export function setRoomDockApiKey(roomId, apiKeyId) {
   return true;
 }
 
+export function touchApiKeyLastSeen(apiKeyId, clientVersion) {
+  if (!apiKeyId) return;
+  const version = normalizeDockClientVersion(clientVersion);
+  getDb().prepare(
+    `UPDATE api_keys SET last_seen_at = datetime('now'),
+      last_client_version = COALESCE(?, last_client_version)
+     WHERE id = ?`
+  ).run(version, apiKeyId);
+}
+
 export function touchRoomDockByApiKey(apiKeyId, instanceKey, clientVersion) {
   if (!apiKeyId) return;
   const key = (instanceKey || 'default').trim() || 'default';
-  const version = clientVersion != null ? String(clientVersion).trim().slice(0, 40) || null : null;
+  const version = normalizeDockClientVersion(clientVersion);
   getDb().prepare(
     `UPDATE room_docks SET last_seen_at = datetime('now'),
       instance_key = ?,
       client_version = COALESCE(?, client_version)
      WHERE api_key_id = ?`
   ).run(key, version, apiKeyId);
+  touchApiKeyLastSeen(apiKeyId, version);
 }
 
 export function getRoomsWithLiveState(accountId) {

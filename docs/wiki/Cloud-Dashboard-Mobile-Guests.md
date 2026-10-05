@@ -77,7 +77,7 @@ Controls lock when the dock is offline or the cloud socket drops.
 
 Rules:
 
-- **One active device per guest link** at a time (second device gets “in use”).
+- **One active device per guest link** at a time (second device gets “in use”). Same browser tab can reclaim after a network switch; use **Take over this link** to displace another device.
 - Link stays valid until you revoke it.
 - QR and URL stay hidden until **Show** (dock Remote tab and mobile Share).
 - Create/revoke from dashboard Settings, dock **Remote** tab (when connected), or mobile **Share** (role permitting).
