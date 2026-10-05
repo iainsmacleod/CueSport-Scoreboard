@@ -8,7 +8,7 @@ import {
   createAccountPlayer,
   fetchPublicConfig,
   GAME_TYPES,
-} from '../shared/cloud-client.js?v=8.4.0';
+} from '../shared/cloud-client.js?v=8.4.0.1';
 import {
   parseRaceTarget,
   isRaceLocked,
@@ -21,7 +21,7 @@ import {
   ensureSupabaseAuth,
   getFreshAccessToken,
   signOutSupabaseSession,
-} from '../shared/supabase-session.js?v=8.4.0';
+} from '../shared/supabase-session.js?v=8.4.0.1';
 import {
   applyImpromptuCommand,
   hydrateAuthorityState,
@@ -721,6 +721,8 @@ async function reconnectQuiet(options = {}) {
       leaveTableForHome({ clearToken: true });
       return;
     }
+    // Boot quiet connect must not stick on the Connecting splash.
+    if (dismissConnectingShellOnBootFailure(err)) return;
     setReconnectBanner(true, 'Connection lost — tap Reconnect');
     scheduleReconnect();
   } finally {
@@ -973,6 +975,8 @@ function shouldLeaveTableForHome(err) {
   return [
     'room_deleted',
     'room_forbidden',
+    'room_not_found',
+    'subscription_required',
     'guest_revoked',
     'invalid_guest_token',
     'account_deleting',
@@ -1005,6 +1009,12 @@ function reloginMessage(err) {
   if (code === 'room_forbidden') {
     return 'This table belongs to another account. Open its mobile link from the dashboard.';
   }
+  if (code === 'room_not_found') {
+    return 'That table was not found. Open a table link from the dashboard.';
+  }
+  if (code === 'subscription_required') {
+    return 'Cloud access is required for this table. Check your plan on the dashboard.';
+  }
   if (code === 'control_connection_limit') {
     return err.message || 'Too many devices controlling this table. Disconnect another phone or upgrade your plan.';
   }
@@ -1015,6 +1025,29 @@ function reloginMessage(err) {
     return 'Couldn\'t connect — check your network and tap Reconnect.';
   }
   return err?.message || err?.code || 'Connection failed. Sign in again.';
+}
+
+function isConnectingShellVisible() {
+  const section = document.getElementById('connectingSection');
+  return !!(section && !section.classList.contains('hidden'));
+}
+
+/**
+ * Initial boot uses quiet connect — never leave the Connecting splash spinning forever.
+ * @returns {boolean} true when the connecting shell was dismissed here
+ */
+function dismissConnectingShellOnBootFailure(err) {
+  if (!isConnectingShellVisible()) return false;
+  if (getStoredAccessToken() || isGuestMode) {
+    stayConnectedWithRetry(reloginMessage(err));
+  } else {
+    wantConnection = false;
+    clearReconnectTimer();
+    setReconnectBanner(false);
+    showLogin();
+    setError(reloginMessage(err));
+  }
+  return true;
 }
 
 /** Keep the control shell + reconnect CTA; never wipe the token. */
@@ -3524,6 +3557,7 @@ async function connectAuthenticatedSession({ quiet, isCurrent }) {
     }
     if (quiet) {
       // Transient drops must not wipe the saved login.
+      // reconnectQuiet dismisses the Connecting splash on initial boot failure.
       dockPresent = false;
       setConnectionStatus('disconnected');
       setReconnectBanner(true, 'Connection lost — tap Reconnect');
@@ -3657,20 +3691,41 @@ function startBootConnect(message) {
 }
 
 const boot = pathContext();
-fetchPublicConfig(window.location.origin)
-  .then(async (config) => {
+
+/**
+ * Wait for public config + Supabase hydrate before choosing login vs auto-connect.
+ * Matches dashboard boot — avoids racing a stale/missing cuesport_token after account switch.
+ */
+(async function bootMobileShell() {
+  const status = document.getElementById('connectingStatus');
+  if (status && !boot.guestToken) {
+    status.textContent = 'Loading…';
+  }
+  try {
+    const config = await fetchPublicConfig(window.location.origin);
     mobilePublicConfigCache = config;
     if (config?.supabaseUrl && config?.supabasePublishableKey) {
       await ensureSupabaseAuth(config);
     }
-  })
-  .catch(() => { /* optional — admin mobile still works with stored token / guest */ });
+  } catch (_) {
+    /* optional — guest / stored token still work without config */
+  }
 
-if (boot.guestToken) {
-  startBootConnect('Connecting…');
-} else if (getStoredAccessToken() && boot.roomId) {
-  // Single entry point — avoids racing pageshow against a parallel quiet connect.
-  startBootConnect('Connecting…');
-} else {
-  showLogin();
-}
+  if (boot.guestToken) {
+    startBootConnect('Connecting…');
+    return;
+  }
+
+  let token = getStoredAccessToken();
+  if (mobilePublicConfigCache) {
+    try {
+      token = (await getFreshAccessToken(mobilePublicConfigCache)) || token;
+    } catch (_) { /* ignore */ }
+  }
+
+  if (token && boot.roomId) {
+    startBootConnect('Connecting…');
+  } else {
+    showLogin();
+  }
+})();

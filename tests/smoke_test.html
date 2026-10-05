@@ -740,6 +740,13 @@
                     !!mobileDoc.querySelector('#connectingSection.app-boot') &&
                     mobileAppSource.indexOf("showConnecting(message || 'Connecting to table…')") !== -1 &&
                     mobileAppSource.indexOf("setConnectionStatus('waiting')") !== -1);
+                assert('Cloud Navigation', 'Mobile boot awaits session hydrate before auto-connect',
+                    mobileAppSource.indexOf('async function bootMobileShell') !== -1 &&
+                    mobileAppSource.indexOf('await ensureSupabaseAuth(config)') !== -1 &&
+                    mobileAppSource.indexOf('await getFreshAccessToken(mobilePublicConfigCache)') !== -1 &&
+                    mobileAppSource.indexOf('function dismissConnectingShellOnBootFailure') !== -1 &&
+                    mobileAppSource.indexOf("'room_not_found'") !== -1 &&
+                    mobileAppSource.indexOf("'subscription_required'") !== -1);
                 assert('Cloud Mobile', 'Forced table exits return home instead of showing saved login',
                     mobileAppSource.indexOf('function shouldLeaveTableForHome') !== -1 &&
                     mobileAppSource.indexOf("window.location.replace('/')") !== -1 &&

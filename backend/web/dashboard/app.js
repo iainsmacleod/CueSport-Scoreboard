@@ -38,7 +38,7 @@ import {
   adoptOAuthHashSession,
   getFreshAccessToken,
   signOutSupabaseSession,
-} from '../shared/supabase-session.js?v=8.4.0';
+} from '../shared/supabase-session.js?v=8.4.0.1';
 import {
   installAppViewportHeightSync,
   settleAppViewportHeight,
@@ -6049,6 +6049,9 @@ async function handleGoogleCredentialResponse(response) {
     platformViewAccountId = '';
     adminSelectedId = '';
     lastTablesFingerprint = '';
+    // Clear prior Supabase session first (same as dev login) so account switch
+    // cannot leave a half-broken admin JWT fighting the new Google session.
+    await signOutSupabaseSession(config).catch(() => {});
     await signInWithGoogleIdToken(config, response.credential);
     localStorage.setItem(SERVER_KEY, getServerUrl());
     window.history.replaceState({}, '', window.location.pathname + window.location.search);

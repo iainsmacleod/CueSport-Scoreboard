@@ -1647,6 +1647,19 @@ label.switch.toggle-disabled {
     min-width: 134px;
 }
 
+/* Replay playing: keep disabled/non-clickable chrome, but status text stays vivid. */
+#btnMonitorGame.replay-active:disabled,
+#btnMonitorGame.replay-active[aria-disabled="true"] {
+	opacity: 1;
+	cursor: not-allowed;
+	box-shadow: none;
+	background-color: #414868;
+	border: 1px solid rgba(224, 175, 104, 0.5);
+	color: #e0af68;
+	font-weight: 700;
+	letter-spacing: 0.02em;
+}
+
 /* Modal Styles */
 .modal {
 	display: none;

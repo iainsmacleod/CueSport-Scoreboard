@@ -14,6 +14,7 @@ let authListenerBound = false;
 let authStateSubscription = null;
 /** Bumped on local sign-out so stale onAuthStateChange callbacks cannot wipe a new session. */
 let authEpoch = 0;
+let storageListenerBound = false;
 
 export function getStoredAccessToken() {
   return localStorage.getItem(CUESPORT_TOKEN_KEY) || '';
@@ -35,6 +36,38 @@ function configKey(config) {
 function canUseSupabase(config) {
   return !!(config?.supabaseUrl && config?.supabasePublishableKey);
 }
+
+function clearAuthListener() {
+  try {
+    authStateSubscription?.unsubscribe?.();
+  } catch (_) { /* ignore */ }
+  authStateSubscription = null;
+  authListenerBound = false;
+}
+
+/**
+ * Drop the in-memory Supabase client so the next ensure/getFresh rebuilds from storage.
+ * Used on local sign-out and when another tab changes auth keys.
+ */
+export function resetSupabaseAuthClient() {
+  authEpoch += 1;
+  clearAuthListener();
+  clientPromise = null;
+  clientConfigKey = '';
+}
+
+function installAuthStorageListener() {
+  if (storageListenerBound || typeof window === 'undefined' || !window.addEventListener) return;
+  storageListenerBound = true;
+  window.addEventListener('storage', (ev) => {
+    if (!ev) return;
+    if (ev.key !== CUESPORT_TOKEN_KEY && ev.key !== SUPABASE_STORAGE_KEY) return;
+    // Another tab signed out / switched accounts — do not let a stale in-memory
+    // session republish the previous JWT into cuesport_token.
+    resetSupabaseAuthClient();
+  });
+}
+installAuthStorageListener();
 
 /**
  * @param {{ supabaseUrl?: string, supabasePublishableKey?: string }} config
@@ -60,14 +93,6 @@ export async function getSupabaseClient(config) {
     });
   })();
   return clientPromise;
-}
-
-function clearAuthListener() {
-  try {
-    authStateSubscription?.unsubscribe?.();
-  } catch (_) { /* ignore */ }
-  authStateSubscription = null;
-  authListenerBound = false;
 }
 
 /**
@@ -211,8 +236,7 @@ export async function getFreshAccessToken(config) {
 /** Clear Supabase session and cuesport_token (local sign-out). */
 export async function signOutSupabaseSession(config) {
   setStoredAccessToken('');
-  authEpoch += 1;
-  clearAuthListener();
+  resetSupabaseAuthClient();
   try {
     if (canUseSupabase(config)) {
       const supabase = await getSupabaseClient(config);
@@ -226,7 +250,5 @@ export async function signOutSupabaseSession(config) {
     localStorage.removeItem(SUPABASE_STORAGE_KEY);
   } catch (_) { /* ignore */ }
   // Drop the shared client so the next sign-in cannot revive an in-memory session.
-  clientPromise = null;
-  clientConfigKey = '';
-  clearAuthListener();
+  resetSupabaseAuthClient();
 }

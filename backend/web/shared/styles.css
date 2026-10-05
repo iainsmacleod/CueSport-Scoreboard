@@ -188,7 +188,18 @@ a.btn:focus {
 }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .btn.monitor-active { background: #f7768e; color: #1a1b26; font-weight: 600; }
-.btn.replay-active { background: #e0af68; color: #1a1b26; font-weight: 600; }
+.btn.replay-active {
+  background: rgba(65, 72, 104, 0.78);
+  color: #e0af68;
+  font-weight: 700;
+  border-color: rgba(224, 175, 104, 0.55);
+  letter-spacing: 0.02em;
+}
+.btn.replay-active:disabled {
+  opacity: 1;
+  cursor: not-allowed;
+  box-shadow: none;
+}
 .btn.stream-active { background: #f7768e; color: #1a1b26; font-weight: 600; }
 .btn.stats-active {
   background: #7aa2f7;

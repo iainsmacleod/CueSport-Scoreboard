@@ -246,6 +246,20 @@ select:disabled,
 	box-shadow: none !important;
 }
 
+/* Replay Active: disabled (non-clickable) chrome, active status text. */
+#btnMonitorGame.replay-active:disabled,
+#btnMonitorGame.replay-active[aria-disabled="true"] {
+	opacity: 1 !important;
+	cursor: not-allowed !important;
+	box-shadow: none !important;
+	filter: none !important;
+	background: rgba(65, 72, 104, 0.78) !important;
+	border-color: rgba(224, 175, 104, 0.55) !important;
+	color: #e0af68 !important;
+	font-weight: 800 !important;
+	letter-spacing: 0.02em !important;
+}
+
 /* Active player is intentionally disabled (no re-select); keep it visually selected. */
 .rack-breaker-btn.rack-breaker-current,
 .rack-breaker-btn.rack-breaker-current:disabled {

@@ -8284,18 +8284,22 @@ function setMonitorButtonText() {
     const btn = document.getElementById('btnMonitorGame');
     if (!btn) return;
     if (isReplayPlaybackActive) {
+        // Status chip: keep disabled chrome, but make the label read clearly active.
         btn.textContent = 'Replay Active';
-        btn.style.backgroundColor = '#e0af68';
-        btn.style.color = '#1a1b26';
+        btn.classList.add('replay-active');
+        btn.style.backgroundColor = '';
+        btn.style.color = '';
         btn.disabled = true;
         btn.setAttribute('aria-disabled', 'true');
     } else if (getStorageItem("isMonitoringActive") === "true") {
+        btn.classList.remove('replay-active');
         btn.textContent = 'Stop Monitoring';
         btn.style.backgroundColor = 'red';  // red fill for Stop Monitoring
         btn.style.color = 'white';           // optionally set text color for contrast
         btn.disabled = false;
         btn.removeAttribute('aria-disabled');
     } else {
+        btn.classList.remove('replay-active');
         btn.textContent = 'Resume Monitoring';
         btn.style.backgroundColor = 'green'; // green fill for Resume Monitoring
         btn.style.color = 'white';            // optionally set text color
