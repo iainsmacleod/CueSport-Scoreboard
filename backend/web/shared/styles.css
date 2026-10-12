@@ -1410,6 +1410,41 @@ body.has-dash-nav .dash-tabs[hidden] {
 .marketing-obs-note a {
   color: #7aa2f7;
 }
+.landing-pitch h2 {
+  margin-top: 0;
+}
+.landing-pitch h3 {
+  margin: 1.25rem 0 0.55rem;
+  font-size: 1.05rem;
+}
+.landing-pitch p {
+  margin: 0.55rem 0 0;
+  line-height: 1.5;
+}
+.landing-pitch p:first-of-type {
+  margin-top: 0.65rem;
+}
+.landing-pitch a {
+  color: #7aa2f7;
+}
+.landing-pitch-audience {
+  margin: 0.75rem 0 0;
+  padding-left: 1.2rem;
+  line-height: 1.45;
+}
+.landing-pitch-audience li + li {
+  margin-top: 0.35rem;
+}
+.landing-pitch-asterisk {
+  font-size: 0.85em;
+  line-height: 0;
+}
+.landing-pitch .marketing-obs-note {
+  margin-top: 0.75rem;
+}
+.landing-pitch .hero-actions {
+  margin-top: 1.15rem;
+}
 /* Landing product carousel */
 .marketing-carousel-panel {
   padding: 0.85rem 0.9rem 1rem;

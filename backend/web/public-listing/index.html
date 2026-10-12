@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>CueSport Scoreboard Cloud</title>
   <link rel="icon" type="image/png" href="/web/images/brand/logo.png?v=1" />
-  <link rel="stylesheet" href="/web/shared/styles.css?v=8.4.0" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.4.0.8" />
 </head>
 <body class="landing-home">
   <header class="site-header">
@@ -35,6 +35,46 @@
     </section>
 
     <div id="landingMarketing" class="landing-marketing">
+      <section id="landingPitch" class="panel landing-pitch" aria-label="Who Cloud is for and what it does">
+        <h2>Who is CueSport Scoreboard Cloud for?</h2>
+        <p>
+          Whether you stream or record to your favorite platform, run a league or tournament and need
+          player stats, or just want a history of games with friends — with or without a camera —
+          Cloud is built for that.
+        </p>
+        <ul class="landing-pitch-audience">
+          <li>Streamers and recorders who need to score from the table, not the PC</li>
+          <li>Organizers tracking standings and player performance</li>
+          <li>Players logging matches with no stream or OBS setup</li>
+        </ul>
+        <h3>What does CueSport Scoreboard Cloud do for you?</h3>
+        <p>
+          Used with
+          <a href="https://github.com/iainsmacleod/CueSport-Scoreboard" target="_blank" rel="noopener noreferrer" aria-describedby="landingObsNote">CueSport Scoreboard</a><sup class="landing-pitch-asterisk" aria-hidden="true">*</sup>,
+          Cloud lets you run the match from your phone so you&rsquo;re not tied to
+          the streaming or recording desk. Hand a focused guest link to a player or helper so they can
+          score without account access. Every completed match feeds searchable history and leaderboards
+          — useful for tournaments, leagues, or casual nights. With <strong>ad-hoc tables</strong>, you
+          can score on the fly with no OBS dock at all and still keep the same Cloud history.
+        </p>
+        <p id="landingObsNote" class="hint marketing-obs-note">
+          <span class="landing-pitch-asterisk" aria-hidden="true">*</span>
+          Streaming tables use OBS with
+          <a href="https://github.com/iainsmacleod/CueSport-Scoreboard" target="_blank" rel="noopener noreferrer">CueSport Scoreboard</a>
+          (the free OBS dock). Cloud is the hosted relay, remotes, billing, and <strong>impromptu</strong> seats for games you are not streaming.
+        </p>
+        <div class="hero-actions">
+          <a id="heroAuthBtn" class="btn primary" href="/dashboard">
+            <svg class="site-nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+            Dashboard
+          </a>
+          <a class="btn" href="/streams">
+            <svg class="site-nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="14" height="12" rx="2"/><polygon points="22 8 16 12 22 16 22 8"/></svg>
+            Live Streams
+          </a>
+        </div>
+      </section>
+
       <section class="panel marketing-carousel-panel" aria-roledescription="carousel" aria-label="Product highlights">
         <div class="marketing-carousel" id="marketingCarousel" tabindex="0">
           <div class="marketing-carousel-viewport">
@@ -126,30 +166,6 @@
             </button>
           </div>
         </div>
-      </section>
-
-      <section class="hero panel">
-        <h2>CueSport Scoreboard Cloud</h2>
-        <p>
-          Connect every OBS CueSport Scoreboard to one secure hosted service. Run matches from your
-          phone, hand off focused guest controls, manage multiple tables, preserve searchable match
-          statistics, and promote active live streams — all from one Cloud account.
-        </p>
-        <div class="hero-actions">
-          <a id="heroAuthBtn" class="btn primary" href="/dashboard">
-            <svg class="site-nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
-            Dashboard
-          </a>
-          <a class="btn" href="/streams">
-            <svg class="site-nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="14" height="12" rx="2"/><polygon points="22 8 16 12 22 16 22 8"/></svg>
-            Live Streams
-          </a>
-        </div>
-        <p class="hint marketing-obs-note">
-          Streaming tables use OBS with
-          <a href="https://github.com/iainsmacleod/CueSport-Scoreboard" target="_blank" rel="noopener noreferrer">CueSport Scoreboard</a>
-          (the free OBS dock). Cloud is the hosted relay, remotes, billing, and <strong>impromptu</strong> seats for games you are not streaming.
-        </p>
       </section>
 
       <section id="landingPricing" class="panel landing-pricing hidden">
