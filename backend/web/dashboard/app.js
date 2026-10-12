@@ -2462,19 +2462,35 @@ function formatAdminSubscriptionStatus(account) {
   return formatAdminTierLabel(status);
 }
 
-/** Access End Date: complimentary end when active, else paid entitlement end. */
+/** Entitlement through: farthest date among complimentary / Stripe clocks (cancel wins). */
 function formatAdminAccessEndDate(account) {
-  if (isComplimentaryActive(account)) {
-    return formatBillingDate(account.trial_ends_at) || '—';
-  }
-  if (account?.access_ends_at) {
-    return formatBillingDate(account.access_ends_at) || '—';
-  }
   const summary = account?.billing_summary;
-  const fromSummary = formatBillingDate(
-    summary?.cancelAt || summary?.trialEnd || summary?.currentPeriodEnd
+  const cancelScheduled = !!(
+    summary?.cancelAtPeriodEnd
+    ?? account?.cancel_at_period_end
   );
-  return fromSummary || '—';
+  if (cancelScheduled || summary?.cancelAt) {
+    const cancelDate = formatBillingDate(
+      summary?.cancelAt || summary?.trialEnd || summary?.currentPeriodEnd || account?.access_ends_at
+    );
+    if (cancelDate) return cancelDate;
+  }
+
+  const candidates = [
+    account?.trial_ends_at,
+    account?.access_ends_at,
+    summary?.trialEnd,
+    summary?.currentPeriodEnd,
+  ];
+  let latestMs = null;
+  for (const raw of candidates) {
+    if (!raw) continue;
+    const d = parseUtcDate(raw) || new Date(raw);
+    if (!d || Number.isNaN(d.getTime())) continue;
+    const ms = d.getTime();
+    if (latestMs == null || ms > latestMs) latestMs = ms;
+  }
+  return latestMs != null ? formatBillingDate(new Date(latestMs).toISOString()) : '—';
 }
 
 function adminTierLabel(account) {
@@ -2606,7 +2622,7 @@ async function loadAdminAccountDetail(accountId) {
             ? ` <span class="hint">(billing field: ${escapeHtml(formatAdminTierLabel(account.subscription_tier))})</span>`
             : ''
         }</div>
-        <div><strong>Access End Date:</strong> ${escapeHtml(formatAdminAccessEndDate(account))}</div>
+        <div><strong>Entitlement through:</strong> ${escapeHtml(formatAdminAccessEndDate(account))}</div>
         <div><strong>Created:</strong> ${escapeHtml(account.created_at ? formatLocalDate(account.created_at) : '—')}</div>
         <div><strong>Quota:</strong> ${
           quota?.limits

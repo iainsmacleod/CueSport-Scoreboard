@@ -446,8 +446,8 @@ async function run() {
       && dashJsText.includes('Cancelled')
   );
   assert(
-    'Dashboard admin Access End Date column',
-    dashHtmlText.includes('Access End Date')
+    'Dashboard admin Entitlement through column',
+    dashHtmlText.includes('Entitlement through')
       && dashJsText.includes('formatAdminAccessEndDate')
       && dashJsText.includes('Complimentary (')
   );
