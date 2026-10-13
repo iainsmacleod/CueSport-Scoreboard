@@ -6,7 +6,7 @@
   <title>CueSport Scoreboard Cloud — Dashboard</title>
   <link rel="icon" type="image/png" href="/web/images/brand/logo.png?v=1" />
   <link rel="apple-touch-icon" href="/web/images/balls/8ball_small.png" />
-  <link rel="stylesheet" href="/web/shared/styles.css?v=8.4.0.5" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.4.0.7" />
 </head>
 <body class="dashboard-page">
   <header class="site-header">
@@ -362,6 +362,19 @@
               </select>
             </label>
           </div>
+          <div id="statsPlayerH2HSection" class="stats-h2h-section">
+            <div class="stats-h2h-heading">
+              <h3 class="stats-section-title">Head to Head</h3>
+              <div id="statsH2HChartModeToggle" class="stats-h2h-chart-mode hidden" role="group" aria-label="Head-to-head chart metric">
+                <button type="button" class="stats-h2h-chart-mode-btn active" data-h2h-chart-mode="matches" aria-pressed="true">Matches</button>
+                <button type="button" class="stats-h2h-chart-mode-btn" data-h2h-chart-mode="racks" aria-pressed="false">Racks / Frames</button>
+              </div>
+            </div>
+            <p id="statsH2HChartHint" class="stats-h2h-chart-hint">Select an opponent to view head-to-head progress.</p>
+            <div id="statsH2HChartWrap" class="stats-h2h-chart-wrap hidden">
+              <canvas id="statsH2HChart" aria-label="Head-to-head wins versus games played"></canvas>
+            </div>
+          </div>
           <h3 class="stats-section-title">Matches</h3>
           <div class="stats-table-wrap">
             <table class="dash-stats-table">
@@ -710,6 +723,7 @@
       </div>
     </div>
   </div>
-  <script type="module" src="/web/dashboard/app.js?v=8.4.0.1"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script type="module" src="/web/dashboard/app.js?v=8.4.0.6"></script>
 </body>
 </html>

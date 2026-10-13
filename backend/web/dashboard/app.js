@@ -114,6 +114,10 @@ let statsPlayerFilterId = '';
 let playerRenameEditing = false;
 let playerDetailOpponentFilter = '';
 let playerDetailGameFilter = '';
+/** H2H chart metric: 'matches' (default) or 'racks'. */
+let playerDetailH2HChartMode = 'matches';
+/** Chart.js instance for player-detail H2H win progression (destroyed on re-render). */
+let statsH2HChart = null;
 
 /** Leaderboard: sort full dataset, then paginate (page UI appears when needed). */
 const LEADERBOARD_PAGE_SIZE = 50;
@@ -3485,6 +3489,8 @@ function applyPlayerNameFilter(playerOrName) {
     if (input) input.value = label;
     statsPlayerFilterId = '';
   }
+  // Ensure Clear enables even if a later render path skips filter sync.
+  syncStatsClearFiltersBtn();
   applyOverviewFiltersChanged();
 }
 
@@ -3497,8 +3503,10 @@ function renderAccountStats() {
     renderPlayerDetail();
     return;
   }
+  destroyH2HWinChart();
   if (overview) overview.classList.remove('hidden');
   if (detail) detail.classList.add('hidden');
+  syncStatsClearFiltersBtn();
 
   const summaryEl = document.getElementById('statsSummary');
   const statusEl = document.getElementById('statsStatus');
@@ -3588,18 +3596,22 @@ function renderAccountStats() {
 
 function matchPairHtml(m) {
   const result = resolveMatchResult(m);
-  const playerSpan = (name, winner) => {
+  const playerSpan = (name, playerId, winner) => {
     const display = String(name || '').trim();
     const classes = winner ? 'stats-match-player stats-winner' : 'stats-match-player';
     if (!display) {
       return `<span class="${classes}">—</span>`;
     }
-    return `<button type="button" class="${classes} stats-match-player-link" data-open-player="${escapeHtml(display)}">${escapeHtml(display)}</button>`;
+    const id = String(playerId || '').trim();
+    const openAttr = id
+      ? ` data-open-player-id="${escapeHtml(id)}" data-open-player="${escapeHtml(display)}"`
+      : ` data-open-player="${escapeHtml(display)}"`;
+    return `<button type="button" class="${classes} stats-match-player-link"${openAttr}>${escapeHtml(display)}</button>`;
   };
   return `<div class="stats-match-pair">
-    ${playerSpan(m.player1Name, result.winnerSlot === '1')}
+    ${playerSpan(m.player1Name, m.player1Id, result.winnerSlot === '1')}
     <span class="stats-match-vs">vs</span>
-    ${playerSpan(m.player2Name, result.winnerSlot === '2')}
+    ${playerSpan(m.player2Name, m.player2Id, result.winnerSlot === '2')}
   </div>`;
 }
 
@@ -4021,6 +4033,366 @@ function balancedSummaryColumns(count, maxPerRow = 4) {
   return Math.ceil(n / rows);
 }
 
+function destroyH2HWinChart() {
+  if (statsH2HChart) {
+    try {
+      statsH2HChart.destroy();
+    } catch (_) {
+      /* ignore */
+    }
+    statsH2HChart = null;
+  }
+}
+
+function syncH2HChartModeToggle(visible) {
+  const toggle = document.getElementById('statsH2HChartModeToggle');
+  if (!toggle) return;
+  toggle.classList.toggle('hidden', !visible);
+  const mode = playerDetailH2HChartMode === 'racks' ? 'racks' : 'matches';
+  toggle.querySelectorAll('[data-h2h-chart-mode]').forEach((btn) => {
+    const active = btn.getAttribute('data-h2h-chart-mode') === mode;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
+}
+
+/** Resolve a rack/frame winner to match slot '1' | '2', or null. */
+function resolveRackWinnerSlot(match, rack) {
+  if (!rack) return null;
+  const slot = rack.winnerSlot != null ? String(rack.winnerSlot) : '';
+  if (slot === '1' || slot === '2') return slot;
+  const wid = rack.winnerId != null ? String(rack.winnerId) : '';
+  if (wid === '1' || wid === '2') return wid;
+  if (wid && wid === String(match.player1Id || '')) return '1';
+  if (wid && wid === String(match.player2Id || '')) return '2';
+  const wName = String(rack.winnerName || '').trim().toLowerCase();
+  if (wName) {
+    if (wName === String(match.player1Name || '').trim().toLowerCase()) return '1';
+    if (wName === String(match.player2Name || '').trim().toLowerCase()) return '2';
+  }
+  return null;
+}
+
+/**
+ * Ordered decisive rack/frame winners for H2H chart stepping.
+ * Prefers stored racks; falls back to synthesizing one winner per point in the scoreline.
+ */
+function h2hRackWinnerSteps(match) {
+  const timed = enrichRacksWithDuration(match);
+  const steps = [];
+  timed.forEach((r, index) => {
+    const winnerSlot = resolveRackWinnerSlot(match, r);
+    if (!winnerSlot) return;
+    steps.push({
+      winnerSlot,
+      rackNumber: Number(r.rackNumber) || (index + 1),
+      rack: r,
+    });
+  });
+  if (steps.length) return steps;
+
+  const s1 = Number(match?.scores?.p1) || 0;
+  const s2 = Number(match?.scores?.p2) || 0;
+  if (s1 + s2 <= 0) return [];
+  // No per-rack history — expand the final score into individual rack wins.
+  // Alternate while both sides still have racks so the line steps instead of jumping.
+  let rem1 = s1;
+  let rem2 = s2;
+  let n = 0;
+  while (rem1 > 0 || rem2 > 0) {
+    let winnerSlot;
+    if (rem1 > 0 && (rem2 === 0 || n % 2 === 0)) {
+      winnerSlot = '1';
+      rem1 -= 1;
+    } else {
+      winnerSlot = '2';
+      rem2 -= 1;
+    }
+    n += 1;
+    steps.push({ winnerSlot, rackNumber: n, rack: null, synthesized: true });
+  }
+  return steps;
+}
+
+/**
+ * Cumulative wins vs played for a pair (chronological).
+ * mode 'matches': X = matches played, Y = matches won
+ * mode 'racks': X = racks/frames played, Y = racks/frames won — one step per rack winner
+ * @returns {{ mode: string, labels: number[], playerWins: number[], opponentWins: number[], pointMeta: object[], playerName: string, opponentName: string, xLabel: string, yLabel: string, playedLabel: string, wonLabel: string } | null}
+ */
+function buildH2HWinProgression(matches, playerKey, opponentKey, mode = 'matches') {
+  const pKey = String(playerKey || '').trim();
+  const oKey = String(opponentKey || '').trim();
+  if (!pKey || !oKey || pKey === oKey) return null;
+
+  const rackMode = mode === 'racks';
+  const completed = (matches || [])
+    .filter((m) => m && m.status === 'completed' && matchPlayerSlot(m, pKey) && matchPlayerSlot(m, oKey))
+    .filter((m) => !rackMode || m.gameType !== 'game4')
+    .slice()
+    .sort((a, b) => {
+      const da = a.completedAt || a.startedAt || '';
+      const db = b.completedAt || b.startedAt || '';
+      return String(da).localeCompare(String(db));
+    });
+
+  let playerName = statsPlayerDisplayName(pKey);
+  let opponentName = statsPlayerDisplayName(oKey);
+  const labels = [0];
+  const playerWins = [0];
+  const opponentWins = [0];
+  const pointMeta = [{ match: null, played: 0, playerWins: 0, opponentWins: 0 }];
+  let pWins = 0;
+  let oWins = 0;
+  let playedTotal = 0;
+
+  const pushPoint = (match, meta = {}) => {
+    labels.push(playedTotal);
+    playerWins.push(pWins);
+    opponentWins.push(oWins);
+    pointMeta.push({
+      match,
+      played: playedTotal,
+      playerWins: pWins,
+      opponentWins: oWins,
+      ...meta,
+    });
+  };
+
+  completed.forEach((m) => {
+    const slot = matchPlayerSlot(m, pKey);
+    if (!slot) return;
+    if (!playerName || playerName === pKey) {
+      playerName = slot === '1'
+        ? String(m.player1Name || playerName || pKey).trim()
+        : String(m.player2Name || playerName || pKey).trim();
+    }
+    if (!opponentName || opponentName === oKey) {
+      opponentName = slot === '1'
+        ? String(m.player2Name || opponentName || oKey).trim()
+        : String(m.player1Name || opponentName || oKey).trim();
+    }
+
+    if (rackMode) {
+      const rackSteps = h2hRackWinnerSteps(m);
+      if (!rackSteps.length) return;
+      rackSteps.forEach((step) => {
+        playedTotal += 1;
+        if (step.winnerSlot === slot) pWins += 1;
+        else oWins += 1;
+        pushPoint(m, {
+          rackNumber: step.rackNumber,
+          rackWinnerSlot: step.winnerSlot,
+          synthesizedRack: !!step.synthesized,
+        });
+      });
+      return;
+    }
+
+    const result = resolveMatchResult(m);
+    if (result.winnerSlot === '1' || result.winnerSlot === '2') {
+      if (result.winnerSlot === slot) pWins += 1;
+      else oWins += 1;
+    }
+    playedTotal += 1;
+    pushPoint(m);
+  });
+
+  return {
+    mode: rackMode ? 'racks' : 'matches',
+    labels,
+    playerWins,
+    opponentWins,
+    pointMeta,
+    playerName: playerName || pKey,
+    opponentName: opponentName || oKey,
+    xLabel: rackMode ? 'Racks / Frames Played' : 'Matches Played',
+    yLabel: rackMode ? 'Racks / Frames Won' : 'Matches Won',
+    playedLabel: rackMode ? 'Racks / frames played' : 'Matches played',
+    wonLabel: rackMode ? 'Racks / frames won' : 'Matches won',
+  };
+}
+
+function formatH2HChartDate(match) {
+  const raw = match && (match.completedAt || match.startedAt);
+  if (!raw) return '';
+  const d = parseUtcDate(raw);
+  if (!d) return String(raw).slice(0, 10);
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function renderH2HWinChart(matches, playerKey, opponentKey) {
+  const section = document.getElementById('statsPlayerH2HSection');
+  const hint = document.getElementById('statsH2HChartHint');
+  const wrap = document.getElementById('statsH2HChartWrap');
+  const canvas = document.getElementById('statsH2HChart');
+  destroyH2HWinChart();
+  if (!section || !hint || !wrap || !canvas) return;
+
+  const opp = String(opponentKey || '').trim();
+  if (!opp) {
+    syncH2HChartModeToggle(false);
+    hint.textContent = 'Select an opponent to view head-to-head progress.';
+    hint.classList.remove('hidden');
+    wrap.classList.add('hidden');
+    return;
+  }
+
+  syncH2HChartModeToggle(true);
+
+  const scopeFilters = getOverviewFilterState();
+  const scoped = (matches || []).filter((m) => matchPassesScopeFilters(m, scopeFilters));
+  const mode = playerDetailH2HChartMode === 'racks' ? 'racks' : 'matches';
+  const series = buildH2HWinProgression(scoped, playerKey, opp, mode);
+  if (!series || series.labels.length <= 1) {
+    hint.textContent = mode === 'racks'
+      ? 'No rack/frame scores vs this opponent in the current filters (Straight Pool is excluded).'
+      : 'No completed head-to-head matches for this opponent in the current filters.';
+    hint.classList.remove('hidden');
+    wrap.classList.add('hidden');
+    return;
+  }
+
+  const ChartLib = typeof window !== 'undefined' ? window.Chart : null;
+  if (!ChartLib) {
+    hint.textContent = 'Chart library failed to load.';
+    hint.classList.remove('hidden');
+    wrap.classList.add('hidden');
+    return;
+  }
+
+  hint.classList.add('hidden');
+  wrap.classList.remove('hidden');
+  canvas.setAttribute(
+    'aria-label',
+    mode === 'racks'
+      ? 'Head-to-head racks or frames won versus racks or frames played'
+      : 'Head-to-head matches won versus matches played'
+  );
+
+  const textColor = '#c0caf5';
+  const gridColor = 'rgba(65, 72, 104, 0.55)';
+  const playerColor = '#7aa2f7';
+  const opponentColor = '#e0af68';
+
+  statsH2HChart = new ChartLib(canvas.getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: series.labels,
+      datasets: [
+        {
+          label: series.playerName,
+          data: series.playerWins,
+          borderColor: playerColor,
+          backgroundColor: playerColor,
+          pointBackgroundColor: playerColor,
+          pointBorderColor: playerColor,
+          tension: 0.15,
+          pointRadius: 0,
+          pointHoverRadius: 5,
+          pointHitRadius: 10,
+        },
+        {
+          label: series.opponentName,
+          data: series.opponentWins,
+          borderColor: opponentColor,
+          backgroundColor: opponentColor,
+          pointBackgroundColor: opponentColor,
+          pointBorderColor: opponentColor,
+          tension: 0.15,
+          pointRadius: 0,
+          pointHoverRadius: 5,
+          pointHitRadius: 10,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'nearest', intersect: true },
+      plugins: {
+        legend: {
+          display: true,
+          labels: {
+            color: textColor,
+            usePointStyle: true,
+            boxWidth: 10,
+          },
+        },
+        tooltip: {
+          callbacks: {
+            title(items) {
+              const item = items && items[0];
+              if (!item) return '';
+              return item.dataset.label || '';
+            },
+            label(context) {
+              const played = Number(context.label) || 0;
+              const wins = Number(context.raw) || 0;
+              return [
+                `${series.playedLabel}: ${played}`,
+                `${series.wonLabel}: ${wins}`,
+              ];
+            },
+            afterBody(items) {
+              const item = items && items[0];
+              if (!item) return [];
+              const meta = series.pointMeta[item.dataIndex];
+              if (!meta || !meta.match) return [];
+              const lines = [];
+              if (meta.rackNumber) {
+                const rackWinner = meta.rackWinnerSlot === '1'
+                  ? (meta.match.player1Name || 'Player 1')
+                  : (meta.rackWinnerSlot === '2'
+                    ? (meta.match.player2Name || 'Player 2')
+                    : '');
+                lines.push(
+                  `Rack/frame #${meta.rackNumber}`
+                  + (rackWinner ? ` · ${rackWinner}` : '')
+                );
+              }
+              const when = formatH2HChartDate(meta.match);
+              if (when) lines.push(`Date: ${when}`);
+              const score = scoreLine(meta.match);
+              if (score && score !== '—') lines.push(`Match score: ${score}`);
+              return lines;
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          title: {
+            display: true,
+            text: series.xLabel,
+            color: textColor,
+          },
+          ticks: {
+            color: textColor,
+            precision: 0,
+            stepSize: 1,
+          },
+          grid: { color: gridColor },
+        },
+        y: {
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: series.yLabel,
+            color: textColor,
+          },
+          ticks: {
+            color: textColor,
+            precision: 0,
+            stepSize: 1,
+          },
+          grid: { color: gridColor },
+        },
+      },
+    },
+  });
+}
+
 function renderPlayerDetail() {
   const allMatches = playerMatches(selectedPlayerKey);
   const matches = playerMatches(selectedPlayerKey, {
@@ -4106,6 +4478,9 @@ function renderPlayerDetail() {
       summary.style.removeProperty('--stats-summary-cols');
     }
   }
+
+  renderH2HWinChart(matches, selectedPlayerKey, playerDetailOpponentFilter);
+
   if (!body) return;
   if (!matches.length) {
     body.innerHTML = '<tr><td colspan="5" class="dash-stats-empty">No matches for this player yet.</td></tr>';
@@ -5093,17 +5468,28 @@ function openPlayerFromSearch(playerOrName) {
   const input = document.getElementById('statsPlayerSearch');
   let key = '';
   let label = '';
+  let filterId = '';
   if (playerOrName && typeof playerOrName === 'object') {
     key = String(playerOrName.id || '').trim();
     label = String(playerOrName.name || '').trim().slice(0, 20);
+    filterId = key;
     if (!key) key = label.toLowerCase();
   } else {
     label = String(playerOrName || '').trim().slice(0, 20);
     const players = statsFromMatches(completedMatches(statsData || {})).players
       .filter((p) => String(p.name || '').toLowerCase() === label.toLowerCase());
-    key = players.length === 1 ? players[0].id : label.toLowerCase();
+    if (players.length === 1) {
+      key = players[0].id;
+      filterId = String(players[0].id || '').trim();
+      if (!label) label = String(players[0].name || '').trim().slice(0, 20);
+    } else {
+      key = label.toLowerCase();
+    }
   }
   if (input) input.value = label;
+  // Keep overview Clear in sync when a pick fills the player field.
+  statsPlayerFilterId = filterId;
+  syncStatsClearFiltersBtn();
   selectedPlayerKey = key;
   playerDetailOpponentFilter = '';
   playerDetailGameFilter = '';
@@ -5531,6 +5917,8 @@ document.getElementById('statsPlayerBackBtn')?.addEventListener('click', () => {
   playerDetailOpponentFilter = '';
   playerDetailGameFilter = '';
   playerRenameEditing = false;
+  destroyH2HWinChart();
+  syncStatsClearFiltersBtn();
   renderAccountStats();
 });
 document.getElementById('statsPlayerOpponentFilter')?.addEventListener('change', (event) => {
@@ -5540,6 +5928,18 @@ document.getElementById('statsPlayerOpponentFilter')?.addEventListener('change',
 document.getElementById('statsPlayerGameFilter')?.addEventListener('change', (event) => {
   playerDetailGameFilter = event.target.value || '';
   renderPlayerDetail();
+});
+document.getElementById('statsH2HChartModeToggle')?.addEventListener('click', (event) => {
+  const btn = event.target.closest('[data-h2h-chart-mode]');
+  if (!btn || !selectedPlayerKey) return;
+  const next = btn.getAttribute('data-h2h-chart-mode') === 'racks' ? 'racks' : 'matches';
+  if (next === playerDetailH2HChartMode) return;
+  playerDetailH2HChartMode = next;
+  const matches = playerMatches(selectedPlayerKey, {
+    opponent: playerDetailOpponentFilter,
+    gameType: playerDetailGameFilter,
+  });
+  renderH2HWinChart(matches, selectedPlayerKey, playerDetailOpponentFilter);
 });
 document.getElementById('statsPlayerRenameEditBtn')?.addEventListener('click', () => {
   const rename = document.getElementById('statsPlayerRenameInput');
@@ -5665,15 +6065,26 @@ document.getElementById('tabStats')?.addEventListener('click', (event) => {
     toggleMatchRacksExpanded(racksToggle.getAttribute('data-toggle-racks'));
     return;
   }
-  const openPlayerBtn = event.target.closest('[data-open-player]');
+  const openPlayerBtn = event.target.closest('[data-open-player], [data-open-player-id]');
   if (openPlayerBtn) {
     event.preventDefault();
-    openPlayerFromSearch(openPlayerBtn.getAttribute('data-open-player') || '');
+    const openId = openPlayerBtn.getAttribute('data-open-player-id') || '';
+    const openName = openPlayerBtn.getAttribute('data-open-player') || '';
+    openPlayerFromSearch(openId
+      ? { id: openId, name: openName || statsPlayerDisplayName(openId) }
+      : openName);
     return;
   }
   const row = event.target.closest('tr[data-player-id]');
   if (row) {
-    selectedPlayerKey = row.getAttribute('data-player-id') || '';
+    const playerId = row.getAttribute('data-player-id') || '';
+    const player = findStatsPlayer(playerId);
+    const input = document.getElementById('statsPlayerSearch');
+    const label = String(player?.name || statsPlayerDisplayName(playerId) || '').trim().slice(0, 20);
+    if (input && label) input.value = label;
+    statsPlayerFilterId = String(playerId || '').trim();
+    syncStatsClearFiltersBtn();
+    selectedPlayerKey = playerId;
     playerDetailOpponentFilter = '';
     playerDetailGameFilter = '';
     playerRenameEditing = false;
