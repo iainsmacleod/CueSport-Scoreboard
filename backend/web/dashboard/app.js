@@ -23,7 +23,7 @@ import {
   openBillingPortal,
   setSimulatedPlan,
   GAME_TYPES,
-} from '../shared/cloud-client.js?v=8.4.0';
+} from '../shared/cloud-client.js?v=8.5.0';
 import {
   computeDurationSeconds,
   formatDurationSeconds,
@@ -38,11 +38,11 @@ import {
   adoptOAuthHashSession,
   getFreshAccessToken,
   signOutSupabaseSession,
-} from '../shared/supabase-session.js?v=8.4.0.1';
+} from '../shared/supabase-session.js?v=8.5.0';
 import {
   installAppViewportHeightSync,
   settleAppViewportHeight,
-} from '../shared/viewport-shell.js?v=8.4.0';
+} from '../shared/viewport-shell.js?v=8.5.0';
 
 const SERVER_KEY = 'cuesport_server';
 const DASH_TAB_KEY = 'cuesport_dashboard_tab';

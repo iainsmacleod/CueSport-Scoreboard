@@ -9,7 +9,7 @@ import {
   fetchPublicConfig,
   GAME_TYPES,
   getOrCreateClientSessionId,
-} from '../shared/cloud-client.js?v=8.4.0.5';
+} from '../shared/cloud-client.js?v=8.5.0';
 import {
   parseRaceTarget,
   isRaceLocked,
@@ -22,16 +22,16 @@ import {
   ensureSupabaseAuth,
   getFreshAccessToken,
   signOutSupabaseSession,
-} from '../shared/supabase-session.js?v=8.4.0.1';
+} from '../shared/supabase-session.js?v=8.5.0';
 import {
   applyImpromptuCommand,
   hydrateAuthorityState,
   createDefaultImpromptuState,
-} from '../shared/impromptu-authority.js?v=8.4.0';
+} from '../shared/impromptu-authority.js?v=8.5.0';
 import {
   installAppViewportHeightSync,
   settleAppViewportHeight,
-} from '../shared/viewport-shell.js?v=8.4.0';
+} from '../shared/viewport-shell.js?v=8.5.0';
 
 let client = null;
 let roomId = '';
