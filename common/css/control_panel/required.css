@@ -2369,6 +2369,48 @@ label.switch.toggle-disabled {
 	margin: 4px 0 0;
 }
 
+#statsExportModal .stats-export-modal-content {
+	max-width: min(720px, 96vw);
+	width: 96%;
+}
+.stats-export-modal-hint {
+	margin: 0 0 0.65rem;
+	color: lightgrey;
+	font-size: 0.9em;
+	line-height: 1.4;
+}
+.stats-export-filename-row {
+	margin: 0 0 0.5rem;
+	color: lightgrey;
+	font-size: 0.85em;
+}
+.stats-export-json {
+	display: block;
+	width: 100%;
+	min-height: 220px;
+	max-height: 45vh;
+	box-sizing: border-box;
+	resize: vertical;
+	font-family: Consolas, "Courier New", monospace;
+	font-size: 0.78rem;
+	line-height: 1.35;
+	color: #e0e0e0;
+	background: rgba(0, 0, 0, 0.35);
+	border: 1px solid rgba(255, 255, 255, 0.18);
+	border-radius: 4px;
+	padding: 0.5rem 0.6rem;
+	white-space: pre;
+}
+.stats-export-copy-status {
+	min-height: 1.2em;
+	margin: 0.45rem 0 0;
+	font-size: 0.85em;
+	color: #9ece6a;
+}
+.stats-export-copy-status.is-error {
+	color: #f7768e;
+}
+
 .local-storage-usage {
 	margin-top: 10px;
 	padding: 8px 10px;

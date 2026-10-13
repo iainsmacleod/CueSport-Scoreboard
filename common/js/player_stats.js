@@ -8808,7 +8808,11 @@
             if (importBtn) { importBtn.classList.remove('disabled'); importBtn.removeAttribute('aria-disabled'); importBtn.style.pointerEvents = ''; importBtn.style.opacity = ''; }
             if (exportBtn) { exportBtn.classList.remove('disabled'); exportBtn.removeAttribute('aria-disabled'); exportBtn.style.pointerEvents = ''; exportBtn.style.opacity = ''; }
             if (clearBtn) { clearBtn.classList.remove('disabled'); clearBtn.removeAttribute('aria-disabled'); clearBtn.style.pointerEvents = ''; clearBtn.style.opacity = ''; }
-            if (hint) hint.textContent = 'Export creates a backup file. Import replaces all current statistics after confirmation. Clear permanently deletes statistics history and resets the current game (names, race/event info, and scoreline).';
+            if (hint) {
+                hint.textContent = isObsBrowserHost()
+                    ? 'Export opens a copy panel in OBS (docks cannot download files). Import replaces all current statistics after confirmation. Clear permanently deletes statistics history and resets the current game (names, race/event info, and scoreline).'
+                    : 'Export creates a backup file. Import replaces all current statistics after confirmation. Clear permanently deletes statistics history and resets the current game (names, race/event info, and scoreline).';
+            }
         }
     }
 
@@ -9430,15 +9434,143 @@
         };
     }
 
-    async function exportStatsJson() {
-        const data = await exportData();
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        const date = new Date().toISOString().slice(0, 10);
+    /**
+     * OBS Browser docks/sources expose window.obsstudio. File downloads are blocked
+     * or silently ignored by that CEF host — use the copy/export modal instead.
+     */
+    function isObsBrowserHost() {
+        try {
+            if (typeof window.obsstudio !== 'undefined' && window.obsstudio) {
+                return true;
+            }
+        } catch (e) { /* ignore */ }
+        try {
+            return /OBS/i.test(String(navigator.userAgent || ''));
+        } catch (e2) {
+            return false;
+        }
+    }
+
+    /**
+     * Trigger a browser file download for a Blob.
+     * Must append the anchor to the document and delay revokeObjectURL — immediate
+     * revoke (or a detached <a>) silently cancels the download in Chromium/Firefox.
+     * Do not rely on this inside OBS docks (see isObsBrowserHost).
+     */
+    function triggerBlobDownload(filename, blob) {
+        const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'cuesport-stats-' + date + '.json';
+        a.href = url;
+        a.download = String(filename || 'download.bin');
+        a.rel = 'noopener';
+        a.style.display = 'none';
+        document.body.appendChild(a);
         a.click();
-        URL.revokeObjectURL(a.href);
+        setTimeout(function () {
+            try { URL.revokeObjectURL(url); } catch (e) { /* ignore */ }
+            try { if (a.parentNode) a.parentNode.removeChild(a); } catch (e2) { /* ignore */ }
+        }, 15000);
+        return { url: url, filename: a.download };
+    }
+
+    function setStatsExportCopyStatus(message, isError) {
+        const el = document.getElementById('statsExportCopyStatus');
+        if (!el) return;
+        el.textContent = message || '';
+        el.classList.toggle('is-error', !!isError);
+    }
+
+    function openStatsExportModal(filename, jsonText) {
+        const modal = document.getElementById('statsExportModal');
+        const nameEl = document.getElementById('statsExportFilename');
+        const textEl = document.getElementById('statsExportJsonText');
+        if (nameEl) nameEl.textContent = filename || 'cuesport-stats.json';
+        if (textEl) textEl.value = jsonText || '';
+        setStatsExportCopyStatus('');
+        if (modal) modal.style.display = 'block';
+        if (textEl) {
+            try {
+                textEl.focus();
+                textEl.select();
+            } catch (e) { /* ignore */ }
+        }
+    }
+
+    function closeStatsExportModal() {
+        const modal = document.getElementById('statsExportModal');
+        if (modal) modal.style.display = 'none';
+        setStatsExportCopyStatus('');
+    }
+
+    function statsExportModalBackdrop(event) {
+        if (event && event.target && event.target.id === 'statsExportModal') {
+            closeStatsExportModal();
+        }
+    }
+
+    async function copyStatsExportJson() {
+        const textEl = document.getElementById('statsExportJsonText');
+        const text = textEl ? String(textEl.value || '') : '';
+        if (!text) {
+            setStatsExportCopyStatus('Nothing to copy.', true);
+            return false;
+        }
+        let ok = false;
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+            try {
+                await navigator.clipboard.writeText(text);
+                ok = true;
+            } catch (e) {
+                ok = false;
+            }
+        }
+        if (!ok && textEl) {
+            try {
+                textEl.focus();
+                textEl.select();
+                ok = document.execCommand('copy');
+            } catch (e2) {
+                ok = false;
+            }
+        }
+        if (ok) {
+            setStatsExportCopyStatus('Copied. Paste into a text editor and save as the .json filename above.');
+        } else {
+            setStatsExportCopyStatus('Copy failed. Select the text manually (Ctrl+A) and copy (Ctrl+C).', true);
+        }
+        return ok;
+    }
+
+    async function exportStatsJson() {
+        try {
+            const data = await exportData();
+            const jsonText = JSON.stringify(data, null, 2);
+            const date = new Date().toISOString().slice(0, 10);
+            const filename = 'cuesport-stats-' + date + '.json';
+
+            // OBS CEF docks do not support <a download> / save dialogs.
+            if (isObsBrowserHost()) {
+                openStatsExportModal(filename, jsonText);
+                return { filename: filename, data: data, mode: 'obs-modal' };
+            }
+
+            const blob = new Blob([jsonText], { type: 'application/json' });
+            const download = triggerBlobDownload(filename, blob);
+            return { filename: download.filename, data: data, url: download.url, mode: 'download' };
+        } catch (err) {
+            console.error('Export failed:', err);
+            // Prefer in-page feedback in OBS (native alert is unreliable there).
+            if (isObsBrowserHost()) {
+                openStatsExportModal(
+                    'export-failed.txt',
+                    'Export failed: ' + (err && err.message ? err.message : String(err))
+                );
+                setStatsExportCopyStatus('Export failed.', true);
+            } else {
+                alert('Export failed: ' + (err && err.message ? err.message : String(err)));
+            }
+            throw err;
+        }
     }
 
     async function importStatsJson(file) {
@@ -9564,6 +9696,11 @@
         exportData: exportData,
         importData: importData,
         clearAllStats: clearAllStats,
+        triggerBlobDownload: triggerBlobDownload,
+        isObsBrowserHost: isObsBrowserHost,
+        exportStatsJson: exportStatsJson,
+        openStatsExportModal: openStatsExportModal,
+        closeStatsExportModal: closeStatsExportModal,
         estimateStatsStorage: estimateStatsStorage,
         broadcastOverlayStatsIfEnabled: broadcastOverlayStatsIfEnabled,
         publishSnookerOverlayLiveStats: publishSnookerOverlayLiveStats,
@@ -9605,7 +9742,18 @@
     window.onStatVisibilityToggle = onStatVisibilityToggle;
     window.onStatsVisibilityGameTypeChange = onStatsVisibilityGameTypeChange;
     window.refreshPlayerOpponentH2H = refreshPlayerOpponentH2H;
-    window.exportStatsJson = exportStatsJson;
+    window.exportStatsJson = function () {
+        return exportStatsJson().catch(function () {
+            /* Error already surfaced inside exportStatsJson. */
+        });
+    };
+    window.closeStatsExportModal = closeStatsExportModal;
+    window.statsExportModalBackdrop = statsExportModalBackdrop;
+    window.copyStatsExportJson = function () {
+        return copyStatsExportJson().catch(function () {
+            setStatsExportCopyStatus('Copy failed. Select the text manually and copy.', true);
+        });
+    };
     window.importStatsJsonFile = function () {
         const input = document.getElementById('statsImportFile');
         if (input) {

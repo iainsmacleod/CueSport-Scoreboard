@@ -22,7 +22,7 @@ for more information about Salotto please visit https://salotto.app
     <link rel="stylesheet" href="./common/css/control_panel/grey.css?v=8.0.0" />
     <link rel="stylesheet" href="./common/css/control_panel/light.css?v=8.0.0" />
     <link rel="stylesheet" href="./common/css/control_panel/rachni.css?v=8.0.0" />
-    <link rel="stylesheet" href="./common/css/control_panel/required.css?v=8.4.0.5" />
+    <link rel="stylesheet" href="./common/css/control_panel/required.css?v=8.4.0.6" />
     <link id="cloudModernTheme" rel="stylesheet" href="./common/css/control_panel/cloud-modern.css?v=8.4.0.5" disabled />
     <script>
         //---------------------------------------------------------------------------------------------
@@ -35,7 +35,7 @@ for more information about Salotto please visit https://salotto.app
     <script src="./common/js/match_racks.js?v=8.0.0"></script>
     <script src="./common/js/cloud_relay.js?v=8.4.0.6"></script>
     <script src="./common/js/stream_sharing.js?v=8.0.0.6"></script>
-    <script src="./common/js/player_stats.js?v=8.4.0"></script>
+    <script src="./common/js/player_stats.js?v=8.4.0.2"></script>
     <script src="./common/js/control_panel.js?v=8.4.0.2"></script>
     <script src="./common/js/cloud_commands.js?v=8.4.0"></script>
     <script src="./common/js/cloud_auth.js?v=8.0.0.4"></script>
@@ -1391,6 +1391,34 @@ for more information about Salotto please visit https://salotto.app
                     <button type="button" class="modal-save-btn hover obs28 button danger-btn" id="resetScoresModalConfirm"
                         onclick="confirmResetScores()">Confirm</button>
                     <button type="button" class="modal-cancel-btn hover obs28 button" onclick="cancelResetScores()">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Local stats export fallback for OBS docks (CEF blocks file downloads) -->
+    <div id="statsExportModal" class="modal" onclick="statsExportModalBackdrop(event)">
+        <div class="modal-content stats-export-modal-content">
+            <div class="modal-header">
+                <h2>Export Statistics</h2>
+                <span class="modal-close" onclick="closeStatsExportModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p id="statsExportModalHint" class="stats-export-modal-hint">
+                    OBS docks cannot download files. Copy the JSON below and save it as a <code>.json</code> file
+                    (for example in Notepad), or open this dock in a normal browser to use Download.
+                </p>
+                <p class="stats-export-filename-row">
+                    Suggested filename:
+                    <strong id="statsExportFilename">cuesport-stats.json</strong>
+                </p>
+                <textarea id="statsExportJsonText" class="stats-export-json" readonly spellcheck="false" aria-label="Exported statistics JSON"></textarea>
+                <p id="statsExportCopyStatus" class="stats-export-copy-status" aria-live="polite"></p>
+            </div>
+            <div class="modal-footer">
+                <div class="modal-footer-buttons">
+                    <button type="button" class="modal-save-btn hover obs28 button" id="statsExportCopyBtn" onclick="copyStatsExportJson()">Copy JSON</button>
+                    <button type="button" class="modal-cancel-btn hover obs28 button" onclick="closeStatsExportModal()">Close</button>
                 </div>
             </div>
         </div>

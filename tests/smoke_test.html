@@ -5560,6 +5560,179 @@
             }
         }
 
+        // --- Local stats export / clear / import round-trip (isolated IndexedDB origin) ---
+        try {
+            if (!cp || !cp.PlayerStats) {
+                assert('StatsExport', 'PlayerStats available for export round-trip', false);
+            } else {
+                function normalizeExportPayload(data) {
+                    const players = (data.players || []).slice().sort(function (a, b) {
+                        return String(a.id || '').localeCompare(String(b.id || ''));
+                    });
+                    const matches = (data.matches || []).slice().sort(function (a, b) {
+                        return String(a.id || '').localeCompare(String(b.id || ''));
+                    });
+                    return JSON.stringify({
+                        schemaVersion: data.schemaVersion,
+                        players: players,
+                        matches: matches
+                    });
+                }
+
+                const backup = await cp.PlayerStats.exportData();
+                await cp.PlayerStats.clearAllStats();
+
+                const rtP1 = await cp.PlayerStats.ensurePlayer((tag + '_ExP1').slice(0, 20));
+                const rtP2 = await cp.PlayerStats.ensurePlayer((tag + '_ExP2').slice(0, 20));
+                assert('StatsExport', 'Seed export player 1', !!(rtP1 && rtP1.id));
+                assert('StatsExport', 'Seed export player 2', !!(rtP2 && rtP2.id));
+                await cp.PlayerStats.saveMatch({
+                    player1Id: rtP1.id,
+                    player2Id: rtP2.id,
+                    player1Name: rtP1.name,
+                    player2Name: rtP2.name,
+                    gameType: 'game1',
+                    scoreP1: 3,
+                    scoreP2: 1,
+                    status: 'completed',
+                    date: '2024-06-15',
+                    ballsP1: 12,
+                    ballsP2: 4,
+                    gameInfo: 'Export Roundtrip'
+                });
+                await cp.PlayerStats.saveMatch({
+                    player1Id: rtP2.id,
+                    player2Id: rtP1.id,
+                    player1Name: rtP2.name,
+                    player2Name: rtP1.name,
+                    gameType: 'game2',
+                    scoreP1: 2,
+                    scoreP2: 2,
+                    status: 'completed',
+                    date: '2024-06-16',
+                    ballsP1: 0,
+                    ballsP2: 0,
+                    gameInfo: 'Export Roundtrip Draw'
+                });
+
+                const original = await cp.PlayerStats.exportData();
+                assert('StatsExport', 'Original export has seeded players',
+                    (original.players || []).length >= 2,
+                    (original.players || []).length);
+                assert('StatsExport', 'Original export has seeded matches',
+                    (original.matches || []).length >= 2,
+                    (original.matches || []).length);
+                assert('StatsExport', 'Original export schemaVersion',
+                    original.schemaVersion >= 1);
+
+                // Download path: append-to-DOM + deferred revoke (regression for "Export does nothing")
+                let createObjectUrlCalls = 0;
+                let appendedDownload = null;
+                const origCreate = cp.URL.createObjectURL.bind(cp.URL);
+                const origRevoke = cp.URL.revokeObjectURL.bind(cp.URL);
+                const origAppend = cp.document.body.appendChild.bind(cp.document.body);
+                cp.URL.createObjectURL = function (blob) {
+                    createObjectUrlCalls += 1;
+                    return origCreate(blob);
+                };
+                let revokedEarly = false;
+                let revokeScheduled = false;
+                cp.URL.revokeObjectURL = function (url) {
+                    // If revoke happens during exportStatsJson before returning, that is the old bug.
+                    if (!revokeScheduled) revokedEarly = true;
+                    return origRevoke(url);
+                };
+                cp.document.body.appendChild = function (node) {
+                    if (node && node.tagName === 'A' && node.download) {
+                        appendedDownload = {
+                            download: node.download,
+                            hasHref: !!(node.href && String(node.href).indexOf('blob:') === 0)
+                        };
+                    }
+                    return origAppend(node);
+                };
+                try {
+                    const dl = await cp.PlayerStats.exportStatsJson();
+                    revokeScheduled = true;
+                    assert('StatsExport', 'exportStatsJson returns filename',
+                        dl && typeof dl.filename === 'string' && dl.filename.indexOf('cuesport-stats-') === 0,
+                        dl && dl.filename);
+                    assert('StatsExport', 'exportStatsJson creates object URL', createObjectUrlCalls >= 1);
+                    assert('StatsExport', 'Download anchor appended to document.body',
+                        !!(appendedDownload && appendedDownload.download && appendedDownload.hasHref),
+                        JSON.stringify(appendedDownload));
+                    assert('StatsExport', 'Object URL not revoked synchronously after click',
+                        revokedEarly === false);
+                } finally {
+                    cp.URL.createObjectURL = origCreate;
+                    cp.URL.revokeObjectURL = origRevoke;
+                    cp.document.body.appendChild = origAppend;
+                    revokeScheduled = true;
+                }
+
+                // OBS docks: CEF blocks downloads — export must open the copy modal instead.
+                const hadObsStudio = Object.prototype.hasOwnProperty.call(cp, 'obsstudio');
+                const prevObsStudio = cp.obsstudio;
+                cp.obsstudio = { stub: true };
+                try {
+                    assert('StatsExport', 'Detects OBS browser host when obsstudio present',
+                        typeof cp.PlayerStats.isObsBrowserHost === 'function' &&
+                        cp.PlayerStats.isObsBrowserHost() === true);
+                    const obsDl = await cp.PlayerStats.exportStatsJson();
+                    const exportModal = cp.document.getElementById('statsExportModal');
+                    const exportText = cp.document.getElementById('statsExportJsonText');
+                    assert('StatsExport', 'OBS export uses modal mode',
+                        obsDl && obsDl.mode === 'obs-modal', obsDl && obsDl.mode);
+                    assert('StatsExport', 'OBS export modal is visible',
+                        exportModal && cp.getComputedStyle(exportModal).display !== 'none');
+                    assert('StatsExport', 'OBS export modal contains JSON payload',
+                        exportText && exportText.value.indexOf('"schemaVersion"') !== -1 &&
+                        exportText.value.indexOf('"players"') !== -1);
+                    if (typeof cp.closeStatsExportModal === 'function') {
+                        cp.closeStatsExportModal();
+                    } else if (cp.PlayerStats.closeStatsExportModal) {
+                        cp.PlayerStats.closeStatsExportModal();
+                    }
+                } finally {
+                    if (hadObsStudio) cp.obsstudio = prevObsStudio;
+                    else try { delete cp.obsstudio; } catch (e) { cp.obsstudio = undefined; }
+                }
+
+                const originalNorm = normalizeExportPayload(original);
+                await cp.PlayerStats.clearAllStats();
+                const afterClear = await cp.PlayerStats.exportData();
+                assert('StatsExport', 'Clear removes players',
+                    (afterClear.players || []).length === 0, (afterClear.players || []).length);
+                assert('StatsExport', 'Clear removes matches',
+                    (afterClear.matches || []).length === 0, (afterClear.matches || []).length);
+
+                const imported = await cp.PlayerStats.importData(original);
+                assert('StatsExport', 'Import restores player count',
+                    imported && imported.players === (original.players || []).length,
+                    imported && imported.players);
+                assert('StatsExport', 'Import restores match count',
+                    imported && imported.matches === (original.matches || []).length,
+                    imported && imported.matches);
+
+                const reexported = await cp.PlayerStats.exportData();
+                const reexportNorm = normalizeExportPayload(reexported);
+                assert('StatsExport', 'Re-export matches original (players/matches)',
+                    reexportNorm === originalNorm,
+                    reexportNorm === originalNorm
+                        ? ''
+                        : ('len orig=' + originalNorm.length + ' re=' + reexportNorm.length));
+
+                // Restore pre-roundtrip dock IndexedDB contents for this test origin.
+                await cp.PlayerStats.clearAllStats();
+                if (backup && Array.isArray(backup.players) && Array.isArray(backup.matches) &&
+                    (backup.players.length || backup.matches.length)) {
+                    await cp.PlayerStats.importData(backup);
+                }
+            }
+        } catch (err) {
+            assert('StatsExport', 'Export round-trip harness', false, err.message || String(err));
+        }
+
         renderResults(rows);
         statusEl.textContent = 'Done.';
         runBtn.disabled = false;
