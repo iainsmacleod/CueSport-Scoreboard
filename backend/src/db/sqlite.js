@@ -970,10 +970,13 @@ const ADMIN_ACCOUNT_SELECT = `
          (SELECT COUNT(*) FROM rooms r WHERE r.account_id = a.id AND COALESCE(r.kind, 'dock') = 'dock') AS dock_room_count,
          (SELECT COUNT(*) FROM rooms r WHERE r.account_id = a.id AND r.kind = 'impromptu') AS impromptu_room_count,
          (SELECT COUNT(*) FROM room_guest_tokens g WHERE g.account_id = a.id AND g.revoked_at IS NULL) AS guest_link_count,
-         MAX(
-           (SELECT MAX(d.last_seen_at) FROM room_docks d WHERE d.account_id = a.id),
-           (SELECT MAX(ak.last_seen_at) FROM api_keys ak WHERE ak.account_id = a.id)
-         ) AS last_dock_seen_at,
+         -- Aggregate MAX (not scalar MAX(a,b)): scalar returns NULL if either arg is NULL,
+         -- which blanked admin last_activity after room prune removed room_docks.
+         (SELECT MAX(ts) FROM (
+            SELECT MAX(d.last_seen_at) AS ts FROM room_docks d WHERE d.account_id = a.id
+            UNION ALL
+            SELECT MAX(ak.last_seen_at) AS ts FROM api_keys ak WHERE ak.account_id = a.id
+          )) AS last_dock_seen_at,
          CASE
            WHEN COALESCE(
              (SELECT MAX(d.last_seen_at) FROM room_docks d
