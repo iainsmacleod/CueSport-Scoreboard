@@ -492,6 +492,12 @@ async function run() {
     'Public config includes supportIssuesUrl',
     typeof config.body.supportIssuesUrl === 'string' && config.body.supportIssuesUrl.length > 0
   );
+  assert(
+    'Public config includes supportContactUrl (string or null)',
+    config.body.supportContactUrl === null
+      || (typeof config.body.supportContactUrl === 'string'
+        && config.body.supportContactUrl.startsWith('mailto:'))
+  );
 
   {
     const { normalizeTierName, getTierDisplayName, getPaidSelfServeTier, getTiersCatalog, getDefaultTierName } =

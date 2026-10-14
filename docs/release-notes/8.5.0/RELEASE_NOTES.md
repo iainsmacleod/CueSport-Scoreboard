@@ -38,6 +38,14 @@ Export was easy to miss in practice: the download link was detached and the blob
 
 ---
 
+## Cloud support contact
+
+- Logged-in Cloud Dashboard header adds **Having trouble?** next to Live Streams when `SUPPORT_CONTACT_EMAIL` is set
+- Comma-separated addresses: first is To, remaining are Cc (`mailto:` via `/api/config/public` `supportContactUrl`)
+- Hidden on the sign-in screen and when the env var is unset
+
+---
+
 ## Docs & versioning
 
 - Product / cache-bust version **8.5.0** (`versionNum`, README, wiki, dashboard & mobile asset queries)
@@ -50,4 +58,5 @@ Export was easy to miss in practice: the download link was detached and the blob
 - Hard-refresh the Cloud dashboard (and mobile if open) so `?v=8.5.0` assets load.
 - OBS dock / browser source cache-bust strings are bumped with this release; hard-refresh docks after pull.
 - No database migration required.
+- Optional: set `SUPPORT_CONTACT_EMAIL` (comma-separated) so logged-in dashboard users see **Having trouble?**
 - After upgrade in OBS: use Export → **Copy JSON** if you need a local backup from a dock (file download still works when the same page is opened in a normal browser).

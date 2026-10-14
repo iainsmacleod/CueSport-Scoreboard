@@ -11,6 +11,15 @@ function parseEnvMs(value, fallback) {
   return Number.isFinite(n) && n >= 0 ? n : fallback;
 }
 
+function parseEmailList(value) {
+  return String(value || '')
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+const supportContactEmails = parseEmailList(process.env.SUPPORT_CONTACT_EMAIL);
+
 export const config = {
   port: parseInt(process.env.PORT || '3000', 10),
   host: process.env.HOST || '0.0.0.0',
@@ -82,6 +91,16 @@ export const config = {
   })(),
   supportIssuesUrl: process.env.SUPPORT_ISSUES_URL
     || 'https://github.com/iainsmacleod/CueSport-Scoreboard/issues',
+  /**
+   * Dashboard “Having trouble?” mailto recipients (comma-separated).
+   * First address is To; remaining addresses are Cc. Exposed via /api/config/public.
+   */
+  supportContactEmails,
+  supportContactUrl: (() => {
+    if (!supportContactEmails.length) return '';
+    const [to, ...cc] = supportContactEmails;
+    return cc.length ? `mailto:${to}?cc=${cc.join(',')}` : `mailto:${to}`;
+  })(),
   legalContactEmail: process.env.LEGAL_CONTACT_EMAIL || '',
   legalEntityName: process.env.LEGAL_ENTITY_NAME || 'CueSport Scoreboard Cloud',
   legalGoverningLaw: process.env.LEGAL_GOVERNING_LAW || '[Operator province/country — fill before publish]',

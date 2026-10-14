@@ -594,6 +594,7 @@ export async function registerAccountRoutes(app) {
     termsUrl: `${config.publicUrl}/terms`,
     privacyUrl: `${config.publicUrl}/privacy`,
     supportIssuesUrl: config.supportIssuesUrl,
+    supportContactUrl: config.supportContactUrl || null,
     billingEnabled: isStripeConfigured() && !config.allowDevAuth,
   }));
 }

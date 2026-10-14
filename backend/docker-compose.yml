@@ -40,6 +40,7 @@
 #
 # Legal / support (Terms + Privacy at /terms and /privacy):
 #   SUPPORT_ISSUES_URL=https://github.com/iainsmacleod/CueSport-Scoreboard/issues
+#   SUPPORT_CONTACT_EMAIL=support@example.com,ops@example.com
 #   LEGAL_CONTACT_EMAIL=you@example.com
 #   LEGAL_ENTITY_NAME=MacLeod Systems Consulting, LLC
 #   LEGAL_GOVERNING_LAW=Commonwealth of Pennsylvania, USA
@@ -101,6 +102,7 @@ services:
       BILLING_CONTACT_URL: ${BILLING_CONTACT_URL:-}
       # Legal / support
       SUPPORT_ISSUES_URL: ${SUPPORT_ISSUES_URL:-}
+      SUPPORT_CONTACT_EMAIL: ${SUPPORT_CONTACT_EMAIL:-}
       LEGAL_CONTACT_EMAIL: ${LEGAL_CONTACT_EMAIL:-}
       LEGAL_ENTITY_NAME: ${LEGAL_ENTITY_NAME:-}
       LEGAL_GOVERNING_LAW: ${LEGAL_GOVERNING_LAW:-}

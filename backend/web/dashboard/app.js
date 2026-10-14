@@ -188,7 +188,19 @@ function resolveBootShell(mode) {
       initOfficialGoogleButton(dashPublicConfigCache).catch(() => {});
     }
   }
+  syncSupportContactLink(mode === 'app');
   finishDashboardBoot();
+}
+
+/** Header “Having trouble?” mailto — logged-in only when SUPPORT_CONTACT_EMAIL is set. */
+function syncSupportContactLink(loggedIn) {
+  const link = document.getElementById('supportContactLink');
+  if (!link) return;
+  const url = String(dashPublicConfigCache?.supportContactUrl || '').trim();
+  const showLink = !!loggedIn && !!url && url.startsWith('mailto:');
+  if (showLink) link.href = url;
+  else link.removeAttribute('href');
+  link.classList.toggle('hidden', !showLink);
 }
 
 /** Ignore stale overlapping renderDashboard() calls (boot / OAuth / sign-in races). */
@@ -6604,6 +6616,8 @@ function setDashLoginTitle(mode) {
 
 function applyDashLoginCapabilities(config) {
   dashPublicConfigCache = config || null;
+  const dashSection = document.getElementById('dashboardSection');
+  syncSupportContactLink(!!dashSection && !dashSection.classList.contains('hidden'));
   updateAccountDeploymentType();
   const google = !!(config?.supabaseUrl && config?.supabasePublishableKey);
   // Dev secret is for self-host / lab only (ALLOW_DEV_AUTH). Official managed sets this false.

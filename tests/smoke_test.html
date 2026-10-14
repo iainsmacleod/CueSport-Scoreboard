@@ -788,9 +788,12 @@
                     mobileAppSource.indexOf('function shouldLeaveTableForHome') !== -1 &&
                     mobileAppSource.indexOf("window.location.replace('/')") !== -1 &&
                     !mobileDoc.getElementById('mobileAccountPanel'));
-                assert('Cloud Dashboard', 'Header keeps home brand and Live Streams only',
+                assert('Cloud Dashboard', 'Header keeps home brand, Live Streams, and support contact link',
                     dashboardDoc.querySelector('.site-brand')?.getAttribute('href') === '/' &&
                     !!dashboardDoc.querySelector('.site-header-actions a[href="/streams"]') &&
+                    !!dashboardDoc.getElementById('supportContactLink') &&
+                    dashboardDoc.getElementById('supportContactLink').classList.contains('hidden') &&
+                    dashboardAppSource.indexOf('syncSupportContactLink') !== -1 &&
                     !dashboardDoc.getElementById('dashAccountMenuBtn') &&
                     !dashboardDoc.getElementById('dashAccountModal'));
                 assert('Cloud Dashboard', 'Redundant Clear Saved Login controls are removed',
