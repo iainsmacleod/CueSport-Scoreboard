@@ -1185,13 +1185,8 @@ body.streams-page .site-header-actions {
     justify-content: center;
   }
 }
-/* Home: marketing first — streams live on /streams via Browse Live Streams. */
-body.landing-home .live-now-panel {
-  display: none;
-}
-/* Both pages already link to Live Streams in their content; keep the header action focused on auth. */
-body.landing-home .site-nav-streams,
-body.streams-page .site-nav-streams {
+/* Header auth only — Shared Streams is a homepage tab. */
+body.landing-home .site-nav-streams {
   display: none;
 }
 .site-nav .btn,
@@ -1312,18 +1307,88 @@ body.streams-page {
     --content-max: 1440px;
   }
 }
-body.streams-page .landing-marketing {
-  display: none;
-}
-body.streams-page.streams-empty .landing-marketing {
-  display: block;
-}
-body.streams-page .live-now-panel {
-  margin-top: 0;
-}
-body.streams-page .landing-main {
+body.landing-home .landing-main {
   /* Extra bottom space so the last Watch Stream control is scrollable into view on phones */
   padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* Homepage section tabs */
+.landing-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+.landing-tablist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0.15rem 0 0.25rem;
+}
+.landing-tab {
+  appearance: none;
+  cursor: pointer;
+  margin: 0;
+  padding: 0.5rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--public-button-border, #414b70);
+  background: linear-gradient(145deg, rgba(155, 92, 255, 0.11), rgba(47, 128, 255, 0.05)), var(--public-button, #1b2035);
+  color: #eef0ff;
+  font: inherit;
+  font-size: 0.92rem;
+  line-height: 1.2;
+  box-shadow: 0 0.25rem 0.7rem rgba(0, 0, 0, 0.18);
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+.landing-tab:hover {
+  color: #fff;
+  border-color: rgba(155, 92, 255, 0.8);
+  transform: translateY(-1px);
+}
+.landing-tab:focus-visible {
+  outline: 2px solid #b98cff;
+  outline-offset: 2px;
+}
+.landing-tab[aria-selected="true"],
+.landing-tab.is-active {
+  background: linear-gradient(135deg, var(--public-purple, #9b5cff), var(--public-blue, #2f80ff));
+  border-color: transparent;
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 0.35rem 0.95rem rgba(92, 54, 170, 0.28);
+}
+.landing-tabpanel {
+  min-width: 0;
+}
+.landing-tabpanel.hidden,
+.landing-tabpanel[hidden] {
+  display: none !important;
+}
+.landing-video-panel h2 {
+  margin-top: 0;
+}
+.landing-video-frame {
+  position: relative;
+  width: 100%;
+  max-width: 960px;
+  margin: 0.75rem auto 0;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #0b0d14;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0.5rem 1.4rem rgba(0, 0, 0, 0.28);
+}
+.landing-video-frame iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.live-now-panel {
+  margin-top: 0;
 }
 .stream-meta, .stream-subscore {
   font-size: 0.85rem;

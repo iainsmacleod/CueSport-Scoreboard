@@ -322,7 +322,7 @@ The OBS **dock remains the scoring authority**. Mobile and guest clients send co
 | **Dashboard** | `/dashboard` | Sign in, see live tables, API keys, open mobile control; platform admins (env allowlist) also get an **Admin** tab for complimentary access and tenant ops |
 | **Mobile control** | `/m/{room_id}` | Full remote (account owner): score, balls, setup, **Stream** (OBS start/stop + overlay P1/P2/H2H when Ball Scoring is on), Share |
 | **Guest control** | `/g/{token}` | Limited remote: score with the same action balls as the dock for that game (foul / undo; free ball on Snooker; respot on Bank / One Pocket), breaker, game type and its options (ball variant, win on break / early game, golden ball, point based), race, event info, and **Restart/End/Call Match** — no names. Standard guests have no Stream/Share; **OBS Dock Owner** guest links also get Stream + Share. **One active device per guest link** at a time (link stays valid until revoked). |
-| **Stream listing** | `/` or `/streams` | Public page of promoted live streams (requires Cloud + Promote toggle + OBS live + stream URL) |
+| **Stream listing** | `/#streams` (also `/streams`) | Homepage Shared Streams tab of promoted live streams (requires Cloud + Promote toggle + OBS live + stream URL) |
 
 - **Stats-safe relay** — mobile commands invoke the same dock functions as the control panel (`postScore`, `selectRackBreaker`, etc.)
 - **Live dashboard** — account WebSocket pushes table list updates when docks connect, disconnect, or publish state (no polling). While the **Stats** tab is open (or after it has loaded once), Recent Matches also refreshes from those live pushes so new **In progress** rows appear without a manual reload

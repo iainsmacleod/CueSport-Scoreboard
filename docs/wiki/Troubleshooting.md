@@ -65,7 +65,7 @@ Clip **×** only clears the path in CueSport — delete video files on disk your
 1. WebSocket connected and OBS **actually streaming**.
 2. Cloud connected with a Dock Key.
 3. Promote toggle on; manual Stream URL set if OBS did not supply one.
-4. Check the public `/streams` page for your self-host or the hosted Live Streams page.
+4. Check the homepage **Shared Streams** tab (`/#streams`, or `/streams`) on your self-host or the hosted Cloud site.
 
 ## macOS dock URL keeps breaking
 

@@ -26,7 +26,7 @@ Mobile and guest clients send commands; the dock runs the same logic as clicking
 | **Dashboard** | `/dashboard` | Live tables, Dock Keys, account, cloud Stats |
 | **Mobile control** | `/m/{room_id}` | Full remote for signed-in operators |
 | **Guest control** | `/g/{token}` | Focused scoring link / QR (limited permissions) |
-| **Live Streams** | `/` or `/streams` | Public list of promoted streams |
+| **Shared Streams** | `/#streams` (also `/streams`) | Homepage tab listing promoted live streams |
 
 Also: cloud match history and player statistics, guest link create/revoke, and connection gating.
 

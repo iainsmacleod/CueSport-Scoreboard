@@ -680,7 +680,22 @@
                 assert('Cloud Website', 'Homepage header includes the responsive sign-in or dashboard action',
                     landingDoc.getElementById('authNavBtn')?.getAttribute('href') === '/dashboard' &&
                     landingSource.indexOf("const navLabel = signedIn ? 'Dashboard' : 'Sign In'") !== -1 &&
-                    sharedStyles.indexOf('body.landing-home .site-nav-streams') !== -1);
+                    !landingDoc.querySelector('.site-nav-streams'));
+                assert('Cloud Website', 'Homepage uses section tabs with Overview default',
+                    landingDoc.querySelectorAll('.landing-tablist [role="tab"]').length === 5 &&
+                    landingDoc.getElementById('tab-overview')?.getAttribute('aria-selected') === 'true' &&
+                    !!landingDoc.getElementById('panel-overview') &&
+                    !!landingDoc.getElementById('panel-video') &&
+                    !!landingDoc.getElementById('panel-features') &&
+                    !!landingDoc.getElementById('panel-pricing') &&
+                    !!landingDoc.getElementById('panel-streams') &&
+                    landingSource.indexOf('function selectTab(') !== -1 &&
+                    landingSource.indexOf("history.replaceState(null, '', '/#streams')") !== -1);
+                assert('Cloud Website', 'Promotional Video tab embeds YouTube without eager src',
+                    landingDoc.getElementById('promoVideoFrame')?.getAttribute('data-src') ===
+                        'https://www.youtube-nocookie.com/embed/9CLuHoMjpAU' &&
+                    !landingDoc.getElementById('promoVideoFrame')?.getAttribute('src') &&
+                    landingSource.indexOf('ensurePromoVideo') !== -1);
                 assert('Cloud Website', 'Marketing carousel contains eight real product slides',
                     slides.length === 8 &&
                     Array.from(slides).every(function (slide) {
@@ -703,9 +718,12 @@
                 assert('Cloud Website', 'Pricing plans retain sign-in subscription deep link',
                     !!landingDoc.getElementById('landingPricing') &&
                     landingSource.indexOf('/dashboard?subscribe=') !== -1);
-                assert('Cloud Website', 'Empty Streams page reuses marketing content',
-                    landingSource.indexOf("classList.toggle('streams-empty'") !== -1 &&
-                    sharedStyles.indexOf('body.streams-page.streams-empty .landing-marketing') !== -1);
+                assert('Cloud Website', 'Shared Streams is a homepage tab with poll lifecycle',
+                    !!landingDoc.getElementById('liveNow') &&
+                    landingDoc.getElementById('panel-streams')?.contains(landingDoc.getElementById('liveNow')) &&
+                    landingSource.indexOf('startStreamsPoll') !== -1 &&
+                    landingSource.indexOf('stopStreamsPoll') !== -1 &&
+                    sharedStyles.indexOf('.landing-tablist') !== -1);
                 assert('Cloud Website', 'Marketing image click pauses and resumes with an indicator',
                     landingSource.indexOf('setCarouselPaused(!carouselPaused)') !== -1 &&
                     landingSource.indexOf('marketing-carousel-pause-indicator') !== -1 &&
@@ -714,30 +732,31 @@
                     landingDoc.querySelectorAll('.marketing-carousel-btn .carousel-control-icon').length === 2 &&
                     sharedStyles.indexOf('.marketing-carousel-btn:first-child') !== -1 &&
                     sharedStyles.indexOf('.marketing-carousel-btn:last-child') !== -1);
-                assert('Cloud Website', 'Streams header has centered brand layout',
-                    sharedStyles.indexOf('body.streams-page .site-header-inner') !== -1 &&
+                assert('Cloud Website', 'Homepage header has centered brand layout',
+                    sharedStyles.indexOf('body.landing-home .site-header-inner') !== -1 &&
                     sharedStyles.indexOf('grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr)') !== -1);
                 assert('Cloud Website', 'Dashboard brand has no version text',
                     (dashboardDoc.querySelector('.site-brand h1')?.textContent || '').trim() ===
                         'CueSport Scoreboard Cloud');
-                assert('Cloud Website', 'Landing pitch leads marketing ahead of carousel and pricing',
+                assert('Cloud Website', 'Landing pitch lives in Overview tab ahead of Features and Pricing',
                     (() => {
-                      const marketing = landingDoc.getElementById('landingMarketing');
                       const pitch = landingDoc.getElementById('landingPitch');
-                      if (!marketing || !pitch) return false;
-                      const children = [...marketing.children];
-                      const pitchIdx = children.findIndex((el) => el.id === 'landingPitch');
-                      const carouselIdx = children.findIndex((el) => el.classList.contains('marketing-carousel-panel'));
-                      const pricingIdx = children.findIndex((el) => el.id === 'landingPricing');
-                      return pitchIdx === 0 && carouselIdx > pitchIdx && pricingIdx > carouselIdx
+                      const overview = landingDoc.getElementById('panel-overview');
+                      const features = landingDoc.getElementById('panel-features');
+                      const pricing = landingDoc.getElementById('panel-pricing');
+                      if (!pitch || !overview || !features || !pricing) return false;
+                      return overview.contains(pitch)
+                        && features.contains(landingDoc.querySelector('.marketing-carousel-panel'))
+                        && pricing.contains(landingDoc.getElementById('landingPricing'))
                         && !landingDoc.querySelector('.hero.panel')
-                        && !!pitch.querySelector('.hero-actions #heroAuthBtn')
+                        && !pitch.querySelector('.hero-actions')
                         && !!pitch.querySelector('#landingObsNote.marketing-obs-note')
                         && landingSource.indexOf('Who is CueSport Scoreboard Cloud for?') !== -1
                         && landingSource.indexOf('What does CueSport Scoreboard Cloud do for you?') !== -1
                         && landingSource.indexOf('ad-hoc tables') !== -1
                         && landingSource.indexOf('landing-pitch-asterisk') !== -1
-                        && sharedStyles.indexOf('.landing-pitch-audience') !== -1;
+                        && sharedStyles.indexOf('.landing-pitch-audience') !== -1
+                        && sharedStyles.indexOf('.landing-video-frame') !== -1;
                     })());
                 assert('Cloud Dashboard', 'Sign-in controls appear above feature cards',
                     (() => {

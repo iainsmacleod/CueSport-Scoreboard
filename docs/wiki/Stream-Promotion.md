@@ -1,6 +1,6 @@
 # Stream Promotion
 
-Optionally list your stream on the public **Live Streams** page (hosted: [cuesport.macleod.systems](https://cuesport.macleod.systems/streams), or your self-hosted `/streams`) with live match metadata so others can find games that are on air.
+Optionally list your stream on the homepage **Shared Streams** tab (hosted: [cuesport.macleod.systems/#streams](https://cuesport.macleod.systems/#streams), or your self-hosted `/#streams`; `/streams` soft-redirects there) with live match metadata so others can find games that are on air.
 
 ## Requirements
 

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>CueSport Scoreboard Cloud</title>
   <link rel="icon" type="image/png" href="/web/images/brand/logo.png?v=1" />
-  <link rel="stylesheet" href="/web/shared/styles.css?v=8.5.0" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.5.1" />
 </head>
 <body class="landing-home">
   <header class="site-header">
@@ -18,180 +18,210 @@
         <p class="subtitle">Remote scoring, multi-table control, and live stream discovery</p>
       </div>
       <nav class="site-nav" aria-label="Site">
-        <a class="btn site-nav-streams" href="/streams">
-          <svg class="site-nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="14" height="12" rx="2"/><polygon points="22 8 16 12 22 16 22 8"/></svg>
-          Live Streams
-        </a>
         <a id="authNavBtn" class="btn primary" href="/dashboard">Sign In</a>
       </nav>
     </div>
   </header>
   <main class="landing-main">
-    <section id="liveNow" class="panel live-now-panel">
-      <h2>Live Now</h2>
-      <p class="hint">Only streams with Stream Promotion enabled and OBS actively streaming appear here.</p>
-      <ul id="streamList" class="stream-list"></ul>
-      <p id="empty" class="hidden">No one is streaming with promotion enabled right now.</p>
-    </section>
+    <div class="landing-tabs" id="landingTabs">
+      <div class="landing-tablist" role="tablist" aria-label="Homepage sections">
+        <button type="button" class="landing-tab" role="tab" id="tab-overview" data-tab="overview" aria-controls="panel-overview" aria-selected="true">Overview</button>
+        <button type="button" class="landing-tab" role="tab" id="tab-video" data-tab="video" aria-controls="panel-video" aria-selected="false" tabindex="-1">Promotional Video</button>
+        <button type="button" class="landing-tab" role="tab" id="tab-features" data-tab="features" aria-controls="panel-features" aria-selected="false" tabindex="-1">Features</button>
+        <button type="button" class="landing-tab" role="tab" id="tab-pricing" data-tab="pricing" aria-controls="panel-pricing" aria-selected="false" tabindex="-1">Pricing</button>
+        <button type="button" class="landing-tab" role="tab" id="tab-streams" data-tab="streams" aria-controls="panel-streams" aria-selected="false" tabindex="-1">Shared Streams</button>
+      </div>
 
-    <div id="landingMarketing" class="landing-marketing">
-      <section id="landingPitch" class="panel landing-pitch" aria-label="Who Cloud is for and what it does">
-        <h2>Who is CueSport Scoreboard Cloud for?</h2>
-        <p>
-          Whether you stream or record to your favorite platform, run a league or tournament and need
-          player stats, or just want a history of games with friends — with or without a camera —
-          Cloud is built for that.
-        </p>
-        <ul class="landing-pitch-audience">
-          <li>Streamers and recorders who need to score from the table, not the PC</li>
-          <li>Organizers tracking standings and player performance</li>
-          <li>Players logging matches with no stream or OBS setup</li>
-        </ul>
-        <h3>What does CueSport Scoreboard Cloud do for you?</h3>
-        <p>
-          Used with
-          <a href="https://github.com/iainsmacleod/CueSport-Scoreboard" target="_blank" rel="noopener noreferrer" aria-describedby="landingObsNote">CueSport Scoreboard</a><sup class="landing-pitch-asterisk" aria-hidden="true">*</sup>,
-          Cloud lets you run the match from your phone so you&rsquo;re not tied to
-          the streaming or recording desk. Hand a focused guest link to a player or helper so they can
-          score without account access. Every completed match feeds searchable history and leaderboards
-          — useful for tournaments, leagues, or casual nights. With <strong>ad-hoc tables</strong>, you
-          can score on the fly with no OBS dock at all and still keep the same Cloud history.
-        </p>
-        <p id="landingObsNote" class="hint marketing-obs-note">
-          <span class="landing-pitch-asterisk" aria-hidden="true">*</span>
-          Streaming tables use OBS with
-          <a href="https://github.com/iainsmacleod/CueSport-Scoreboard" target="_blank" rel="noopener noreferrer">CueSport Scoreboard</a>
-          (the free OBS dock). Cloud is the hosted relay, remotes, billing, and <strong>impromptu</strong> seats for games you are not streaming.
-        </p>
-        <div class="hero-actions">
-          <a id="heroAuthBtn" class="btn primary" href="/dashboard">
-            <svg class="site-nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
-            Dashboard
-          </a>
-          <a class="btn" href="/streams">
-            <svg class="site-nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="14" height="12" rx="2"/><polygon points="22 8 16 12 22 16 22 8"/></svg>
-            Live Streams
-          </a>
-        </div>
-      </section>
-
-      <section class="panel marketing-carousel-panel" aria-roledescription="carousel" aria-label="Product highlights">
-        <div class="marketing-carousel" id="marketingCarousel" tabindex="0">
-          <div class="marketing-carousel-viewport">
-            <ul class="marketing-carousel-track" id="marketingCarouselTrack">
-              <li class="marketing-slide is-wide" data-caption="Dock and Phone">
-                <figure class="marketing-slide-media">
-                  <img src="/web/images/marketing/dock-and-phone.png?v=1" alt="CueSport Scoreboard OBS dock beside a phone running Cloud remote control" width="1920" height="1032" loading="eager" />
-                </figure>
-                <div class="marketing-slide-caption">
-                  <h3>OBS Dock + Phone Control</h3>
-                  <p>Keep the free OBS CueSport Scoreboard on stream, and run the same match from your phone over Cloud. Scorers stay mobile around the venue while viewers still see the overlay.</p>
-                </div>
-              </li>
-              <li class="marketing-slide is-wide" data-caption="OBS CueSport Scoreboard Dock">
-                <figure class="marketing-slide-media">
-                  <img src="/web/images/marketing/obs-dock-controls.png" alt="OBS CueSport Scoreboard dock scoring controls" width="1280" height="720" loading="lazy" />
-                </figure>
-                <div class="marketing-slide-caption">
-                  <h3>OBS CueSport Scoreboard Dock</h3>
-                  <p>Run the match from the OBS dock, your phone, or a guest scorer’s device. Everyone sees the same score instantly, so your team can work from anywhere around the venue.</p>
-                </div>
-              </li>
-              <li class="marketing-slide is-wide" data-caption="Cloud Connection">
-                <figure class="marketing-slide-media">
-                  <img src="/web/images/marketing/obs-dock-cloud.png" alt="OBS dock Cloud Connection settings" width="1280" height="720" loading="lazy" />
-                </figure>
-                <div class="marketing-slide-caption">
-                  <h3>One Dock Key per Table</h3>
-                  <p>Connect each table to Cloud with its own Dock Key. Start with one weekly stream and add more tables as your events grow, all managed from one account.</p>
-                </div>
-              </li>
-              <li class="marketing-slide is-wide" data-caption="Ad-hoc Tables">
-                <figure class="marketing-slide-media">
-                  <img src="/web/images/marketing/impromptu-table.png?v=1" alt="Dashboard showing an OBS dock table beside an ad-hoc Snooker table and Create Ad-hoc Table" width="1485" height="419" loading="lazy" />
-                </figure>
-                <div class="marketing-slide-caption">
-                  <h3>Ad-hoc Tables — No Stream Required</h3>
-                  <p>Not every match needs OBS. Create a dockless seat from the dashboard and score league nights, side tables, and multi-table events that aren’t on stream — while your main table still runs on the dock.</p>
-                  <p>Same Cloud scoring, guest links, and match history as a streamed table. Your phone is the authority; helpers join with a scoring-only link. End or destroy the seat when you’re done and free the quota for the next game.</p>
-                </div>
-              </li>
-              <li class="marketing-slide is-phone" data-caption="Mobile Scoring">
-                <figure class="marketing-slide-media marketing-phone-frame">
-                  <img src="/web/images/marketing/mobile-score.png?v=3" alt="Mobile match scoring screen" width="390" height="768" loading="lazy" />
-                </figure>
-                <div class="marketing-slide-caption">
-                  <h3>Score From Your Phone</h3>
-                  <p>Move around the venue while controlling players, breakers, balls, fouls, racks, race details, and overall match state.</p>
-                </div>
-              </li>
-              <li class="marketing-slide is-phone" data-caption="Guest Remote Links">
-                <figure class="marketing-slide-media marketing-phone-frame">
-                  <img src="/web/images/marketing/mobile-share.png?v=3" alt="Mobile share and guest remote screen" width="390" height="768" loading="lazy" />
-                </figure>
-                <div class="marketing-slide-caption">
-                  <h3>Guest Remote Links</h3>
-                  <p>Hand a scorer a QR link with focused match controls, one active device per link, and no access to account or replay settings.</p>
-                </div>
-              </li>
-              <li class="marketing-slide is-phone" data-caption="Multi-Table Control">
-                <figure class="marketing-slide-media marketing-phone-frame">
-                  <img src="/web/images/marketing/mobile-tables.png?v=3" alt="Mobile tables list" width="390" height="768" loading="lazy" />
-                </figure>
-                <div class="marketing-slide-caption">
-                  <h3>Multi-Table Control</h3>
-                  <p>See every active OBS dock from one responsive dashboard, review the live score, and jump directly into the table that needs attention.</p>
-                </div>
-              </li>
-              <li class="marketing-slide is-wide" data-caption="Cloud Match Statistics">
-                <figure class="marketing-slide-media">
-                  <img src="/web/images/marketing/dashboard-tables.png?v=3" alt="CueSport Scoreboard Cloud match statistics leaderboard" width="1024" height="529" loading="lazy" />
-                </figure>
-                <div class="marketing-slide-caption">
-                  <h3>Cloud Match Statistics</h3>
-                  <p>Keep a searchable record of completed matches, compare leaderboards, review recent results, and explore each player’s history from any device. You can also help viewers find your stream when you go live.</p>
-                </div>
-              </li>
+      <div id="landingMarketing" class="landing-marketing">
+        <div id="panel-overview" class="landing-tabpanel" role="tabpanel" aria-labelledby="tab-overview" data-tab="overview">
+          <section id="landingPitch" class="panel landing-pitch" aria-label="Who Cloud is for and what it does">
+            <h2>Who is CueSport Scoreboard Cloud for?</h2>
+            <p>
+              Whether you stream or record to your favorite platform, run a league or tournament and need
+              player stats, or just want a history of games with friends — with or without a camera —
+              Cloud is built for that.
+            </p>
+            <ul class="landing-pitch-audience">
+              <li>Streamers and recorders who need to score from the table, not the PC</li>
+              <li>Organizers tracking standings and player performance</li>
+              <li>Players logging matches with no stream or OBS setup</li>
             </ul>
-          </div>
-          <div class="marketing-carousel-controls">
-            <button type="button" class="btn secondary marketing-carousel-btn" id="carouselPrev" aria-label="Previous slide" title="Previous">
-              <svg class="carousel-control-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m15.4 5.4-6.6 6.6 6.6 6.6-1.4 1.4-8-8 8-8 1.4 1.4z"/></svg>
-              <span class="carousel-control-label">Previous</span>
-            </button>
-            <div class="marketing-carousel-dots" id="marketingCarouselDots" role="tablist" aria-label="Carousel slides"></div>
-            <button type="button" class="btn secondary marketing-carousel-btn" id="carouselNext" aria-label="Next slide" title="Next">
-              <span class="carousel-control-label">Next</span>
-              <svg class="carousel-control-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m8.6 18.6 6.6-6.6-6.6-6.6L10 4l8 8-8 8-1.4-1.4z"/></svg>
-            </button>
-          </div>
+            <h3>What does CueSport Scoreboard Cloud do for you?</h3>
+            <p>
+              Used with
+              <a href="https://github.com/iainsmacleod/CueSport-Scoreboard" target="_blank" rel="noopener noreferrer" aria-describedby="landingObsNote">CueSport Scoreboard</a><sup class="landing-pitch-asterisk" aria-hidden="true">*</sup>,
+              Cloud lets you run the match from your phone so you&rsquo;re not tied to
+              the streaming or recording desk. Hand a focused guest link to a player or helper so they can
+              score without account access. Every completed match feeds searchable history and leaderboards
+              — useful for tournaments, leagues, or casual nights. With <strong>ad-hoc tables</strong>, you
+              can score on the fly with no OBS dock at all and still keep the same Cloud history.
+            </p>
+            <p id="landingObsNote" class="hint marketing-obs-note">
+              <span class="landing-pitch-asterisk" aria-hidden="true">*</span>
+              Streaming tables use OBS with
+              <a href="https://github.com/iainsmacleod/CueSport-Scoreboard" target="_blank" rel="noopener noreferrer">CueSport Scoreboard</a>
+              (the free OBS dock). Cloud is the hosted relay, remotes, billing, and <strong>impromptu</strong> seats for games you are not streaming.
+            </p>
+          </section>
         </div>
-      </section>
 
-      <section id="landingPricing" class="panel landing-pricing hidden">
-        <h2>Plans &amp; pricing</h2>
-        <p id="landingPricingHint" class="hint">Prices come from Stripe and may update. Start on Streamer with a free trial when offered.</p>
-        <div id="landingPlanGrid" class="billing-plan-grid"></div>
-        <p id="landingPricingNotice" class="hint hidden" aria-live="polite"></p>
-      </section>
+        <div id="panel-video" class="landing-tabpanel hidden" role="tabpanel" aria-labelledby="tab-video" data-tab="video" hidden>
+          <section class="panel landing-video-panel" aria-label="Promotional video">
+            <h2>Promotional Video</h2>
+            <p class="hint">A quick look at CueSport Scoreboard Cloud in action.</p>
+            <div class="landing-video-frame">
+              <iframe
+                id="promoVideoFrame"
+                title="CueSport Scoreboard Cloud promotional video"
+                data-src="https://www.youtube-nocookie.com/embed/9CLuHoMjpAU"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowfullscreen
+                loading="lazy"
+                referrerpolicy="strict-origin-when-cross-origin"
+              ></iframe>
+            </div>
+          </section>
+        </div>
 
-      <section id="landingPricingSoon" class="panel landing-pricing-soon hidden">
-        <h2>Plans &amp; pricing</h2>
-        <p class="hint">Self-serve plans will appear here when Stripe billing is configured on this server.</p>
-        <a class="btn primary" href="/dashboard">Dashboard</a>
-      </section>
+        <div id="panel-features" class="landing-tabpanel hidden" role="tabpanel" aria-labelledby="tab-features" data-tab="features" hidden>
+          <section class="panel marketing-carousel-panel" aria-roledescription="carousel" aria-label="Product highlights">
+            <div class="marketing-carousel" id="marketingCarousel" tabindex="0">
+              <div class="marketing-carousel-viewport">
+                <ul class="marketing-carousel-track" id="marketingCarouselTrack">
+                  <li class="marketing-slide is-wide" data-caption="Dock and Phone">
+                    <figure class="marketing-slide-media">
+                      <img src="/web/images/marketing/dock-and-phone.png?v=1" alt="CueSport Scoreboard OBS dock beside a phone running Cloud remote control" width="1920" height="1032" loading="eager" />
+                    </figure>
+                    <div class="marketing-slide-caption">
+                      <h3>OBS Dock + Phone Control</h3>
+                      <p>Keep the free OBS CueSport Scoreboard on stream, and run the same match from your phone over Cloud. Scorers stay mobile around the venue while viewers still see the overlay.</p>
+                    </div>
+                  </li>
+                  <li class="marketing-slide is-wide" data-caption="OBS CueSport Scoreboard Dock">
+                    <figure class="marketing-slide-media">
+                      <img src="/web/images/marketing/obs-dock-controls.png" alt="OBS CueSport Scoreboard dock scoring controls" width="1280" height="720" loading="lazy" />
+                    </figure>
+                    <div class="marketing-slide-caption">
+                      <h3>OBS CueSport Scoreboard Dock</h3>
+                      <p>Run the match from the OBS dock, your phone, or a guest scorer’s device. Everyone sees the same score instantly, so your team can work from anywhere around the venue.</p>
+                    </div>
+                  </li>
+                  <li class="marketing-slide is-wide" data-caption="Cloud Connection">
+                    <figure class="marketing-slide-media">
+                      <img src="/web/images/marketing/obs-dock-cloud.png" alt="OBS dock Cloud Connection settings" width="1280" height="720" loading="lazy" />
+                    </figure>
+                    <div class="marketing-slide-caption">
+                      <h3>One Dock Key per Table</h3>
+                      <p>Connect each table to Cloud with its own Dock Key. Start with one weekly stream and add more tables as your events grow, all managed from one account.</p>
+                    </div>
+                  </li>
+                  <li class="marketing-slide is-wide" data-caption="Ad-hoc Tables">
+                    <figure class="marketing-slide-media">
+                      <img src="/web/images/marketing/impromptu-table.png?v=1" alt="Dashboard showing an OBS dock table beside an ad-hoc Snooker table and Create Ad-hoc Table" width="1485" height="419" loading="lazy" />
+                    </figure>
+                    <div class="marketing-slide-caption">
+                      <h3>Ad-hoc Tables — No Stream Required</h3>
+                      <p>Not every match needs OBS. Create a dockless seat from the dashboard and score league nights, side tables, and multi-table events that aren’t on stream — while your main table still runs on the dock.</p>
+                      <p>Same Cloud scoring, guest links, and match history as a streamed table. Your phone is the authority; helpers join with a scoring-only link. End or destroy the seat when you’re done and free the quota for the next game.</p>
+                    </div>
+                  </li>
+                  <li class="marketing-slide is-phone" data-caption="Mobile Scoring">
+                    <figure class="marketing-slide-media marketing-phone-frame">
+                      <img src="/web/images/marketing/mobile-score.png?v=3" alt="Mobile match scoring screen" width="390" height="768" loading="lazy" />
+                    </figure>
+                    <div class="marketing-slide-caption">
+                      <h3>Score From Your Phone</h3>
+                      <p>Move around the venue while controlling players, breakers, balls, fouls, racks, race details, and overall match state.</p>
+                    </div>
+                  </li>
+                  <li class="marketing-slide is-phone" data-caption="Guest Remote Links">
+                    <figure class="marketing-slide-media marketing-phone-frame">
+                      <img src="/web/images/marketing/mobile-share.png?v=3" alt="Mobile share and guest remote screen" width="390" height="768" loading="lazy" />
+                    </figure>
+                    <div class="marketing-slide-caption">
+                      <h3>Guest Remote Links</h3>
+                      <p>Hand a scorer a QR link with focused match controls, one active device per link, and no access to account or replay settings.</p>
+                    </div>
+                  </li>
+                  <li class="marketing-slide is-phone" data-caption="Multi-Table Control">
+                    <figure class="marketing-slide-media marketing-phone-frame">
+                      <img src="/web/images/marketing/mobile-tables.png?v=3" alt="Mobile tables list" width="390" height="768" loading="lazy" />
+                    </figure>
+                    <div class="marketing-slide-caption">
+                      <h3>Multi-Table Control</h3>
+                      <p>See every active OBS dock from one responsive dashboard, review the live score, and jump directly into the table that needs attention.</p>
+                    </div>
+                  </li>
+                  <li class="marketing-slide is-wide" data-caption="Cloud Match Statistics">
+                    <figure class="marketing-slide-media">
+                      <img src="/web/images/marketing/dashboard-tables.png?v=3" alt="CueSport Scoreboard Cloud match statistics leaderboard" width="1024" height="529" loading="lazy" />
+                    </figure>
+                    <div class="marketing-slide-caption">
+                      <h3>Cloud Match Statistics</h3>
+                      <p>Keep a searchable record of completed matches, compare leaderboards, review recent results, and explore each player’s history from any device. You can also help viewers find your stream when you go live.</p>
+                    </div>
+                  </li>
+                </ul>
+              </div>
+              <div class="marketing-carousel-controls">
+                <button type="button" class="btn secondary marketing-carousel-btn" id="carouselPrev" aria-label="Previous slide" title="Previous">
+                  <svg class="carousel-control-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m15.4 5.4-6.6 6.6 6.6 6.6-1.4 1.4-8-8 8-8 1.4 1.4z"/></svg>
+                  <span class="carousel-control-label">Previous</span>
+                </button>
+                <div class="marketing-carousel-dots" id="marketingCarouselDots" role="tablist" aria-label="Carousel slides"></div>
+                <button type="button" class="btn secondary marketing-carousel-btn" id="carouselNext" aria-label="Next slide" title="Next">
+                  <span class="carousel-control-label">Next</span>
+                  <svg class="carousel-control-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m8.6 18.6 6.6-6.6-6.6-6.6L10 4l8 8-8 8-1.4-1.4z"/></svg>
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <div id="panel-pricing" class="landing-tabpanel hidden" role="tabpanel" aria-labelledby="tab-pricing" data-tab="pricing" hidden>
+          <section id="landingPricing" class="panel landing-pricing hidden">
+            <h2>Plans &amp; pricing</h2>
+            <p id="landingPricingHint" class="hint">Prices come from Stripe and may update. Start on Streamer with a free trial when offered.</p>
+            <div id="landingPlanGrid" class="billing-plan-grid"></div>
+            <p id="landingPricingNotice" class="hint hidden" aria-live="polite"></p>
+          </section>
+          <section id="landingPricingSoon" class="panel landing-pricing-soon hidden">
+            <h2>Plans &amp; pricing</h2>
+            <p class="hint">Self-serve plans will appear here when Stripe billing is configured on this server.</p>
+            <a class="btn primary" href="/dashboard">Dashboard</a>
+          </section>
+        </div>
+
+        <div id="panel-streams" class="landing-tabpanel hidden" role="tabpanel" aria-labelledby="tab-streams" data-tab="streams" hidden>
+          <section id="liveNow" class="panel live-now-panel">
+            <h2>Live Now</h2>
+            <p class="hint">Only streams with Stream Promotion enabled and OBS actively streaming appear here.</p>
+            <ul id="streamList" class="stream-list"></ul>
+            <p id="empty" class="hidden">No one is streaming with promotion enabled right now.</p>
+          </section>
+        </div>
+      </div>
     </div>
   </main>
   <script type="module">
-    const isStreamsPage = /\/streams\/?$/.test(location.pathname);
-    if (isStreamsPage) {
-      document.body.classList.remove('landing-home');
-      document.body.classList.add('streams-page');
-      document.title = 'Live Streams — CueSport Scoreboard Cloud';
-    }
-
     const SUBSCRIBE_KEY = 'cuesport_subscribe_tier';
     const CAROUSEL_MS = 5000;
+    const TAB_IDS = ['overview', 'video', 'features', 'pricing', 'streams'];
+    const TAB_HASH = {
+      overview: 'overview',
+      video: 'video',
+      features: 'features',
+      pricing: 'pricing',
+      streams: 'streams',
+    };
+
+    let activeTab = 'overview';
+    let streamsPollTimer = null;
+    let promoVideoLoaded = false;
+
+    if (/\/streams\/?$/.test(location.pathname)) {
+      history.replaceState(null, '', '/#streams');
+    }
 
     function syncAuthNav() {
       const signedIn = !!localStorage.getItem('cuesport_token');
@@ -203,13 +233,6 @@
         btn.innerHTML = `${signedIn ? dashIcon : signInIcon}${navLabel}`;
         btn.setAttribute('aria-label', navLabel);
         btn.title = navLabel;
-      }
-      const hero = document.getElementById('heroAuthBtn');
-      if (hero) {
-        const heroLabel = 'Dashboard';
-        hero.innerHTML = `${dashIcon}${heroLabel}`;
-        hero.setAttribute('aria-label', heroLabel);
-        hero.title = heroLabel;
       }
     }
 
@@ -237,10 +260,107 @@
       return `${money}/mo`;
     }
 
-    function setMarketingVisible(show) {
-      document.body.classList.toggle('streams-empty', !!(isStreamsPage && show));
-      if (show) startCarousel();
-      else stopCarousel();
+    function normalizeTabId(raw) {
+      const id = String(raw || '').replace(/^#/, '').toLowerCase();
+      if (id === 'live' || id === 'shared-streams' || id === 'sharedstreams') return 'streams';
+      if (id === 'promo' || id === 'promotional-video' || id === 'promotionalvideo') return 'video';
+      return TAB_IDS.includes(id) ? id : null;
+    }
+
+    function ensurePromoVideo() {
+      if (promoVideoLoaded) return;
+      const frame = document.getElementById('promoVideoFrame');
+      if (!frame) return;
+      const src = frame.getAttribute('data-src');
+      if (!src) return;
+      frame.setAttribute('src', src);
+      promoVideoLoaded = true;
+    }
+
+    function stopStreamsPoll() {
+      if (streamsPollTimer) {
+        clearInterval(streamsPollTimer);
+        streamsPollTimer = null;
+      }
+    }
+
+    function startStreamsPoll() {
+      stopStreamsPoll();
+      loadStreams();
+      streamsPollTimer = setInterval(loadStreams, 15000);
+    }
+
+    function selectTab(tabId, { updateHash = true, focusTab = false } = {}) {
+      const id = normalizeTabId(tabId) || 'overview';
+      const prev = activeTab;
+      activeTab = id;
+
+      document.querySelectorAll('.landing-tablist [role="tab"]').forEach((tab) => {
+        const on = tab.dataset.tab === id;
+        tab.setAttribute('aria-selected', on ? 'true' : 'false');
+        tab.tabIndex = on ? 0 : -1;
+        tab.classList.toggle('is-active', on);
+        if (on && focusTab) tab.focus();
+      });
+
+      document.querySelectorAll('.landing-tabpanel').forEach((panel) => {
+        const on = panel.dataset.tab === id;
+        panel.classList.toggle('hidden', !on);
+        panel.toggleAttribute('hidden', !on);
+        panel.setAttribute('aria-hidden', on ? 'false' : 'true');
+      });
+
+      if (id === 'features') {
+        goToSlide(carouselIndex);
+        startCarousel();
+      } else if (prev === 'features') {
+        stopCarousel();
+      }
+
+      if (id === 'video') ensurePromoVideo();
+
+      if (id === 'streams') {
+        document.title = 'Shared Streams — CueSport Scoreboard Cloud';
+        startStreamsPoll();
+      } else {
+        if (prev === 'streams') stopStreamsPoll();
+        document.title = 'CueSport Scoreboard Cloud';
+      }
+
+      if (updateHash) {
+        const nextUrl = id === 'overview' ? '/' : `/#${TAB_HASH[id] || id}`;
+        const current = `${location.pathname}${location.hash || ''}`;
+        if (current !== nextUrl && !(id === 'overview' && location.pathname === '/' && !location.hash)) {
+          history.replaceState(null, '', nextUrl);
+        }
+      }
+    }
+
+    function initTabs() {
+      document.querySelectorAll('.landing-tablist [role="tab"]').forEach((tab) => {
+        tab.addEventListener('click', () => selectTab(tab.dataset.tab, { focusTab: false }));
+        tab.addEventListener('keydown', (event) => {
+          const tabs = Array.from(document.querySelectorAll('.landing-tablist [role="tab"]'));
+          const idx = tabs.indexOf(tab);
+          if (idx < 0) return;
+          let next = -1;
+          if (event.key === 'ArrowRight' || event.key === 'ArrowDown') next = (idx + 1) % tabs.length;
+          else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') next = (idx - 1 + tabs.length) % tabs.length;
+          else if (event.key === 'Home') next = 0;
+          else if (event.key === 'End') next = tabs.length - 1;
+          if (next < 0) return;
+          event.preventDefault();
+          selectTab(tabs[next].dataset.tab, { focusTab: true });
+        });
+      });
+
+      window.addEventListener('hashchange', () => {
+        const fromHash = normalizeTabId(location.hash);
+        if (fromHash && fromHash !== activeTab) selectTab(fromHash, { updateHash: false });
+      });
+
+      const fromHash = normalizeTabId(location.hash);
+      selectTab(fromHash || 'overview', { updateHash: !!fromHash });
     }
 
     /* ---- Carousel ---- */
@@ -323,11 +443,7 @@
       stopCarousel();
       const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
       if (reduce || carouselPaused) return;
-      const marketing = document.getElementById('landingMarketing');
-      if (!marketing || marketing.offsetParent === null) {
-        // Hidden via CSS (streams with live list)
-        if (isStreamsPage && !document.body.classList.contains('streams-empty')) return;
-      }
+      if (activeTab !== 'features') return;
       carouselTimer = setInterval(() => goToSlide(carouselIndex + 1), CAROUSEL_MS);
     }
 
@@ -375,7 +491,9 @@
       });
       buildCarouselClones();
       goToSlide(0);
-      window.addEventListener('resize', () => goToSlide(carouselIndex));
+      window.addEventListener('resize', () => {
+        if (activeTab === 'features') goToSlide(carouselIndex);
+      });
       document.getElementById('carouselPrev')?.addEventListener('click', () => {
         goToSlide(carouselIndex - 1);
         restartCarousel();
@@ -398,7 +516,6 @@
         restartCarousel();
         touchX = null;
       }, { passive: true });
-      if (!isStreamsPage) startCarousel();
     }
 
     /* ---- Pricing ---- */
@@ -480,17 +597,14 @@
         if (!res.ok) {
           empty.textContent = 'Could not load live streams right now.';
           empty.classList.remove('hidden');
-          setMarketingVisible(true);
           return;
         }
         if (!streams.length) {
           empty.textContent = 'No one is streaming with promotion enabled right now.';
           empty.classList.remove('hidden');
-          setMarketingVisible(true);
           return;
         }
         empty.classList.add('hidden');
-        setMarketingVisible(false);
         streams.forEach((s) => {
           const st = s.state || {};
           const li = document.createElement('li');
@@ -514,17 +628,13 @@
         list.innerHTML = '';
         empty.textContent = 'Could not load live streams right now.';
         empty.classList.remove('hidden');
-        setMarketingVisible(true);
       }
     }
 
     syncAuthNav();
     initCarousel();
+    initTabs();
     loadPricing();
-    if (isStreamsPage) {
-      loadStreams();
-      setInterval(loadStreams, 15000);
-    }
   </script>
 </body>
 </html>
