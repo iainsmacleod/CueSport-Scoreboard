@@ -18,7 +18,42 @@ function parseEmailList(value) {
     .filter(Boolean);
 }
 
+/**
+ * Accept a YouTube watch / youtu.be / embed URL or bare video id.
+ * Returns a youtube-nocookie embed URL, or '' when unset/invalid.
+ */
+export function parseYoutubeEmbedUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  let id = '';
+  if (/^[\w-]{11}$/.test(raw)) {
+    id = raw;
+  } else {
+    try {
+      const withScheme = /^[a-z]+:\/\//i.test(raw) ? raw : `https://${raw}`;
+      const u = new URL(withScheme);
+      const host = u.hostname.replace(/^www\./, '').toLowerCase();
+      if (host === 'youtu.be') {
+        id = u.pathname.split('/').filter(Boolean)[0] || '';
+      } else if (host === 'youtube.com' || host === 'm.youtube.com' || host === 'youtube-nocookie.com') {
+        if (u.pathname.startsWith('/embed/')) {
+          id = u.pathname.split('/')[2] || '';
+        } else if (u.pathname.startsWith('/shorts/')) {
+          id = u.pathname.split('/')[2] || '';
+        } else {
+          id = u.searchParams.get('v') || '';
+        }
+      }
+    } catch {
+      return '';
+    }
+  }
+  if (!/^[\w-]{11}$/.test(id)) return '';
+  return `https://www.youtube-nocookie.com/embed/${id}`;
+}
+
 const supportContactEmails = parseEmailList(process.env.SUPPORT_CONTACT_EMAIL);
+const landingPromoYoutubeEmbedUrl = parseYoutubeEmbedUrl(process.env.LANDING_PROMO_YOUTUBE_URL);
 
 export const config = {
   port: parseInt(process.env.PORT || '3000', 10),
@@ -101,6 +136,12 @@ export const config = {
     const [to, ...cc] = supportContactEmails;
     return cc.length ? `mailto:${to}?cc=${cc.join(',')}` : `mailto:${to}`;
   })(),
+  /**
+   * Optional homepage Promotional Video tab (YouTube).
+   * Set LANDING_PROMO_YOUTUBE_URL to a watch/youtu.be/embed URL or 11-char id.
+   * Empty/invalid → tab hidden. Exposed via /api/config/public.
+   */
+  landingPromoYoutubeEmbedUrl,
   legalContactEmail: process.env.LEGAL_CONTACT_EMAIL || '',
   legalEntityName: process.env.LEGAL_ENTITY_NAME || 'CueSport Scoreboard Cloud',
   legalGoverningLaw: process.env.LEGAL_GOVERNING_LAW || '[Operator province/country — fill before publish]',

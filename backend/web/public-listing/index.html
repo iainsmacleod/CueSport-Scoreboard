@@ -26,7 +26,7 @@
     <div class="landing-tabs" id="landingTabs">
       <div class="landing-tablist" role="tablist" aria-label="Homepage sections">
         <button type="button" class="landing-tab" role="tab" id="tab-overview" data-tab="overview" aria-controls="panel-overview" aria-selected="true">Overview</button>
-        <button type="button" class="landing-tab" role="tab" id="tab-video" data-tab="video" aria-controls="panel-video" aria-selected="false" tabindex="-1">Promotional Video</button>
+        <button type="button" class="landing-tab hidden" role="tab" id="tab-video" data-tab="video" aria-controls="panel-video" aria-selected="false" tabindex="-1" hidden>Promotional Video</button>
         <button type="button" class="landing-tab" role="tab" id="tab-features" data-tab="features" aria-controls="panel-features" aria-selected="false" tabindex="-1">Features</button>
         <button type="button" class="landing-tab" role="tab" id="tab-pricing" data-tab="pricing" aria-controls="panel-pricing" aria-selected="false" tabindex="-1">Pricing</button>
         <button type="button" class="landing-tab" role="tab" id="tab-streams" data-tab="streams" aria-controls="panel-streams" aria-selected="false" tabindex="-1">Shared Streams</button>
@@ -73,7 +73,7 @@
               <iframe
                 id="promoVideoFrame"
                 title="CueSport Scoreboard Cloud promotional video"
-                data-src="https://www.youtube-nocookie.com/embed/9CLuHoMjpAU"
+                data-src=""
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 allowfullscreen
                 loading="lazy"
@@ -218,6 +218,7 @@
     let activeTab = 'overview';
     let streamsPollTimer = null;
     let promoVideoLoaded = false;
+    let promoVideoEnabled = false;
 
     if (/\/streams\/?$/.test(location.pathname)) {
       history.replaceState(null, '', '/#streams');
@@ -263,18 +264,61 @@
     function normalizeTabId(raw) {
       const id = String(raw || '').replace(/^#/, '').toLowerCase();
       if (id === 'live' || id === 'shared-streams' || id === 'sharedstreams') return 'streams';
-      if (id === 'promo' || id === 'promotional-video' || id === 'promotionalvideo') return 'video';
+      if (id === 'promo' || id === 'promotional-video' || id === 'promotionalvideo') {
+        return promoVideoEnabled ? 'video' : null;
+      }
+      if (id === 'video' && !promoVideoEnabled) return null;
       return TAB_IDS.includes(id) ? id : null;
     }
 
+    function setPromoVideoEnabled(embedUrl) {
+      const url = String(embedUrl || '').trim();
+      const ok = /^https:\/\/www\.youtube-nocookie\.com\/embed\/[\w-]{11}$/.test(url);
+      promoVideoEnabled = ok;
+      const tab = document.getElementById('tab-video');
+      const panel = document.getElementById('panel-video');
+      const frame = document.getElementById('promoVideoFrame');
+      if (tab) {
+        tab.classList.toggle('hidden', !ok);
+        tab.toggleAttribute('hidden', !ok);
+      }
+      if (panel && !ok) {
+        panel.classList.add('hidden');
+        panel.setAttribute('hidden', '');
+        panel.setAttribute('aria-hidden', 'true');
+      }
+      if (frame) {
+        if (ok) frame.setAttribute('data-src', url);
+        else {
+          frame.removeAttribute('src');
+          frame.setAttribute('data-src', '');
+          promoVideoLoaded = false;
+        }
+      }
+      if (!ok && activeTab === 'video') {
+        selectTab('overview', { updateHash: true });
+      }
+    }
+
     function ensurePromoVideo() {
-      if (promoVideoLoaded) return;
+      if (!promoVideoEnabled || promoVideoLoaded) return;
       const frame = document.getElementById('promoVideoFrame');
       if (!frame) return;
       const src = frame.getAttribute('data-src');
       if (!src) return;
       frame.setAttribute('src', src);
       promoVideoLoaded = true;
+    }
+
+    async function loadPublicConfig() {
+      try {
+        const res = await fetch('/api/config/public');
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'config');
+        setPromoVideoEnabled(data.landingPromoYoutubeEmbedUrl);
+      } catch {
+        setPromoVideoEnabled('');
+      }
     }
 
     function stopStreamsPoll() {
@@ -290,17 +334,29 @@
       streamsPollTimer = setInterval(loadStreams, 15000);
     }
 
+    function visibleTabs() {
+      return Array.from(document.querySelectorAll('.landing-tablist [role="tab"]'))
+        .filter((tab) => !tab.hasAttribute('hidden') && !tab.classList.contains('hidden'));
+    }
+
     function selectTab(tabId, { updateHash = true, focusTab = false } = {}) {
-      const id = normalizeTabId(tabId) || 'overview';
+      let id = normalizeTabId(tabId) || 'overview';
+      if (id === 'video' && !promoVideoEnabled) id = 'overview';
       const prev = activeTab;
       activeTab = id;
 
-      document.querySelectorAll('.landing-tablist [role="tab"]').forEach((tab) => {
+      visibleTabs().forEach((tab) => {
         const on = tab.dataset.tab === id;
         tab.setAttribute('aria-selected', on ? 'true' : 'false');
         tab.tabIndex = on ? 0 : -1;
         tab.classList.toggle('is-active', on);
         if (on && focusTab) tab.focus();
+      });
+      // Keep hidden optional tabs deselected.
+      document.querySelectorAll('.landing-tablist [role="tab"][hidden], .landing-tablist [role="tab"].hidden').forEach((tab) => {
+        tab.setAttribute('aria-selected', 'false');
+        tab.tabIndex = -1;
+        tab.classList.remove('is-active');
       });
 
       document.querySelectorAll('.landing-tabpanel').forEach((panel) => {
@@ -338,9 +394,12 @@
 
     function initTabs() {
       document.querySelectorAll('.landing-tablist [role="tab"]').forEach((tab) => {
-        tab.addEventListener('click', () => selectTab(tab.dataset.tab, { focusTab: false }));
+        tab.addEventListener('click', () => {
+          if (tab.hasAttribute('hidden') || tab.classList.contains('hidden')) return;
+          selectTab(tab.dataset.tab, { focusTab: false });
+        });
         tab.addEventListener('keydown', (event) => {
-          const tabs = Array.from(document.querySelectorAll('.landing-tablist [role="tab"]'));
+          const tabs = visibleTabs();
           const idx = tabs.indexOf(tab);
           if (idx < 0) return;
           let next = -1;
@@ -357,8 +416,14 @@
       window.addEventListener('hashchange', () => {
         const fromHash = normalizeTabId(location.hash);
         if (fromHash && fromHash !== activeTab) selectTab(fromHash, { updateHash: false });
+        else if (!fromHash && location.hash.replace(/^#/, '').toLowerCase() === 'video') {
+          selectTab('overview', { updateHash: true });
+        }
       });
+    }
 
+    async function bootLanding() {
+      await loadPublicConfig();
       const fromHash = normalizeTabId(location.hash);
       selectTab(fromHash || 'overview', { updateHash: !!fromHash });
     }
@@ -635,6 +700,7 @@
     initCarousel();
     initTabs();
     loadPricing();
+    bootLanding();
   </script>
 </body>
 </html>

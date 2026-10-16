@@ -651,7 +651,10 @@
                     fetchRepoText('../backend/web/shared/cloud-client.js'),
                     fetchRepoText('../common/js/cloud_commands.js'),
                     fetchRepoText('../backend/web/mobile/app.js'),
-                    fetchRepoText('../backend/src/ws/room-hub.js')
+                    fetchRepoText('../backend/src/ws/room-hub.js'),
+                    fetchRepoText('../backend/src/config.js'),
+                    fetchRepoText('../backend/src/api/accounts.js'),
+                    fetchRepoText('../backend/.env.example')
                 ]);
                 const landingSource = sourceFiles[0].replace(/\r\n/g, '\n');
                 const dashboardSource = sourceFiles[1].replace(/\r\n/g, '\n');
@@ -663,6 +666,9 @@
                 const cloudCommandsSource = sourceFiles[7].replace(/\r\n/g, '\n');
                 const mobileAppSource = sourceFiles[8].replace(/\r\n/g, '\n');
                 const roomHubSource = sourceFiles[9].replace(/\r\n/g, '\n');
+                const backendConfigSource = sourceFiles[10].replace(/\r\n/g, '\n');
+                const accountsApiSource = sourceFiles[11].replace(/\r\n/g, '\n');
+                const envExampleSource = sourceFiles[12].replace(/\r\n/g, '\n');
                 const parser = new DOMParser();
                 const landingDoc = parser.parseFromString(landingSource, 'text/html');
                 const dashboardDoc = parser.parseFromString(dashboardSource, 'text/html');
@@ -691,11 +697,20 @@
                     !!landingDoc.getElementById('panel-streams') &&
                     landingSource.indexOf('function selectTab(') !== -1 &&
                     landingSource.indexOf("history.replaceState(null, '', '/#streams')") !== -1);
-                assert('Cloud Website', 'Promotional Video tab embeds YouTube without eager src',
-                    landingDoc.getElementById('promoVideoFrame')?.getAttribute('data-src') ===
-                        'https://www.youtube-nocookie.com/embed/9CLuHoMjpAU' &&
+                assert('Cloud Website', 'Promotional Video tab is config-gated and has no hardcoded YouTube id',
+                    landingDoc.getElementById('tab-video')?.hasAttribute('hidden') === true &&
+                    (landingDoc.getElementById('promoVideoFrame')?.getAttribute('data-src') || '') === '' &&
                     !landingDoc.getElementById('promoVideoFrame')?.getAttribute('src') &&
+                    landingSource.indexOf('9CLuHoMjpAU') === -1 &&
+                    landingSource.indexOf('landingPromoYoutubeEmbedUrl') !== -1 &&
+                    landingSource.indexOf('setPromoVideoEnabled') !== -1 &&
                     landingSource.indexOf('ensurePromoVideo') !== -1);
+                assert('Cloud Website', 'LANDING_PROMO_YOUTUBE_URL is parsed into public config embed URL',
+                    backendConfigSource.indexOf('export function parseYoutubeEmbedUrl') !== -1 &&
+                    backendConfigSource.indexOf('LANDING_PROMO_YOUTUBE_URL') !== -1 &&
+                    backendConfigSource.indexOf('landingPromoYoutubeEmbedUrl') !== -1 &&
+                    accountsApiSource.indexOf('landingPromoYoutubeEmbedUrl: config.landingPromoYoutubeEmbedUrl') !== -1 &&
+                    envExampleSource.indexOf('LANDING_PROMO_YOUTUBE_URL=') !== -1);
                 assert('Cloud Website', 'Marketing carousel contains eight real product slides',
                     slides.length === 8 &&
                     Array.from(slides).every(function (slide) {

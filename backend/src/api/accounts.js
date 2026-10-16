@@ -595,6 +595,8 @@ export async function registerAccountRoutes(app) {
     privacyUrl: `${config.publicUrl}/privacy`,
     supportIssuesUrl: config.supportIssuesUrl,
     supportContactUrl: config.supportContactUrl || null,
+    /** youtube-nocookie embed URL when LANDING_PROMO_YOUTUBE_URL is set; otherwise null. */
+    landingPromoYoutubeEmbedUrl: config.landingPromoYoutubeEmbedUrl || null,
     billingEnabled: isStripeConfigured() && !config.allowDevAuth,
   }));
 }

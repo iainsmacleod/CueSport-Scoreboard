@@ -1358,6 +1358,10 @@ body.landing-home .landing-main {
   font-weight: 700;
   box-shadow: 0 0.35rem 0.95rem rgba(92, 54, 170, 0.28);
 }
+.landing-tab.hidden,
+.landing-tab[hidden] {
+  display: none !important;
+}
 .landing-tabpanel {
   min-width: 0;
 }

@@ -108,6 +108,7 @@ See [`.env.example`](.env.example).
 | `BILLING_CONTACT_URL` | Contact CTA for Network Organization (e.g. `mailto:…`) |
 | `SUPPORT_ISSUES_URL` / `LEGAL_CONTACT_EMAIL` / `LEGAL_ENTITY_NAME` / `LEGAL_GOVERNING_LAW` | Legal page placeholders (`/terms`, `/privacy`) |
 | `SUPPORT_CONTACT_EMAIL` | Dashboard “Having trouble?” mailto (comma-separated: first To, rest Cc; exposed on `/api/config/public`) |
+| `LANDING_PROMO_YOUTUBE_URL` | Optional homepage Promotional Video tab (YouTube URL or 11-char id). Unset/invalid hides the tab; exposed on `/api/config/public` as `landingPromoYoutubeEmbedUrl` |
 | `ROOM_CLEANUP_GRACE_MS` | After last dock leaves, wait before deleting the room (default 45m) |
 | `ROOM_IDLE_TTL_MS` | Delete mapped rooms older than this `last_seen_at` (default 14d) |
 | `ROOM_CLEANUP_SWEEPER_MS` | How often the sweeper runs (default 10m) |
