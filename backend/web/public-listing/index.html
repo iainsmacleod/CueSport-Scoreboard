@@ -219,6 +219,7 @@
     let streamsPollTimer = null;
     let promoVideoLoaded = false;
     let promoVideoEnabled = false;
+    let promoConfigReady = false;
 
     if (/\/streams\/?$/.test(location.pathname)) {
       history.replaceState(null, '', '/#streams');
@@ -261,13 +262,24 @@
       return `${money}/mo`;
     }
 
+    function hashToken(raw) {
+      return String(raw || '').replace(/^#/, '').toLowerCase();
+    }
+
+    function isPromoHash(raw) {
+      const id = hashToken(raw);
+      return id === 'video'
+        || id === 'promo'
+        || id === 'promotional-video'
+        || id === 'promotionalvideo';
+    }
+
     function normalizeTabId(raw) {
-      const id = String(raw || '').replace(/^#/, '').toLowerCase();
+      const id = hashToken(raw);
       if (id === 'live' || id === 'shared-streams' || id === 'sharedstreams') return 'streams';
-      if (id === 'promo' || id === 'promotional-video' || id === 'promotionalvideo') {
+      if (isPromoHash(id)) {
         return promoVideoEnabled ? 'video' : null;
       }
-      if (id === 'video' && !promoVideoEnabled) return null;
       return TAB_IDS.includes(id) ? id : null;
     }
 
@@ -414,9 +426,13 @@
       });
 
       window.addEventListener('hashchange', () => {
+        // Ignore until LANDING_PROMO_YOUTUBE_URL config is known — otherwise
+        // #video/#promo would be treated as disabled during the fetch race.
+        if (!promoConfigReady) return;
         const fromHash = normalizeTabId(location.hash);
-        if (fromHash && fromHash !== activeTab) selectTab(fromHash, { updateHash: false });
-        else if (!fromHash && location.hash.replace(/^#/, '').toLowerCase() === 'video') {
+        if (fromHash && fromHash !== activeTab) {
+          selectTab(fromHash, { updateHash: false });
+        } else if (!fromHash && isPromoHash(location.hash)) {
           selectTab('overview', { updateHash: true });
         }
       });
@@ -424,8 +440,11 @@
 
     async function bootLanding() {
       await loadPublicConfig();
+      promoConfigReady = true;
       const fromHash = normalizeTabId(location.hash);
-      selectTab(fromHash || 'overview', { updateHash: !!fromHash });
+      // Clear disabled promo aliases (#video, #promo, …) from the URL.
+      const clearPromoHash = !fromHash && isPromoHash(location.hash);
+      selectTab(fromHash || 'overview', { updateHash: !!fromHash || clearPromoHash });
     }
 
     /* ---- Carousel ---- */

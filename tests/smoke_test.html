@@ -704,7 +704,9 @@
                     landingSource.indexOf('9CLuHoMjpAU') === -1 &&
                     landingSource.indexOf('landingPromoYoutubeEmbedUrl') !== -1 &&
                     landingSource.indexOf('setPromoVideoEnabled') !== -1 &&
-                    landingSource.indexOf('ensurePromoVideo') !== -1);
+                    landingSource.indexOf('ensurePromoVideo') !== -1 &&
+                    landingSource.indexOf('promoConfigReady') !== -1 &&
+                    landingSource.indexOf('function isPromoHash(') !== -1);
                 assert('Cloud Website', 'LANDING_PROMO_YOUTUBE_URL is parsed into public config embed URL',
                     backendConfigSource.indexOf('export function parseYoutubeEmbedUrl') !== -1 &&
                     backendConfigSource.indexOf('LANDING_PROMO_YOUTUBE_URL') !== -1 &&
