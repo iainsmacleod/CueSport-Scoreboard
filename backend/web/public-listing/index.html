@@ -29,7 +29,7 @@
         <button type="button" class="landing-tab hidden" role="tab" id="tab-video" data-tab="video" aria-controls="panel-video" aria-selected="false" tabindex="-1" hidden>Promotional Video</button>
         <button type="button" class="landing-tab" role="tab" id="tab-features" data-tab="features" aria-controls="panel-features" aria-selected="false" tabindex="-1">Features</button>
         <button type="button" class="landing-tab" role="tab" id="tab-pricing" data-tab="pricing" aria-controls="panel-pricing" aria-selected="false" tabindex="-1">Pricing</button>
-        <button type="button" class="landing-tab" role="tab" id="tab-streams" data-tab="streams" aria-controls="panel-streams" aria-selected="false" tabindex="-1">Shared Streams</button>
+        <button type="button" class="landing-tab hidden" role="tab" id="tab-streams" data-tab="streams" aria-controls="panel-streams" aria-selected="false" tabindex="-1" hidden>Shared Streams</button>
       </div>
 
       <div id="landingMarketing" class="landing-marketing">
@@ -219,7 +219,9 @@
     let streamsPollTimer = null;
     let promoVideoLoaded = false;
     let promoVideoEnabled = false;
+    let streamsTabEnabled = false;
     let promoConfigReady = false;
+    let streamsConfigReady = false;
 
     if (/\/streams\/?$/.test(location.pathname)) {
       history.replaceState(null, '', '/#streams');
@@ -274,13 +276,41 @@
         || id === 'promotionalvideo';
     }
 
+    function isStreamsHash(raw) {
+      const id = hashToken(raw);
+      return id === 'streams'
+        || id === 'live'
+        || id === 'shared-streams'
+        || id === 'sharedstreams';
+    }
+
     function normalizeTabId(raw) {
       const id = hashToken(raw);
-      if (id === 'live' || id === 'shared-streams' || id === 'sharedstreams') return 'streams';
+      if (isStreamsHash(id)) {
+        return streamsTabEnabled ? 'streams' : null;
+      }
       if (isPromoHash(id)) {
         return promoVideoEnabled ? 'video' : null;
       }
       return TAB_IDS.includes(id) ? id : null;
+    }
+
+    function setStreamsTabEnabled(ok) {
+      streamsTabEnabled = !!ok;
+      const tab = document.getElementById('tab-streams');
+      const panel = document.getElementById('panel-streams');
+      if (tab) {
+        tab.classList.toggle('hidden', !streamsTabEnabled);
+        tab.toggleAttribute('hidden', !streamsTabEnabled);
+      }
+      if (panel && !streamsTabEnabled) {
+        panel.classList.add('hidden');
+        panel.setAttribute('hidden', '');
+        panel.setAttribute('aria-hidden', 'true');
+      }
+      if (!streamsTabEnabled && activeTab === 'streams') {
+        selectTab('overview', { updateHash: true });
+      }
     }
 
     function setPromoVideoEnabled(embedUrl) {
@@ -340,10 +370,12 @@
       }
     }
 
+    /** Background poll so the Shared Streams tab can appear/disappear as listings change. */
     function startStreamsPoll() {
-      stopStreamsPoll();
-      loadStreams();
-      streamsPollTimer = setInterval(loadStreams, 15000);
+      if (streamsPollTimer) return;
+      streamsPollTimer = setInterval(() => {
+        loadStreams();
+      }, 15000);
     }
 
     function visibleTabs() {
@@ -354,6 +386,7 @@
     function selectTab(tabId, { updateHash = true, focusTab = false } = {}) {
       let id = normalizeTabId(tabId) || 'overview';
       if (id === 'video' && !promoVideoEnabled) id = 'overview';
+      if (id === 'streams' && !streamsTabEnabled) id = 'overview';
       const prev = activeTab;
       activeTab = id;
 
@@ -389,9 +422,8 @@
 
       if (id === 'streams') {
         document.title = 'Shared Streams — CueSport Scoreboard Cloud';
-        startStreamsPoll();
+        loadStreams();
       } else {
-        if (prev === 'streams') stopStreamsPoll();
         document.title = 'CueSport Scoreboard Cloud';
       }
 
@@ -426,25 +458,27 @@
       });
 
       window.addEventListener('hashchange', () => {
-        // Ignore until LANDING_PROMO_YOUTUBE_URL config is known — otherwise
-        // #video/#promo would be treated as disabled during the fetch race.
-        if (!promoConfigReady) return;
+        // Ignore until promo + streams availability are known.
+        if (!promoConfigReady || !streamsConfigReady) return;
         const fromHash = normalizeTabId(location.hash);
         if (fromHash && fromHash !== activeTab) {
           selectTab(fromHash, { updateHash: false });
-        } else if (!fromHash && isPromoHash(location.hash)) {
+        } else if (!fromHash && (isPromoHash(location.hash) || isStreamsHash(location.hash))) {
           selectTab('overview', { updateHash: true });
         }
       });
     }
 
     async function bootLanding() {
-      await loadPublicConfig();
+      await Promise.all([loadPublicConfig(), loadStreams()]);
       promoConfigReady = true;
+      streamsConfigReady = true;
+      startStreamsPoll();
       const fromHash = normalizeTabId(location.hash);
-      // Clear disabled promo aliases (#video, #promo, …) from the URL.
-      const clearPromoHash = !fromHash && isPromoHash(location.hash);
-      selectTab(fromHash || 'overview', { updateHash: !!fromHash || clearPromoHash });
+      // Clear disabled promo/streams aliases from the URL.
+      const clearOptionalHash = !fromHash
+        && (isPromoHash(location.hash) || isStreamsHash(location.hash));
+      selectTab(fromHash || 'overview', { updateHash: !!fromHash || clearOptionalHash });
     }
 
     /* ---- Carousel ---- */
@@ -677,12 +711,15 @@
         const res = await fetch('/api/streams');
         const payload = await res.json().catch(() => []);
         const streams = Array.isArray(payload) ? payload : (Array.isArray(payload?.streams) ? payload.streams : []);
-        list.innerHTML = '';
         if (!res.ok) {
+          setStreamsTabEnabled(false);
+          list.innerHTML = '';
           empty.textContent = 'Could not load live streams right now.';
           empty.classList.remove('hidden');
           return;
         }
+        setStreamsTabEnabled(streams.length > 0);
+        list.innerHTML = '';
         if (!streams.length) {
           empty.textContent = 'No one is streaming with promotion enabled right now.';
           empty.classList.remove('hidden');
@@ -709,6 +746,7 @@
           list.appendChild(li);
         });
       } catch {
+        setStreamsTabEnabled(false);
         list.innerHTML = '';
         empty.textContent = 'Could not load live streams right now.';
         empty.classList.remove('hidden');

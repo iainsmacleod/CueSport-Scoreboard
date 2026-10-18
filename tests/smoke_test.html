@@ -735,11 +735,13 @@
                 assert('Cloud Website', 'Pricing plans retain sign-in subscription deep link',
                     !!landingDoc.getElementById('landingPricing') &&
                     landingSource.indexOf('/dashboard?subscribe=') !== -1);
-                assert('Cloud Website', 'Shared Streams is a homepage tab with poll lifecycle',
+                assert('Cloud Website', 'Shared Streams tab is hidden until live listings exist',
                     !!landingDoc.getElementById('liveNow') &&
                     landingDoc.getElementById('panel-streams')?.contains(landingDoc.getElementById('liveNow')) &&
+                    landingDoc.getElementById('tab-streams')?.hasAttribute('hidden') === true &&
+                    landingSource.indexOf('setStreamsTabEnabled') !== -1 &&
                     landingSource.indexOf('startStreamsPoll') !== -1 &&
-                    landingSource.indexOf('stopStreamsPoll') !== -1 &&
+                    landingSource.indexOf('function isStreamsHash(') !== -1 &&
                     sharedStyles.indexOf('.landing-tablist') !== -1);
                 assert('Cloud Website', 'Marketing image click pauses and resumes with an indicator',
                     landingSource.indexOf('setCarouselPaused(!carouselPaused)') !== -1 &&
