@@ -1372,6 +1372,9 @@ body.landing-home .landing-main {
 .landing-video-panel h2 {
   margin-top: 0;
 }
+.landing-video-panel a {
+  color: #7aa2f7;
+}
 .landing-video-frame {
   position: relative;
   width: 100%;
