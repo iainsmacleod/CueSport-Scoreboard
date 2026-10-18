@@ -68,7 +68,7 @@
         <div id="panel-video" class="landing-tabpanel hidden" role="tabpanel" aria-labelledby="tab-video" data-tab="video" hidden>
           <section class="panel landing-video-panel" aria-label="Promotional video">
             <h2>Promotional Video</h2>
-            <p class="hint">A quick look at CueSport Scoreboard Cloud in action.</p>
+            <p class="hint">A quick look at CueSport Scoreboard <a href="https://github.com/iainsmacleod/CueSport-Scoreboard" target="_blank" rel="noopener noreferrer">OBS dock</a> and Cloud in action.</p>
             <div class="landing-video-frame">
               <iframe
                 id="promoVideoFrame"
@@ -397,7 +397,10 @@
         stopStreamsPoll();
         return;
       }
-      loadStreams();
+      // Immediate refresh only while viewing Shared Streams; other tabs rely on idle discovery poll.
+      if (activeTab === 'streams') {
+        loadStreams();
+      }
       startStreamsPoll();
     }
 
