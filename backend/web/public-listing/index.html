@@ -363,6 +363,10 @@
       }
     }
 
+    /** Refresh list while viewing Shared Streams; slower discovery poll on other tabs. */
+    const STREAMS_POLL_ACTIVE_MS = 15000;
+    const STREAMS_POLL_IDLE_MS = 60000;
+
     function stopStreamsPoll() {
       if (streamsPollTimer) {
         clearInterval(streamsPollTimer);
@@ -370,12 +374,31 @@
       }
     }
 
-    /** Background poll so the Shared Streams tab can appear/disappear as listings change. */
+    function streamsPollIntervalMs() {
+      return activeTab === 'streams' ? STREAMS_POLL_ACTIVE_MS : STREAMS_POLL_IDLE_MS;
+    }
+
+    /**
+     * Poll while the landing page is visible so the Shared Streams tab can appear
+     * when someone goes live. Pause entirely when the document is hidden.
+     */
     function startStreamsPoll() {
-      if (streamsPollTimer) return;
+      stopStreamsPoll();
+      if (document.visibilityState === 'hidden') return;
+      const ms = streamsPollIntervalMs();
       streamsPollTimer = setInterval(() => {
+        if (document.visibilityState === 'hidden') return;
         loadStreams();
-      }, 15000);
+      }, ms);
+    }
+
+    function onStreamsVisibilityChange() {
+      if (document.visibilityState === 'hidden') {
+        stopStreamsPoll();
+        return;
+      }
+      loadStreams();
+      startStreamsPoll();
     }
 
     function visibleTabs() {
@@ -427,6 +450,9 @@
         document.title = 'CueSport Scoreboard Cloud';
       }
 
+      // Retune poll cadence: 15s on Shared Streams, 60s discovery elsewhere.
+      if (streamsConfigReady) startStreamsPoll();
+
       if (updateHash) {
         const nextUrl = id === 'overview' ? '/' : `/#${TAB_HASH[id] || id}`;
         const current = `${location.pathname}${location.hash || ''}`;
@@ -473,6 +499,7 @@
       await Promise.all([loadPublicConfig(), loadStreams()]);
       promoConfigReady = true;
       streamsConfigReady = true;
+      document.addEventListener('visibilitychange', onStreamsVisibilityChange);
       startStreamsPoll();
       const fromHash = normalizeTabId(location.hash);
       // Clear disabled promo/streams aliases from the URL.

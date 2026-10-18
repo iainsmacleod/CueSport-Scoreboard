@@ -741,6 +741,9 @@
                     landingDoc.getElementById('tab-streams')?.hasAttribute('hidden') === true &&
                     landingSource.indexOf('setStreamsTabEnabled') !== -1 &&
                     landingSource.indexOf('startStreamsPoll') !== -1 &&
+                    landingSource.indexOf('stopStreamsPoll') !== -1 &&
+                    landingSource.indexOf('STREAMS_POLL_IDLE_MS') !== -1 &&
+                    landingSource.indexOf('onStreamsVisibilityChange') !== -1 &&
                     landingSource.indexOf('function isStreamsHash(') !== -1 &&
                     sharedStyles.indexOf('.landing-tablist') !== -1);
                 assert('Cloud Website', 'Marketing image click pauses and resumes with an indicator',
