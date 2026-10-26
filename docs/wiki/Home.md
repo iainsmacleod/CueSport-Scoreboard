@@ -57,7 +57,7 @@ The **OBS dock remains the scoring authority**. Mobile and guest clients send co
 
 - Root [README](https://github.com/iainsmacleod/CueSport-Scoreboard/blob/main/README.md) — full reference
 - [backend/README](https://github.com/iainsmacleod/CueSport-Scoreboard/blob/main/backend/README.md) — Cloud server, env vars, Docker
-- [Release notes](https://github.com/iainsmacleod/CueSport-Scoreboard/blob/main/docs/release-notes/8.5.0/RELEASE_NOTES.md) — 8.5.0 Cloud H2H chart, local Export / OBS copy (current build **8.6.0**)
+- [Release notes](https://github.com/iainsmacleod/CueSport-Scoreboard/blob/main/docs/release-notes/8.6.0/RELEASE_NOTES.md) — 8.6.0 hosted URL, Manage account, Shared Streams (8.5.0 notes remain in the repo)
 
 ## Publishing this wiki
 
