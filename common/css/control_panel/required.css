@@ -1038,17 +1038,17 @@ select.dropdown option,
 	font: inherit;
 }
 
-/* Text links in the dock (readable on dark + light themes; matches Support Developer). */
+/* Text links in the dock. Each theme sets --cp-link; disabled theme sheets do not apply. */
 .cp-text-link,
 a.cp-text-link {
-	color: red;
+	color: var(--cp-link, #7dcfff);
 	text-decoration: underline;
 	cursor: pointer;
 	font: inherit;
 }
 .cp-text-link:hover,
 a.cp-text-link:hover {
-	color: #ed4e54;
+	color: var(--cp-link-hover, var(--cp-link, #7dcfff));
 }
 
 .cloud-meta-row .cloud-status {
@@ -1675,10 +1675,11 @@ label.switch.toggle-disabled {
 }
 
 .modal-content {
-	background-color: #2b2e38;
+	background-color: var(--cp-modal-bg, #2b2e38);
+	color: var(--cp-modal-text, #f2f2f2);
 	margin: 10% auto;
 	padding: 0;
-	border: 2px solid #000;
+	border: 2px solid var(--cp-modal-border, #000);
 	border-radius: 0px 0px 10px 0px;
 	display: table;
 	width: 90%;
@@ -1686,12 +1687,25 @@ label.switch.toggle-disabled {
 	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 }
 
+.modal-content div,
+.modal-content p,
+.modal-content label,
+.modal-content h2,
+.modal-content li {
+	color: var(--cp-modal-text, #f2f2f2) !important;
+}
+
+.modal-content .gsi-btn,
+.modal-content .gsi-btn span {
+	color: #3c4043 !important;
+}
+
 .modal-header {
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
 	padding: 15px 20px;
-	border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+	border-bottom: 1px solid var(--cp-modal-line, rgba(255, 255, 255, 0.1));
 }
 
 .modal-header h2 {
@@ -1703,7 +1717,7 @@ label.switch.toggle-disabled {
 }
 
 .modal-close {
-	color: white;
+	color: var(--cp-modal-text, #f2f2f2);
 	font-size: 28px;
 	font-weight: bold;
 	cursor: pointer;
@@ -1738,7 +1752,7 @@ label.switch.toggle-disabled {
 #cloudConnectionModal .modal-body .form-row .field {
 	display: flex;
 	flex-direction: column;
-	align-items: flex-start;
+	align-items: stretch;
 	justify-content: flex-start;
 	gap: 5px;
 	width: 100%;
@@ -1761,6 +1775,39 @@ label.switch.toggle-disabled {
 	width: 100%;
 	box-sizing: border-box;
 	flex-shrink: 0;
+}
+
+#cloudConnectionModal .cloud-key-field {
+	position: relative;
+	width: 100%;
+	align-self: stretch;
+	min-width: 0;
+}
+
+#cloudConnectionModal .cloud-key-field input {
+	padding-right: 1.6rem;
+}
+
+#cloudConnectionModal .cloud-key-clear {
+	position: absolute;
+	right: 2px;
+	top: 50%;
+	transform: translateY(-50%);
+	border: 0;
+	background: transparent;
+	color: inherit;
+	cursor: pointer;
+	font-size: 16px;
+	line-height: 1;
+	padding: 0 4px;
+	min-width: 0;
+	min-height: 0;
+	box-shadow: none;
+}
+
+#cloudConnectionModal .cloud-key-clear:hover {
+	background: transparent;
+	opacity: 0.75;
 }
 
 #websocketSettingsModal .password-input-wrapper,
@@ -1826,7 +1873,7 @@ label.switch.toggle-disabled {
 	display: flex;
 	justify-content: flex-end;
 	padding: 15px 20px;
-	border-top: 1px solid rgba(255, 255, 255, 0.1);
+	border-top: 1px solid var(--cp-modal-line, rgba(255, 255, 255, 0.1));
 }
 
 .modal-footer-buttons {

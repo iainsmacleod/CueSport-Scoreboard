@@ -2060,6 +2060,31 @@ function setBallsScoreAbsolute(player, value) {
     }
 }
 
+function restoreBallSetUndoSnapshot(before) {
+    if (!before) {
+        return;
+    }
+    const ballSet = before.playerBallSet || "p1Open";
+    setStorageItem("playerBallSet", ballSet);
+    const radio = document.querySelector('input[name="p1BallSetSelect"][value="' + ballSet + '"]');
+    if (radio) {
+        radio.checked = true;
+    }
+    if (typeof bc !== "undefined") {
+        bc.postMessage({ playerBallSet: ballSet });
+    }
+    setStorageItem("ballSetOpenLastPotSlot", before.ballSetOpenLastPotSlot || "");
+    setStorageItem("ballSetOpenSamePlayerPots", before.ballSetOpenSamePlayerPots || "0");
+}
+
+function captureBallSetUndoSnapshot() {
+    return {
+        playerBallSet: getStorageItem("playerBallSet") || "p1Open",
+        ballSetOpenLastPotSlot: getStorageItem("ballSetOpenLastPotSlot") || "",
+        ballSetOpenSamePlayerPots: getStorageItem("ballSetOpenSamePlayerPots") || "0"
+    };
+}
+
 function restoreTrackerFromScoringSnapshot(before) {
     if (!before) {
         return;
@@ -2088,17 +2113,7 @@ function restoreTrackerFromScoringSnapshot(before) {
     });
 
     setPocketBallOwners(before.pocketOwners || {});
-    const ballSet = before.playerBallSet || "p1Open";
-    setStorageItem("playerBallSet", ballSet);
-    const radio = document.querySelector('input[name="p1BallSetSelect"][value="' + ballSet + '"]');
-    if (radio) {
-        radio.checked = true;
-    }
-    if (typeof bc !== "undefined") {
-        bc.postMessage({ playerBallSet: ballSet });
-    }
-    setStorageItem("ballSetOpenLastPotSlot", before.ballSetOpenLastPotSlot || "");
-    setStorageItem("ballSetOpenSamePlayerPots", before.ballSetOpenSamePlayerPots || "0");
+    restoreBallSetUndoSnapshot(before);
 
     setStorageItem("rackBreakerSlot", before.rackBreakerSlot || "");
     setStorageItem("rackOpponentVisited", before.rackOpponentVisited === "yes" ? "yes" : "no");
@@ -2459,6 +2474,7 @@ async function applyScoringUndoEntry(entry) {
                 bc.postMessage({ resetBall: entry.ballId });
             }
         }
+        restoreBallSetUndoSnapshot(entry.ballSetBefore);
         if (entry.recordedBall && entry.player) {
             await undoTrackerBallPot(entry.player);
         }
@@ -5009,7 +5025,11 @@ function togglePot(element) {
 
     // 8-Ball / Custom: while Open, assign Chosen Ball from Active Player
     // (8-Ball: 2nd pot same player, or 1st pot after player change).
+    // Snapshot first so undo can return the table to Open, including the
+    // first-pot counter that has not assigned a group yet.
+    let ballSetBefore = null;
     if (nowFaded) {
+        ballSetBefore = captureBallSetUndoSnapshot();
         maybeAssignBallSetFromPot(element.id);
     }
 
@@ -5038,13 +5058,22 @@ function togglePot(element) {
             // Next rack underway — clear pending game-ball fade without deducting.
             clearPendingTrackerRackWinBallIfNeeded(element.id);
             const player = getActivePlayerSlot();
-            pushScoringUndo({ type: "fade", ballId: element.id, player: player, recordedBall: true });
+            pushScoringUndo({
+                type: "fade",
+                ballId: element.id,
+                player: player,
+                recordedBall: true,
+                ballSetBefore: ballSetBefore
+            });
             recordTrackerBallPot(player);
         }
         if (!nowFaded && element.id !== winningId) {
             const discarded = discardLastScoringUndoIf(function (e) {
                 return e.type === "fade" && e.ballId === element.id;
             });
+            if (discarded && discarded.ballSetBefore) {
+                restoreBallSetUndoSnapshot(discarded.ballSetBefore);
+            }
             if (discarded && discarded.recordedBall && discarded.player) {
                 undoTrackerBallPot(discarded.player);
             }

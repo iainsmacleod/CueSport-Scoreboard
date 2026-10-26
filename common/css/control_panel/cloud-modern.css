@@ -9,6 +9,12 @@
 	--cs-purple: #9b5cff;
 	--cs-success: #42dd8b;
 	--cs-danger: #ff6b85;
+	--cp-link: #7eb6ff;
+	--cp-link-hover: #c5dcff;
+	--cp-modal-bg: var(--cs-surface);
+	--cp-modal-text: var(--cs-text);
+	--cp-modal-border: var(--cs-border);
+	--cp-modal-line: var(--cs-border);
 }
 
 /* Gradients size to the body box (≈ panel/tab height). Default background-repeat
@@ -118,7 +124,24 @@ textarea,
 
 input:focus,
 select:focus,
-textarea:focus,
+textarea:focus {
+	border-color: var(--cs-blue) !important;
+	outline: none;
+}
+
+button.cloud-key-clear,
+button.cloud-key-clear:hover,
+button.cloud-key-clear:focus {
+	border: 0 !important;
+	background: transparent !important;
+	box-shadow: none !important;
+	color: var(--cs-muted) !important;
+	padding: 0 4px !important;
+	min-width: 0 !important;
+	min-height: 0 !important;
+	border-radius: 0 !important;
+}
+
 button:focus-visible {
 	outline: 2px solid var(--cs-blue) !important;
 	outline-offset: 2px;

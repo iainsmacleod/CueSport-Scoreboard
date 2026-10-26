@@ -1774,6 +1774,9 @@ body.has-dash-nav .dash-tabs[hidden] {
 .account-deployment-type {
   margin: 0.3rem 0 0;
 }
+.account-legal-links {
+  margin: 0.35rem 0 0;
+}
 .account-plan-line {
   margin: 0 0 0.45rem;
   line-height: 1.4;

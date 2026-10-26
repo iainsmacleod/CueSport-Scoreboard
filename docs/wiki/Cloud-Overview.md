@@ -2,7 +2,7 @@
 
 **CueSport Scoreboard Cloud** is optional. Local OBS scoring works without it. Cloud adds remote phones, a web dashboard, guest scorers, cloud match history, and public live-stream discovery.
 
-Managed service: [cuesport.macleod.systems](https://cuesport.macleod.systems)  
+Managed service: [cuesportscoreboard.com](https://cuesportscoreboard.com)  
 Self-host: free (GPL) via the included [`backend/`](https://github.com/iainsmacleod/CueSport-Scoreboard/tree/main/backend)
 
 ## Architecture

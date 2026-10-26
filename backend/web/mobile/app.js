@@ -9,29 +9,29 @@ import {
   fetchPublicConfig,
   GAME_TYPES,
   getOrCreateClientSessionId,
-} from '../shared/cloud-client.js?v=8.5.0';
+} from '../shared/cloud-client.js?v=8.6.0';
 import {
   parseRaceTarget,
   isRaceLocked,
   normalizePlayerName,
   truncatePlayerName,
-} from '../shared/scoreboard-helpers.js?v=8.0.0';
+} from '../shared/scoreboard-helpers.js?v=8.6.0';
 import {
   getStoredAccessToken,
   setStoredAccessToken,
   ensureSupabaseAuth,
   getFreshAccessToken,
   signOutSupabaseSession,
-} from '../shared/supabase-session.js?v=8.5.0';
+} from '../shared/supabase-session.js?v=8.6.0';
 import {
   applyImpromptuCommand,
   hydrateAuthorityState,
   createDefaultImpromptuState,
-} from '../shared/impromptu-authority.js?v=8.5.0';
+} from '../shared/impromptu-authority.js?v=8.6.0';
 import {
   installAppViewportHeightSync,
   settleAppViewportHeight,
-} from '../shared/viewport-shell.js?v=8.5.0';
+} from '../shared/viewport-shell.js?v=8.6.0';
 
 let client = null;
 let roomId = '';

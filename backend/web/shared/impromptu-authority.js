@@ -9,7 +9,7 @@ import {
   isRaceLocked,
   truncatePlayerName,
   winnerSlotFromScores,
-} from './scoreboard-helpers.js?v=8.0.0';
+} from './scoreboard-helpers.js?v=8.6.0';
 
 const POOL_BALL_COUNTS = {
   game1: 15, game2: 9, game3: 10, game4: 15,

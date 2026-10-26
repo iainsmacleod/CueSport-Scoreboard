@@ -1,3 +1,12 @@
+:root {
+	--cp-link: #1a4fb5;
+	--cp-link-hover: #0d3a8a;
+	--cp-modal-bg: #f3f3f3;
+	--cp-modal-text: #111111;
+	--cp-modal-border: #3345a3;
+	--cp-modal-line: rgba(0, 0, 0, 0.16);
+}
+
 div {
 	color:black !important; /*override white div font color */
 }

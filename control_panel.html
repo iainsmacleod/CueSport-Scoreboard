@@ -16,31 +16,31 @@ for more information about Salotto please visit https://salotto.app
 
 <head>
     <meta charset="UTF-8" />
-    <link rel="stylesheet" href="./common/css/control_panel/dark.css?v=8.0.0" />
-    <link rel="stylesheet" href="./common/css/control_panel/yami.css?v=8.0.0" />
-    <link rel="stylesheet" href="./common/css/control_panel/acri.css?v=8.0.0" />
-    <link rel="stylesheet" href="./common/css/control_panel/grey.css?v=8.0.0" />
-    <link rel="stylesheet" href="./common/css/control_panel/light.css?v=8.0.0" />
-    <link rel="stylesheet" href="./common/css/control_panel/rachni.css?v=8.0.0" />
-    <link rel="stylesheet" href="./common/css/control_panel/required.css?v=8.5.0" />
-    <link id="cloudModernTheme" rel="stylesheet" href="./common/css/control_panel/cloud-modern.css?v=8.5.0" disabled />
+    <link rel="stylesheet" href="./common/css/control_panel/dark.css?v=8.6.0" />
+    <link rel="stylesheet" href="./common/css/control_panel/yami.css?v=8.6.0" />
+    <link rel="stylesheet" href="./common/css/control_panel/acri.css?v=8.6.0" />
+    <link rel="stylesheet" href="./common/css/control_panel/grey.css?v=8.6.0" />
+    <link rel="stylesheet" href="./common/css/control_panel/light.css?v=8.6.0" />
+    <link rel="stylesheet" href="./common/css/control_panel/rachni.css?v=8.6.0" />
+    <link rel="stylesheet" href="./common/css/control_panel/required.css?v=8.6.0" />
+    <link id="cloudModernTheme" rel="stylesheet" href="./common/css/control_panel/cloud-modern.css?v=8.6.0" disabled />
     <script>
         //---------------------------------------------------------------------------------------------
-        var versionNum = "8.5.0";
+        var versionNum = "8.6.0";
         //---------------------------------------------------------------------------------------------
     </script>
-    <script src="./common/js/obs-websocket-js.js?v=8.0.0"></script>
-    <script src="./common/js/jquery.js?v=8.0.0"></script>
-    <script src="./common/js/scoreboard_helpers.js?v=8.0.0"></script>
-    <script src="./common/js/match_racks.js?v=8.0.0"></script>
-    <script src="./common/js/cloud_relay.js?v=8.5.0"></script>
-    <script src="./common/js/stream_sharing.js?v=8.0.0.6"></script>
-    <script src="./common/js/player_stats.js?v=8.5.0"></script>
-    <script src="./common/js/control_panel.js?v=8.5.0"></script>
-    <script src="./common/js/cloud_commands.js?v=8.5.0"></script>
-    <script src="./common/js/cloud_auth.js?v=8.0.0.4"></script>
-    <script src="./common/js/cloud_remote.js?v=8.5.0"></script>
-    <script src="hotkeys.js?v=8.0.0"></script>
+    <script src="./common/js/obs-websocket-js.js?v=8.6.0"></script>
+    <script src="./common/js/jquery.js?v=8.6.0"></script>
+    <script src="./common/js/scoreboard_helpers.js?v=8.6.0"></script>
+    <script src="./common/js/match_racks.js?v=8.6.0"></script>
+    <script src="./common/js/cloud_relay.js?v=8.6.0"></script>
+    <script src="./common/js/stream_sharing.js?v=8.6.0"></script>
+    <script src="./common/js/player_stats.js?v=8.6.0"></script>
+    <script src="./common/js/control_panel.js?v=8.6.0"></script>
+    <script src="./common/js/cloud_commands.js?v=8.6.0"></script>
+    <script src="./common/js/cloud_auth.js?v=8.6.0"></script>
+    <script src="./common/js/cloud_remote.js?v=8.6.0"></script>
+    <script src="hotkeys.js?v=8.6.0"></script>
 
     <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
 </head>
@@ -894,7 +894,7 @@ for more information about Salotto please visit https://salotto.app
                     <div class="modal-body">
                         <p class="stats-hint" style="margin: 0 0 0.75rem;">
                             Promote Live Stream lists you on
-                            <a href="https://cuesport.macleod.systems/streams" target="_blank" rel="noopener noreferrer" class="cp-text-link">cuesport.macleod.systems</a>
+                            <a href="https://cuesportscoreboard.com/streams" target="_blank" rel="noopener noreferrer" class="cp-text-link">cuesportscoreboard.com</a>
                             through <strong>CueSport Scoreboard Cloud</strong>. Enable Cloud with an OBS Dock Key and wait until Status shows connected.
                         </p>
                         <p class="stats-hint" style="margin: 0 0 0.75rem;">
@@ -930,19 +930,13 @@ for more information about Salotto please visit https://salotto.app
                     <div class="modal-body">
                         <div id="cloudManagedPane">
                             <div class="cloud-connection-intro" style="font-size: 0.9em; opacity: 0.9; margin-bottom: 0.75rem;">
-                                <p style="margin: 0 0 0.65rem;">
-                                    CueSport Scoreboard Cloud allows desktop and mobile control of the OBS CueSport Scoreboard overlay, giving you freedom from your streaming machine.
-                                </p>
-                                <p style="margin: 0;">
-                                    Sign in to manage your account. From the Settings page retrieve an <strong>OBS Dock Key</strong>, if you haven&rsquo;t already, and paste below.
-                                    Alternatively, open sign-up in your browser at
-                                    <a id="cloudManagedPublicUrl" class="cp-text-link" href="https://cuesport.macleod.systems" target="_blank" rel="noopener noreferrer">https://cuesport.macleod.systems</a>
-                                    and retrieve the key from Settings.
+                                <p id="cloudManagedIntro" style="margin: 0;">
+                                    Do you want hosted statistics and remote management? Sign in to learn more.
                                 </p>
                             </div>
                             <div class="form-row">
                                 <div class="field google-auth-buttons">
-                                    <button type="button" class="gsi-btn" onclick="signInWithGoogle()" title="Sign in with Google" aria-label="Sign in with Google">
+                                    <button type="button" class="gsi-btn" id="cloudGoogleSignInBtn" onclick="onManagedCloudAuthClick()" title="Sign in with Google" aria-label="Sign in with Google">
                                         <span class="gsi-btn-icon" aria-hidden="true">
                                             <img src="common/images/google/g-logo.svg" width="20" height="20" alt="" />
                                         </span>
@@ -950,21 +944,27 @@ for more information about Salotto please visit https://salotto.app
                                     </button>
                                     <p class="stats-hint cloud-login-legal" style="margin: 0.5rem 0 0; font-size: 0.85em;">
                                         By continuing, you agree to the
-                                        <a class="cp-text-link" href="https://cuesport.macleod.systems/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a>
+                                        <a class="cp-text-link" href="https://cuesportscoreboard.com/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a>
                                         and
-                                        <a class="cp-text-link" href="https://cuesport.macleod.systems/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>.
+                                        <a class="cp-text-link" href="https://cuesportscoreboard.com/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>.
                                     </p>
                                 </div>
                             </div>
                             <div class="form-row">
                                 <div class="field">
                                     <label for="cloudManagedApiKeyModal">OBS Dock Key:</label>
-                                    <input type="text" id="cloudManagedApiKeyModal" placeholder="32-char hex key from Settings" style="width: 100%;" />
+                                    <div class="cloud-key-field">
+                                        <input type="text" id="cloudManagedApiKeyModal" placeholder="32-char hex key from Settings" oninput="syncCloudKeyClearButtons()" />
+                                        <button type="button" class="cloud-key-clear" id="cloudManagedApiKeyClear" hidden onclick="clearCloudApiKeyField()" title="Clear OBS Dock Key" aria-label="Clear OBS Dock Key">&times;</button>
+                                    </div>
                                 </div>
                             </div>
                             <div class="form-row" style="margin-top: 0.75rem;">
                                 <div class="field">
-                                    <a href="#" id="cloudShowSelfHostLink" class="cp-text-link" onclick="showCloudSelfHostPane(); return false;" style="font-size: 0.85em;">Self-hosting</a>
+                                    <p class="stats-hint" style="margin: 0; font-size: 0.85em;">
+                                        CueSport Scoreboard Cloud can also be self-hosted.
+                                        <a href="#" id="cloudShowSelfHostLink" class="cp-text-link" onclick="showCloudSelfHostPane(); return false;">Click here if you are self-hosting.</a>
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -981,7 +981,10 @@ for more information about Salotto please visit https://salotto.app
                             <div class="form-row">
                                 <div class="field">
                                     <label for="cloudApiKeyModal">OBS Dock Key:</label>
-                                    <input type="text" id="cloudApiKeyModal" placeholder="32-char hex key" style="width: 100%;" />
+                                    <div class="cloud-key-field">
+                                        <input type="text" id="cloudApiKeyModal" placeholder="32-char hex key" oninput="syncCloudKeyClearButtons()" />
+                                        <button type="button" class="cloud-key-clear" id="cloudApiKeyClear" hidden onclick="clearCloudApiKeyField()" title="Clear OBS Dock Key" aria-label="Clear OBS Dock Key">&times;</button>
+                                    </div>
                                 </div>
                             </div>
                             <div class="form-row" style="margin-top: 0.75rem;">
@@ -995,7 +998,6 @@ for more information about Salotto please visit https://salotto.app
                         <div class="modal-footer-buttons">
                             <button id="cloudConnectionSaveConnectBtn" class="modal-save-btn hover obs28 button" onclick="saveCloudConnectionSettingsAndConnect()" title="Save settings and enable CueSport Scoreboard Cloud">Save &amp; Connect</button>
                             <button id="cloudConnectionSaveBtn" class="modal-save-btn hover obs28 button" onclick="saveCloudConnectionSettings()">Save</button>
-                            <button type="button" class="modal-cancel-btn hover obs28 button" onclick="signOutCloud()" title="Remove key and sign out on this dock">Clear key</button>
                             <button class="modal-cancel-btn hover obs28 button" onclick="closeCloudConnectionModal()">Close</button>
                         </div>
                     </div>
@@ -1442,7 +1444,7 @@ for more information about Salotto please visit https://salotto.app
         </div>
     </div>
 
-    <script src="./common/js/control_panel_post.js?v=8.0.0.2"></script>
+    <script src="./common/js/control_panel_post.js?v=8.6.0"></script>
     <script>
         //////////////////// HotKey scripts
 

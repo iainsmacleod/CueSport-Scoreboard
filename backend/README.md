@@ -197,7 +197,7 @@ Clients send `join` then `event`, `command`, `state`, or `session` messages. See
 
 ## GPL + hosted service
 
-This backend is GPL-licensed alongside the scoreboard. You may run your own instance for free. The author's hosted service at `cuesport.macleod.systems` is an optional managed deployment (uptime, auth, storage). The subscription fee covers that managed hosting — not ownership of the GPL software.
+This backend is GPL-licensed alongside the scoreboard. You may run your own instance for free. The author's hosted service at `cuesportscoreboard.com` is an optional managed deployment (uptime, auth, storage). The subscription fee covers that managed hosting — not ownership of the GPL software.
 
 ## API
 

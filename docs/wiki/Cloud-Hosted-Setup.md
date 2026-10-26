@@ -1,6 +1,6 @@
 # Cloud Hosted Setup
 
-Use the managed service at **[cuesport.macleod.systems](https://cuesport.macleod.systems)** so you do not run a backend yourself.
+Use the managed service at **[cuesportscoreboard.com](https://cuesportscoreboard.com)** so you do not run a backend yourself.
 
 ## Before you start
 
@@ -19,7 +19,7 @@ Caps also include mobile + guest connections per table (see the dashboard billin
 
 ## 1. Create your account
 
-1. Open [cuesport.macleod.systems/dashboard](https://cuesport.macleod.systems/dashboard).
+1. Open [cuesportscoreboard.com/dashboard](https://cuesportscoreboard.com/dashboard).
 2. Sign in with **Google**.
 3. New accounts start inactive until you choose a plan (or receive complimentary access from support).
 4. Complete Stripe Checkout for your plan and accept the Terms / Privacy when prompted.

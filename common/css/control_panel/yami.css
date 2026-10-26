@@ -1,3 +1,12 @@
+:root {
+	--cp-link: #9ecbff;
+	--cp-link-hover: #d4e8ff;
+	--cp-modal-bg: #1f1e1f;
+	--cp-modal-text: #f2f2f2;
+	--cp-modal-border: #3c404b;
+	--cp-modal-line: rgba(255, 255, 255, 0.14);
+}
+
 .blue28, .tabcontent, .tab button:hover {
 	background: #3345a3;
 	border:0px;

@@ -23,13 +23,13 @@ import {
   openBillingPortal,
   setSimulatedPlan,
   GAME_TYPES,
-} from '../shared/cloud-client.js?v=8.5.0';
+} from '../shared/cloud-client.js?v=8.6.0';
 import {
   computeDurationSeconds,
   formatDurationSeconds,
   enrichRacksWithDuration,
   sumRackDurationSeconds,
-} from '../shared/match-racks.js?v=8.0.0';
+} from '../shared/match-racks.js?v=8.6.0';
 import {
   getStoredAccessToken,
   setStoredAccessToken,
@@ -38,11 +38,11 @@ import {
   adoptOAuthHashSession,
   getFreshAccessToken,
   signOutSupabaseSession,
-} from '../shared/supabase-session.js?v=8.5.0';
+} from '../shared/supabase-session.js?v=8.6.0';
 import {
   installAppViewportHeightSync,
   settleAppViewportHeight,
-} from '../shared/viewport-shell.js?v=8.5.0';
+} from '../shared/viewport-shell.js?v=8.6.0';
 
 const SERVER_KEY = 'cuesport_server';
 const DASH_TAB_KEY = 'cuesport_dashboard_tab';
@@ -5370,7 +5370,16 @@ async function applyDashboardMe(me, { renderSeq = renderDashboardSeq } = {}) {
   if (emailEl) emailEl.textContent = me.account.email;
   canSimulatePlanUser = !!(me.can_simulate_plan || me.is_platform_admin || dashPublicConfigCache?.allowDevAuth);
   setPlatformAdminUi(!!me.is_platform_admin);
-  setActiveDashTab(localStorage.getItem(DASH_TAB_KEY) || 'tables');
+  const requestedTab = new URLSearchParams(window.location.search).get('tab');
+  if (requestedTab && DASH_TABS.has(requestedTab)) {
+    const params = new URLSearchParams(window.location.search);
+    params.delete('tab');
+    const next = `${window.location.pathname}${params.toString() ? `?${params}` : ''}${window.location.hash || ''}`;
+    window.history.replaceState({}, '', next);
+    setActiveDashTab(requestedTab);
+  } else {
+    setActiveDashTab(localStorage.getItem(DASH_TAB_KEY) || 'tables');
+  }
   renderQuota(me.quota, me.account);
   syncSimulatedPlanSelect(me);
   renderApiKeys(me.api_keys);

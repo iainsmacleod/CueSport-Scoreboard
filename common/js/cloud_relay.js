@@ -5,6 +5,8 @@
  */
 (function () {
     const STORAGE_PREFIX = 'cloudRelay_';
+    const MANAGED_SERVER_URL = 'https://cuesportscoreboard.com';
+    const LEGACY_MANAGED_SERVER_URL = 'https://cuesport.macleod.systems';
 
     let ws = null;
     let reconnectTimer = null;
@@ -157,7 +159,13 @@
     }
 
     function getServerUrl() {
-        return (getStorageItem('serverUrl') || 'https://cuesport.macleod.systems').replace(/\/$/, '');
+        const stored = (getStorageItem('serverUrl') || '').replace(/\/$/, '');
+        const selfHost = getStorageItem('connectionMode') === 'selfhost';
+        if (!selfHost && stored === LEGACY_MANAGED_SERVER_URL) {
+            setStorageItem('serverUrl', MANAGED_SERVER_URL);
+            return MANAGED_SERVER_URL;
+        }
+        return (stored || MANAGED_SERVER_URL).replace(/\/$/, '');
     }
 
     function getWsUrl() {

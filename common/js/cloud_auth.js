@@ -5,7 +5,7 @@
  */
 (function () {
     const CONNECTION_MODE_KEY = 'connectionMode';
-    const MANAGED_SERVER_URL = 'https://cuesport.macleod.systems';
+    const MANAGED_SERVER_URL = 'https://cuesportscoreboard.com';
 
     function storageKey(k) {
         const prefix = 'cloudRelay_';
@@ -62,6 +62,38 @@
         return res.json();
     }
 
+    function syncManagedAuthButton() {
+        const signedIn = !!getStored('signedInEmail');
+        const btn = document.getElementById('cloudGoogleSignInBtn');
+        const label = btn?.querySelector('.gsi-btn-label');
+        const icon = btn?.querySelector('.gsi-btn-icon');
+        const intro = document.getElementById('cloudManagedIntro');
+        if (intro) {
+            intro.textContent = signedIn
+                ? 'Do you want hosted statistics and remote management?'
+                : 'Do you want hosted statistics and remote management? Sign in to learn more.';
+        }
+        if (label) label.textContent = signedIn ? 'Manage' : 'Sign in with Google';
+        if (btn) {
+            const title = signedIn ? 'Manage your account' : 'Sign in with Google';
+            btn.title = title;
+            btn.setAttribute('aria-label', title);
+        }
+        if (icon) icon.hidden = signedIn;
+    }
+
+    function onManagedCloudAuthClick() {
+        if (getStored('signedInEmail')) {
+            window.open(
+                `${MANAGED_SERVER_URL.replace(/\/$/, '')}/dashboard?tab=account`,
+                '_blank',
+                'noopener,noreferrer'
+            );
+            return;
+        }
+        signInWithGoogle();
+    }
+
     async function signInWithGoogle() {
         setConnectionMode('managed');
         const config = await fetchPublicConfig();
@@ -103,6 +135,7 @@
             managedKey.value = data.api_key || existingKey;
         }
         window.cloudRelay.updateCloudUI();
+        syncManagedAuthButton();
         closeCloudConnectionModal();
         if (data.api_key || existingKey) {
             alert(`Signed in as ${data.account?.email || 'user'}. Enable CueSport Scoreboard Cloud to connect.`);
@@ -114,6 +147,33 @@
             openCloudConnectionModal();
             showCloudManagedPane();
         }
+    }
+
+    function syncCloudKeyClearButtons() {
+        [
+            ['cloudManagedApiKeyModal', 'cloudManagedApiKeyClear'],
+            ['cloudApiKeyModal', 'cloudApiKeyClear'],
+        ].forEach(([inputId, buttonId]) => {
+            const input = document.getElementById(inputId);
+            const button = document.getElementById(buttonId);
+            if (!input || !button) return;
+            button.hidden = !String(input.value || '').trim();
+        });
+    }
+
+    function clearCloudApiKeyField() {
+        const managedKey = document.getElementById('cloudManagedApiKeyModal');
+        const selfHostKey = document.getElementById('cloudApiKeyModal');
+        if (managedKey) managedKey.value = '';
+        if (selfHostKey) selfHostKey.value = '';
+        setStored('apiKey', '');
+        if (window.cloudRelay) {
+            window.cloudRelay.setEnabled(false);
+            window.cloudRelay.setCredentials({ apiKey: '', accessToken: '', roomId: '' });
+        }
+        const toggle = document.getElementById('cloudRelayToggle');
+        if (toggle) toggle.checked = false;
+        syncCloudKeyClearButtons();
     }
 
     function signOutCloud(options) {
@@ -132,6 +192,7 @@
         if (managedKey) managedKey.value = '';
         const selfHostKey = document.getElementById('cloudApiKeyModal');
         if (selfHostKey) selfHostKey.value = '';
+        syncManagedAuthButton();
         if (!silent) closeCloudConnectionModal();
     }
 
@@ -153,6 +214,7 @@
         if (managedKey && !managedKey.value) {
             managedKey.value = getStored('apiKey');
         }
+        syncCloudKeyClearButtons();
         syncConnectionPaneUI('managed');
     }
 
@@ -167,6 +229,7 @@
         if (apiKey && !apiKey.value) {
             apiKey.value = getStored('apiKey');
         }
+        syncCloudKeyClearButtons();
     }
 
     function syncManagedPublicUrlLink() {
@@ -187,6 +250,8 @@
         if (apiKey) apiKey.value = getStored('apiKey');
         if (managedKey) managedKey.value = getStored('apiKey');
         syncManagedPublicUrlLink();
+        syncManagedAuthButton();
+        syncCloudKeyClearButtons();
         const mode = getConnectionMode();
         syncConnectionPaneUI(mode);
         modal.style.display = 'block';
@@ -270,6 +335,9 @@
     }
 
     window.signInWithGoogle = signInWithGoogle;
+    window.onManagedCloudAuthClick = onManagedCloudAuthClick;
+    window.syncCloudKeyClearButtons = syncCloudKeyClearButtons;
+    window.clearCloudApiKeyField = clearCloudApiKeyField;
     window.signOutCloud = signOutCloud;
     window.openCloudConnectionModal = openCloudConnectionModal;
     window.closeCloudConnectionModal = closeCloudConnectionModal;

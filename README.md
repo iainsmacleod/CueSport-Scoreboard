@@ -10,7 +10,7 @@ Display player names, race and game info, racks (and balls where needed), logos,
 
 *Best viewed as a **1920×1080** browser source*
 
-**Current version: 8.5.0**
+**Current version: 8.6.0**
 
 </div>
 
@@ -297,7 +297,7 @@ Click **Update Sources** after editing names. Names must match OBS **exactly** (
 
 ## CueSport Scoreboard Cloud
 
-Optional **remote mobile control**, **web dashboard**, **guest scorer links**, **match event logging**, and **public stream listing** via the CueSport Scoreboard Cloud backend ([`backend/`](backend/)). Self-host for free (GPL) or use the hosted service at **[https://cuesport.macleod.systems](https://cuesport.macleod.systems)**.
+Optional **remote mobile control**, **web dashboard**, **guest scorer links**, **match event logging**, and **public stream listing** via the CueSport Scoreboard Cloud backend ([`backend/`](backend/)). Self-host for free (GPL) or use the hosted service at **[https://cuesportscoreboard.com](https://cuesportscoreboard.com)**.
 
 The OBS **dock remains the scoring authority**. Mobile and guest clients send commands through the cloud relay; the dock executes them with the same logic as the control panel, then publishes state back to all connected clients.
 
@@ -396,7 +396,7 @@ Caps are overridable via `TIER_{TIER}_MAX_*` or `TIER_LIMITS_JSON` — see [`bac
 | Auth | Google for account + OBS Dock Key per dock | Dev secret on dashboard; OBS Dock Key + server URL in dock Connection settings → Self-hosting |
 | Account model | Separate customer accounts on a managed multi-tenant service | One server-owner account; share named role-scoped Dock Keys instead of creating user accounts |
 | Other operators | Each customer manages its own account; Dock Keys and guest links delegate table access | OBS operators use Administrator / Trusted Operator / Operator Dock Keys; temporary scorers use guest links |
-| Backend | `cuesport.macleod.systems` | Your own `backend/` deployment |
+| Backend | `cuesportscoreboard.com` | Your own `backend/` deployment |
 | Cost | **Streamer** (free trial then monthly) / **Tournament Organizer** / **League Director** via Stripe Checkout; **Network Organization** by contact; platform admins can grant **Complimentary access** (no card) | Free and unrestricted (you run the server); optional **Simulated plan** on Account for local quota testing |
 | Platform admin | Hosted service operator support: account inspection, complimentary access, session/key actions, and account deletion | Disabled; the unrestricted owner manages the deployment and delegates access with Dock Keys |
 
@@ -404,7 +404,7 @@ Caps are overridable via `TIER_{TIER}_MAX_*` or `TIER_LIMITS_JSON` — see [`bac
 
 ## Stream Promotion
 
-Optional listing on **[https://cuesport.macleod.systems](https://cuesport.macleod.systems)** so others can find streams that are currently on air with live match info.
+Optional listing on **[https://cuesportscoreboard.com](https://cuesportscoreboard.com)** so others can find streams that are currently on air with live match info.
 
 ### Setup
 
