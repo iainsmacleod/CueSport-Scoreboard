@@ -6,6 +6,7 @@
 (function () {
     const CONNECTION_MODE_KEY = 'connectionMode';
     const MANAGED_SERVER_URL = 'https://cuesportscoreboard.com';
+    const LEGACY_MANAGED_SERVER_URL = 'https://cuesport.macleod.systems';
 
     function storageKey(k) {
         const prefix = 'cloudRelay_';
@@ -62,8 +63,19 @@
         return res.json();
     }
 
+    function isManagedHost() {
+        if (getConnectionMode() === 'selfhost') return false;
+        const stored = getStored('serverUrl').replace(/\/$/, '');
+        if (!stored) return true;
+        return stored === MANAGED_SERVER_URL || stored === LEGACY_MANAGED_SERVER_URL;
+    }
+
+    function hasManagedAccount() {
+        return isManagedHost() && !!(getStored('signedInEmail') || getStored('apiKey'));
+    }
+
     function syncManagedAuthButton() {
-        const signedIn = !!getStored('signedInEmail');
+        const signedIn = hasManagedAccount();
         const btn = document.getElementById('cloudGoogleSignInBtn');
         const label = btn?.querySelector('.gsi-btn-label');
         const icon = btn?.querySelector('.gsi-btn-icon');
@@ -73,7 +85,7 @@
                 ? 'Do you want hosted statistics and remote management?'
                 : 'Do you want hosted statistics and remote management? Sign in to learn more.';
         }
-        if (label) label.textContent = signedIn ? 'Manage' : 'Sign in with Google';
+        if (label) label.textContent = signedIn ? 'Manage account' : 'Sign in with Google';
         if (btn) {
             const title = signedIn ? 'Manage your account' : 'Sign in with Google';
             btn.title = title;
@@ -83,7 +95,7 @@
     }
 
     function onManagedCloudAuthClick() {
-        if (getStored('signedInEmail')) {
+        if (hasManagedAccount()) {
             window.open(
                 `${MANAGED_SERVER_URL.replace(/\/$/, '')}/dashboard?tab=account`,
                 '_blank',
@@ -174,6 +186,7 @@
         const toggle = document.getElementById('cloudRelayToggle');
         if (toggle) toggle.checked = false;
         syncCloudKeyClearButtons();
+        syncManagedAuthButton();
     }
 
     function signOutCloud(options) {
@@ -296,6 +309,7 @@
             });
         }
         closeCloudConnectionModal();
+        syncManagedAuthButton();
         if (connect) {
             const toggle = document.getElementById('cloudRelayToggle');
             if (toggle) toggle.checked = true;
@@ -347,6 +361,8 @@
     window.saveCloudConnectionSettingsAndConnect = saveCloudConnectionSettingsAndConnect;
     window.toggleCloudRelay = toggleCloudRelay;
     window.applyCloudLoginResult = applyLoginResult;
+
+    window.addEventListener('cloudRelayStateChange', syncManagedAuthButton);
 
     window.addEventListener('message', function (event) {
         if (event.data && event.data.type === 'cuesport_auth' && event.data.payload) {
