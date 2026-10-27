@@ -106,12 +106,13 @@ await app.register(fastifyStatic, {
   root: webRoot,
   prefix: '/web/',
   decorateReply: false,
-  setHeaders(res, filePath) {
+  setHeaders(reply, filePath) {
     // Versioned JS/CSS URLs are safe to cache; HTML under /web should not stick.
+    // @fastify/static 10+ passes the Fastify reply (not Node ServerResponse).
     if (filePath.endsWith('.html')) {
-      res.setHeader('Cache-Control', 'no-store');
+      reply.header('Cache-Control', 'no-store');
     } else if (/\.(js|css)$/i.test(filePath)) {
-      res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
+      reply.header('Cache-Control', 'public, max-age=0, must-revalidate');
     }
   },
 });

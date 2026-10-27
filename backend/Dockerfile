@@ -1,4 +1,4 @@
-FROM node:22-bookworm-slim
+FROM node:22.23.4-bookworm-slim
 
 # better-sqlite3 native build + healthcheck
 RUN apt-get update \

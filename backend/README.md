@@ -60,8 +60,10 @@ In the OBS dock **Connection settings** (⚙) → **Self-hosting**, use server U
 To publish an image (from repo root — includes `common/images` ball assets):
 
 ```bash
-docker build -f backend/Dockerfile -t cuesport-cloud:latest .
+docker build --pull -f backend/Dockerfile -t cuesport-cloud:latest .
 ```
+
+The Dockerfile pins `node:22.23.4-bookworm-slim` (Oct 2026 Node security release). Raise that tag when you adopt a newer patched 22.x, and use `--pull` so the builder does not reuse a stale base layer.
 
 ## OBS dock connection
 

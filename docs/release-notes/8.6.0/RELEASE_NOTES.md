@@ -49,6 +49,14 @@ Undo now restores 8-ball and Custom **chosen ball** (solids / stripes, or the op
 
 ---
 
+## Security
+
+- Docker image pins **Node.js 22.23.4** (Oct 2026 security release, including CVE-2026-111497)
+- Cloud deps: **fastify 5.12.7**, **@fastify/static 10.1.7**, with `fast-uri` overrides for patched transitive versions
+- `@fastify/static` 10 `setHeaders` now uses the Fastify reply API (`reply.header`) for cache-control on `/web/` assets
+
+---
+
 ## Docs & versioning
 
 - Product / cache-bust version **8.6.0** (`versionNum`, README, wiki, dashboard, mobile, and public-listing asset queries)

@@ -11,5 +11,6 @@
 - **Shared Streams** — public tab appears when a promoted stream is live
 - **Promo video** — optional homepage tab via `LANDING_PROMO_YOUTUBE_URL`
 - **Account** — Privacy Policy and Terms of Service links under Deployment
+- **Security** — Node 22.23.4 image pin; Fastify 5.12.7; `@fastify/static` 10.1.7 (and patched `fast-uri` overrides)
 
 Local OBS docks continue to work without Cloud. See [RELEASE_NOTES.md](./RELEASE_NOTES.md) for full detail.
