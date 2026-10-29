@@ -210,6 +210,11 @@ function show(id, visible) {
   }
 }
 
+function isDashboardBootPending() {
+  const boot = document.getElementById('dashboardBoot');
+  return !!(boot && !boot.classList.contains('hidden') && boot.getAttribute('aria-busy') !== 'false');
+}
+
 function finishDashboardBoot() {
   const boot = document.getElementById('dashboardBoot');
   if (!boot) return;
@@ -231,6 +236,12 @@ function resolveBootShell(mode) {
   }
   syncSupportContactLink(mode === 'app');
   finishDashboardBoot();
+}
+
+/** If a stale renderDashboard aborted before resolving the shell, never leave the spinner up. */
+function ensureBootResolvedAfterStaleRender() {
+  if (!isDashboardBootPending()) return;
+  resolveBootShell(getToken() ? 'app' : 'login');
 }
 
 /** Header “Having trouble?” mailto — logged-in only when SUPPORT_CONTACT_EMAIL is set. */
@@ -3780,9 +3791,28 @@ async function copyPublicPlayerLink() {
   if (playerDetailGameFilter) params.set('game', playerDetailGameFilter);
   const qs = params.toString();
   const url = `${publicStatsBaseUrl()}/player/${encodeURIComponent(id)}${qs ? `?${qs}` : ''}`;
-  await copyTextToClipboard(url);
+  const ok = await copyTextToClipboard(url);
+  if (!ok) throw new Error('Could not copy link to clipboard');
+  showPlayerCopyNotice('Player stats link copied.');
+}
+
+let playerCopyNoticeTimer = null;
+function showPlayerCopyNotice(msg) {
+  const el = document.getElementById('statsPlayerCopyNotice');
+  if (el) {
+    el.textContent = msg || '';
+    el.classList.toggle('hidden', !msg);
+    if (playerCopyNoticeTimer) clearTimeout(playerCopyNoticeTimer);
+    if (msg) {
+      playerCopyNoticeTimer = setTimeout(() => {
+        el.textContent = '';
+        el.classList.add('hidden');
+        playerCopyNoticeTimer = null;
+      }, 2500);
+    }
+  }
   const status = document.getElementById('statsStatus');
-  if (status) status.textContent = 'Public player link copied.';
+  if (status && msg) status.textContent = msg;
 }
 
 async function copySharedLeaderboardLink() {
@@ -3799,9 +3829,20 @@ async function copySharedLeaderboardLink() {
     dateTo: filters.dateTo || '',
   });
   const url = result?.url || `${publicStatsBaseUrl()}/l/${encodeURIComponent(result.token)}`;
-  await copyTextToClipboard(url);
+  const ok = await copyTextToClipboard(url);
+  if (!ok) throw new Error('Could not copy link to clipboard');
   const status = document.getElementById('statsStatus');
   if (status) status.textContent = 'Event leaderboard link copied.';
+  const shareBtn = document.getElementById('statsShareLeaderboardBtn');
+  if (shareBtn) {
+    const prevTitle = shareBtn.title;
+    shareBtn.title = 'Link copied';
+    shareBtn.classList.add('is-copied');
+    setTimeout(() => {
+      shareBtn.title = prevTitle || 'Copy a public link for this event/date leaderboard';
+      shareBtn.classList.remove('is-copied');
+    }, 2000);
+  }
 }
 
 function clearOverviewFilters() {
@@ -5749,11 +5790,17 @@ async function renderDashboard() {
     try {
       await ensureSupabaseAuth(dashPublicConfigCache);
     } catch (_) { /* ignore */ }
-    if (renderSeq !== renderDashboardSeq) return;
+    if (renderSeq !== renderDashboardSeq) {
+      ensureBootResolvedAfterStaleRender();
+      return;
+    }
     token = getToken();
   }
   if (!token) {
-    if (renderSeq !== renderDashboardSeq) return;
+    if (renderSeq !== renderDashboardSeq) {
+      ensureBootResolvedAfterStaleRender();
+      return;
+    }
     resolveBootShell('login');
     return;
   }
@@ -7090,23 +7137,71 @@ async function adoptOAuthReturnIfNeeded(config) {
   history.replaceState({}, '', window.location.pathname + window.location.search);
 }
 
+const DASH_BOOT_BUDGET_MS = 20000;
+let dashBootResolved = false;
+function resolveBootOnce(mode, errorMsg) {
+  if (dashBootResolved && !isDashboardBootPending()) {
+    if (errorMsg) setError(errorMsg);
+    return;
+  }
+  dashBootResolved = true;
+  if (errorMsg) setError(errorMsg);
+  resolveBootShell(mode);
+}
+
 fetchPublicConfig(getServerUrl())
   .then(async (config) => {
     applyDashLoginCapabilities(config);
-    if (config?.supabaseUrl && config?.supabasePublishableKey) {
-      await ensureSupabaseAuth(config);
+    try {
+      if (config?.supabaseUrl && config?.supabasePublishableKey) {
+        await ensureSupabaseAuth(config);
+      }
+      await adoptOAuthReturnIfNeeded(config);
+      // Wait for session hydrate (+ OAuth adopt) before the first shell render —
+      // otherwise a cold load can flash Sign In even with a valid session.
+      await renderDashboard();
+      // renderDashboard always resolves the shell on the winning seq; if boot is
+      // somehow still pending, force login rather than spin forever.
+      if (isDashboardBootPending()) {
+        resolveBootOnce(getToken() ? 'app' : 'login');
+      } else {
+        dashBootResolved = true;
+      }
+    } catch (err) {
+      resolveBootOnce('login', err?.message || 'Could not finish signing in. Try again.');
     }
-    await adoptOAuthReturnIfNeeded(config);
-    // Wait for session hydrate (+ OAuth adopt) before the first shell render —
-    // otherwise a cold load can flash Sign In even with a valid session.
-    await renderDashboard();
   })
-  .catch(async () => {
-    // Keep panes hidden until config loads; show unavailable if request fails.
+  .catch(async (err) => {
+    // Config failed/timed out — still try to show login rather than hang on Loading.
     applyDashLoginCapabilities({});
-    await adoptOAuthReturnIfNeeded(dashPublicConfigCache || {});
-    await renderDashboard();
+    try {
+      await adoptOAuthReturnIfNeeded(dashPublicConfigCache || {});
+      await renderDashboard();
+      if (isDashboardBootPending()) {
+        resolveBootOnce(
+          'login',
+          err?.message || 'Could not load server config. Check your connection and try again.'
+        );
+      } else {
+        dashBootResolved = true;
+        if (err?.message) setError(err.message);
+      }
+    } catch (inner) {
+      resolveBootOnce(
+        'login',
+        inner?.message || err?.message || 'Could not load dashboard. Check your connection and try again.'
+      );
+    }
   });
+
+// Absolute safety net: never leave the boot spinner up longer than the budget.
+setTimeout(() => {
+  if (!isDashboardBootPending()) return;
+  resolveBootOnce(
+    getToken() ? 'app' : 'login',
+    'Sign-in is taking too long. Check your connection and try again.'
+  );
+}, DASH_BOOT_BUDGET_MS);
 
 let liveFeedHiddenAt = 0;
 
@@ -7340,10 +7435,31 @@ setMatchModalActionButtons();
     label: 'Clear',
     title: 'Clear filters',
   });
+  setDashActionButtonContent(document.getElementById('statsShareLeaderboardBtn'), {
+    icon: 'share',
+    label: 'Share board',
+    title: 'Copy a public link for this event/date leaderboard',
+  });
   setDashActionButtonContent(document.getElementById('statsRefreshBtn'), {
     icon: 'refresh',
     label: 'Refresh',
     title: 'Refresh stats',
+  });
+  setDashActionButtonContent(document.getElementById('statsPlayerCopyLinkBtn'), {
+    icon: 'share',
+    label: 'Share',
+    title: 'Copy public player link',
+  });
+  setDashActionButtonContent(document.getElementById('statsPlayerRenameEditBtn'), {
+    icon: 'edit',
+    label: 'Edit',
+    title: 'Rename player',
+  });
+  setDashActionButtonContent(document.getElementById('statsPlayerDeleteBtn'), {
+    icon: 'trash',
+    label: 'Delete',
+    title: 'Delete player',
+    className: 'stats-player-delete-btn',
   });
   syncStatsClearFiltersBtn();
   const createKeyBtn = document.getElementById('createKeyBtn');

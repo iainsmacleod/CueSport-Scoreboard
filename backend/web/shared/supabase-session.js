@@ -72,6 +72,18 @@ installAuthStorageListener();
 /**
  * @param {{ supabaseUrl?: string, supabasePublishableKey?: string }} config
  */
+function withTimeout(promise, ms, label) {
+  let timer = null;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(label || 'Timed out'));
+    }, ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer != null) clearTimeout(timer);
+  });
+}
+
 export async function getSupabaseClient(config) {
   if (!canUseSupabase(config)) {
     throw new Error('Supabase is not configured on this server');
@@ -82,7 +94,11 @@ export async function getSupabaseClient(config) {
   }
   clientConfigKey = key;
   clientPromise = (async () => {
-    const { createClient } = await import(SUPABASE_JS_URL);
+    const { createClient } = await withTimeout(
+      import(SUPABASE_JS_URL),
+      8000,
+      'Timed out loading sign-in library'
+    );
     return createClient(config.supabaseUrl, config.supabasePublishableKey, {
       auth: {
         persistSession: true,
@@ -91,7 +107,12 @@ export async function getSupabaseClient(config) {
         storageKey: SUPABASE_STORAGE_KEY,
       },
     });
-  })();
+  })().catch((err) => {
+    // Allow a later retry after CDN / network failure.
+    clientPromise = null;
+    clientConfigKey = '';
+    throw err;
+  });
   return clientPromise;
 }
 
@@ -103,7 +124,17 @@ export async function getSupabaseClient(config) {
  */
 export async function ensureSupabaseAuth(config) {
   if (!canUseSupabase(config)) return null;
-  const supabase = await getSupabaseClient(config);
+  let supabase;
+  try {
+    supabase = await withTimeout(
+      getSupabaseClient(config),
+      8000,
+      'Timed out connecting to sign-in'
+    );
+  } catch (_) {
+    // Boot must continue to the login shell even if Supabase CDN/session is down.
+    return null;
+  }
   if (!authListenerBound) {
     const epochAtBind = authEpoch;
     await new Promise((resolve) => {
@@ -144,7 +175,11 @@ export async function ensureSupabaseAuth(config) {
   }
   // Hydrate / refresh persisted session into cuesport_token.
   try {
-    const { data } = await supabase.auth.getSession();
+    const { data } = await withTimeout(
+      supabase.auth.getSession(),
+      5000,
+      'Timed out reading session'
+    );
     if (data?.session?.access_token) {
       setStoredAccessToken(data.session.access_token);
     }

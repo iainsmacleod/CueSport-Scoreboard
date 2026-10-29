@@ -3141,21 +3141,28 @@ body.controls-locked #mobileBottomNav {
 .stats-date-clear[hidden] {
   display: none;
 }
-/* Clear/Refresh: icon+label when the toolbar is wide enough; icon-only when compact. */
+/* Clear / Share board / Refresh: icon+label when wide; icon-only when compact. */
 .stats-toolbar #statsClearFiltersBtn,
+.stats-toolbar #statsShareLeaderboardBtn,
 .stats-toolbar #statsRefreshBtn {
   flex: 0 0 auto;
   margin: 0;
   align-self: flex-end;
 }
+.stats-toolbar #statsShareLeaderboardBtn.is-copied {
+  outline: 1px solid rgba(158, 206, 106, 0.7);
+  box-shadow: 0 0 0 2px rgba(158, 206, 106, 0.2);
+}
 @container stats-toolbar (max-width: 54rem) {
   #statsClearFiltersBtn,
+  #statsShareLeaderboardBtn,
   #statsRefreshBtn {
     width: 2.75rem;
     min-width: 2.75rem;
     padding: 0.5rem 0.65rem;
   }
   #statsClearFiltersBtn .dash-action-label,
+  #statsShareLeaderboardBtn .dash-action-label,
   #statsRefreshBtn .dash-action-label {
     position: absolute;
     width: 1px;
@@ -3170,16 +3177,19 @@ body.controls-locked #mobileBottomNav {
 }
 .stats-player-heading {
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
   margin: 0.35rem 0 0.85rem;
   min-height: 2.25rem;
+  gap: 0.35rem;
 }
 .stats-player-title-view {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 0.45rem;
+  gap: 0.55rem 0.65rem;
   max-width: 100%;
 }
 .stats-player-title-view.hidden {
@@ -3193,6 +3203,54 @@ body.controls-locked #mobileBottomNav {
   font-weight: 700;
   line-height: 1.25;
 }
+.stats-player-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+}
+.stats-player-actions .dash-action-btn {
+  flex: 0 0 auto;
+}
+.stats-player-actions .stats-player-delete-btn {
+  color: #f7768e;
+  border-color: rgba(247, 118, 142, 0.45);
+}
+.stats-player-actions .stats-player-delete-btn:hover,
+.stats-player-actions .stats-player-delete-btn:focus-visible {
+  color: #ff9db0;
+  background: rgba(247, 118, 142, 0.16);
+}
+.stats-player-copy-notice {
+  margin: 0;
+  min-height: 1.1em;
+  text-align: center;
+  color: #9ece6a;
+}
+.stats-player-copy-notice.hidden {
+  display: none;
+}
+/* Mobile: icon-only Share / Edit / Delete to save space. */
+@media (max-width: 640px) {
+  .stats-player-actions .dash-action-btn {
+    width: 2.75rem;
+    min-width: 2.75rem;
+    padding: 0.5rem 0.65rem;
+  }
+  .stats-player-actions .dash-action-btn .dash-action-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+}
+/* Legacy icon-only edit buttons (kept for any remaining uses). */
 .stats-player-edit-btn {
   appearance: none;
   background: transparent;

@@ -339,16 +339,13 @@
           <div class="stats-player-heading">
             <div id="statsPlayerTitleView" class="stats-player-title-view">
               <h2 id="statsPlayerTitle">Player</h2>
-              <button type="button" id="statsPlayerCopyLinkBtn" class="stats-player-edit-btn" title="Copy public player link" aria-label="Copy public player link">
-                <svg class="stats-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-              </button>
-              <button type="button" id="statsPlayerRenameEditBtn" class="stats-player-edit-btn" title="Rename player" aria-label="Rename player">
-                <svg class="stats-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
-              </button>
-              <button type="button" id="statsPlayerDeleteBtn" class="stats-player-edit-btn stats-player-delete-btn" title="Delete player" aria-label="Delete player">
-                <svg class="stats-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-              </button>
+              <div class="stats-player-actions" role="group" aria-label="Player actions">
+                <button type="button" id="statsPlayerCopyLinkBtn" class="btn secondary dash-action-btn" title="Copy public player link" aria-label="Share">Share</button>
+                <button type="button" id="statsPlayerRenameEditBtn" class="btn secondary dash-action-btn" title="Rename player" aria-label="Edit">Edit</button>
+                <button type="button" id="statsPlayerDeleteBtn" class="btn danger dash-action-btn stats-player-delete-btn" title="Delete player" aria-label="Delete">Delete</button>
+              </div>
             </div>
+            <p id="statsPlayerCopyNotice" class="hint stats-player-copy-notice hidden" aria-live="polite"></p>
             <form id="statsPlayerRenameForm" class="stats-player-rename-inline hidden">
               <input id="statsPlayerRenameInput" type="text" maxlength="20" autocomplete="off" aria-label="Player display name" />
               <button type="submit" class="btn save">Save</button>

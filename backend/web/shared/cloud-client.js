@@ -317,9 +317,22 @@ export class CloudClient {
 
 export async function fetchPublicConfig(serverUrl) {
   const base = (serverUrl || window.location.origin).replace(/\/$/, '');
-  const res = await fetch(`${base}/api/config/public`);
-  if (!res.ok) throw new Error('Config fetch failed');
-  return res.json();
+  const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timeoutId = ctrl ? setTimeout(() => ctrl.abort(), 12000) : null;
+  try {
+    const res = await fetch(`${base}/api/config/public`, {
+      signal: ctrl ? ctrl.signal : undefined,
+    });
+    if (!res.ok) throw new Error('Config fetch failed');
+    return await res.json();
+  } catch (err) {
+    if (err && err.name === 'AbortError') {
+      throw new Error('Timed out loading server config. Check your connection and try again.');
+    }
+    throw err;
+  } finally {
+    if (timeoutId != null) clearTimeout(timeoutId);
+  }
 }
 
 export async function devLogin(serverUrl, secret) {
