@@ -1985,6 +1985,62 @@ async function run() {
         headers: { Authorization: `Bearer ${tokenFresh}` },
       });
       assert('GET /api/stats', stats.ok && Array.isArray(stats.body.players) && Array.isArray(stats.body.matches));
+
+      // Public player / event leaderboard share smoke
+      const publicPlayerMissing = await fetchJson('/api/public/players/00000000-0000-4000-8000-000000000099');
+      assert('GET /api/public/players/:id unknown', publicPlayerMissing.status === 404);
+      const playerPage = await fetch(`${BASE}/player/00000000-0000-4000-8000-000000000099`);
+      assert('GET /player/:id serves HTML', playerPage.ok && String(playerPage.headers.get('content-type') || '').includes('text/html'));
+      const boardPage = await fetch(`${BASE}/l/lb_missing_token`);
+      assert('GET /l/:token serves HTML', boardPage.ok && String(boardPage.headers.get('content-type') || '').includes('text/html'));
+      const shareUnauth = await fetchJson('/api/stats/leaderboard-shares', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventQuery: 'Open' }),
+      });
+      assert('POST /api/stats/leaderboard-shares unauthorized', shareUnauth.status === 401);
+      const shareEmpty = await fetchJson('/api/stats/leaderboard-shares', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokenFresh}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      });
+      assert('POST /api/stats/leaderboard-shares rejects empty scope', shareEmpty.status === 400);
+      const shareOk = await fetchJson('/api/stats/leaderboard-shares', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokenFresh}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ eventQuery: 'Cloud API Smoke Event' }),
+      });
+      assert(
+        'POST /api/stats/leaderboard-shares',
+        shareOk.ok && !!shareOk.body.token && !!shareOk.body.url,
+        JSON.stringify(shareOk.body)
+      );
+      const publicBoard = await fetchJson(`/api/public/leaderboards/${encodeURIComponent(shareOk.body.token)}`);
+      assert(
+        'GET /api/public/leaderboards/:token',
+        publicBoard.ok
+          && publicBoard.body.eventQuery === 'Cloud API Smoke Event'
+          && Array.isArray(publicBoard.body.players),
+        JSON.stringify(publicBoard.body)
+      );
+      const rosterPlayer = (stats.body.players || []).find((p) => p?.id);
+      if (rosterPlayer?.id) {
+        const publicPlayer = await fetchJson(`/api/public/players/${encodeURIComponent(rosterPlayer.id)}`);
+        assert(
+          'GET /api/public/players/:id',
+          publicPlayer.ok
+            && publicPlayer.body.player?.id === rosterPlayer.id
+            && Array.isArray(publicPlayer.body.matches),
+          JSON.stringify(publicPlayer.body?.player)
+        );
+      }
+
       const editable = (stats.body.matches || []).find((m) => m.startEventId && m.status === 'completed');
       if (editable) {
         const patched = await fetchJson(`/api/stats/matches/${editable.startEventId}`, {

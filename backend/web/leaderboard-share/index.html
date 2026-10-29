@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Event Leaderboard — CueSport Scoreboard Cloud</title>
+  <link rel="icon" type="image/png" href="/web/images/brand/logo.png?v=8.6.0" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.6.0" />
+</head>
+<body class="public-stats-page">
+  <header class="site-header">
+    <div class="site-header-inner">
+      <div>
+        <a class="site-brand" href="/">
+          <img class="site-brand-mark" src="/web/images/brand/logo.png?v=8.6.0" alt="" />
+          <h1>CueSport Scoreboard Cloud</h1>
+        </a>
+        <p class="subtitle">Shared event leaderboard</p>
+      </div>
+      <nav class="site-nav" aria-label="Site">
+        <a class="btn secondary" href="/dashboard">Dashboard</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="landing-main public-stats-main">
+    <p id="publicBoardStatus" class="hint" aria-live="polite">Loading…</p>
+    <div id="publicBoardPanel" class="panel hidden">
+      <h2 id="publicBoardTitle">Event Leaderboard</h2>
+      <p id="publicBoardScope" class="hint public-board-scope"></p>
+      <div class="stats-table-wrap">
+        <table class="dash-stats-table" id="publicBoardTable">
+          <thead>
+            <tr>
+              <th>Rank</th>
+              <th>Player</th>
+              <th>Matches W/D/L</th>
+              <th>Win %</th>
+              <th>Racks W/L</th>
+              <th>Last Played</th>
+            </tr>
+          </thead>
+          <tbody id="publicBoardBody"></tbody>
+        </table>
+      </div>
+      <p class="hint">Standings update when matches are recorded. Refresh the page for the latest results.</p>
+    </div>
+  </main>
+
+  <script type="module" src="/web/leaderboard-share/app.js?v=8.6.0"></script>
+</body>
+</html>

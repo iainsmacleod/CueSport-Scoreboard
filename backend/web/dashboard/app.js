@@ -5,6 +5,7 @@ import {
   fetchMe,
   fetchAccountStats,
   fetchPlayers,
+  createLeaderboardShare,
   updateAccountMatch,
   deleteAccountMatch,
   renameAccountPlayer,
@@ -144,7 +145,47 @@ let isPlatformAdminUser = false;
 let canSimulatePlanUser = false;
 let adminAccountsCache = [];
 let adminSelectedId = '';
-let adminSearchTimer = null;
+let adminFilterTimer = null;
+/** null = keep API order (created_at DESC from last fetch). */
+let adminSortKey = null;
+let adminSortDir = null;
+const ADMIN_SORT_DEFAULTS = {
+  email: 'asc',
+  status: 'asc',
+  tier: 'asc',
+  entitlement: 'desc',
+  keys: 'desc',
+  activeDock: 'desc',
+  activeAdhoc: 'desc',
+  dockVersion: 'desc',
+  lastActivity: 'desc',
+};
+const ADMIN_SORT_LABELS = {
+  email: 'Email',
+  status: 'Status',
+  tier: 'Tier',
+  entitlement: 'Entitlement through',
+  keys: 'Keys',
+  activeDock: 'Active Dock',
+  activeAdhoc: 'Active Ad-Hoc',
+  dockVersion: 'Dock version',
+  lastActivity: 'Last activity',
+};
+const ADMIN_FILTER_KEYS = [
+  'email', 'status', 'tier', 'entitlement', 'keys',
+  'activeDock', 'activeAdhoc', 'dockVersion', 'lastActivity',
+];
+const adminColumnFilters = {
+  email: '',
+  status: '',
+  tier: '',
+  entitlement: '',
+  keys: '',
+  activeDock: '',
+  activeAdhoc: '',
+  dockVersion: '',
+  lastActivity: '',
+};
 /** Platform admin: empty = own account; `__all__` = every tenant; otherwise one tenant. */
 let platformViewAccountId = '';
 /** Sentinel for platform-admin cross-tenant Tables/Stats view. */
@@ -2260,6 +2301,7 @@ async function applyPlatformAccountFilter(accountId) {
   await refreshTablesForCurrentView();
   syncPlatformTablesPolling();
   const statsTab = document.getElementById('tabStats');
+  syncStatsShareLeaderboardBtn();
   if (statsTab && !statsTab.classList.contains('hidden')) {
     await loadAccountStats(true);
   }
@@ -2388,6 +2430,14 @@ function setPlatformAdminUi(enabled) {
     platformAccountsForFilter = [];
     adminSelectedId = '';
     adminAccountsCache = [];
+    adminSortKey = null;
+    adminSortDir = null;
+    for (const key of ADMIN_FILTER_KEYS) {
+      adminColumnFilters[key] = '';
+      const input = document.querySelector(`[data-admin-filter="${key}"]`);
+      if (input) input.value = '';
+    }
+    syncAdminAccountsResetBtn();
     const select = document.getElementById('platformAccountFilter');
     if (select) {
       select.innerHTML =
@@ -2415,18 +2465,11 @@ function setPlatformAdminUi(enabled) {
 
 async function loadAdminAccounts() {
   if (!isPlatformAdminUser || !getToken()) return;
-  const q = document.getElementById('adminAccountSearch')?.value?.trim() || '';
   setAdminStatus('Loading accounts…');
   try {
-    const qs = q ? `?q=${encodeURIComponent(q)}` : '';
-    const data = await adminFetchJson(`/api/admin/accounts${qs}`);
+    const data = await adminFetchJson('/api/admin/accounts?limit=500');
     adminAccountsCache = data.accounts || [];
     renderAdminAccountsTable();
-    setAdminStatus(
-      adminAccountsCache.length
-        ? `${adminAccountsCache.length} account${adminAccountsCache.length === 1 ? '' : 's'}`
-        : 'No accounts found'
-    );
     if (adminSelectedId) {
       const stillThere = adminAccountsCache.some((a) => a.id === adminSelectedId);
       if (stillThere) await loadAdminAccountDetail(adminSelectedId);
@@ -2435,6 +2478,224 @@ async function loadAdminAccounts() {
   } catch (err) {
     setAdminStatus(err.message || 'Failed to load accounts');
   }
+}
+
+function adminFilterCount() {
+  return ADMIN_FILTER_KEYS.reduce((n, key) => n + (String(adminColumnFilters[key] || '').trim() ? 1 : 0), 0);
+}
+
+function adminPresentationIsDefault() {
+  return adminSortKey == null && adminFilterCount() === 0;
+}
+
+function syncAdminAccountsResetBtn() {
+  const btn = document.getElementById('adminAccountsResetBtn');
+  if (btn) btn.disabled = adminPresentationIsDefault();
+}
+
+function resetAdminAccountsPresentation() {
+  adminSortKey = null;
+  adminSortDir = null;
+  for (const key of ADMIN_FILTER_KEYS) {
+    adminColumnFilters[key] = '';
+    const input = document.querySelector(`[data-admin-filter="${key}"]`);
+    if (input) input.value = '';
+  }
+  renderAdminAccountsTable();
+}
+
+function setAdminSort(key) {
+  if (!ADMIN_SORT_DEFAULTS[key]) return;
+  if (adminSortKey === key) {
+    adminSortDir = adminSortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    adminSortKey = key;
+    adminSortDir = ADMIN_SORT_DEFAULTS[key];
+  }
+  renderAdminAccountsTable();
+}
+
+function adminAccountViewModel(account) {
+  const entitlement = formatAdminAccessEndDate(account);
+  const lastActivityLabel = account.last_activity_at
+    ? formatLocalDate(account.last_activity_at)
+    : '—';
+  const dockVersion = account.dock_client_version
+    ? String(account.dock_client_version).trim()
+    : '';
+  return {
+    account,
+    email: String(account.email || ''),
+    status: formatAdminSubscriptionStatus(account),
+    tier: adminTierLabel(account),
+    entitlement,
+    entitlementMs: adminParseSortDateMs(entitlement === '—' ? null : entitlement, account),
+    keys: Number(account.api_key_count) || 0,
+    activeDock: Number(account.active_dock_count) || 0,
+    activeAdhoc: Number(account.active_adhoc_count) || 0,
+    dockVersion: dockVersion || '—',
+    dockVersionRaw: dockVersion,
+    lastActivity: lastActivityLabel,
+    lastActivityMs: account.last_activity_at
+      ? (parseUtcDate(account.last_activity_at) || new Date(account.last_activity_at))?.getTime?.() || null
+      : null,
+  };
+}
+
+/** Prefer raw ISO fields for entitlement sort; fall back to parsed display when needed. */
+function adminParseSortDateMs(displayLabel, account) {
+  const candidates = [
+    account?.trial_ends_at,
+    account?.access_ends_at,
+    account?.billing_summary?.trialEnd,
+    account?.billing_summary?.currentPeriodEnd,
+    account?.billing_summary?.cancelAt,
+  ];
+  let latestMs = null;
+  for (const raw of candidates) {
+    if (!raw) continue;
+    const d = parseUtcDate(raw) || new Date(raw);
+    if (!d || Number.isNaN(d.getTime())) continue;
+    const ms = d.getTime();
+    if (latestMs == null || ms > latestMs) latestMs = ms;
+  }
+  if (latestMs != null) return latestMs;
+  if (!displayLabel || displayLabel === '—') return null;
+  const parsed = Date.parse(displayLabel);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function adminTextMatches(haystack, needle) {
+  const q = String(needle || '').trim().toLowerCase();
+  if (!q) return true;
+  return String(haystack || '').toLowerCase().includes(q);
+}
+
+function adminNumericMatches(value, needle) {
+  const q = String(needle || '').trim();
+  if (!q) return true;
+  const asNum = Number(q);
+  if (Number.isFinite(asNum) && String(asNum) === q) {
+    return Number(value) === asNum;
+  }
+  return String(value).includes(q);
+}
+
+function filterAdminAccounts(rows) {
+  return rows.filter((row) => {
+    if (!adminTextMatches(row.email, adminColumnFilters.email)) return false;
+    if (!adminTextMatches(row.status, adminColumnFilters.status)) return false;
+    if (!adminTextMatches(row.tier, adminColumnFilters.tier)) return false;
+    if (!adminTextMatches(row.entitlement, adminColumnFilters.entitlement)) return false;
+    if (!adminNumericMatches(row.keys, adminColumnFilters.keys)) return false;
+    if (!adminNumericMatches(row.activeDock, adminColumnFilters.activeDock)) return false;
+    if (!adminNumericMatches(row.activeAdhoc, adminColumnFilters.activeAdhoc)) return false;
+    if (!adminTextMatches(row.dockVersion, adminColumnFilters.dockVersion)) return false;
+    if (!adminTextMatches(row.lastActivity, adminColumnFilters.lastActivity)) return false;
+    return true;
+  });
+}
+
+function adminCompareNullableMs(a, b, dir) {
+  const aEmpty = a == null || Number.isNaN(a);
+  const bEmpty = b == null || Number.isNaN(b);
+  if (aEmpty && bEmpty) return 0;
+  if (aEmpty) return 1;
+  if (bEmpty) return -1;
+  return dir === 'asc' ? a - b : b - a;
+}
+
+function sortAdminAccounts(rows) {
+  if (!adminSortKey || !ADMIN_SORT_DEFAULTS[adminSortKey]) return rows;
+  const dir = adminSortDir === 'asc' ? 'asc' : 'desc';
+  const mul = dir === 'asc' ? 1 : -1;
+  return rows.slice().sort((left, right) => {
+    let cmp = 0;
+    switch (adminSortKey) {
+      case 'email':
+      case 'status':
+      case 'tier':
+      case 'dockVersion':
+        cmp = String(left[adminSortKey] || '').localeCompare(
+          String(right[adminSortKey] || ''),
+          undefined,
+          { sensitivity: 'base', numeric: true }
+        );
+        break;
+      case 'entitlement':
+        return adminCompareNullableMs(left.entitlementMs, right.entitlementMs, dir)
+          || String(left.email).localeCompare(String(right.email), undefined, { sensitivity: 'base' });
+      case 'lastActivity':
+        return adminCompareNullableMs(left.lastActivityMs, right.lastActivityMs, dir)
+          || String(left.email).localeCompare(String(right.email), undefined, { sensitivity: 'base' });
+      case 'keys':
+      case 'activeDock':
+      case 'activeAdhoc':
+        cmp = (Number(left[adminSortKey]) || 0) - (Number(right[adminSortKey]) || 0);
+        break;
+      default:
+        cmp = 0;
+    }
+    if (cmp !== 0) return cmp * mul;
+    return String(left.email).localeCompare(String(right.email), undefined, { sensitivity: 'base' });
+  });
+}
+
+function updateAdminSortHeaders() {
+  document.querySelectorAll('#adminAccountsTable thead tr:first-child th').forEach((th) => {
+    const key = th.getAttribute('data-sort-key');
+    const sortable = !!key && !!ADMIN_SORT_DEFAULTS[key];
+    const label = th.getAttribute('data-label')
+      || th.textContent.replace(/[▲▼]\s*$/, '').trim();
+    th.setAttribute('data-label', label);
+    const filtered = !!(key && String(adminColumnFilters[key] || '').trim());
+    th.classList.toggle('is-filtered', filtered);
+    if (sortable) {
+      const active = key === adminSortKey;
+      th.classList.toggle('is-sorted', active);
+      th.setAttribute('aria-sort', active
+        ? (adminSortDir === 'asc' ? 'ascending' : 'descending')
+        : 'none');
+      const arrow = active
+        ? (adminSortDir === 'asc' ? '▲' : '▼')
+        : '';
+      const arrowHtml = arrow
+        ? `<span class="sort-arrow" aria-hidden="true">${arrow}</span>`
+        : '';
+      th.innerHTML = `${escapeHtml(label)}${arrowHtml}`;
+    } else {
+      th.classList.remove('is-sorted');
+      th.removeAttribute('aria-sort');
+    }
+  });
+  document.querySelectorAll('#adminAccountsTable .admin-filter-row .admin-col-filter').forEach((input) => {
+    const key = input.getAttribute('data-admin-filter');
+    const active = !!(key && String(adminColumnFilters[key] || '').trim());
+    input.classList.toggle('is-filtered', active);
+    const cell = input.closest('th');
+    cell?.classList.toggle('is-filtered', active);
+  });
+}
+
+function updateAdminAccountsStatus(visibleCount, totalCount) {
+  const parts = [];
+  if (!totalCount) {
+    parts.push('No accounts found');
+  } else if (visibleCount === totalCount) {
+    parts.push(`${totalCount} account${totalCount === 1 ? '' : 's'}`);
+  } else {
+    parts.push(`${visibleCount} of ${totalCount} account${totalCount === 1 ? '' : 's'}`);
+  }
+  if (adminSortKey && ADMIN_SORT_LABELS[adminSortKey]) {
+    const arrow = adminSortDir === 'asc' ? '↑' : '↓';
+    parts.push(`sorted by ${ADMIN_SORT_LABELS[adminSortKey]} ${arrow}`);
+  }
+  const filters = adminFilterCount();
+  if (filters) {
+    parts.push(`${filters} filter${filters === 1 ? '' : 's'}`);
+  }
+  setAdminStatus(parts.join(' · '));
+  syncAdminAccountsResetBtn();
 }
 
 function isOwnAdminAccount(accountId) {
@@ -2517,29 +2778,39 @@ function adminTierLabel(account) {
 function renderAdminAccountsTable() {
   const body = document.getElementById('adminAccountsBody');
   if (!body) return;
-  if (!adminAccountsCache.length) {
+  updateAdminSortHeaders();
+  const totalCount = adminAccountsCache.length;
+  if (!totalCount) {
     body.innerHTML = '<tr><td colspan="9">No accounts</td></tr>';
+    updateAdminAccountsStatus(0, 0);
     return;
   }
-  body.innerHTML = adminAccountsCache.map((a) => {
+  const rows = sortAdminAccounts(filterAdminAccounts(adminAccountsCache.map(adminAccountViewModel)));
+  if (!rows.length) {
+    body.innerHTML = '<tr><td colspan="9">No accounts match the current filters.</td></tr>';
+    updateAdminAccountsStatus(0, totalCount);
+    return;
+  }
+  body.innerHTML = rows.map((row) => {
+    const a = row.account;
     const classes = [];
     if (a.id === adminSelectedId) classes.push('admin-row-selected');
     if (isOwnAdminAccount(a.id)) classes.push('admin-row-self');
-    const dockVersion = a.dock_client_version ? String(a.dock_client_version).trim() : '';
     return `
     <tr data-admin-account-id="${escapeHtml(a.id)}" class="${classes.join(' ')}" tabindex="0">
-      <td>${escapeHtml(a.email)}${isOwnAdminAccount(a.id) ? ' <span class="admin-self-badge">You</span>' : ''}</td>
-      <td>${escapeHtml(formatAdminSubscriptionStatus(a))}</td>
-      <td>${escapeHtml(adminTierLabel(a))}</td>
-      <td>${escapeHtml(formatAdminAccessEndDate(a))}</td>
-      <td>${Number(a.api_key_count) || 0}</td>
-      <td>${Number(a.active_dock_count) || 0}</td>
-      <td>${Number(a.active_adhoc_count) || 0}</td>
-      <td>${escapeHtml(dockVersion || '—')}</td>
-      <td>${escapeHtml(a.last_activity_at ? formatLocalDate(a.last_activity_at) : '—')}</td>
+      <td>${escapeHtml(row.email)}${isOwnAdminAccount(a.id) ? ' <span class="admin-self-badge">You</span>' : ''}</td>
+      <td>${escapeHtml(row.status)}</td>
+      <td>${escapeHtml(row.tier)}</td>
+      <td>${escapeHtml(row.entitlement)}</td>
+      <td>${row.keys}</td>
+      <td>${row.activeDock}</td>
+      <td>${row.activeAdhoc}</td>
+      <td>${escapeHtml(row.dockVersion)}</td>
+      <td>${escapeHtml(row.lastActivity)}</td>
     </tr>
   `;
   }).join('');
+  updateAdminAccountsStatus(rows.length, totalCount);
 }
 
 function closeAdminDetail() {
@@ -3466,9 +3737,71 @@ function overviewFiltersActive(filters = getOverviewFilterState()) {
   );
 }
 
+/** Event / date scope only — required to share a public event leaderboard. */
+function overviewScopeFiltersActive(filters = getOverviewFilterState()) {
+  return !!(filters.eventQuery || filters.dateFrom || filters.dateTo);
+}
+
 function syncStatsClearFiltersBtn() {
   const btn = document.getElementById('statsClearFiltersBtn');
   if (btn) btn.disabled = !overviewFiltersActive();
+  syncStatsShareLeaderboardBtn();
+}
+
+function syncStatsShareLeaderboardBtn() {
+  const btn = document.getElementById('statsShareLeaderboardBtn');
+  if (!btn) return;
+  const canShare = overviewScopeFiltersActive() && !isViewingOtherAccount();
+  btn.disabled = !canShare;
+  btn.title = isViewingOtherAccount()
+    ? 'Switch to your account to share an event leaderboard'
+    : canShare
+      ? 'Copy a public link for this event/date leaderboard'
+      : 'Set an event and/or date range to share a leaderboard';
+}
+
+function publicPlayerIdFromKey(key) {
+  const s = String(key || '').trim();
+  const idx = s.indexOf(':');
+  if (idx > 0 && idx < s.length - 1) return s.slice(idx + 1);
+  return s;
+}
+
+function publicStatsBaseUrl() {
+  const fromConfig = String(dashPublicConfigCache?.publicUrl || '').replace(/\/$/, '');
+  return fromConfig || getServerUrl().replace(/\/$/, '');
+}
+
+async function copyPublicPlayerLink() {
+  const id = publicPlayerIdFromKey(selectedPlayerKey);
+  if (!id) return;
+  const params = new URLSearchParams();
+  if (playerDetailOpponentFilter) params.set('opponent', playerDetailOpponentFilter);
+  if (playerDetailGameFilter) params.set('game', playerDetailGameFilter);
+  const qs = params.toString();
+  const url = `${publicStatsBaseUrl()}/player/${encodeURIComponent(id)}${qs ? `?${qs}` : ''}`;
+  await copyTextToClipboard(url);
+  const status = document.getElementById('statsStatus');
+  if (status) status.textContent = 'Public player link copied.';
+}
+
+async function copySharedLeaderboardLink() {
+  if (isViewingOtherAccount()) {
+    throw new Error('Switch to your account to share an event leaderboard');
+  }
+  const filters = getOverviewFilterState();
+  if (!overviewScopeFiltersActive(filters)) {
+    throw new Error('Set an event and/or date range before sharing');
+  }
+  const result = await createLeaderboardShare(getServerUrl(), getToken(), {
+    eventQuery: document.getElementById('statsEventSearch')?.value?.trim() || '',
+    dateFrom: filters.dateFrom || '',
+    dateTo: filters.dateTo || '',
+  });
+  const url = result?.url || `${publicStatsBaseUrl()}/l/${encodeURIComponent(result.token)}`;
+  await copyTextToClipboard(url);
+  const status = document.getElementById('statsStatus');
+  if (status) status.textContent = 'Event leaderboard link copied.';
 }
 
 function clearOverviewFilters() {
@@ -4435,8 +4768,10 @@ function renderPlayerDetail() {
   setPlayerRenameEditing(playerRenameEditing, { focus: false });
   const renameBtn = document.getElementById('statsPlayerRenameEditBtn');
   const deleteBtn = document.getElementById('statsPlayerDeleteBtn');
+  const copyLinkBtn = document.getElementById('statsPlayerCopyLinkBtn');
   renameBtn?.classList.remove('hidden');
   deleteBtn?.classList.remove('hidden');
+  copyLinkBtn?.classList.remove('hidden');
   populatePlayerDetailFilters(allMatches);
   if (summary) {
     const cards = [];
@@ -5800,6 +6135,14 @@ function initStatsOverviewFilters() {
     if (!overviewFiltersActive()) return;
     clearOverviewFilters();
   });
+  document.getElementById('statsShareLeaderboardBtn')?.addEventListener('click', async () => {
+    if (document.getElementById('statsShareLeaderboardBtn')?.disabled) return;
+    try {
+      await copySharedLeaderboardLink();
+    } catch (err) {
+      setError(err.message || 'Failed to copy leaderboard link');
+    }
+  });
   document.getElementById('statsRefreshBtn')?.addEventListener('click', () => {
     if (statsLoading) return;
     loadAccountStats(true);
@@ -5810,12 +6153,29 @@ document.querySelectorAll('.dash-tab').forEach((tab) => {
   tab.addEventListener('click', () => setActiveDashTab(tab.dataset.tab));
 });
 
-document.getElementById('adminAccountSearch')?.addEventListener('input', () => {
-  clearTimeout(adminSearchTimer);
-  adminSearchTimer = setTimeout(() => {
+document.getElementById('adminAccountsTable')?.querySelector('thead')?.addEventListener('click', (event) => {
+  if (event.target.closest('.admin-col-filter')) return;
+  const th = event.target.closest('th[data-sort-key]');
+  if (!th || th.closest('.admin-filter-row')) return;
+  setAdminSort(th.getAttribute('data-sort-key'));
+});
+
+document.getElementById('adminAccountsTable')?.querySelector('.admin-filter-row')?.addEventListener('input', (event) => {
+  const input = event.target.closest('[data-admin-filter]');
+  if (!input) return;
+  const key = input.getAttribute('data-admin-filter');
+  if (!ADMIN_FILTER_KEYS.includes(key)) return;
+  adminColumnFilters[key] = input.value || '';
+  clearTimeout(adminFilterTimer);
+  adminFilterTimer = setTimeout(() => {
     if (document.getElementById('tabAdmin')?.classList.contains('hidden')) return;
-    loadAdminAccounts();
-  }, 250);
+    renderAdminAccountsTable();
+  }, 150);
+});
+
+document.getElementById('adminAccountsResetBtn')?.addEventListener('click', () => {
+  if (adminPresentationIsDefault()) return;
+  resetAdminAccountsPresentation();
 });
 
 document.getElementById('platformAccountFilter')?.addEventListener('change', (event) => {
@@ -5962,6 +6322,15 @@ document.getElementById('statsH2HChartModeToggle')?.addEventListener('click', (e
   });
   renderH2HWinChart(matches, selectedPlayerKey, playerDetailOpponentFilter);
 });
+document.getElementById('statsPlayerCopyLinkBtn')?.addEventListener('click', async () => {
+  if (!selectedPlayerKey) return;
+  try {
+    await copyPublicPlayerLink();
+  } catch (err) {
+    setError(err.message || 'Failed to copy player link');
+  }
+});
+
 document.getElementById('statsPlayerRenameEditBtn')?.addEventListener('click', () => {
   const rename = document.getElementById('statsPlayerRenameInput');
   const title = document.getElementById('statsPlayerTitle');

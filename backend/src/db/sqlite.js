@@ -120,12 +120,24 @@ CREATE TABLE IF NOT EXISTS account_players (
   last_seen_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS leaderboard_shares (
+  token TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  event_query TEXT NOT NULL DEFAULT '',
+  date_from TEXT,
+  date_to TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_api_keys_account ON api_keys(account_id);
 CREATE INDEX IF NOT EXISTS idx_rooms_account ON rooms(account_id);
 CREATE INDEX IF NOT EXISTS idx_account_players_account ON account_players(account_id);
 CREATE INDEX IF NOT EXISTS idx_account_players_name ON account_players(account_id, name_normalized);
 CREATE INDEX IF NOT EXISTS idx_room_docks_account ON room_docks(account_id);
 CREATE INDEX IF NOT EXISTS idx_room_docks_api_key ON room_docks(api_key_id);
+CREATE INDEX IF NOT EXISTS idx_leaderboard_shares_account ON leaderboard_shares(account_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_leaderboard_shares_scope
+  ON leaderboard_shares(account_id, event_query, ifnull(date_from, ''), ifnull(date_to, ''));
 `;
 
 const MATCH_EVENTS_INDEXES = `
@@ -387,6 +399,7 @@ export function getDb() {
     ensureMatchEventColumns(db);
     ensureAccountPlayersUuid(db);
     ensureAccountPlayerColumns(db);
+    ensureLeaderboardSharesTable(db);
     ensureRoomKindColumn(db);
     db.exec(MATCH_EVENTS_INDEXES);
     db.prepare(
@@ -1697,6 +1710,79 @@ export function getAccountPlayer(accountId, playerId) {
   return getDb().prepare(
     'SELECT id, account_id, name, name_normalized, created_at, last_seen_at FROM account_players WHERE id = ? AND account_id = ?'
   ).get(playerId, accountId) || null;
+}
+
+/** Lookup roster player by global UUID (public player pages). */
+export function getAccountPlayerById(playerId) {
+  const id = String(playerId || '').trim();
+  if (!id) return null;
+  return getDb().prepare(
+    'SELECT id, account_id, name, name_normalized, created_at, last_seen_at FROM account_players WHERE id = ?'
+  ).get(id) || null;
+}
+
+function ensureLeaderboardSharesTable(database) {
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS leaderboard_shares (
+      token TEXT PRIMARY KEY,
+      account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+      event_query TEXT NOT NULL DEFAULT '',
+      date_from TEXT,
+      date_to TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_leaderboard_shares_account ON leaderboard_shares(account_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_leaderboard_shares_scope
+      ON leaderboard_shares(account_id, event_query, ifnull(date_from, ''), ifnull(date_to, ''));
+  `);
+}
+
+function mapLeaderboardShareRow(row) {
+  if (!row) return null;
+  return {
+    token: row.token,
+    account_id: row.account_id,
+    event_query: row.event_query || '',
+    date_from: row.date_from || null,
+    date_to: row.date_to || null,
+    created_at: row.created_at || null,
+  };
+}
+
+export function getLeaderboardShare(token) {
+  const t = String(token || '').trim();
+  if (!t) return null;
+  return mapLeaderboardShareRow(
+    getDb().prepare('SELECT * FROM leaderboard_shares WHERE token = ?').get(t)
+  );
+}
+
+/**
+ * Create or reuse a share for the same account + event/date scope.
+ * @returns {{ token: string, created: boolean } | null}
+ */
+export function upsertLeaderboardShare(accountId, { eventQuery = '', dateFrom = null, dateTo = null } = {}) {
+  if (!accountId) return null;
+  const event_query = String(eventQuery || '').trim().slice(0, 60);
+  const date_from = dateFrom ? String(dateFrom).trim() : null;
+  const date_to = dateTo ? String(dateTo).trim() : null;
+  const existing = getDb().prepare(
+    `SELECT * FROM leaderboard_shares
+     WHERE account_id = ?
+       AND event_query = ?
+       AND ifnull(date_from, '') = ifnull(?, '')
+       AND ifnull(date_to, '') = ifnull(?, '')
+     LIMIT 1`
+  ).get(accountId, event_query, date_from, date_to);
+  if (existing) {
+    return { token: existing.token, created: false, share: mapLeaderboardShareRow(existing) };
+  }
+  const token = `lb_${generateApiKeyPlaintext()}`;
+  getDb().prepare(
+    `INSERT INTO leaderboard_shares (token, account_id, event_query, date_from, date_to)
+     VALUES (?, ?, ?, ?, ?)`
+  ).run(token, accountId, event_query, date_from, date_to);
+  return { token, created: true, share: getLeaderboardShare(token) };
 }
 
 /** Full account roster (including players with no recorded matches). */

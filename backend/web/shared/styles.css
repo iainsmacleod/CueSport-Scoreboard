@@ -2120,9 +2120,53 @@ body.has-dash-nav .dash-tabs[hidden] {
     grid-template-columns: minmax(0, 1fr);
   }
 }
-.admin-search {
-  max-width: 28rem;
-  margin: 0.75rem 0;
+.admin-accounts-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1rem;
+  margin: 0.5rem 0 0.75rem;
+}
+.admin-accounts-toolbar #adminStatus {
+  flex: 1 1 12rem;
+  margin: 0;
+}
+#adminAccountsTable thead th.stats-sortable {
+  max-width: none;
+}
+#adminAccountsTable thead th.is-filtered {
+  color: #c0caf5;
+}
+#adminAccountsTable .admin-filter-row th {
+  padding: 0.35rem 0.4rem 0.55rem;
+  vertical-align: top;
+  font-weight: 400;
+  background: rgba(15, 18, 30, 0.45);
+  border-bottom: 1px solid rgba(122, 162, 247, 0.18);
+}
+#adminAccountsTable .admin-filter-row th.is-filtered {
+  background: rgba(122, 162, 247, 0.12);
+}
+#adminAccountsTable .admin-col-filter {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid rgba(122, 162, 247, 0.28);
+  border-radius: 0.3rem;
+  background: rgba(10, 12, 20, 0.85);
+  color: inherit;
+  font: inherit;
+  font-size: 0.78rem;
+}
+#adminAccountsTable .admin-col-filter:focus {
+  outline: none;
+  border-color: rgba(122, 162, 247, 0.7);
+  box-shadow: 0 0 0 2px rgba(122, 162, 247, 0.2);
+}
+#adminAccountsTable .admin-col-filter.is-filtered {
+  border-color: rgba(122, 162, 247, 0.75);
+  background: rgba(122, 162, 247, 0.14);
 }
 #adminAccountsTable tbody tr {
   cursor: pointer;
@@ -4396,5 +4440,43 @@ body.streams-page .btn.primary.billing-cta-trial strong {
 }
 .simulated-plan-filter select {
   width: 100%;
+}
+
+/* Public player stats + shared event leaderboard pages */
+body.public-stats-page {
+  min-height: 100vh;
+}
+body.public-stats-page .public-stats-main {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 1rem 1.25rem 2.5rem;
+}
+body.public-stats-page .public-board-scope {
+  margin: 0.35rem 0 1rem;
+}
+body.public-stats-page .public-player-link {
+  color: #7aa2f7;
+  text-decoration: none;
+}
+body.public-stats-page .public-player-link:hover,
+body.public-stats-page .public-player-link:focus-visible {
+  text-decoration: underline;
+}
+body.public-stats-page .stats-live-badge {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #1a1b26;
+  background: #9ece6a;
+}
+body.public-stats-page .stats-match-event-sub {
+  font-size: 0.8em;
+  opacity: 0.8;
+  margin-top: 0.15rem;
 }
 

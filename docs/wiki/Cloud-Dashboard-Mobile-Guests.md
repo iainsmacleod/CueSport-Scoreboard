@@ -7,7 +7,7 @@ Day-to-day use after Cloud is connected ([Hosted](Cloud-Hosted-Setup) or [Self-h
 | Tab | Purpose |
 |-----|---------|
 | **Tables** | Live cards for connected docks **and** open ad-hoc tables. First-time onboarding carousel when no dock is online. **Create Ad-hoc Table** for dockless scoring. |
-| **Stats** | Account leaderboard, recent matches (including Live / in progress), player detail, rename, edit/delete matches, **Kill** unfinished matches. |
+| **Stats** | Account leaderboard, recent matches (including Live / in progress), player detail, rename, edit/delete matches, **Kill** unfinished matches. **Copy public player link** from player detail; **Share board** copies a live event leaderboard link when Event/date filters are set. See [Public Stats Sharing](Cloud-Public-Stats). |
 | **Settings** | OBS Dock Keys — create, rename, change role, copy, revoke one, **Revoke All**. |
 | **Account** | Plan / billing (hosted), manage sessions (**Clear All Logins** also revokes guest links), sign out, account deletion. |
 

@@ -395,6 +395,22 @@ export async function fetchAccountStats(serverUrl, token) {
   return res.json();
 }
 
+/** Create or reuse an opaque public event-leaderboard share URL. */
+export async function createLeaderboardShare(serverUrl, token, { eventQuery, dateFrom, dateTo } = {}) {
+  const base = serverUrl.replace(/\/$/, '');
+  const res = await fetch(`${base}/api/stats/leaderboard-shares`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ eventQuery, dateFrom, dateTo }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || 'Failed to create leaderboard share');
+  return body;
+}
+
 export async function updateAccountMatch(serverUrl, token, startEventId, payload) {
   const base = serverUrl.replace(/\/$/, '');
   const res = await fetch(`${base}/api/stats/matches/${encodeURIComponent(startEventId)}`, {

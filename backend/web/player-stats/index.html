@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Player Stats — CueSport Scoreboard Cloud</title>
+  <link rel="icon" type="image/png" href="/web/images/brand/logo.png?v=8.6.0" />
+  <link rel="stylesheet" href="/web/shared/styles.css?v=8.6.0" />
+</head>
+<body class="public-stats-page">
+  <header class="site-header">
+    <div class="site-header-inner">
+      <div>
+        <a class="site-brand" href="/">
+          <img class="site-brand-mark" src="/web/images/brand/logo.png?v=8.6.0" alt="" />
+          <h1>CueSport Scoreboard Cloud</h1>
+        </a>
+        <p class="subtitle">Public player statistics</p>
+      </div>
+      <nav class="site-nav" aria-label="Site">
+        <a class="btn secondary" href="/dashboard">Dashboard</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="landing-main public-stats-main">
+    <p id="publicPlayerStatus" class="hint" aria-live="polite">Loading…</p>
+    <div id="publicPlayerPanel" class="panel hidden">
+      <div class="stats-player-heading">
+        <div class="stats-player-title-view">
+          <h2 id="publicPlayerTitle">Player</h2>
+        </div>
+      </div>
+      <div id="publicPlayerSummary" class="stats-summary"></div>
+      <div class="stats-toolbar stats-player-filters">
+        <label class="stats-filter">
+          Game
+          <select id="publicPlayerGameFilter">
+            <option value="">All games</option>
+          </select>
+        </label>
+        <label class="stats-filter stats-filter-end">
+          Opponent
+          <select id="publicPlayerOpponentFilter">
+            <option value="">All opponents</option>
+          </select>
+        </label>
+      </div>
+      <div id="publicPlayerH2HSection" class="stats-h2h-section">
+        <div class="stats-h2h-heading">
+          <h3 class="stats-section-title">Head to Head</h3>
+          <div id="publicH2HChartModeToggle" class="stats-h2h-chart-mode hidden" role="group" aria-label="Head-to-head chart metric">
+            <button type="button" class="stats-h2h-chart-mode-btn active" data-h2h-chart-mode="matches" aria-pressed="true">Matches</button>
+            <button type="button" class="stats-h2h-chart-mode-btn" data-h2h-chart-mode="racks" aria-pressed="false">Racks / Frames</button>
+          </div>
+        </div>
+        <p id="publicH2HChartHint" class="stats-h2h-chart-hint">Select an opponent to view head-to-head progress.</p>
+        <div id="publicH2HChartWrap" class="stats-h2h-chart-wrap hidden">
+          <canvas id="publicH2HChart" aria-label="Head-to-head wins versus games played"></canvas>
+        </div>
+      </div>
+      <h3 class="stats-section-title">Matches</h3>
+      <div class="stats-table-wrap">
+        <table class="dash-stats-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Match</th>
+              <th>Game</th>
+              <th>Score</th>
+            </tr>
+          </thead>
+          <tbody id="publicPlayerMatchesBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script type="module" src="/web/player-stats/app.js?v=8.6.0"></script>
+</body>
+</html>

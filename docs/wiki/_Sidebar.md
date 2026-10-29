@@ -15,6 +15,7 @@
 - [Cloud Hosted Setup](Cloud-Hosted-Setup)
 - [Cloud Self-Hosted Setup](Cloud-Self-Hosted-Setup)
 - [Dashboard, Mobile & Guests](Cloud-Dashboard-Mobile-Guests)
+- [Public Stats Sharing](Cloud-Public-Stats)
 - [Stream Promotion](Stream-Promotion)
 
 * Help

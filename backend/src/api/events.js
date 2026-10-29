@@ -2,12 +2,17 @@ import * as sqlite from '../db/sqlite.js';
 import { resolveAuthFromRequest } from './accounts.js';
 import { getAccountStats, pairSessionEvents } from '../stats/account-stats.js';
 import {
+  normalizeLeaderboardScope,
+  scopeHasFilter,
+} from '../stats/public-stats.js';
+import {
   clampScore,
   normalizePlayerDisplayName,
 } from '../lib/scoreboard-helpers.js';
 import { broadcastRoomCommand, notifyAccountTables, getConnectedDockPromotedStreams } from '../ws/room-hub.js';
 import { canMutateMatch, isAccountAdminAuth, permissionsForAuth } from '../lib/dock-roles.js';
 import { isPlatformAdmin } from '../lib/platform-admin.js';
+import { config } from '../config.js';
 
 const GAME_TYPE_IDS = new Set(['game1', 'game2', 'game3', 'game4', 'game5', 'game6', 'game7', 'game8']);
 
@@ -600,5 +605,34 @@ export async function registerEventRoutes(app) {
     return Array.from(byRoom.values()).sort((a, b) =>
       String(b.updated_at || '').localeCompare(String(a.updated_at || ''))
     );
+  });
+
+  /** Create or reuse an opaque public event-leaderboard share for the signed-in account. */
+  app.post('/api/stats/leaderboard-shares', async (request, reply) => {
+    const auth = await resolveAuthFromRequest(request);
+    if (!auth?.account) return reply.code(401).send({ error: 'Unauthorized' });
+    const scope = normalizeLeaderboardScope(request.body || {});
+    if (!scopeHasFilter(scope)) {
+      return reply.code(400).send({
+        error: 'Set an event and/or date range before sharing a leaderboard',
+      });
+    }
+    const result = sqlite.upsertLeaderboardShare(auth.account.id, {
+      eventQuery: scope.eventQuery,
+      dateFrom: scope.dateFrom || null,
+      dateTo: scope.dateTo || null,
+    });
+    if (!result?.token) {
+      return reply.code(500).send({ error: 'Could not create leaderboard share' });
+    }
+    const url = `${config.publicUrl}/l/${encodeURIComponent(result.token)}`;
+    return {
+      token: result.token,
+      url,
+      created: !!result.created,
+      eventQuery: scope.eventQuery,
+      dateFrom: scope.dateFrom || null,
+      dateTo: scope.dateTo || null,
+    };
   });
 }

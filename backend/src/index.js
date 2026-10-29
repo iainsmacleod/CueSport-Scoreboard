@@ -11,6 +11,7 @@ import { registerAccountRoutes } from './api/accounts.js';
 import { registerAdminRoutes } from './api/admin.js';
 import { registerBillingRoutes } from './api/billing.js';
 import { registerEventRoutes } from './api/events.js';
+import { registerPublicStatsRoutes } from './api/public-stats.js';
 import { registerQrRoutes } from './api/qr.js';
 import * as sqlite from './db/sqlite.js';
 
@@ -180,6 +181,8 @@ if (googleButtonRoot) {
 app.get('/', async (_req, reply) => sendWebHtml(reply, 'public-listing/index.html'));
 app.get('/streams', async (_req, reply) => sendWebHtml(reply, 'public-listing/index.html'));
 app.get('/dashboard', async (_req, reply) => sendWebHtml(reply, 'dashboard/index.html'));
+app.get('/player/:playerId', async (_req, reply) => sendWebHtml(reply, 'player-stats/index.html'));
+app.get('/l/:token', async (_req, reply) => sendWebHtml(reply, 'leaderboard-share/index.html'));
 app.get('/m/:roomId', async (_req, reply) => sendWebHtml(reply, 'mobile/index.html'));
 app.get('/g/:guestToken', async (_req, reply) => sendWebHtml(reply, 'mobile/index.html'));
 app.get('/terms', async (_req, reply) => {
@@ -212,6 +215,7 @@ await registerAccountRoutes(app);
 await registerAdminRoutes(app);
 await registerBillingRoutes(app);
 await registerEventRoutes(app);
+await registerPublicStatsRoutes(app);
 registerQrRoutes(app);
 
 sqlite.getDb();

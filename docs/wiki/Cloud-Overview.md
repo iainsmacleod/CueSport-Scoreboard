@@ -28,7 +28,7 @@ Mobile and guest clients send commands; the dock runs the same logic as clicking
 | **Guest control** | `/g/{token}` | Focused scoring link / QR (limited permissions) |
 | **Shared Streams** | `/#streams` (also `/streams`) | Homepage tab listing promoted live streams |
 
-Also: cloud match history and player statistics, guest link create/revoke, and connection gating.
+Also: cloud match history and player statistics, [public player pages and event leaderboard shares](Cloud-Public-Stats), guest link create/revoke, and connection gating.
 
 ## Hosted vs self-hosted
 

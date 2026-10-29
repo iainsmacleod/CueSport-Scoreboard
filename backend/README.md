@@ -132,7 +132,7 @@ Use the **Product name** column when creating Stripe Products. Map each Productâ
 ## Supabase setup (production)
 
 1. Create a Supabase project.
-2. Run [`supabase/migrations/001_initial.sql`](supabase/migrations/001_initial.sql), [`002_session_epoch_quotas.sql`](supabase/migrations/002_session_epoch_quotas.sql), [`003_account_players_uuid.sql`](supabase/migrations/003_account_players_uuid.sql), [`004_dock_key_roles.sql`](supabase/migrations/004_dock_key_roles.sql), [`005_admin_support_trial.sql`](supabase/migrations/005_admin_support_trial.sql), [`006_account_deletion.sql`](supabase/migrations/006_account_deletion.sql), then [`007_account_player_created_at.sql`](supabase/migrations/007_account_player_created_at.sql) in the SQL editor.
+2. Run [`supabase/migrations/001_initial.sql`](supabase/migrations/001_initial.sql), [`002_session_epoch_quotas.sql`](supabase/migrations/002_session_epoch_quotas.sql), [`003_account_players_uuid.sql`](supabase/migrations/003_account_players_uuid.sql), [`004_dock_key_roles.sql`](supabase/migrations/004_dock_key_roles.sql), [`005_admin_support_trial.sql`](supabase/migrations/005_admin_support_trial.sql), [`006_account_deletion.sql`](supabase/migrations/006_account_deletion.sql), [`007_account_player_created_at.sql`](supabase/migrations/007_account_player_created_at.sql), then [`008_leaderboard_shares.sql`](supabase/migrations/008_leaderboard_shares.sql) in the SQL editor.
 3. Enable **Google** provider under Authentication â†’ Providers.
 4. Add redirect URLs: `{PUBLIC_URL}/web/dashboard/`, `{PUBLIC_URL}/auth/callback`.
 5. Set env vars in `.env` (including `PLATFORM_ADMIN_EMAILS` for your ops Google accounts) and deploy.
@@ -242,6 +242,11 @@ This backend is GPL-licensed alongside the scoreboard. You may run your own inst
 | POST | `/api/sessions/invalidate-all` | Sign out everywhere (invalidate + disconnect admin dashboard/mobile; revoke guest links and disconnect guests; Dock Keys kept) |
 | GET | `/api/rooms/:roomId/events` | Match event log |
 | GET | `/api/stats` | Account match stats (players, matches, summary) |
+| POST | `/api/stats/leaderboard-shares` | Create/reuse opaque public event-leaderboard share (`eventQuery` / `dateFrom` / `dateTo`; at least one required) |
+| GET | `/api/public/players/:playerId` | Public read-only player stats (no auth) |
+| GET | `/api/public/leaderboards/:token` | Public live leaderboard for a share token (no auth) |
+| GET | `/player/:playerId` | Public player stats page |
+| GET | `/l/:token` | Public event leaderboard page |
 | PATCH | `/api/stats/matches/:startEventId` | Edit a completed match (scores, names, extras; winner derived from scores) |
 | DELETE | `/api/stats/matches/:startEventId` | Delete a completed match, or abandon an in-progress (unended) match. Abandon clears the room session pointer and, when a dock is connected to that room, relays `abandon_match` (`dockNotified` in the response). |
 | PATCH | `/api/stats/players` | Rename a player across all match history + roster |
