@@ -30,6 +30,14 @@ export class CloudClient {
     this.reconnectGraceUntil = 0;
     this._graceTimer = null;
     this._intentionalClose = false;
+    /** Application keepalive. Mobile NAT/radio often drops an idle socket around a minute. */
+    this.pingIntervalMs = Number.isFinite(options.pingIntervalMs) ? options.pingIntervalMs : 20000;
+    /** No inbound message for this long means the open socket is treated as dead. */
+    this.staleMs = Number.isFinite(options.staleMs) ? options.staleMs : 25000;
+    this.lastHeardAt = 0;
+    this._pingTimer = null;
+    /** Set by the app. Called when a command finds a stale open socket so the tap can be queued across reconnect. */
+    this.onStale = null;
   }
 
   wsUrl() {
@@ -46,6 +54,41 @@ export class CloudClient {
   /** True when the socket is actually OPEN (not a stale connected flag after backgrounding). */
   isOpen() {
     return !!(this.ws && this.ws.readyState === 1 && this.connected);
+  }
+
+  /** Open socket that has not heard from the server within staleMs. */
+  isStale() {
+    if (!this.isOpen() || !this.lastHeardAt) return false;
+    return Date.now() - this.lastHeardAt >= this.staleMs;
+  }
+
+  _noteHeard() {
+    this.lastHeardAt = Date.now();
+  }
+
+  _stopPing() {
+    if (this._pingTimer) {
+      clearInterval(this._pingTimer);
+      this._pingTimer = null;
+    }
+  }
+
+  _startPing() {
+    this._stopPing();
+    if (!(this.pingIntervalMs > 0)) return;
+    this._pingTimer = setInterval(() => {
+      if (!this.isOpen()) return;
+      try {
+        this.ws.send(JSON.stringify({ type: 'ping', ts: new Date().toISOString() }));
+      } catch (_) {
+        /* ignore; stale detection or the next command will reconnect */
+      }
+    }, this.pingIntervalMs);
+  }
+
+  _requestStaleReconnect() {
+    if (typeof this.onStale !== 'function') return;
+    try { this.onStale(); } catch (_) { /* ignore */ }
   }
 
   isReconnecting() {
@@ -182,6 +225,10 @@ export class CloudClient {
       this.ws.onmessage = (ev) => {
         let data;
         try { data = JSON.parse(ev.data); } catch { return; }
+        this._noteHeard();
+        if (data.type === 'pong') {
+          return;
+        }
         if (data.type === 'joined') {
           this.connected = true;
           this._endReconnectGrace({ dropQueue: false });
@@ -197,6 +244,7 @@ export class CloudClient {
             this.handlers.state.forEach((fn) => fn(data.state));
           }
           this._flushCommandQueue();
+          this._startPing();
           this.handlers.joined.forEach((fn) => fn(data));
           this._emitConnection();
           finish(resolve, data);
@@ -226,6 +274,7 @@ export class CloudClient {
         if (!this.connected) fail('websocket_error', 'WebSocket error');
       };
       this.ws.onclose = () => {
+        this._stopPing();
         const wasConnected = this.connected;
         this.connected = false;
         const intentional = this._intentionalClose;
@@ -250,15 +299,30 @@ export class CloudClient {
    * @returns {boolean} true if sent or queued; false if hard offline
    */
   sendCommand(action, payload = {}) {
-    if (this.ws && this.ws.readyState === 1 && this.connected) {
-      this.ws.send(JSON.stringify({
-        type: 'command',
-        room_id: this.roomId,
-        action,
-        payload,
-        source: this.client,
-        ts: new Date().toISOString(),
-      }));
+    if (this.isOpen() && !this.isStale()) {
+      try {
+        this.ws.send(JSON.stringify({
+          type: 'command',
+          room_id: this.roomId,
+          action,
+          payload,
+          source: this.client,
+          ts: new Date().toISOString(),
+        }));
+        return true;
+      } catch (_) {
+        this._enqueueCommand(action, payload);
+        this._beginReconnectGrace();
+        this._emitConnection();
+        this._requestStaleReconnect();
+        return true;
+      }
+    }
+    if (this.isOpen() && this.isStale()) {
+      this._enqueueCommand(action, payload);
+      this._beginReconnectGrace();
+      this._emitConnection();
+      this._requestStaleReconnect();
       return true;
     }
     if (this.isReconnecting()) {
@@ -293,9 +357,12 @@ export class CloudClient {
     return true;
   }
 
-  disconnect() {
+  disconnect(options = {}) {
+    const keepQueue = !!(options && options.keepQueue);
     this._intentionalClose = true;
-    this._endReconnectGrace({ dropQueue: true });
+    this._stopPing();
+    if (keepQueue) this._clearGraceTimer();
+    else this._endReconnectGrace({ dropQueue: true });
     if (typeof this._connectFail === 'function') {
       try {
         this._connectFail('connection_closed', 'Connection superseded.');

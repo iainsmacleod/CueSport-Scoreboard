@@ -430,6 +430,8 @@ function prepareNextRackOrFrame(state, winnerSlot, options = {}) {
       state._cooldown = null;
     }
     state.playerBallSet = 'p1Open';
+    state.pendingBallElection = null;
+    state._ballSetElectionArmed = false;
     state._ballSetOpenLastPotSlot = '';
     state._ballSetOpenSamePlayerPots = 0;
     // Dock recordRackWin clears per-rack foul counters after capture; match for pool.
@@ -861,7 +863,13 @@ function getBallSetValueForPottedBall(num, activeSlot, selection) {
   return p1GetsRedSmalls ? 'p1yellow/bigs' : 'p1red/smalls';
 }
 
-/** Auto-assign Chosen Ball while Open (8-Ball / Custom) — dock maybeAssignBallSetFromPot. */
+function ballSetGroupLabel(style, value) {
+  if (style === 'international') return value === 'p1yellow/bigs' ? 'Yellows' : 'Reds';
+  if (style === 'unity') return value === 'p1yellow/bigs' ? 'Blue' : 'Pink';
+  return value === 'p1yellow/bigs' ? 'Stripes' : 'Solids';
+}
+
+/** Ask instead of assigning. Open keeps the table open; the next object pot asks again. */
 function maybeAssignBallSetFromPot(state, ballId) {
   if (state.useBallSet !== true) return;
   if (state.gameType !== 'game1' && state.gameType !== 'game7') return;
@@ -870,7 +878,8 @@ function maybeAssignBallSetFromPot(state, ballId) {
   if (!Number.isFinite(num) || num === 8 || num < 1 || num > 15) return;
 
   const active = state.activePlayer === '2' ? '2' : '1';
-  if (state.gameType === 'game1') {
+  const armed = state._ballSetElectionArmed === true;
+  if (state.gameType === 'game1' && !armed) {
     const lastPotSlot = state._ballSetOpenLastPotSlot || '';
     let samePlayerPots = Number(state._ballSetOpenSamePlayerPots) || 0;
     if (lastPotSlot === active) samePlayerPots += 1;
@@ -886,7 +895,32 @@ function maybeAssignBallSetFromPot(state, ballId) {
     if (!breaker && !playerChanged && samePlayerPots < 2) return;
   }
 
-  state.playerBallSet = getBallSetValueForPottedBall(num, active, state.ballSelection || 'american');
+  const style = state.ballSelection || 'american';
+  const suggested = getBallSetValueForPottedBall(num, active, style);
+  const playerName = active === '2'
+    ? (state.player2Name || 'Player 2')
+    : (state.player1Name || 'Player 1');
+  state.pendingBallElection = {
+    slot: active,
+    playerName,
+    suggestedSet: suggested,
+    suggestedLabel: ballSetGroupLabel(style, suggested),
+    ballId: String(ballId),
+    ballNum: num,
+  };
+  state._ballSetElectionArmed = true;
+}
+
+function resolveBallElection(state, choice) {
+  const selected = choice === 'p1red/smalls' || choice === 'p1yellow/bigs' ? choice : 'p1Open';
+  state.pendingBallElection = null;
+  if (selected === 'p1Open') {
+    state.playerBallSet = 'p1Open';
+    state._ballSetElectionArmed = true;
+    return;
+  }
+  state.playerBallSet = selected;
+  state._ballSetElectionArmed = false;
   state._ballSetOpenLastPotSlot = '';
   state._ballSetOpenSamePlayerPots = 0;
 }
@@ -1354,6 +1388,8 @@ function captureScoringBefore(state) {
     _cooldown: state._cooldown ? { ...state._cooldown } : null,
     _ballSetOpenLastPotSlot: state._ballSetOpenLastPotSlot || '',
     _ballSetOpenSamePlayerPots: Number(state._ballSetOpenSamePlayerPots) || 0,
+    _ballSetElectionArmed: state._ballSetElectionArmed === true,
+    pendingBallElection: state.pendingBallElection ? { ...state.pendingBallElection } : null,
     _matchRacks: (state._matchRacks || []).map((r) => (r && typeof r === 'object' ? { ...r } : r)),
     _matchStartedAt: state._matchStartedAt || null,
     _highestRunP1: Number(state._highestRunP1) || 0,
@@ -1402,6 +1438,10 @@ function applyScoringBefore(state, before) {
   state._cooldown = before._cooldown ? { ...before._cooldown } : null;
   state._ballSetOpenLastPotSlot = before._ballSetOpenLastPotSlot || '';
   state._ballSetOpenSamePlayerPots = Number(before._ballSetOpenSamePlayerPots) || 0;
+  if (before._ballSetElectionArmed != null) state._ballSetElectionArmed = before._ballSetElectionArmed === true;
+  if (before.pendingBallElection !== undefined) {
+    state.pendingBallElection = before.pendingBallElection ? { ...before.pendingBallElection } : null;
+  }
   state._matchRacks = (before._matchRacks || []).map((r) => (r && typeof r === 'object' ? { ...r } : r));
   state._matchStartedAt = before._matchStartedAt || null;
   state._highestRunP1 = Number(before._highestRunP1) || 0;
@@ -1586,6 +1626,7 @@ function publicState(state) {
   delete cleaned._cooldown;
   delete cleaned._ballSetOpenLastPotSlot;
   delete cleaned._ballSetOpenSamePlayerPots;
+  delete cleaned._ballSetElectionArmed;
   delete cleaned._matchId;
   delete cleaned._cloudStarted;
   delete cleaned._internal;
@@ -1642,6 +1683,7 @@ export function createDefaultImpromptuState(overrides = {}) {
     // group assignment, win rules, and slot badges work out of the box.
     useBallSet: true,
     playerBallSet: 'p1Open',
+    pendingBallElection: null,
     activePlayer: '1',
     rackBreakerSlot: '',
     // awaitingBreaker / playerSlotMode derived in refreshDerived (dock parity).
@@ -1662,6 +1704,7 @@ export function createDefaultImpromptuState(overrides = {}) {
     _cooldown: null,
     _ballSetOpenLastPotSlot: '',
     _ballSetOpenSamePlayerPots: 0,
+    _ballSetElectionArmed: false,
     _matchId: null,
     _cloudStarted: false,
     _matchRacks: [],
@@ -2092,6 +2135,8 @@ export function applyImpromptuCommand(stateIn, action, payload = {}) {
       clearMatchStats(state);
       state.rackBreakerSlot = '';
       state.playerBallSet = 'p1Open';
+      state.pendingBallElection = null;
+      state._ballSetElectionArmed = false;
       state._ballSetOpenLastPotSlot = '';
       state._ballSetOpenSamePlayerPots = 0;
       // Dock applyGameTypeChange: Snooker forces snooker balls; leaving Snooker
@@ -2121,12 +2166,28 @@ export function applyImpromptuCommand(stateIn, action, payload = {}) {
       state.useBallSet = !!payload.enabled;
       if (!state.useBallSet) {
         state.playerBallSet = 'p1Open';
+        state.pendingBallElection = null;
+        state._ballSetElectionArmed = false;
         state._ballSetOpenLastPotSlot = '';
         state._ballSetOpenSamePlayerPots = 0;
       }
       break;
-    case 'set_player_ball_set':
-      state.playerBallSet = String(payload.value || 'p1Open');
+    case 'set_player_ball_set': {
+      const prevSet = state.playerBallSet || 'p1Open';
+      const nextSet = String(payload.value || 'p1Open');
+      state.playerBallSet = nextSet;
+      state.pendingBallElection = null;
+      if (nextSet === 'p1red/smalls' || nextSet === 'p1yellow/bigs') {
+        state._ballSetElectionArmed = false;
+        state._ballSetOpenLastPotSlot = '';
+        state._ballSetOpenSamePlayerPots = 0;
+      } else if (prevSet !== 'p1Open') {
+        state._ballSetElectionArmed = true;
+      }
+      break;
+    }
+    case 'resolve_ball_election':
+      resolveBallElection(state, payload && payload.choice);
       break;
     case 'toggle_pot':
     case 'snooker_ball': {

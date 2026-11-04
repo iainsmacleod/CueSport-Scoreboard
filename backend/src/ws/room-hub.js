@@ -419,6 +419,9 @@ async function handleMessage(ws, meta, msg) {
       return handleStats(ws, meta, msg);
     case 'disconnect':
       return ws.close();
+    case 'ping':
+      send(ws, { type: 'pong', ts: new Date().toISOString() });
+      return;
     default:
       send(ws, { type: 'error', code: 'unknown_type', message: `Unknown message type: ${msg.type}` });
   }

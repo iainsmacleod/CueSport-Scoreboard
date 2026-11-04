@@ -5673,7 +5673,8 @@ function liveFeedIsOpen() {
 function ensureLiveFeed(options = {}) {
   if (!wantLiveFeed || !getToken()) return;
   const force = !!(options && options.force);
-  if (!force && liveFeedIsOpen()) return;
+  const stale = !!(dashClient && typeof dashClient.isStale === 'function' && dashClient.isStale());
+  if (!force && !stale && liveFeedIsOpen()) return;
   clearReconnect();
   reconnectAttempt = 0;
   connectLiveFeed().catch(() => {});

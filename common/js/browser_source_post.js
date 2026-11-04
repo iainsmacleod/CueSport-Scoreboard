@@ -47,7 +47,52 @@ initializeDefaults();
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////			
 
 // First, separate handlers into distinct functions
+function overlayShouldHideActivePlayer() {
+    const both = getStorageItem("usePlayer1") === "yes" && getStorageItem("usePlayer2") === "yes";
+    if (!both) return false;
+    const slot = getStorageItem("rackBreakerSlot") || "";
+    return slot !== "1" && slot !== "2";
+}
+
+function hideOverlayActivePlayerBars() {
+    ["player1Image", "player2Image"].forEach((id) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.classList.remove("fadeInElm");
+        el.classList.add("fadeOutElm");
+    });
+}
+
+function resetOverlayElementPositions() {
+    const ids = ["scoreBoardDiv", "gameInfo", "logoSlideshowDiv", "ballTracker", "videoContainer", "overlayStatsPanel"];
+    const prefix = INSTANCE_ID ? `${INSTANCE_ID}_` : '';
+    ids.forEach((id) => {
+        localStorage.removeItem(`${prefix}elementPosition_${id}`);
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.style.left = '';
+        el.style.top = '';
+        el.style.right = '';
+        el.style.bottom = '';
+        el.style.width = '';
+        el.style.height = '';
+        el.style.margin = '';
+        el.style.position = '';
+        el.style.transform = '';
+    });
+    ['p1', 'p2', 'h2h'].forEach((mode) => {
+        localStorage.removeItem(`${prefix}elementPosition_overlayStatsPanel_${mode}`);
+    });
+    localStorage.removeItem(`${prefix}elementPosition_overlayStatsPanel`);
+    const panel = document.getElementById('overlayStatsPanel');
+    if (panel) panel.classList.remove('overlay-stats-positioned');
+}
+
 const handlers = {
+    resetOverlayPositions() {
+        resetOverlayElementPositions();
+    },
+
     ballTracker(data) {
         console.log('Ball tracker value:', data.ballTracker);
         if (data.ballTracker === "vertical" || data.ballTracker === "horizontal") {
@@ -199,11 +244,13 @@ const handlers = {
                 console.log("Use clock evaluating as not enabled");
             }
             // Check if both players are enabled before fading in the player images
-            if (bothPlayersEnabled && playerToggleEnabled) {
+            if (bothPlayersEnabled && playerToggleEnabled && !overlayShouldHideActivePlayer()) {
                 const activePlayer = getStorageItem("activePlayer");
                 console.log(`Show player ${activePlayer} as active`);
                 document.getElementById("player1Image").classList.replace(activePlayer === "1" ? "fadeOutElm" : "fadeInElm", activePlayer === "1" ? "fadeInElm" : "fadeOutElm");
                 document.getElementById("player2Image").classList.replace(activePlayer === "2" ? "fadeOutElm" : "fadeInElm", activePlayer === "2" ? "fadeInElm" : "fadeOutElm");
+            } else if (overlayShouldHideActivePlayer()) {
+                hideOverlayActivePlayerBars();
             }
             if (player1Enabled && getStorageItem("useCustomLogo") == "yes") {
                 document.getElementById("customLogo1").classList.replace("fadeOutElm", "fadeInElm");
@@ -300,28 +347,39 @@ const handlers = {
             if (data.clockDisplay == "logoSlideShow-hide") { document.getElementById("logoSlideshowDiv").classList.replace("fadeInElm", "fadeOutElm"); };
 
             if (data.clockDisplay === 'toggleActivePlayer') {
+                if (data.rackBreakerSlot != null) {
+                    setStorageItem("rackBreakerSlot", String(data.rackBreakerSlot || ""));
+                }
                 const playerToggle = data.player; // Get the active player from the message
                 var activePlayer = playerToggle ? "1" : "2";
                 console.log(`Toggle to player ${activePlayer}`);
-                changeActivePlayer(playerToggle); // Call the function to update the display
+                if (overlayShouldHideActivePlayer()) {
+                    hideOverlayActivePlayerBars();
+                } else {
+                    changeActivePlayer(playerToggle);
+                }
             }
 
             if (data.clockDisplay === 'showActivePlayer') {
+                if (data.rackBreakerSlot != null) {
+                    setStorageItem("rackBreakerSlot", String(data.rackBreakerSlot || ""));
+                }
                 const activePlayer = data.player; // Get the active player from the message
                 const player1Enabled = getStorageItem("usePlayer1") === "yes";
                 const player2Enabled = getStorageItem("usePlayer2") === "yes";
                 const bothPlayersEnabled = player1Enabled && player2Enabled;
-                // const playerToggle = (activePlayer === 1 || activePlayer === 2); // true if activePlayer is 1 or 2, otherwise false
-                // console.log(`playerToggle: ${playerToggle}`);
                 console.log(`Display active player: ${bothPlayersEnabled}`)
-                if (bothPlayersEnabled) {
-                    //const activePlayer = getStorageItem("activePlayer");
-                    changeActivePlayer(activePlayer); // Call the function to update the display
+                if (overlayShouldHideActivePlayer()) {
+                    hideOverlayActivePlayerBars();
+                } else if (bothPlayersEnabled) {
+                    changeActivePlayer(activePlayer);
                 }
             }
             if (data.clockDisplay === 'hideActivePlayer') {
-                document.getElementById("player1Image").classList.replace("fadeInElm", "fadeOutElm");
-                document.getElementById("player2Image").classList.replace("fadeInElm", "fadeOutElm");
+                if (data.rackBreakerSlot != null) {
+                    setStorageItem("rackBreakerSlot", String(data.rackBreakerSlot || ""));
+                }
+                hideOverlayActivePlayerBars();
             }
         }
     },
@@ -713,11 +771,7 @@ function readOverlayStatsSavedPosition(mode) {
     if (!mode) {
         return null;
     }
-    let raw = getStorageItem(getOverlayStatsPositionStorageKey(mode));
-    // Fall back to legacy shared position so existing layouts still load once
-    if (!raw) {
-        raw = getStorageItem('elementPosition_overlayStatsPanel');
-    }
+    const raw = getStorageItem(getOverlayStatsPositionStorageKey(mode));
     if (!raw) {
         return null;
     }
@@ -932,10 +986,9 @@ $(document).ready(function () {
     // List of draggable element IDs
     const draggableElements = [
         "scoreBoardDiv",
-        "gameInfo", 
+        "gameInfo",
         "logoSlideshowDiv",
         "ballTracker",
-        "videoContainer",
         "overlayStatsPanel"
     ];
 
@@ -969,6 +1022,24 @@ $(document).ready(function () {
         }
 
         const dragOptions = {
+            start: function() {
+                const el = $element[0];
+                const rect = el.getBoundingClientRect();
+                $element.css({
+                    position: 'absolute',
+                    left: (rect.left + window.scrollX) + 'px',
+                    top: (rect.top + window.scrollY) + 'px',
+                    right: 'auto',
+                    bottom: 'auto',
+                    margin: '0',
+                    width: Math.round(rect.width) + 'px',
+                    height: Math.round(rect.height) + 'px',
+                    transform: 'none'
+                });
+                if (elementId === 'overlayStatsPanel') {
+                    $element.addClass('overlay-stats-positioned');
+                }
+            },
             stop: function(event, ui) {
                 if (elementId === 'overlayStatsPanel') {
                     const el = $element[0];
@@ -990,26 +1061,6 @@ $(document).ready(function () {
                 console.log(`Saved position for ${elementId}:`, position);
             }
         };
-
-        if (elementId === 'overlayStatsPanel') {
-            dragOptions.start = function(event, ui) {
-                const el = $element[0];
-                // Lock pixel width so OBS/CEF does not stretch the panel while dragging
-                const lockedWidth = Math.round(el.getBoundingClientRect().width);
-                if (!$element.hasClass('overlay-stats-positioned')) {
-                    const rect = el.getBoundingClientRect();
-                    $element.css({
-                        position: 'absolute',
-                        left: rect.left + window.scrollX + 'px',
-                        top: rect.top + window.scrollY + 'px',
-                        transform: 'none',
-                        width: lockedWidth + 'px'
-                    }).addClass('overlay-stats-positioned');
-                } else if (!$element[0].style.width) {
-                    $element.css('width', lockedWidth + 'px');
-                }
-            };
-        }
 
         $element.draggable(dragOptions);
     });
@@ -1109,7 +1160,7 @@ if (player1Enabled === null || player2Enabled === null) {
     const playerToggleEnabled = getStorageItem("usePlayerToggle") === "yes";
 }
 
-if (bothPlayersEnabled && playerToggleEnabled) {
+if (bothPlayersEnabled && playerToggleEnabled && !overlayShouldHideActivePlayer()) {
     const activePlayer = getStorageItem("activePlayer");
     console.log(`Show player image in autostart condition. PlayerToggle: ${playerToggleEnabled}. Players both enabled: ${bothPlayersEnabled}`);
     // Show active player image, hide inactive player image

@@ -1230,6 +1230,7 @@ function applyState(state) {
     if (p2NameEl) p2NameEl.textContent = p2Name || 'P2';
     else slotP2.textContent = p2Name || 'P2';
     syncPlayerSlotBallBadges(state, slotP1, slotP2);
+    syncMobileBallElection(state);
     slotP1.classList.remove('selected', 'rack-breaker-match-locked', 'rack-breaker-inactive', 'rack-breaker-current', 'rack-breaker-last-winner');
     slotP2.classList.remove('selected', 'rack-breaker-match-locked', 'rack-breaker-inactive', 'rack-breaker-current', 'rack-breaker-last-winner');
     slotP1.disabled = false;
@@ -1496,7 +1497,72 @@ function ballSetGroupLabels(style) {
   if (style === 'international') {
     return { low: 'Reds', high: 'Yellows' };
   }
+  if (style === 'unity') {
+    return { low: 'Pink', high: 'Blue' };
+  }
   return { low: 'Solids', high: 'Stripes' };
+}
+
+function ballElectionImage(style, which) {
+  if (style === 'international') {
+    return which === 'high'
+      ? 'yellow-international-small-ball.png'
+      : 'red-international-small-ball.png';
+  }
+  const n = which === 'high' ? 15 : 1;
+  return ballImageFile(n, style);
+}
+
+function syncMobileBallElection(state) {
+  const modal = document.getElementById('ballElectionModal');
+  if (!modal) return;
+  const pending = state && state.pendingBallElection;
+  const suggested = pending && pending.suggestedSet;
+  if (!pending || (suggested !== 'p1red/smalls' && suggested !== 'p1yellow/bigs') || isViewOnly) {
+    modal.classList.add('hidden');
+    return;
+  }
+  const style = state.ballSelection || 'american';
+  const labels = ballSetGroupLabels(style);
+  const suggestedLabel = suggested === 'p1yellow/bigs' ? labels.high : labels.low;
+  const playerEl = document.getElementById('ballElectionPlayer');
+  const groupEl = document.getElementById('ballElectionGroup');
+  const inlineImg = document.getElementById('ballElectionInlineImg');
+  if (playerEl) playerEl.textContent = pending.playerName || 'Player';
+  if (groupEl) groupEl.textContent = pending.suggestedLabel || suggestedLabel;
+  if (inlineImg) {
+    inlineImg.src = `${BALL_IMG}/${ballElectionImage(style, suggested === 'p1yellow/bigs' ? 'high' : 'low')}`;
+    inlineImg.alt = suggestedLabel;
+  }
+  const lowImg = document.getElementById('ballElectionLowImg');
+  const highImg = document.getElementById('ballElectionHighImg');
+  const lowLabel = document.getElementById('ballElectionLowLabel');
+  const highLabel = document.getElementById('ballElectionHighLabel');
+  if (lowImg) {
+    lowImg.src = `${BALL_IMG}/${ballElectionImage(style, 'low')}`;
+    lowImg.alt = labels.low;
+  }
+  if (highImg) {
+    highImg.src = `${BALL_IMG}/${ballElectionImage(style, 'high')}`;
+    highImg.alt = labels.high;
+  }
+  if (lowLabel) lowLabel.textContent = labels.low;
+  if (highLabel) highLabel.textContent = labels.high;
+  modal.classList.remove('hidden');
+}
+
+function chooseBallElection(choice) {
+  if (isAuthority && isImpromptuTable()) {
+    runAuthorityCommand('resolve_ball_election', { choice });
+    return;
+  }
+  sendCmd('resolve_ball_election', { choice });
+}
+
+function wireBallElectionModal() {
+  document.getElementById('ballElectionOpen')?.addEventListener('click', () => chooseBallElection('p1Open'));
+  document.getElementById('ballElectionLow')?.addEventListener('click', () => chooseBallElection('p1red/smalls'));
+  document.getElementById('ballElectionHigh')?.addEventListener('click', () => chooseBallElection('p1yellow/bigs'));
 }
 
 function isEightBallBallSetGame(state) {
@@ -3341,9 +3407,10 @@ async function connectGuestSession({ quiet, isCurrent, takeover = false }) {
   isViewOnly = false;
   applyViewOnlyUI();
   applyGuestUI();
-  if (client) {
-    try { client.disconnect(); } catch (_) { /* ignore */ }
-  }
+  const carriedQueue = (quiet && client && Array.isArray(client.commandQueue))
+    ? client.commandQueue.slice()
+    : [];
+  const previous = client;
   const clientSessionId = getOrCreateClientSessionId(`guest:${guestToken}`);
   client = new CloudClient({
     serverUrl: window.location.origin,
@@ -3352,8 +3419,20 @@ async function connectGuestSession({ quiet, isCurrent, takeover = false }) {
     clientSessionId,
     takeover: !!takeover,
   });
+  if (quiet) {
+    client.commandQueue = carriedQueue;
+    client._beginReconnectGrace();
+  }
+  client.onStale = () => {
+    if (!wantConnection || reconnectInFlight) return;
+    ensureConnection({ force: true });
+  };
   client.on('state', applyState);
+  if (previous) {
+    try { previous.disconnect({ keepQueue: true }); } catch (_) { /* ignore */ }
+  }
   wireClientLifecycle(client);
+  if (quiet) client._emitConnection();
   client.on('error', (e) => {
     if (!isCurrent()) return;
     if (shouldLeaveTableForHome(e)) {
@@ -3465,18 +3544,30 @@ async function connectAuthenticatedSession({ quiet, isCurrent }) {
     } catch (_) { /* keep stored token */ }
   }
 
-  if (client) {
-    try { client.disconnect(); } catch (_) { /* ignore */ }
-  }
-
+  const carriedQueue = (quiet && client && Array.isArray(client.commandQueue))
+    ? client.commandQueue.slice()
+    : [];
+  const previous = client;
   client = new CloudClient({
     serverUrl: window.location.origin,
     roomId,
     client: 'mobile',
     accessToken: token,
   });
+  if (quiet) {
+    client.commandQueue = carriedQueue;
+    client._beginReconnectGrace();
+  }
+  client.onStale = () => {
+    if (!wantConnection || reconnectInFlight) return;
+    ensureConnection({ force: true });
+  };
   client.on('state', applyState);
+  if (previous) {
+    try { previous.disconnect({ keepQueue: true }); } catch (_) { /* ignore */ }
+  }
   wireClientLifecycle(client);
+  if (quiet) client._emitConnection();
   client.on('error', (e) => {
     if (!isCurrent()) return;
     if (shouldLeaveTableForHome(e)) {
@@ -3686,7 +3777,8 @@ document.addEventListener('visibilitychange', () => {
   const awayMs = connectionHiddenAt ? Date.now() - connectionHiddenAt : 0;
   connectionHiddenAt = 0;
   // Event-driven only: force a fresh join after a long background (zombie sockets).
-  ensureConnection({ force: awayMs >= 15000 || !connectionIsOpen() });
+  const stale = !!(client && typeof client.isStale === 'function' && client.isStale());
+  ensureConnection({ force: awayMs >= 15000 || !connectionIsOpen() || stale });
 });
 
 window.addEventListener('pageshow', (ev) => {
@@ -3708,6 +3800,7 @@ wirePlayerAutocomplete();
 wireMatchConfirmModal();
 wireSnookerFoulModal();
 wirePoolRespotModal();
+wireBallElectionModal();
 wireMobileNav();
 installAppViewportHeightSync();
 

@@ -216,9 +216,9 @@ for more information about Salotto please visit https://salotto.app
                     <span class="rack-breaker-question" id="playerSlotQuestion">Active Player</span>
                     <div class="rack-breaker-buttons">
                         <button type="button" id="rackBreakerP1Btn" class="rack-breaker-btn hover obs28 button"
-                            onclick="onPlayerSlotButton('1')">Player 1</button>
+                            onclick="onPlayerSlotButton('1')"><span class="slot-name">Player 1</span><img class="slot-ball noShow" id="rackBreakerP1Ball" alt=""></button>
                         <button type="button" id="rackBreakerP2Btn" class="rack-breaker-btn hover obs28 button"
-                            onclick="onPlayerSlotButton('2')">Player 2</button>
+                            onclick="onPlayerSlotButton('2')"><span class="slot-name">Player 2</span><img class="slot-ball noShow" id="rackBreakerP2Ball" alt=""></button>
                     </div>
                 </div>
                 <input type="checkbox" id="playerToggleCheckbox" class="noShow" aria-hidden="true"
@@ -690,6 +690,11 @@ for more information about Salotto please visit https://salotto.app
                         onchange="saveOpacity()" />
                     <span id="sliderValue">100%</span>
                 </div>
+                <div class="panel-row">
+                    <label for="resetOverlayPositionBtn">Overlay Position</label>
+                    <button type="button" class="hover obs28 button" id="resetOverlayPositionBtn" onclick="openResetOverlayPositionModal()">Reset Overlay Position</button>
+                    <span></span>
+                </div>
             </div>
             <div class="section-header" id="feaureSettingLabel">
                 Feature Settings
@@ -782,9 +787,9 @@ for more information about Salotto please visit https://salotto.app
                 </div>
             </div>
 
-            <!-- Enable Replay Function Section -->
+            <!-- OBS Remote Control (WebSocket): replay, promotion, and other OBS actions -->
             <div class="section-header-with-controls">
-                <span id="replaySettingsLabel">Enable Replay Function</span>
+                <span id="replaySettingsLabel">OBS Remote Control</span>
                 <div class="section-controls">
                     <button class="settings-cog-btn" id="websocketSettingsCog" onclick="openWebSocketSettingsModal()" title="WebSocket Settings">
                         &#x2699;
@@ -843,12 +848,12 @@ for more information about Salotto please visit https://salotto.app
             <div id="websocketSettingsModal" class="modal">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h2>Enable Replay Function</h2>
+                        <h2>OBS Remote Control</h2>
                         <span class="modal-close" onclick="closeWebSocketSettingsModal()">&times;</span>
                     </div>
                     <div class="modal-body">
                         <p class="stats-hint" style="margin: 0 0 0.75rem;">
-                            Enabling replay control allows you to capture streaming clips for replay.
+                            This connection is required for replay, stream promotion, and other OBS controls, not only the replay buffer.
                             Clip length is based on your OBS Replay Buffer settings.
                             <strong>NOTE:</strong> Captured clips need to be cleaned up manually; clip replay buttons are merely references to actual files.
                         </p>
@@ -898,7 +903,7 @@ for more information about Salotto please visit https://salotto.app
                             through <strong>CueSport Scoreboard Cloud</strong>. Enable Cloud with an OBS Dock Key and wait until Status shows connected.
                         </p>
                         <p class="stats-hint" style="margin: 0 0 0.75rem;">
-                            Also turn on <strong>Enable Replay Function</strong> (OBS WebSocket) so the dock can verify that OBS is streaming, then enable Promote once you are live.
+                            Also turn on <strong>OBS Remote Control</strong> (OBS WebSocket) so the dock can verify that OBS is streaming, then enable Promote once you are live.
                         </p>
                         <p class="stats-hint" style="margin: 0 0 0.75rem;">
                             Cloud tries to read your public stream URL from OBS (Twitch channel, etc.).
@@ -1354,6 +1359,32 @@ for more information about Salotto please visit https://salotto.app
             <div class="modal-footer">
                 <div class="modal-footer-buttons">
                     <button type="button" class="modal-cancel-btn hover obs28 button" onclick="cancelSnookerFoul()">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 8-ball / Custom: confirm group election instead of assigning silently -->
+    <div id="ballElectionModal" class="modal" style="display:none" aria-hidden="true" role="dialog" aria-labelledby="ballElectionTitle">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="ballElectionTitle">Choose Balls</h2>
+            </div>
+            <div class="modal-body">
+                <p id="ballElectionPrompt" class="ball-election-prompt">
+                    Is <strong id="ballElectionPlayer">Player</strong> electing
+                    <img id="ballElectionInlineImg" class="ball-election-inline" alt="" src="">
+                    <strong id="ballElectionGroup">Solids</strong>,
+                    or is the table still open?
+                </p>
+                <div class="ball-election-choices">
+                    <button type="button" class="hover obs28 button" onclick="resolveBallElection('p1Open')">Open</button>
+                    <button type="button" class="hover obs28 button ball-election-group" onclick="resolveBallElection('p1red/smalls')">
+                        <img id="ballElectionLowImg" alt=""><span id="ballElectionLowLabel">Solids</span>
+                    </button>
+                    <button type="button" class="hover obs28 button ball-election-group" onclick="resolveBallElection('p1yellow/bigs')">
+                        <img id="ballElectionHighImg" alt=""><span id="ballElectionHighLabel">Stripes</span>
+                    </button>
                 </div>
             </div>
         </div>

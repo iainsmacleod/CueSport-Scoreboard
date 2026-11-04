@@ -250,6 +250,11 @@
                 }
                 return Promise.resolve().then(publishAfterScoring);
             }
+            case 'resolve_ball_election': {
+                const choice = payload && payload.choice ? String(payload.choice) : 'p1Open';
+                if (typeof resolveBallElection === 'function') resolveBallElection(choice);
+                return Promise.resolve().then(publishAfterScoring);
+            }
             case 'toggle_pot':
             case 'snooker_ball': {
                 const ballId = payload && payload.ballId;

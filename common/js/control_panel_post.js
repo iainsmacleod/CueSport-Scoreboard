@@ -154,7 +154,12 @@ window.onload = function () {
 		document.getElementById("playerToggleCheckbox").checked = activePlayer === "1";
 		setStorageItem("toggleState", activePlayer === "1");
 		console.log(`activePlayer: ${activePlayer}`);
-		bc.postMessage({ clockDisplay: 'showActivePlayer', player: activePlayer });
+		const breakerSlot = getStorageItem("rackBreakerSlot") || "";
+		if (breakerSlot === "1" || breakerSlot === "2") {
+			bc.postMessage({ clockDisplay: 'showActivePlayer', player: activePlayer === "1", rackBreakerSlot: breakerSlot });
+		} else {
+			bc.postMessage({ clockDisplay: 'hideActivePlayer', rackBreakerSlot: "" });
+		}
 	}
 
 	if (getStorageItem("scoreDisplay") === "yes") {

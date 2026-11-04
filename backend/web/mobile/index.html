@@ -233,7 +233,7 @@
       <div id="viewReplay" class="mobile-view hidden">
         <div class="panel" id="replayPanel">
           <h2>Stream</h2>
-          <p id="replayObsHint" class="hint hidden">Connect OBS WebSocket on the dock Settings tab to control streaming, monitoring, and clips.</p>
+          <p id="replayObsHint" class="hint hidden">Connect OBS Remote Control on the dock Settings tab to control streaming, monitoring, and clips.</p>
           <div class="stream-section" id="streamOutputSection">
             <h3 class="share-links-heading">Live Stream</h3>
             <p class="hint">Start or stop streaming on your remotely connected OBS instance.</p>
@@ -419,6 +419,30 @@
       </div>
       <p id="snookerFoulHint" class="snooker-foul-hint" aria-live="polite"></p>
       <div id="snookerFoulTargets" class="snooker-foul-targets"></div>
+    </div>
+  </div>
+
+  <div id="ballElectionModal" class="mobile-modal hidden" role="dialog" aria-modal="true" aria-labelledby="ballElectionTitle">
+    <div class="mobile-modal-backdrop" id="ballElectionBackdrop"></div>
+    <div class="mobile-modal-sheet snooker-foul-sheet">
+      <div class="mobile-modal-head">
+        <h2 id="ballElectionTitle">Choose Balls</h2>
+      </div>
+      <p id="ballElectionPrompt" class="ball-election-prompt">
+        Is <strong id="ballElectionPlayer">Player</strong> electing
+        <img id="ballElectionInlineImg" class="ball-election-inline" alt="" src="">
+        <strong id="ballElectionGroup">Solids</strong>,
+        or is the table still open?
+      </p>
+      <div class="ball-election-choices">
+        <button type="button" class="btn" id="ballElectionOpen">Open</button>
+        <button type="button" class="btn ball-election-group" id="ballElectionLow">
+          <img id="ballElectionLowImg" alt=""><span id="ballElectionLowLabel">Solids</span>
+        </button>
+        <button type="button" class="btn ball-election-group" id="ballElectionHigh">
+          <img id="ballElectionHighImg" alt=""><span id="ballElectionHighLabel">Stripes</span>
+        </button>
+      </div>
     </div>
   </div>
 

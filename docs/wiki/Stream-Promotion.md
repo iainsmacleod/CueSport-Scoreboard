@@ -11,7 +11,7 @@ Optionally list your stream on the homepage **Shared Streams** tab (hosted: [cue
 
 ## Setup
 
-1. Connect WebSocket under **Settings → Enable Replay Function**.
+1. Connect WebSocket under **Settings → OBS Remote Control**.
 2. Connect Cloud under **Settings → CueSport Scoreboard Cloud**.
 3. Open **Promote Live Stream** ⚙ and optionally set a manual **Stream URL** (`https://…`) as failover if OBS cannot provide a Twitch/YouTube (etc.) link.
 4. Start streaming in OBS.

@@ -308,7 +308,9 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 #obsTheme {
-	width: 89px;
+	width: 100%;
+	max-width: 280px;
+	min-width: 140px;
 }
 
 #logoSlideShowDiv {
@@ -1170,6 +1172,55 @@ a.cp-text-link:hover {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+}
+
+.rack-breaker-btn .slot-name {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	min-width: 0;
+}
+
+.rack-breaker-btn .slot-ball {
+	width: 1.15rem;
+	height: 1.15rem;
+	object-fit: contain;
+	flex: 0 0 auto;
+}
+
+.ball-election-prompt {
+	margin: 0 0 12px;
+	line-height: 1.45;
+}
+
+.ball-election-inline {
+	width: 28px;
+	height: 28px;
+	object-fit: contain;
+	vertical-align: middle;
+	margin: 0 4px;
+}
+
+.ball-election-choices {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.ball-election-group {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.ball-election-group img {
+	width: 28px;
+	height: 28px;
+	object-fit: contain;
 }
 
 .rack-breaker-btn:disabled,

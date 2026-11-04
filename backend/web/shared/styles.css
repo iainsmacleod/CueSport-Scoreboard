@@ -1037,6 +1037,37 @@ ul { padding-left: 1.2rem; }
   /* Avoid intrinsic PNG size growing the button before/while loading. */
   line-height: 0;
 }
+.ball-election-prompt {
+  margin: 0.4rem 0 0.75rem;
+  line-height: 1.45;
+}
+.ball-election-inline {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  vertical-align: middle;
+  margin: 0 4px;
+}
+.ball-election-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.ball-election-choices .btn {
+  flex: 1 1 30%;
+  margin: 0;
+}
+.ball-election-group {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+}
+.ball-election-group img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
 #playerSlotP1Btn.rack-breaker-last-winner .slot-name,
 #playerSlotP2Btn.rack-breaker-last-winner .slot-name,
 #playerSlotP1Btn.rack-breaker-last-winner,

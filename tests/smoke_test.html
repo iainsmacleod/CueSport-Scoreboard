@@ -639,6 +639,63 @@
                     themeSelect.value = savedTheme;
                     cp.obsThemeChange();
                 }
+                const settingsPane = cp.document.getElementById('GeneralSettings');
+                const settingsDisplay = settingsPane ? settingsPane.style.display : '';
+                if (settingsPane) settingsPane.style.display = 'block';
+                const themeWidth = themeSelect ? parseFloat(cp.getComputedStyle(themeSelect).width) : 0;
+                if (settingsPane) settingsPane.style.display = settingsDisplay;
+                assert('Cloud UI', 'OBS Theme dropdown is wider than 89px', themeWidth > 89, String(themeWidth));
+                assert('Cloud UI', 'Replay control is labeled OBS Remote Control',
+                    (cp.document.getElementById('replaySettingsLabel')?.textContent || '') === 'OBS Remote Control');
+            }
+            {
+                const copyFiles = await Promise.all([
+                    fetchRepoText('../backend/web/mobile/index.html'),
+                    fetchRepoText('../docs/wiki/Instant-Replay.md'),
+                    fetchRepoText('../backend/src/ws/room-hub.js'),
+                    fetchRepoText('../backend/web/shared/cloud-client.js')
+                ]);
+                assert('Cloud UI', 'Mobile hint no longer says Enable Replay Function',
+                    copyFiles[0].indexOf('Enable Replay Function') === -1 &&
+                    copyFiles[0].indexOf('OBS Remote Control') !== -1);
+                assert('Cloud UI', 'Instant Replay docs no longer say Enable Replay Function',
+                    copyFiles[1].indexOf('Enable Replay Function') === -1 &&
+                    copyFiles[1].indexOf('OBS Remote Control') !== -1);
+                assert('Cloud UI', 'Room hub accepts ping',
+                    /case 'ping':/.test(copyFiles[2]) && copyFiles[2].indexOf("type: 'pong'") !== -1);
+                assert('Cloud UI', 'Cloud client queues a command on a stale socket',
+                    copyFiles[3].indexOf('staleMs') !== -1 &&
+                    copyFiles[3].indexOf('_requestStaleReconnect') !== -1 &&
+                    copyFiles[3].indexOf('_enqueueCommand') !== -1);
+            }
+            {
+                const zOf = (id) => {
+                    const el = bs.document.getElementById(id);
+                    return el ? (parseInt(bs.getComputedStyle(el).zIndex, 10) || 0) : 0;
+                };
+                const video = bs.document.getElementById('videoContainer');
+                assert('Overlay', 'Video layer ignores pointer events',
+                    video && bs.getComputedStyle(video).pointerEvents === 'none' &&
+                    !video.classList.contains('ui-draggable'));
+                assert('Overlay', 'Overlay layers stack from video up to stats',
+                    zOf('videoContainer') < zOf('scoreBoardDiv') &&
+                    zOf('scoreBoardDiv') < zOf('ballTracker') &&
+                    zOf('ballTracker') < zOf('gameInfo') &&
+                    zOf('gameInfo') < zOf('logoSlideshowDiv') &&
+                    zOf('logoSlideshowDiv') < zOf('overlayStatsPanel'),
+                    [zOf('videoContainer'), zOf('scoreBoardDiv'), zOf('ballTracker'), zOf('gameInfo'), zOf('logoSlideshowDiv'), zOf('overlayStatsPanel')].join(','));
+                bs.setStorageItem('elementPosition_scoreBoardDiv', JSON.stringify({ left: 12, top: 18 }));
+                bs.setStorageItem('elementPosition_overlayStatsPanel_p1', JSON.stringify({ anchor: 'bottom-center', anchorX: 10, anchorY: 10 }));
+                const scoreEl = bs.document.getElementById('scoreBoardDiv');
+                scoreEl.style.left = '12px';
+                scoreEl.style.top = '18px';
+                cp.openResetOverlayPositionModal();
+                cp.confirmResetScores();
+                await sleep(40);
+                assert('Overlay', 'Reset overlay position clears saved scoreboard position',
+                    !bs.getStorageItem('elementPosition_scoreBoardDiv') &&
+                    !bs.getStorageItem('elementPosition_overlayStatsPanel_p1') &&
+                    scoreEl.style.left === '' && scoreEl.style.top === '');
             }
             try {
                 const sourceFiles = await Promise.all([
@@ -3588,8 +3645,15 @@
                 (cp.document.getElementById('playerSlotQuestion').textContent || '').indexOf('Breaking Player') !== -1 &&
                 !cp.getStorageItem('rackBreakerSlot') &&
                 cp.document.getElementById('ballTrackerDiv').classList.contains('ball-tracker-awaiting-breaker'));
+            await sleep(40);
+            assert('RackWin', 'Active player bar hidden until a breaker is chosen',
+                bs.document.getElementById('player1Image').classList.contains('fadeOutElm') &&
+                bs.document.getElementById('player2Image').classList.contains('fadeOutElm'));
             cp.selectRackBreaker('1');
-            await sleep(30);
+            await sleep(40);
+            assert('RackWin', 'Breaker pick shows only player 1 identifier',
+                bs.document.getElementById('player1Image').classList.contains('fadeInElm') &&
+                bs.document.getElementById('player2Image').classList.contains('fadeOutElm'));
 
             cp.setStorageItem('useBallSet', 'yes');
             cp.document.getElementById('ballSetCheckbox').checked = true;
@@ -3618,15 +3682,21 @@
             cp.togglePot(cp.document.getElementById('ball 3'));
             await sleep(30);
             assert('RackWin', 'First object ball keeps Open Table (8-Ball)',
-                cp.getStorageItem('playerBallSet') === 'p1Open');
+                cp.getStorageItem('playerBallSet') === 'p1Open' && !cp.readPendingBallElection());
             cp.togglePot(cp.document.getElementById('ball 10'));
             await sleep(30);
-            assert('RackWin', 'Second pot international assigns red group (ball 10)',
-                cp.getStorageItem('playerBallSet') === 'p1red/smalls');
+            const intlPending = cp.readPendingBallElection();
+            assert('RackWin', 'Second pot asks before assigning reds (ball 10)',
+                cp.getStorageItem('playerBallSet') === 'p1Open' &&
+                intlPending && intlPending.suggestedSet === 'p1red/smalls' &&
+                cp.document.getElementById('ballElectionModal').style.display === 'block' &&
+                !!cp.document.getElementById('ballElectionLowImg').getAttribute('src'));
+            cp.resetBallSet();
             cp.resetBallTracker();
             cp.selectRackBreaker('1');
             await sleep(30);
             cp.setStorageItem('playerBallSet', 'p1Open');
+            cp.setStorageItem('ballSetElectionArmed', 'no');
             cp.document.getElementById('p1colorOpen').checked = true;
             cp.document.getElementById('ballSelection').value = 'american';
             cp.toggleBallSelection();
@@ -3634,11 +3704,36 @@
             cp.togglePot(cp.document.getElementById('ball 10'));
             await sleep(30);
             assert('RackWin', 'American first stripe keeps Open Table',
-                cp.getStorageItem('playerBallSet') === 'p1Open');
+                cp.getStorageItem('playerBallSet') === 'p1Open' && !cp.readPendingBallElection());
             cp.togglePot(cp.document.getElementById('ball 3'));
             await sleep(30);
-            assert('RackWin', 'American second pot assigns solids (ball 3)',
-                cp.getStorageItem('playerBallSet') === 'p1red/smalls');
+            const usPending = cp.readPendingBallElection();
+            assert('RackWin', 'American second pot asks before assigning solids',
+                cp.getStorageItem('playerBallSet') === 'p1Open' &&
+                usPending && usPending.suggestedSet === 'p1red/smalls');
+            cp.resolveBallElection('p1Open');
+            await sleep(20);
+            assert('RackWin', 'Open leaves the table open',
+                cp.getStorageItem('playerBallSet') === 'p1Open' && !cp.readPendingBallElection());
+            cp.togglePot(cp.document.getElementById('ball 1'));
+            await sleep(30);
+            assert('RackWin', 'Next pot after Open asks again',
+                cp.getStorageItem('playerBallSet') === 'p1Open' &&
+                cp.readPendingBallElection() &&
+                cp.readPendingBallElection().suggestedSet === 'p1red/smalls');
+            cp.resolveBallElection('p1red/smalls');
+            await sleep(20);
+            const p1Badge = cp.document.getElementById('rackBreakerP1Ball');
+            assert('RackWin', 'Choosing solids sets the group and shows the dock badge',
+                cp.getStorageItem('playerBallSet') === 'p1red/smalls' &&
+                !cp.readPendingBallElection() &&
+                p1Badge && !p1Badge.classList.contains('noShow') &&
+                (p1Badge.getAttribute('src') || '').indexOf('1ball') !== -1);
+            cp.togglePot(cp.document.getElementById('ball 2'));
+            await sleep(20);
+            assert('RackWin', 'Later pot does not ask again after a group is set',
+                !cp.readPendingBallElection() && cp.getStorageItem('playerBallSet') === 'p1red/smalls');
+            cp.resetBallSet();
 
             // Dry break: breaker never pots → other player's first object pot nominates.
             cp.setStorageItem('playerBallSet', 'p1Open');
@@ -3659,9 +3754,12 @@
                 String(cp.getStorageItem('activePlayer')));
             cp.togglePot(cp.document.getElementById('ball 10'));
             await sleep(30);
-            assert('RackWin', 'Dry break → P2 first pot nominates (P1 gets solids)',
-                cp.getStorageItem('playerBallSet') === 'p1red/smalls',
+            const dryPending = cp.readPendingBallElection();
+            assert('RackWin', 'Dry break → P2 first pot asks (P1 solids suggested)',
+                cp.getStorageItem('playerBallSet') === 'p1Open' &&
+                dryPending && dryPending.suggestedSet === 'p1red/smalls',
                 cp.getStorageItem('playerBallSet'));
+            cp.resetBallSet();
 
             cp.setStorageItem('playerBallSet', 'p1Open');
             cp.document.getElementById('p1colorOpen').checked = true;
@@ -3683,6 +3781,11 @@
             assert('RackWin', 'Out-of-sequence 8 is a loss for Active Player',
                 parseInt(cp.getStorageItem('p1ScoreCtrlPanel'), 10) === 0 &&
                 parseInt(cp.getStorageItem('p2ScoreCtrlPanel'), 10) === 1);
+            await sleep(40);
+            assert('RackWin', 'Active player bar hides again when Breaking Player returns',
+                (cp.document.getElementById('playerSlotQuestion').textContent || '').indexOf('Breaking Player') !== -1 &&
+                bs.document.getElementById('player1Image').classList.contains('fadeOutElm') &&
+                bs.document.getElementById('player2Image').classList.contains('fadeOutElm'));
             await cp.PlayerStats.flushRackRecordQueue();
             const lossPending = cp.PlayerStats.getActivePendingMatch && cp.PlayerStats.getActivePendingMatch();
             const lossRack = lossPending && lossPending.racks && lossPending.racks[lossPending.racks.length - 1];

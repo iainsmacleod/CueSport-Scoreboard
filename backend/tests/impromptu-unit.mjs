@@ -894,9 +894,30 @@ try {
   });
   ballSet = applyImpromptuCommand(ballSet, 'select_breaker', { slot: '1' })._private;
   ballSet = applyImpromptuCommand(ballSet, 'toggle_pot', { ballId: 'ball 3' })._private;
-  assert('first break pot keeps Open', ballSet.playerBallSet === 'p1Open');
+  assert('first break pot keeps Open', ballSet.playerBallSet === 'p1Open' && !ballSet.pendingBallElection);
   ballSet = applyImpromptuCommand(ballSet, 'toggle_pot', { ballId: 'ball 5' })._private;
-  assert('second break pot assigns solids', ballSet.playerBallSet === 'p1red/smalls');
+  assert(
+    'second break pot asks instead of assigning',
+    ballSet.playerBallSet === 'p1Open'
+      && ballSet.pendingBallElection
+      && ballSet.pendingBallElection.suggestedSet === 'p1red/smalls',
+  );
+  ballSet = applyImpromptuCommand(ballSet, 'resolve_ball_election', { choice: 'p1red/smalls' })._private;
+  assert('confirming solids sets the group', ballSet.playerBallSet === 'p1red/smalls' && !ballSet.pendingBallElection);
+
+  let askAgain = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game1', useBallSet: true, playerBallSet: 'p1Open',
+  });
+  askAgain = applyImpromptuCommand(askAgain, 'select_breaker', { slot: '1' })._private;
+  askAgain = applyImpromptuCommand(askAgain, 'toggle_pot', { ballId: 'ball 9' })._private;
+  askAgain = applyImpromptuCommand(askAgain, 'toggle_pot', { ballId: 'ball 10' })._private;
+  askAgain = applyImpromptuCommand(askAgain, 'resolve_ball_election', { choice: 'p1Open' })._private;
+  assert('Open declines the ball and stays open', askAgain.playerBallSet === 'p1Open' && !askAgain.pendingBallElection);
+  askAgain = applyImpromptuCommand(askAgain, 'toggle_pot', { ballId: 'ball 11' })._private;
+  assert(
+    'next pot after Open asks again',
+    askAgain.playerBallSet === 'p1Open' && askAgain.pendingBallElection?.suggestedSet === 'p1yellow/bigs',
+  );
 
   // Legal 8 after clearing assigned group.
   for (const n of [1, 2, 4, 6, 7]) {
@@ -924,8 +945,10 @@ try {
   autoAssign = applyImpromptuCommand(autoAssign, 'toggle_pot', { ballId: 'ball 2' })._private;
   const autoPub = applyImpromptuCommand(autoAssign, 'toggle_pot', { ballId: 'ball 4' });
   assert(
-    'default Ball Set auto-assigns group without override',
-    autoPub.state.useBallSet === true && autoPub.state.playerBallSet === 'p1red/smalls',
+    'default Ball Set asks for the group without override',
+    autoPub.state.useBallSet === true
+      && autoPub.state.playerBallSet === 'p1Open'
+      && autoPub.state.pendingBallElection?.suggestedSet === 'p1red/smalls',
     `use=${autoPub.state.useBallSet} set=${autoPub.state.playerBallSet}`,
   );
   const setToggle = applyImpromptuCommand(autoPub._private, 'set_use_ball_set', { enabled: false });

@@ -629,9 +629,10 @@ function playWebmAnimation(gameType, containerSelector = '#videoContainer') {
         return;
     }
     
-	// Optionally, give the container a high z-index and proper positioning
-    container.style.position = 'absolute';  // or fixed/absolute, depending on your layout
-    container.style.zIndex = '4';         // Ensure the container is over other content
+	// Paint the celebration above the scoreboard. Pointer events stay off so the empty frame cannot be dragged.
+    container.style.position = 'fixed';
+    container.style.zIndex = '15';
+    container.style.pointerEvents = 'none';
 
     // Create and configure the video element.
     const video = document.createElement('video');
@@ -648,7 +649,10 @@ function playWebmAnimation(gameType, containerSelector = '#videoContainer') {
     
     // Remove the video element once the animation has finished playing.
     video.addEventListener('ended', () => {
-        container.removeChild(video);
+        if (video.parentNode === container) container.removeChild(video);
+        container.style.zIndex = '1';
+        container.style.position = 'fixed';
+        container.style.pointerEvents = 'none';
     });
     
     // // (Optional) Allow early removal on click.

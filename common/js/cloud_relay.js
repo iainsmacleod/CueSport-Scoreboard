@@ -621,7 +621,7 @@
                 state.playerSlotMode = 'off';
             }
             state.obsConnected = dockStorage('isConnected', 'false') === 'true';
-            // Stream tab / OBS socket available (Enable Replay Function or live socket).
+            // Stream tab / OBS socket available (OBS Remote Control or live socket).
             state.replayEnabled = dockStorage('websocketEnabled', 'false') === 'true' || state.obsConnected;
             // Prefer storage; also trust control_panel Monitor / Instant Replay button labels.
             const monitorBtn = document.getElementById('btnMonitorGame');
@@ -632,7 +632,7 @@
                 (instantBtn && !instantBtn.classList.contains('noShow'))
             );
             state.monitoringActive = monitoringFromStorage || monitoringFromUi;
-            // Mobile Stream tab: monitoring/clips stay hidden until Enable Replay Function
+            // Mobile Stream tab: monitoring/clips stay hidden until OBS Remote Control
             // (or monitoring is already running on the dock). Explicit Disable wins over
             // stale UI heuristics so the unlock section returns after Disable.
             const replayControlsStored = dockStorage('replayControlsEnabled', '');
@@ -703,6 +703,13 @@
             state.pointBased = dockStorage('pointBased', 'no');
             state.useBallSet = dockStorage('useBallSet', 'no') === 'yes';
             state.playerBallSet = dockStorage('playerBallSet', 'p1Open') || 'p1Open';
+            try {
+                const pendingRaw = dockStorage('pendingBallElection', '') || '';
+                const pending = pendingRaw ? JSON.parse(pendingRaw) : null;
+                state.pendingBallElection = pending && pending.suggestedSet ? pending : null;
+            } catch (_) {
+                state.pendingBallElection = null;
+            }
             const gt = state.gameType || dockStorage('gameType', 'game1') || 'game1';
             if (gt === 'game1') {
                 state.earlyGameBallEnabled = dockStorage('winOnBreakEnabled', 'no') === 'yes';

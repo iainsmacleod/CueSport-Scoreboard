@@ -1194,7 +1194,12 @@ async function run() {
       let set8 = start('game1', { playerBallSet: 'p1Open' });
       set8 = applyImpromptuCommand(set8, 'toggle_pot', { ballId: 'ball 3' })._private;
       set8 = applyImpromptuCommand(set8, 'toggle_pot', { ballId: 'ball 5' })._private;
-      assert('smoke ball-set assigns on 2nd pot', set8.playerBallSet === 'p1red/smalls');
+      assert(
+        'smoke ball-set asks on 2nd pot',
+        set8.playerBallSet === 'p1Open' && set8.pendingBallElection?.suggestedSet === 'p1red/smalls',
+      );
+      set8 = applyImpromptuCommand(set8, 'resolve_ball_election', { choice: 'p1red/smalls' })._private;
+      assert('smoke ball-set confirm sets solids', set8.playerBallSet === 'p1red/smalls');
       assert('smoke ball-set published for badges', set8.useBallSet === true);
       for (const n of [1, 2, 4, 6, 7]) {
         set8 = applyImpromptuCommand(set8, 'toggle_pot', { ballId: `ball ${n}` })._private;
@@ -1401,6 +1406,10 @@ async function run() {
         const boot = await wsJoin({ client: 'dock', apiKey, instanceId: smokeInstance });
         roomId = boot.data.room_id;
         assert('Dock join creates room', !!roomId);
+        const pongP = waitForWsMessage(boot.ws, (m) => m.type === 'pong', 3000);
+        boot.ws.send(JSON.stringify({ type: 'ping' }));
+        const pong = await pongP;
+        assert('Hub answers ping with pong', pong && pong.type === 'pong');
         boot.ws.close();
         await sleep(150);
       } catch (e) {
