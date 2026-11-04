@@ -935,6 +935,47 @@ try {
   p2Solids = applyImpromptuCommand(p2Solids, 'resolve_ball_election', { choice: 'p1red/smalls' })._private;
   assert('Solids button gives P2 solids', p2Solids.playerBallSet === 'p1yellow/bigs');
 
+  let undoElection = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game1', useBallSet: true, playerBallSet: 'p1Open',
+  });
+  undoElection = applyImpromptuCommand(undoElection, 'select_breaker', { slot: '1' })._private;
+  undoElection = applyImpromptuCommand(undoElection, 'toggle_pot', { ballId: 'ball 1' })._private;
+  undoElection = applyImpromptuCommand(undoElection, 'toggle_pot', { ballId: 'ball 2' })._private;
+  assert('nominating pot opens an election', !!undoElection.pendingBallElection);
+  const undoneElection = applyImpromptuCommand(undoElection, 'undo', {});
+  assert(
+    'undo of the nominating pot clears the election',
+    !undoneElection.state.pendingBallElection && undoneElection.state.playerBallSet === 'p1Open',
+  );
+
+  let legacyUndo = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game1', useBallSet: true, playerBallSet: 'p1Open',
+  });
+  legacyUndo = applyImpromptuCommand(legacyUndo, 'select_breaker', { slot: '1' })._private;
+  legacyUndo = applyImpromptuCommand(legacyUndo, 'toggle_pot', { ballId: 'ball 1' })._private;
+  legacyUndo = applyImpromptuCommand(legacyUndo, 'toggle_pot', { ballId: 'ball 2' })._private;
+  const legacyEntry = legacyUndo._scoringUndoStack[legacyUndo._scoringUndoStack.length - 1];
+  delete legacyEntry.before.pendingBallElection;
+  delete legacyEntry.before._ballSetElectionArmed;
+  const undoneLegacy = applyImpromptuCommand(legacyUndo, 'undo', {});
+  assert(
+    'undo snapshot without an election field still clears the prompt',
+    !undoneLegacy.state.pendingBallElection,
+  );
+
+  const restarted = applyImpromptuCommand(p2Solids, 'reset_scores', {});
+  assert(
+    'restart match clears the elected group and any open prompt',
+    restarted.state.playerBallSet === 'p1Open' && !restarted.state.pendingBallElection,
+    `set=${restarted.state.playerBallSet} pending=${JSON.stringify(restarted.state.pendingBallElection)}`,
+  );
+  let afterRestart = applyImpromptuCommand(restarted._private, 'select_breaker', { slot: '1' })._private;
+  afterRestart = applyImpromptuCommand(afterRestart, 'toggle_pot', { ballId: 'ball 1' })._private;
+  assert(
+    'first pot after restart stays open',
+    afterRestart.playerBallSet === 'p1Open' && !afterRestart.pendingBallElection,
+  );
+
   // Legal 8 after clearing assigned group.
   for (const n of [1, 2, 4, 6, 7]) {
     ballSet = applyImpromptuCommand(ballSet, 'toggle_pot', { ballId: `ball ${n}` })._private;

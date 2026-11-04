@@ -1451,10 +1451,9 @@ function applyScoringBefore(state, before) {
   state._cooldown = before._cooldown ? { ...before._cooldown } : null;
   state._ballSetOpenLastPotSlot = before._ballSetOpenLastPotSlot || '';
   state._ballSetOpenSamePlayerPots = Number(before._ballSetOpenSamePlayerPots) || 0;
-  if (before._ballSetElectionArmed != null) state._ballSetElectionArmed = before._ballSetElectionArmed === true;
-  if (before.pendingBallElection !== undefined) {
-    state.pendingBallElection = before.pendingBallElection ? { ...before.pendingBallElection } : null;
-  }
+  // A snapshot from before these fields existed must clear the election the undone pot opened.
+  state._ballSetElectionArmed = before._ballSetElectionArmed === true;
+  state.pendingBallElection = before.pendingBallElection ? { ...before.pendingBallElection } : null;
   state._matchRacks = (before._matchRacks || []).map((r) => (r && typeof r === 'object' ? { ...r } : r));
   state._matchStartedAt = before._matchStartedAt || null;
   state._highestRunP1 = Number(before._highestRunP1) || 0;
@@ -2616,6 +2615,11 @@ export function applyImpromptuCommand(stateIn, action, payload = {}) {
       resetSnookerFrame(state);
       clearMatchStats(state);
       state.rackBreakerSlot = '';
+      state.playerBallSet = 'p1Open';
+      state.pendingBallElection = null;
+      state._ballSetElectionArmed = false;
+      state._ballSetOpenLastPotSlot = '';
+      state._ballSetOpenSamePlayerPots = 0;
       state._cloudStarted = false;
       state._matchId = null;
       break;

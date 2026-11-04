@@ -2084,12 +2084,9 @@ function restoreBallSetUndoSnapshot(before) {
     }
     setStorageItem("ballSetOpenLastPotSlot", before.ballSetOpenLastPotSlot || "");
     setStorageItem("ballSetOpenSamePlayerPots", before.ballSetOpenSamePlayerPots || "0");
-    if (before.ballSetElectionArmed != null) {
-        setStorageItem("ballSetElectionArmed", before.ballSetElectionArmed || "no");
-    }
-    if (before.pendingBallElection != null) {
-        setStorageItem("pendingBallElection", before.pendingBallElection || "");
-    }
+    // Missing keys are snapshots from before the election fields existed: clear the prompt.
+    setStorageItem("ballSetElectionArmed", before.ballSetElectionArmed || "no");
+    setStorageItem("pendingBallElection", before.pendingBallElection || "");
     if (typeof syncBallElectionModal === "function") syncBallElectionModal();
     if (typeof syncDockSlotBallBadges === "function") syncDockSlotBallBadges();
 }
