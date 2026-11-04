@@ -16,31 +16,31 @@ for more information about Salotto please visit https://salotto.app
 
 <head>
     <meta charset="UTF-8" />
-    <link rel="stylesheet" href="./common/css/control_panel/dark.css?v=8.6.0" />
-    <link rel="stylesheet" href="./common/css/control_panel/yami.css?v=8.6.0" />
-    <link rel="stylesheet" href="./common/css/control_panel/acri.css?v=8.6.0" />
-    <link rel="stylesheet" href="./common/css/control_panel/grey.css?v=8.6.0" />
-    <link rel="stylesheet" href="./common/css/control_panel/light.css?v=8.6.0" />
-    <link rel="stylesheet" href="./common/css/control_panel/rachni.css?v=8.6.0" />
-    <link rel="stylesheet" href="./common/css/control_panel/required.css?v=8.6.0" />
-    <link id="cloudModernTheme" rel="stylesheet" href="./common/css/control_panel/cloud-modern.css?v=8.6.0" disabled />
+    <link rel="stylesheet" href="./common/css/control_panel/dark.css?v=8.6.5" />
+    <link rel="stylesheet" href="./common/css/control_panel/yami.css?v=8.6.5" />
+    <link rel="stylesheet" href="./common/css/control_panel/acri.css?v=8.6.5" />
+    <link rel="stylesheet" href="./common/css/control_panel/grey.css?v=8.6.5" />
+    <link rel="stylesheet" href="./common/css/control_panel/light.css?v=8.6.5" />
+    <link rel="stylesheet" href="./common/css/control_panel/rachni.css?v=8.6.5" />
+    <link rel="stylesheet" href="./common/css/control_panel/required.css?v=8.6.5" />
+    <link id="cloudModernTheme" rel="stylesheet" href="./common/css/control_panel/cloud-modern.css?v=8.6.5" disabled />
     <script>
         //---------------------------------------------------------------------------------------------
-        var versionNum = "8.6.0";
+        var versionNum = "8.6.5";
         //---------------------------------------------------------------------------------------------
     </script>
-    <script src="./common/js/obs-websocket-js.js?v=8.6.0"></script>
-    <script src="./common/js/jquery.js?v=8.6.0"></script>
-    <script src="./common/js/scoreboard_helpers.js?v=8.6.0"></script>
-    <script src="./common/js/match_racks.js?v=8.6.0"></script>
-    <script src="./common/js/cloud_relay.js?v=8.6.0"></script>
-    <script src="./common/js/stream_sharing.js?v=8.6.0"></script>
-    <script src="./common/js/player_stats.js?v=8.6.0"></script>
-    <script src="./common/js/control_panel.js?v=8.6.0"></script>
-    <script src="./common/js/cloud_commands.js?v=8.6.0"></script>
-    <script src="./common/js/cloud_auth.js?v=8.6.0.1"></script>
-    <script src="./common/js/cloud_remote.js?v=8.6.0"></script>
-    <script src="hotkeys.js?v=8.6.0"></script>
+    <script src="./common/js/obs-websocket-js.js?v=8.6.5"></script>
+    <script src="./common/js/jquery.js?v=8.6.5"></script>
+    <script src="./common/js/scoreboard_helpers.js?v=8.6.5"></script>
+    <script src="./common/js/match_racks.js?v=8.6.5"></script>
+    <script src="./common/js/cloud_relay.js?v=8.6.5"></script>
+    <script src="./common/js/stream_sharing.js?v=8.6.5"></script>
+    <script src="./common/js/player_stats.js?v=8.6.5"></script>
+    <script src="./common/js/control_panel.js?v=8.6.5"></script>
+    <script src="./common/js/cloud_commands.js?v=8.6.5"></script>
+    <script src="./common/js/cloud_auth.js?v=8.6.5"></script>
+    <script src="./common/js/cloud_remote.js?v=8.6.5"></script>
+    <script src="hotkeys.js?v=8.6.5"></script>
 
     <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
 </head>
@@ -787,9 +787,9 @@ for more information about Salotto please visit https://salotto.app
                 </div>
             </div>
 
-            <!-- OBS Remote Control (WebSocket): replay, promotion, and other OBS actions -->
+            <!-- OBS Remote Control and Replay Settings (WebSocket): replay, promotion, and other OBS actions -->
             <div class="section-header-with-controls">
-                <span id="replaySettingsLabel">OBS Remote Control</span>
+                <span id="replaySettingsLabel">OBS Remote Control and Replay Settings</span>
                 <div class="section-controls">
                     <button class="settings-cog-btn" id="websocketSettingsCog" onclick="openWebSocketSettingsModal()" title="WebSocket Settings">
                         &#x2699;
@@ -848,7 +848,7 @@ for more information about Salotto please visit https://salotto.app
             <div id="websocketSettingsModal" class="modal">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h2>OBS Remote Control</h2>
+                        <h2>OBS Remote Control and Replay Settings</h2>
                         <span class="modal-close" onclick="closeWebSocketSettingsModal()">&times;</span>
                     </div>
                     <div class="modal-body">
@@ -903,7 +903,7 @@ for more information about Salotto please visit https://salotto.app
                             through <strong>CueSport Scoreboard Cloud</strong>. Enable Cloud with an OBS Dock Key and wait until Status shows connected.
                         </p>
                         <p class="stats-hint" style="margin: 0 0 0.75rem;">
-                            Also turn on <strong>OBS Remote Control</strong> (OBS WebSocket) so the dock can verify that OBS is streaming, then enable Promote once you are live.
+                            Also turn on <strong>OBS Remote Control and Replay Settings</strong> (OBS WebSocket) so the dock can verify that OBS is streaming, then enable Promote once you are live.
                         </p>
                         <p class="stats-hint" style="margin: 0 0 0.75rem;">
                             Cloud tries to read your public stream URL from OBS (Twitch channel, etc.).
@@ -1373,7 +1373,6 @@ for more information about Salotto please visit https://salotto.app
             <div class="modal-body">
                 <p id="ballElectionPrompt" class="ball-election-prompt">
                     Is <strong id="ballElectionPlayer">Player</strong> electing
-                    <img id="ballElectionInlineImg" class="ball-election-inline" alt="" src="">
                     <strong id="ballElectionGroup">Solids</strong>,
                     or is the table still open?
                 </p>
@@ -1475,7 +1474,7 @@ for more information about Salotto please visit https://salotto.app
         </div>
     </div>
 
-    <script src="./common/js/control_panel_post.js?v=8.6.0"></script>
+    <script src="./common/js/control_panel_post.js?v=8.6.5"></script>
     <script>
         //////////////////// HotKey scripts
 

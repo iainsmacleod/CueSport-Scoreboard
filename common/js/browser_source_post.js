@@ -767,11 +767,7 @@ function getOverlayStatsPositionStorageKey(mode) {
     return 'elementPosition_overlayStatsPanel';
 }
 
-function readOverlayStatsSavedPosition(mode) {
-    if (!mode) {
-        return null;
-    }
-    const raw = getStorageItem(getOverlayStatsPositionStorageKey(mode));
+function parseOverlayStatsPosition(raw) {
     if (!raw) {
         return null;
     }
@@ -792,6 +788,33 @@ function readOverlayStatsSavedPosition(mode) {
         console.warn('Failed to parse overlay stats position:', e);
     }
     return null;
+}
+
+function readOverlayStatsSavedPosition(mode) {
+    if (!mode) {
+        return null;
+    }
+    const modeKey = getOverlayStatsPositionStorageKey(mode);
+    const saved = parseOverlayStatsPosition(getStorageItem(modeKey));
+    if (saved) {
+        return saved;
+    }
+    // Layouts saved before per-mode keys used one shared key. Copy it onto this
+    // mode once so an upgrade keeps that spot. Later moves write only the mode
+    // key, so P1 / P2 / head-to-head do not keep sharing one position.
+    if (mode !== 'p1' && mode !== 'p2' && mode !== 'h2h') {
+        return null;
+    }
+    const legacy = parseOverlayStatsPosition(getStorageItem('elementPosition_overlayStatsPanel'));
+    if (!legacy) {
+        return null;
+    }
+    try {
+        setStorageItem(modeKey, JSON.stringify(legacy));
+    } catch (e) {
+        /* ignore persistence errors */
+    }
+    return legacy;
 }
 
 /** Place panel so its bottom-center sits on the saved anchor (or migrate legacy top-left). */
@@ -982,6 +1005,31 @@ bc.onmessage = (event) => {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
+/** Lock the grabbed layer to its current pixel box without adding padding and border again. */
+function pinOverlayDragBox(el) {
+    const rect = el.getBoundingClientRect();
+    const style = window.getComputedStyle(el);
+    const padX = (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0);
+    const padY = (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0);
+    const borderX = (parseFloat(style.borderLeftWidth) || 0) + (parseFloat(style.borderRightWidth) || 0);
+    const borderY = (parseFloat(style.borderTopWidth) || 0) + (parseFloat(style.borderBottomWidth) || 0);
+    let width = rect.width;
+    let height = rect.height;
+    if (style.boxSizing !== 'border-box') {
+        width -= padX + borderX;
+        height -= padY + borderY;
+    }
+    el.style.position = 'absolute';
+    el.style.left = (rect.left + window.scrollX) + 'px';
+    el.style.top = (rect.top + window.scrollY) + 'px';
+    el.style.right = 'auto';
+    el.style.bottom = 'auto';
+    el.style.margin = '0';
+    el.style.width = Math.max(0, width) + 'px';
+    el.style.height = Math.max(0, height) + 'px';
+    el.style.transform = 'none';
+}
+
 $(document).ready(function () {
     // List of draggable element IDs
     const draggableElements = [
@@ -1024,18 +1072,7 @@ $(document).ready(function () {
         const dragOptions = {
             start: function() {
                 const el = $element[0];
-                const rect = el.getBoundingClientRect();
-                $element.css({
-                    position: 'absolute',
-                    left: (rect.left + window.scrollX) + 'px',
-                    top: (rect.top + window.scrollY) + 'px',
-                    right: 'auto',
-                    bottom: 'auto',
-                    margin: '0',
-                    width: Math.round(rect.width) + 'px',
-                    height: Math.round(rect.height) + 'px',
-                    transform: 'none'
-                });
+                pinOverlayDragBox(el);
                 if (elementId === 'overlayStatsPanel') {
                     $element.addClass('overlay-stats-positioned');
                 }

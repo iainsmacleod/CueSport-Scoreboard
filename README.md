@@ -10,7 +10,7 @@ Display player names, race and game info, racks (and balls where needed), logos,
 
 *Best viewed as a **1920×1080** browser source*
 
-**Current version: 8.6.0**
+**Current version: 8.6.5**
 
 </div>
 
@@ -210,7 +210,7 @@ Tabs: **Setup**, **Controls**, **Images**, **Replay/Share**, **Stats**, **Settin
 
 ### Replay/Share
 
-- **OBS Remote Control** — WebSocket toggle + **⚙** settings. Required for replay, stream promotion, and other OBS controls.
+- **OBS Remote Control and Replay Settings** — WebSocket toggle + **⚙** settings. Required for replay, stream promotion, and other OBS controls.
 - Stream Promotion toggle + **⚙** (OBS URL first; manual failover).
 - Replay source names and **Auto-resume Monitoring**.
 
@@ -625,7 +625,7 @@ Reads `DEV_AUTH_SECRET` from `backend/.env`. Options: `--skip-api`, `--skip-smok
 
 ## Release notes
 
-Versioned changelogs and screenshot tooling live in [`docs/release-notes/`](docs/release-notes/). README screenshots are in [`docs/readme/images/`](docs/readme/images/) (regenerate with [`docs/readme/capture-screenshots.mjs`](docs/readme/capture-screenshots.mjs)). Run `docs/release-notes/create-release.ps1 -Version 8.6.0` (requires [GitHub CLI](https://cli.github.com/)) to refresh release-note captures and open a **draft** GitHub release.
+Versioned changelogs and screenshot tooling live in [`docs/release-notes/`](docs/release-notes/). README screenshots are in [`docs/readme/images/`](docs/readme/images/) (regenerate with [`docs/readme/capture-screenshots.mjs`](docs/readme/capture-screenshots.mjs)). Run `docs/release-notes/create-release.ps1 -Version 8.6.5` (requires [GitHub CLI](https://cli.github.com/)) to refresh release-note captures and open a **draft** GitHub release.
 
 ---
 

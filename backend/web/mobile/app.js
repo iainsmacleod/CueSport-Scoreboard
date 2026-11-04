@@ -9,29 +9,29 @@ import {
   fetchPublicConfig,
   GAME_TYPES,
   getOrCreateClientSessionId,
-} from '../shared/cloud-client.js?v=8.6.0';
+} from '../shared/cloud-client.js?v=8.6.5';
 import {
   parseRaceTarget,
   isRaceLocked,
   normalizePlayerName,
   truncatePlayerName,
-} from '../shared/scoreboard-helpers.js?v=8.6.0';
+} from '../shared/scoreboard-helpers.js?v=8.6.5';
 import {
   getStoredAccessToken,
   setStoredAccessToken,
   ensureSupabaseAuth,
   getFreshAccessToken,
   signOutSupabaseSession,
-} from '../shared/supabase-session.js?v=8.6.0';
+} from '../shared/supabase-session.js?v=8.6.5';
 import {
   applyImpromptuCommand,
   hydrateAuthorityState,
   createDefaultImpromptuState,
-} from '../shared/impromptu-authority.js?v=8.6.0';
+} from '../shared/impromptu-authority.js?v=8.6.5';
 import {
   installAppViewportHeightSync,
   settleAppViewportHeight,
-} from '../shared/viewport-shell.js?v=8.6.0';
+} from '../shared/viewport-shell.js?v=8.6.5';
 
 let client = null;
 let roomId = '';
@@ -1524,16 +1524,14 @@ function syncMobileBallElection(state) {
   }
   const style = state.ballSelection || 'american';
   const labels = ballSetGroupLabels(style);
-  const suggestedLabel = suggested === 'p1yellow/bigs' ? labels.high : labels.low;
+  let suggestedLabel = suggested === 'p1yellow/bigs' ? labels.high : labels.low;
+  if (String(pending.slot) === '2') {
+    suggestedLabel = suggestedLabel === labels.low ? labels.high : labels.low;
+  }
   const playerEl = document.getElementById('ballElectionPlayer');
   const groupEl = document.getElementById('ballElectionGroup');
-  const inlineImg = document.getElementById('ballElectionInlineImg');
   if (playerEl) playerEl.textContent = pending.playerName || 'Player';
-  if (groupEl) groupEl.textContent = pending.suggestedLabel || suggestedLabel;
-  if (inlineImg) {
-    inlineImg.src = `${BALL_IMG}/${ballElectionImage(style, suggested === 'p1yellow/bigs' ? 'high' : 'low')}`;
-    inlineImg.alt = suggestedLabel;
-  }
+  if (groupEl) groupEl.textContent = suggestedLabel;
   const lowImg = document.getElementById('ballElectionLowImg');
   const highImg = document.getElementById('ballElectionHighImg');
   const lowLabel = document.getElementById('ballElectionLowLabel');

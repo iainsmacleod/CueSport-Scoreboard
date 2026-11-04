@@ -1,4 +1,4 @@
-import { GAME_TYPES } from '../shared/cloud-client.js?v=8.6.0';
+import { GAME_TYPES } from '../shared/cloud-client.js?v=8.6.5';
 
 const GAME_LABELS = Object.fromEntries(GAME_TYPES.map((g) => [g.id, g.label]));
 

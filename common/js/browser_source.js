@@ -417,6 +417,9 @@ function applyOverlayBallTrackerLayout() {
 		return;
 	}
 	const direction = getStorageItem("ballTrackerDirection") || "vertical";
+	// A drag pins width/height. Drop that box so vertical ↔ horizontal can size to the balls.
+	ballTracker.style.width = "";
+	ballTracker.style.height = "";
 	ballTracker.style.flexDirection = direction === "vertical" ? "column" : "row";
 }
 

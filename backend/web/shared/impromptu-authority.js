@@ -9,7 +9,7 @@ import {
   isRaceLocked,
   truncatePlayerName,
   winnerSlotFromScores,
-} from './scoreboard-helpers.js?v=8.6.0';
+} from './scoreboard-helpers.js?v=8.6.5';
 
 const POOL_BALL_COUNTS = {
   game1: 15, game2: 9, game3: 10, game4: 15,
@@ -869,6 +869,15 @@ function ballSetGroupLabel(style, value) {
   return value === 'p1yellow/bigs' ? 'Stripes' : 'Solids';
 }
 
+/** Group name for the player who potted, not the P1-centric storage value. */
+function ballSetGroupLabelForSlot(style, value, slot) {
+  const p1Label = ballSetGroupLabel(style, value);
+  if (String(slot) !== '2') return p1Label;
+  if (style === 'international') return value === 'p1yellow/bigs' ? 'Reds' : 'Yellows';
+  if (style === 'unity') return value === 'p1yellow/bigs' ? 'Pink' : 'Blue';
+  return value === 'p1yellow/bigs' ? 'Solids' : 'Stripes';
+}
+
 /** Ask instead of assigning. Open keeps the table open; the next object pot asks again. */
 function maybeAssignBallSetFromPot(state, ballId) {
   if (state.useBallSet !== true) return;
@@ -904,7 +913,7 @@ function maybeAssignBallSetFromPot(state, ballId) {
     slot: active,
     playerName,
     suggestedSet: suggested,
-    suggestedLabel: ballSetGroupLabel(style, suggested),
+    suggestedLabel: ballSetGroupLabelForSlot(style, suggested, active),
     ballId: String(ballId),
     ballNum: num,
   };
@@ -912,7 +921,11 @@ function maybeAssignBallSetFromPot(state, ballId) {
 }
 
 function resolveBallElection(state, choice) {
-  const selected = choice === 'p1red/smalls' || choice === 'p1yellow/bigs' ? choice : 'p1Open';
+  let selected = choice === 'p1red/smalls' || choice === 'p1yellow/bigs' ? choice : 'p1Open';
+  const slot = state.pendingBallElection && state.pendingBallElection.slot;
+  if (selected !== 'p1Open' && String(slot) === '2') {
+    selected = selected === 'p1red/smalls' ? 'p1yellow/bigs' : 'p1red/smalls';
+  }
   state.pendingBallElection = null;
   if (selected === 'p1Open') {
     state.playerBallSet = 'p1Open';

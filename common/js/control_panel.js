@@ -5302,16 +5302,12 @@ function syncBallElectionModal() {
     }
     const style = getStorageItem("ballSelection") || "american";
     const pres = ballSetChoicePresentation(style);
-    const suggested = ballSetChoiceByValue(pending.suggestedSet, style);
+    const forP1 = pending.suggestedSet === "p1yellow/bigs" ? pres.high : pres.low;
+    const forPlayer = pending.slot === "2" ? (forP1 === pres.low ? pres.high : pres.low) : forP1;
     const playerEl = document.getElementById("ballElectionPlayer");
     const groupEl = document.getElementById("ballElectionGroup");
-    const inlineImg = document.getElementById("ballElectionInlineImg");
     if (playerEl) playerEl.textContent = pending.playerName || "Player";
-    if (groupEl) groupEl.textContent = suggested.label;
-    if (inlineImg) {
-        inlineImg.src = suggested.image;
-        inlineImg.alt = suggested.label;
-    }
+    if (groupEl) groupEl.textContent = forPlayer.label;
     const lowImg = document.getElementById("ballElectionLowImg");
     const highImg = document.getElementById("ballElectionHighImg");
     const lowLabel = document.getElementById("ballElectionLowLabel");
@@ -5343,7 +5339,12 @@ function publishBallElectionState() {
  * A group choice sets playerBallSet and later pots do not ask.
  */
 function resolveBallElection(choice) {
-    const selected = choice === "p1red/smalls" || choice === "p1yellow/bigs" ? choice : "p1Open";
+    const pending = readPendingBallElection();
+    let selected = choice === "p1red/smalls" || choice === "p1yellow/bigs" ? choice : "p1Open";
+    // Button labels are the group for the player in the question, not always Player 1.
+    if (selected !== "p1Open" && pending && pending.slot === "2") {
+        selected = selected === "p1red/smalls" ? "p1yellow/bigs" : "p1red/smalls";
+    }
     setStorageItem("pendingBallElection", "");
     if (selected === "p1Open") {
         setStorageItem("playerBallSet", "p1Open");
@@ -8430,7 +8431,7 @@ obs.on('ConnectionClosed', () => {
  */
 async function toggleObsStreaming() {
     if (!isObsReady) {
-        const msg = 'OBS WebSocket is not connected. Connect it under Settings (OBS Remote Control) first.';
+        const msg = 'OBS WebSocket is not connected. Connect it under Settings (OBS Remote Control and Replay Settings) first.';
         console.warn(msg);
         alert(msg);
         throw new Error(msg);

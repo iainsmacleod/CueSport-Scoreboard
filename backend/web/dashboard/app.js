@@ -24,13 +24,13 @@ import {
   openBillingPortal,
   setSimulatedPlan,
   GAME_TYPES,
-} from '../shared/cloud-client.js?v=8.6.0';
+} from '../shared/cloud-client.js?v=8.6.5';
 import {
   computeDurationSeconds,
   formatDurationSeconds,
   enrichRacksWithDuration,
   sumRackDurationSeconds,
-} from '../shared/match-racks.js?v=8.6.0';
+} from '../shared/match-racks.js?v=8.6.5';
 import {
   getStoredAccessToken,
   setStoredAccessToken,
@@ -39,11 +39,11 @@ import {
   adoptOAuthHashSession,
   getFreshAccessToken,
   signOutSupabaseSession,
-} from '../shared/supabase-session.js?v=8.6.0';
+} from '../shared/supabase-session.js?v=8.6.5';
 import {
   installAppViewportHeightSync,
   settleAppViewportHeight,
-} from '../shared/viewport-shell.js?v=8.6.0';
+} from '../shared/viewport-shell.js?v=8.6.5';
 
 const SERVER_KEY = 'cuesport_server';
 const DASH_TAB_KEY = 'cuesport_dashboard_tab';
@@ -7139,15 +7139,23 @@ async function adoptOAuthReturnIfNeeded(config) {
 }
 
 const DASH_BOOT_BUDGET_MS = 20000;
+const DASH_BOOT_TIMEOUT_MSG = 'Sign-in is taking too long. Check your connection and try again.';
 let dashBootResolved = false;
 function resolveBootOnce(mode, errorMsg) {
+  // A late safety-net call must not paint an error over a dashboard that already loaded.
   if (dashBootResolved && !isDashboardBootPending()) {
-    if (errorMsg) setError(errorMsg);
     return;
   }
   dashBootResolved = true;
   if (errorMsg) setError(errorMsg);
   resolveBootShell(mode);
+}
+
+function clearStaleBootTimeoutError() {
+  const loginError = document.getElementById('loginError');
+  const appError = document.getElementById('error');
+  const showingTimeout = [loginError, appError].some((el) => el && el.textContent === DASH_BOOT_TIMEOUT_MSG);
+  if (showingTimeout) setError('');
 }
 
 fetchPublicConfig(getServerUrl())
@@ -7167,6 +7175,7 @@ fetchPublicConfig(getServerUrl())
         resolveBootOnce(getToken() ? 'app' : 'login');
       } else {
         dashBootResolved = true;
+        clearStaleBootTimeoutError();
       }
     } catch (err) {
       resolveBootOnce('login', err?.message || 'Could not finish signing in. Try again.');
@@ -7185,6 +7194,7 @@ fetchPublicConfig(getServerUrl())
         );
       } else {
         dashBootResolved = true;
+        clearStaleBootTimeoutError();
         if (err?.message) setError(err.message);
       }
     } catch (inner) {
@@ -7200,7 +7210,7 @@ setTimeout(() => {
   if (!isDashboardBootPending()) return;
   resolveBootOnce(
     getToken() ? 'app' : 'login',
-    'Sign-in is taking too long. Check your connection and try again.'
+    DASH_BOOT_TIMEOUT_MSG
   );
 }, DASH_BOOT_BUDGET_MS);
 

@@ -17,7 +17,7 @@ Instant replay uses OBS’s **Replay Buffer**. CueSport does not record video it
 1. OBS → **Tools → WebSocket Server Settings** (OBS 28+).
 2. Enable the server; note the **port** (default **4455**) and password if set.
 3. In the CueSport dock → **Settings**:
-   - Open **OBS Remote Control** ⚙.
+   - Open **OBS Remote Control and Replay Settings** ⚙.
    - **OBS WebSocket Address**: `ws://127.0.0.1:4455` (use a LAN IP only if the dock runs elsewhere).
    - Enter the **Password** if required → **Save**.
 4. Turn the WebSocket **toggle** on. It should show connected.
@@ -26,7 +26,7 @@ The dock can auto-reconnect on load if WebSocket was left enabled.
 
 ## CueSport source settings
 
-Still under **Settings → OBS Remote Control**:
+Still under **Settings → OBS Remote Control and Replay Settings**:
 
 | Field | Required | Purpose |
 |--------|----------|---------|

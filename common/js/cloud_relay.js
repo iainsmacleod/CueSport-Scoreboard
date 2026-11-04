@@ -621,7 +621,7 @@
                 state.playerSlotMode = 'off';
             }
             state.obsConnected = dockStorage('isConnected', 'false') === 'true';
-            // Stream tab / OBS socket available (OBS Remote Control or live socket).
+            // Stream tab / OBS socket available (OBS Remote Control and Replay Settings or live socket).
             state.replayEnabled = dockStorage('websocketEnabled', 'false') === 'true' || state.obsConnected;
             // Prefer storage; also trust control_panel Monitor / Instant Replay button labels.
             const monitorBtn = document.getElementById('btnMonitorGame');
@@ -632,7 +632,7 @@
                 (instantBtn && !instantBtn.classList.contains('noShow'))
             );
             state.monitoringActive = monitoringFromStorage || monitoringFromUi;
-            // Mobile Stream tab: monitoring/clips stay hidden until OBS Remote Control
+            // Mobile Stream tab: monitoring/clips stay hidden until OBS Remote Control and Replay Settings
             // (or monitoring is already running on the dock). Explicit Disable wins over
             // stale UI heuristics so the unlock section returns after Disable.
             const replayControlsStored = dockStorage('replayControlsEnabled', '');

@@ -2,7 +2,7 @@
 
 Practical setup and usage guides for **CueSport Scoreboard** (OBS control panel + browser source) and optional **CueSport Scoreboard Cloud**.
 
-**Current product version:** 8.6.0
+**Current product version:** 8.6.5
 
 ## Start here
 

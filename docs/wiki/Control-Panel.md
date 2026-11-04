@@ -110,7 +110,7 @@ Notes:
 
 Toggle + ⚙ connection settings (hosted Google or self-host URL + Dock Key). Status line shows Off / connecting / connected.
 
-### OBS Remote Control & Promote Live Stream
+### OBS Remote Control and Replay Settings & Promote Live Stream
 
 WebSocket toggle + source names; Promote Live Stream toggle. See [Instant Replay](Instant-Replay) and [Stream Promotion](Stream-Promotion).
 

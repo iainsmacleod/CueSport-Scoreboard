@@ -900,7 +900,8 @@ try {
     'second break pot asks instead of assigning',
     ballSet.playerBallSet === 'p1Open'
       && ballSet.pendingBallElection
-      && ballSet.pendingBallElection.suggestedSet === 'p1red/smalls',
+      && ballSet.pendingBallElection.suggestedSet === 'p1red/smalls'
+      && ballSet.pendingBallElection.suggestedLabel === 'Solids',
   );
   ballSet = applyImpromptuCommand(ballSet, 'resolve_ball_election', { choice: 'p1red/smalls' })._private;
   assert('confirming solids sets the group', ballSet.playerBallSet === 'p1red/smalls' && !ballSet.pendingBallElection);
@@ -918,6 +919,21 @@ try {
     'next pot after Open asks again',
     askAgain.playerBallSet === 'p1Open' && askAgain.pendingBallElection?.suggestedSet === 'p1yellow/bigs',
   );
+
+  let p2Solids = createDefaultImpromptuState({
+    player1Name: 'A', player2Name: 'B', gameType: 'game1', useBallSet: true, playerBallSet: 'p1Open',
+  });
+  p2Solids = applyImpromptuCommand(p2Solids, 'select_breaker', { slot: '1' })._private;
+  p2Solids = applyImpromptuCommand(p2Solids, 'player_slot', { slot: '2' })._private;
+  p2Solids = applyImpromptuCommand(p2Solids, 'toggle_pot', { ballId: 'ball 1' })._private;
+  assert(
+    'P2 solid asks as solids for P2',
+    p2Solids.playerBallSet === 'p1Open'
+      && p2Solids.pendingBallElection?.slot === '2'
+      && p2Solids.pendingBallElection?.suggestedLabel === 'Solids',
+  );
+  p2Solids = applyImpromptuCommand(p2Solids, 'resolve_ball_election', { choice: 'p1red/smalls' })._private;
+  assert('Solids button gives P2 solids', p2Solids.playerBallSet === 'p1yellow/bigs');
 
   // Legal 8 after clearing assigned group.
   for (const n of [1, 2, 4, 6, 7]) {
