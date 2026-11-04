@@ -470,7 +470,7 @@ const GUEST_ALLOWED_COMMANDS = new Set([
   'score_add', 'score_sub', 'balls_add', 'balls_sub',
   // Object balls + action row: foul, undo, free ball (via snooker_ball), respot, player switch.
   'player_slot', 'select_breaker', 'toggle_active_player',
-  'toggle_pot', 'snooker_ball', 'snooker_foul', 'undo',
+  'toggle_pot', 'resolve_ball_election', 'snooker_ball', 'snooker_foul', 'undo',
   'pool_foul', 'respot_ball',
   'set_race', 'set_game_info', 'set_game_type',
   'set_ball_selection', 'set_early_game_ball', 'set_snooker_gold', 'set_point_based',

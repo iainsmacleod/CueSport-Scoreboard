@@ -960,6 +960,7 @@
                     !!guestAllowedMatch &&
                     guestAllowedBlock.indexOf('set_player_name') === -1 &&
                     guestAllowedBlock.indexOf('score_add') !== -1 &&
+                    guestAllowedBlock.indexOf('resolve_ball_election') !== -1 &&
                     guestAllowedBlock.indexOf('reset_scores') !== -1);
                 assert('Cloud Dock', 'Account-owner stream/replay commands require owner auth',
                     !!ownerCommandsMatch &&

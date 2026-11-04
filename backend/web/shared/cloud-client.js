@@ -87,8 +87,31 @@ export class CloudClient {
   }
 
   _requestStaleReconnect() {
-    if (typeof this.onStale !== 'function') return;
-    try { this.onStale(); } catch (_) { /* ignore */ }
+    if (typeof this.onStale === 'function') {
+      try {
+        this.onStale();
+        return;
+      } catch (_) { /* caller failed; reconnect on this client */ }
+    }
+    this._recoverStaleSocket();
+  }
+
+  /** Close a zombie OPEN socket and join again so the queued command can flush. */
+  _recoverStaleSocket() {
+    const ws = this.ws;
+    if (ws) {
+      ws.onopen = null;
+      ws.onmessage = null;
+      ws.onerror = null;
+      ws.onclose = null;
+      try { ws.close(); } catch (_) { /* ignore */ }
+    }
+    this.ws = null;
+    this.connected = false;
+    this._stopPing();
+    if (!(this.reconnectGraceUntil > Date.now())) this._beginReconnectGrace();
+    this._emitConnection();
+    this.connect().catch(() => {});
   }
 
   isReconnecting() {
